@@ -1,0 +1,14 @@
+"""``fuaran_py.ops`` — the ``TreeOp`` codec.
+
+Public surface:
+
+* :func:`~fuaran_py.ops.decode.decode_op` — wire JSON → ``Result[Obj, DecodeError]``
+* :func:`~fuaran_py.ops.encode.encode_op` — decoded op → canonical wire JSON
+"""
+
+from __future__ import annotations
+
+from .decode import OP_CASES, decode_op
+from .encode import encode_op
+
+__all__ = ["decode_op", "encode_op", "OP_CASES"]

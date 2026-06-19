@@ -1,0 +1,50 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fuaran-py"
+version = "0.0.1"
+description = "Headless Python host of the Fuaran UI wire format — canonical-JSON codec + pre-emit validator."
+readme = "README.md"
+requires-python = ">=3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Diametrical Pty Ltd" }]
+keywords = ["fuaran", "wire-format", "canonical-json", "ui", "codec"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Software Development :: Libraries",
+  "Typing :: Typed",
+]
+dependencies = []   # dependency-light: the codec uses only the Python standard library.
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6"]
+
+[project.urls]
+Homepage = "https://github.com/fuaran-ui/fuaran-py"
+Repository = "https://github.com/fuaran-ui/fuaran-py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fuaran_py"]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.13"
+files = ["src/fuaran_py"]
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

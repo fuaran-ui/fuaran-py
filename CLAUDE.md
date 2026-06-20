@@ -1,10 +1,12 @@
 # CLAUDE.md — fuaran-py (Python reference implementation)
 
-This repo is the **headless Python host of the Fuaran UI wire format**: the
+This repo is the **Python host of the Fuaran UI wire format**: the
 canonical-JSON codec (`decode_node` / `encode_node` / `decode_op` / `encode_op`),
-a pre-emit validator, and a corpus conformance harness. It ships **no renderer**
-(headless by design) — it is what a Python AI orchestrator needs to read and
-write Fuaran UI trees.
+a pre-emit validator, and a corpus conformance harness — what a Python AI
+orchestrator needs to read and write Fuaran UI trees. The codec core is
+**headless** (no rendering dependency); an **optional, stdlib-only server-HTML
+renderer** (`fuaran_py.renderer`, Phase 239) ships alongside it for hosts that
+want to render a decoded tree to HTML with no client runtime.
 
 This is a sibling repo under the Fuaran-UI sub-estate at `../` (alongside
 `fuaran`, `fuaran-ts`, `orchestration`, `orchestrator-demo`, `eval-suite`).
@@ -45,7 +47,8 @@ fuaran-py/
 │   ├── schema/           # decode_node / encode_node + the per-kind field schemas
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
-│   └── conformance/      # corpus round-trip smoke harness
+│   ├── conformance/      # corpus round-trip smoke harness
+│   └── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
 ├── tests/                # pytest: number form, full-corpus round-trip + reject, validator
 ├── docs/                 # fable-python-decision.md (the build-vs-port decision record)
 ├── pyproject.toml        # dependency-light; dev extras = pytest / mypy / ruff
@@ -89,6 +92,38 @@ accepted structurally (still byte-exact on round-trip). The formal certification
 harness (offline corpus snapshot + drift guard, schema validation, a
 language-agnostic certification bridge, a CI leg, and generative parity) is
 follow-up work.
+
+## Renderer (Phase 239)
+
+`fuaran_py.renderer.render_html` walks a decoded `Node` tree and emits a
+**body-fragment HTML string** carrying the reference `fuaran-*` class vocabulary,
+so the byte-copied stylesheet styles it exactly as the F#/TS hosts style their
+output. Server semantics mirror the F# SSR precedent: no runtime, no dispatch
+(`Button` inert, `Link` a real `<a href>`), `Static` bindings resolve and the
+rest placeholder to an em-dash, and client-library visualisations render a
+deterministic placeholder.
+
+Two disciplines keep it honest:
+
+- **Reference-CSS byte-copy.** `src/fuaran_py/renderer/content/fuaran-reference.css`
+  is a byte-for-byte copy of the F# canonical
+  (`../fuaran/src/Fuaran.UI.Renderer/content/fuaran-reference.css`). A test
+  (`test_render_parity` / the byte-identical check) fails if the copy drifts when
+  the F# sibling is checked out alongside. Re-copy it in the same change-set as
+  any F#-side CSS change (the §11 forward-coupling rule now spans this host too).
+- **Class-name vocabulary parity.** `tests/test_render_parity.py` extracts the
+  class vocabulary straight from the F# reference renderer source (`Render.fs` +
+  `Theme.fs`, literals + `sprintf "...-%s"` prefixes) and asserts every class the
+  Python renderer emits over the node corpus is in it — a cross-host parity lock,
+  the rendering analogue of the wire corpus. It skips when the F# sibling is
+  absent. **A new `NodeKind` / variant that changes the emitted class vocabulary
+  updates the renderer here in the same move that updates the codec.**
+
+Sanitisation matches the F#/TS posture (`fuaran_py.renderer.sanitize` ports
+`Sanitize.fs`): URL-scheme default-deny, `data-*`/`aria-*` attribute allowlist,
+markdown escaped-first then swept. The `Custom` host-renderer registry is a host
+trust boundary — the baseline ships no registry seam, so `Custom` renders an
+inert labelled placeholder.
 
 ## Cross-repo dependencies
 

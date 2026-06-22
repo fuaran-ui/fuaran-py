@@ -103,6 +103,16 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         """A ``Static`` whose value the encoder cannot decompose (``"<opaque>"``)."""
         return t.Static(t.OPAQUE)
 
+    @staticmethod
+    def format(source: Binding, fmt: t.Format, locale: t.LocaleSource) -> Binding:
+        """``Binding.Format`` — a locale-aware formatted value over a numeric source."""
+        return t.FormatBinding(source, fmt, locale)
+
+    @staticmethod
+    def local(initial_from: Binding, flush_on: t.LocalFlushTrigger) -> Binding:
+        """``Binding.Local`` — a component-scoped buffer (commit/parse/format are closures)."""
+        return t.Local(initial_from, flush_on)
+
 
 # ── Typed action entry points (the ``action`` namespace) ─────────────────────
 
@@ -133,6 +143,11 @@ class action:  # noqa: N801 — namespace object
     @staticmethod
     def write_to_clipboard(text: str) -> Action:
         return t.WriteToClipboard(text)
+
+    @staticmethod
+    def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text") -> Action:
+        """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure."""
+        return t.ReadFileBody(file_ref, encoding)
 
 
 # ── Typed cell-format entry points (the ``format`` namespace) ────────────────
@@ -516,6 +531,22 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     ) -> UiNode:
         return _node(id, t.FileUpload(_text(label), tuple(accept or ()), multiple), accessibility.file_upload)
 
+    @staticmethod
+    def form(
+        id: str,  # noqa: A002
+        *,
+        fields: list[t.FormField],
+        on_submit: Action | None = None,
+        submit_label: t.TextInput = "Submit",
+        disabled: Binding | None = None,
+    ) -> UiNode:
+        kind = t.Form(tuple(fields), on_submit if on_submit is not None else t.Chain(), _text(submit_label), disabled)
+        return _node(id, kind, accessibility.form)
+
+    @staticmethod
+    def filters(id: str, *, items: list[t.FilterSpec]) -> UiNode:  # noqa: A002
+        return _node(id, t.Filters(tuple(items)), accessibility.none)
+
     # ── Visualisation ─────────────────────────────────────────────────────────
     @staticmethod
     def chart(
@@ -555,6 +586,16 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     ) -> UiNode:
         return _node(id, t.Map(source, centre_latitude, centre_longitude, zoom), accessibility.map)
 
+    @staticmethod
+    def grid(
+        id: str,  # noqa: A002
+        *,
+        source: Binding,
+        columns: list[t.Column] | None = None,
+        editable: bool = False,
+    ) -> UiNode:
+        return _node(id, t.DataGrid(source, tuple(columns or ()), editable), accessibility.grid)
+
     # ── Structural ─────────────────────────────────────────────────────────────
     @staticmethod
     def custom(
@@ -563,13 +604,15 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         module_id: str,
         component_id: str,
         props: dict[str, t.Value] | None = None,
+        content_hash: t.ContentHash | None = None,
         exposed_node_ids: list[str] | None = None,
     ) -> UiNode:
         kind = t.Custom(
-            module_id,
-            component_id,
-            props if props is not None else {},
-            tuple(exposed_node_ids) if exposed_node_ids is not None else None,
+            module_id=module_id,
+            component_id=component_id,
+            props=props if props is not None else {},
+            content_hash=content_hash,
+            exposed_node_ids=tuple(exposed_node_ids) if exposed_node_ids is not None else None,
         )
         return _node(id, kind, accessibility.none)
 
@@ -578,12 +621,25 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.ErrorBoundary(child, fallback), accessibility.none)
 
     @staticmethod
-    def fragment_decl(id: str, *, name: str, body: UiNode) -> UiNode:  # noqa: A002
-        return _node(id, t.FragmentDecl(name, body), accessibility.none)
+    def fragment_decl(
+        id: str,  # noqa: A002
+        *,
+        name: str,
+        body: UiNode,
+        holes: list[t.HoleDecl] | None = None,
+        effect: t.EffectClass | None = None,
+    ) -> UiNode:
+        kind = t.FragmentDecl(name, body, tuple(holes or ()), effect)
+        return _node(id, kind, accessibility.none)
 
     @staticmethod
-    def fragment_ref(id: str, *, name: str) -> UiNode:  # noqa: A002
-        return _node(id, t.FragmentRef(name), accessibility.none)
+    def fragment_ref(
+        id: str,  # noqa: A002
+        *,
+        name: str,
+        args: dict[str, t.FragmentArg] | None = None,
+    ) -> UiNode:
+        return _node(id, t.FragmentRef(name, args), accessibility.none)
 
 
 # ── Encoding ─────────────────────────────────────────────────────────────────

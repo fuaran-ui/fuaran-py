@@ -19,7 +19,7 @@ import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py.schema import types as t
-from fuaran_py.ui import accessibility, binding, encode, fuaran, node
+from fuaran_py.ui import accessibility, action, binding, encode, fuaran, node
 
 
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
@@ -157,6 +157,178 @@ def _authored() -> dict[str, t.UiNode]:
         # ── Style trait ──────────────────────────────────────────────────────
         "style-role-voice-1": node.with_voice(
             "Display", node.with_role("Data", fuaran.markdown("style-role-voice-1", "Q3 revenue"))
+        ),
+        # ── Full-parity surface (the Phase 278 → full-coverage expansion) ─────
+        "btn-copy-link": node.bare(
+            fuaran.button(
+                "btn-copy-link",
+                label="Copy share link",
+                variant="Secondary",
+                on_click=action.chain(
+                    [action.write_to_clipboard("https://example.com/share/abc123"), action.dispatch()]
+                ),
+            )
+        ),
+        "btn-read-workbook": node.bare(
+            fuaran.button(
+                "btn-read-workbook",
+                label="Load workbook",
+                variant="Primary",
+                on_click=action.read_file_body("workbook-upload:0", "Base64"),
+            )
+        ),
+        "custom-bounded-1": fuaran.custom(
+            "custom-bounded-1",
+            module_id="deal-flow",
+            component_id="QualityRing",
+            content_hash=t.ContentHash("SHA256", "abc123def456", "StrictReplay"),
+            exposed_node_ids=["quality-ring-segment-1", "quality-ring-segment-2"],
+        ),
+        "custom-bounded-advisory": fuaran.custom(
+            "custom-bounded-advisory",
+            module_id="deal-flow",
+            component_id="TrendCard",
+            content_hash=t.ContentHash("SHA256", "fedcba654321", "AdvisoryWarning"),
+        ),
+        "grid-1": node.bare(fuaran.grid("grid-1", source=binding.opaque(), columns=[t.Column(label="Channel")])),
+        "filters-1": fuaran.filters(
+            "filters-1",
+            items=[
+                t.FilterSpec("q", t.LiteralText("Search"), t.TextFilter(t.Static(""))),
+                t.FilterSpec("tier", t.LiteralText("Tier"), t.ChoiceFilter(binding.opaque(), binding.opaque())),
+            ],
+        ),
+        "filters-segmented": fuaran.filters(
+            "filters-segmented",
+            items=[
+                t.FilterSpec(
+                    "view",
+                    t.LiteralText("View"),
+                    t.SegmentedFilter(binding.opaque(), binding.opaque(), "Horizontal"),
+                )
+            ],
+        ),
+        "form-1": node.bare(
+            fuaran.form(
+                "form-1",
+                disabled=binding.state("formBusy", False),
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "name", t.LiteralText("Name"), t.TextField(t.Static("")), True, t.LiteralText("Full legal name")
+                    ),
+                    t.FormField("age", t.LiteralText("Age"), t.NumberField(t.Static(0)), False),
+                    t.FormField("agree", t.LiteralText("I agree"), t.CheckboxField(t.Static(False)), True),
+                    t.FormField(
+                        "tier", t.LiteralText("Tier"), t.ChoiceField(binding.opaque(), binding.opaque()), False
+                    ),
+                    t.FormField("notes", t.LiteralText("Notes"), t.TextAreaField(t.Static(""), 5), False),
+                ],
+            )
+        ),
+        "form-ranged": node.bare(
+            fuaran.form(
+                "form-ranged",
+                submit_label="Save",
+                fields=[
+                    t.FormField("year", t.LiteralText("Year"), t.RangedNumber(t.Static(2024), 1979, 2028, 1), True),
+                    t.FormField("years", t.LiteralText("Years contributed"), t.RangedNumber(t.Static(10), 0), False),
+                    t.FormField("amount", t.LiteralText("Amount"), t.RangedNumber(t.Static(100)), False),
+                ],
+            )
+        ),
+        "form-segmented": node.bare(
+            fuaran.form(
+                "form-segmented",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "metric",
+                        t.LiteralText("Metric"),
+                        t.SegmentedChoice(binding.opaque(), binding.opaque(), "Horizontal"),
+                        False,
+                    ),
+                    t.FormField(
+                        "tier",
+                        t.LiteralText("Tier"),
+                        t.SegmentedChoice(binding.opaque(), t.Static(None), "Vertical"),
+                        True,
+                    ),
+                ],
+            )
+        ),
+        "form-local-1": node.bare(
+            fuaran.form(
+                "form-local-1",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "salary-input",
+                        t.LiteralText("Salary"),
+                        t.TextField(t.Local(t.State("salary", ""), t.OnBlur())),
+                        False,
+                    )
+                ],
+            )
+        ),
+        "form-local-debounce": node.bare(
+            fuaran.form(
+                "form-local-debounce",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "email-input",
+                        t.LiteralText("Email"),
+                        t.TextField(t.Local(t.Static("draft@example.com"), t.OnDebounce(250))),
+                        True,
+                    )
+                ],
+            )
+        ),
+        "frag-decl-param": fuaran.fragment_decl(
+            "frag-decl-param",
+            name="stat-card",
+            body=fuaran.markdown("param-body", "Parameterised body"),
+            effect=t.EffectClass("ReadsHost", "Clock"),
+            holes=[
+                t.ValueHole("title", t.StringLen(1, 40), t.ScalarStr("Untitled")),
+                t.ValueHole("count", t.IntRange(0, 100)),
+                t.SlotHole("content", "Display"),
+                t.RepeatHole("rows", t.IntRange(1, 12)),
+            ],
+        ),
+        "frag-ref-args": fuaran.fragment_ref(
+            "frag-ref-args",
+            name="stat-card",
+            args={
+                "content": t.SlotArg(fuaran.markdown("slot-tree", "Bound slot")),
+                "count": t.ScalarInt(7),
+            },
+        ),
+        "format-bindings": fuaran.stack(
+            "format-bindings",
+            children=[
+                fuaran.markdown(
+                    "fmt-number",
+                    t.Bound(binding.format(t.Static(1234.5), t.FmtNumber(2), t.Explicit("en-US"))),
+                ),
+                fuaran.markdown(
+                    "fmt-currency",
+                    t.Bound(binding.format(t.Static(1234.5), t.FmtCurrency("GBP"), t.Explicit("en-GB"))),
+                ),
+                fuaran.markdown(
+                    "fmt-percent",
+                    t.Bound(binding.format(t.Static(0.42), t.FmtPercent(), t.Ambient())),
+                ),
+                fuaran.markdown(
+                    "fmt-date",
+                    t.Bound(binding.format(t.Static(1700000000), t.FmtDate("Medium"), t.Explicit("fr-FR"))),
+                ),
+                fuaran.markdown(
+                    "fmt-relative",
+                    t.Bound(binding.format(t.Static(-3), t.FmtRelativeTime("Day"), t.Explicit("en-US"))),
+                ),
+            ],
         ),
     }
 

@@ -106,12 +106,8 @@ class LiteralText:
         return Obj("Literal", {"text": self.text})
 
 
-TextSource = LiteralText
-"""The authoring ``TextSource`` surface (the ``Literal`` case; `Bound`/`I18n` are
-emitted via raw bindings as the surface grows)."""
-
-TextInput = str | LiteralText
-"""A ``TextSource``, or a bare ``str`` coerced to a :class:`LiteralText`."""
+# The ``TextSource`` / ``TextInput`` aliases are defined just after the binding
+# cases below, because ``Bound`` (a ``TextSource``) wraps a ``Binding``.
 
 
 # ── Binding (WIRE_FORMAT.md §3.3) ───────────────────────────────────────────
@@ -148,13 +144,158 @@ class Filter:
         return Obj("Filter", {"name": self.name})
 
 
-Binding = Static | State | Filter
+# ── Locale-aware Format DU + LocaleSource (WIRE_FORMAT.md §3.3, Phase 102) ───
+# Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
+# ``Date`` carries ``dateStyle`` (a bare enum, not a format string).
+
+DateStyle = Literal["Short", "Medium", "Long", "Full"]
+RelativeTimeUnit = Literal["Second", "Minute", "Hour", "Day", "Week", "Month", "Year"]
+
+
+@dataclass(frozen=True)
+class FmtNumber:
+    decimals: int | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Number", {"decimals": self.decimals})
+
+
+@dataclass(frozen=True)
+class FmtCurrency:
+    iso_code: str
+
+    def to_wire(self) -> Value:
+        return Obj("Currency", {"isoCode": self.iso_code})
+
+
+@dataclass(frozen=True)
+class FmtPercent:
+    decimals: int | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Percent", {"decimals": self.decimals})
+
+
+@dataclass(frozen=True)
+class FmtDate:
+    date_style: DateStyle
+
+    def to_wire(self) -> Value:
+        return Obj("Date", {"dateStyle": self.date_style})
+
+
+@dataclass(frozen=True)
+class FmtRelativeTime:
+    unit: RelativeTimeUnit
+
+    def to_wire(self) -> Value:
+        return Obj("RelativeTime", {"unit": self.unit})
+
+
+Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime
+
+
+@dataclass(frozen=True)
+class Ambient:
+    def to_wire(self) -> Value:
+        return Obj("Ambient", {})
+
+
+@dataclass(frozen=True)
+class Explicit:
+    tag: str
+
+    def to_wire(self) -> Value:
+        return Obj("Explicit", {"tag": self.tag})
+
+
+LocaleSource = Ambient | Explicit
+
+
+# ── LocalFlushTrigger (WIRE_FORMAT.md §3.3) ─────────────────────────────────
+
+
+@dataclass(frozen=True)
+class OnBlur:
+    def to_wire(self) -> Value:
+        return Obj("OnBlur", {})
+
+
+@dataclass(frozen=True)
+class OnDebounce:
+    milliseconds: int
+
+    def to_wire(self) -> Value:
+        return Obj("OnDebounce", {"milliseconds": self.milliseconds})
+
+
+LocalFlushTrigger = OnBlur | OnDebounce
+
+
+# ── The remaining binding cases (Format / Local) ────────────────────────────
+
+
+@dataclass(frozen=True)
+class FormatBinding:
+    """``Binding.Format`` — a locale-aware formatted value over a numeric source."""
+
+    source: Binding
+    format: Format
+    locale: LocaleSource
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "Format", {"format": _lower(self.format), "locale": _lower(self.locale), "source": _lower(self.source)}
+        )
+
+
+@dataclass(frozen=True)
+class Local:
+    """``Binding.Local`` — a component-scoped buffer; ``format``/``onCommit``/``parse`` are closures."""
+
+    initial_from: Binding
+    flush_on: LocalFlushTrigger
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "Local",
+            {
+                "flushOn": _lower(self.flush_on),
+                "format": CLOSURE,
+                "initialFrom": _lower(self.initial_from),
+                "onCommit": CLOSURE,
+                "parse": CLOSURE,
+            },
+        )
+
+
+Binding = Static | State | Filter | FormatBinding | Local
 
 NumberInput = float | int | Binding
 """A numeric ``Binding``, or a bare number coerced to :class:`Static`."""
 
 StringInput = str | Binding
 """A string ``Binding``, or a bare ``str`` coerced to :class:`Static`."""
+
+
+# ── TextSource (now that ``Binding`` is defined) ────────────────────────────
+
+
+@dataclass(frozen=True)
+class Bound:
+    """A ``TextSource.Bound`` — projects a ``Binding<string>`` as display text."""
+
+    binding: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("Bound", {"binding": _lower(self.binding)})
+
+
+TextSource = LiteralText | Bound
+"""The authoring ``TextSource`` surface (``Literal`` + ``Bound``)."""
+
+TextInput = str | LiteralText | Bound
+"""A ``TextSource``, or a bare ``str`` coerced to a :class:`LiteralText`."""
 
 
 # ── Action (WIRE_FORMAT.md §3.3 / §4) ───────────────────────────────────────
@@ -214,7 +355,21 @@ class WriteToClipboard:
         return Obj("WriteToClipboard", {"text": self.text})
 
 
-Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard
+FileReadEncoding = Literal["Text", "Base64", "DataUrl"]
+
+
+@dataclass(frozen=True)
+class ReadFileBody:
+    """``Action.ReadFileBody`` — reads a selected file's body; ``onRead`` is a closure."""
+
+    file_ref: str
+    encoding: FileReadEncoding = "Text"
+
+    def to_wire(self) -> Value:
+        return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
+
+
+Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | ReadFileBody
 
 
 # ── CellFormat (WIRE_FORMAT.md §3.3) ────────────────────────────────────────
@@ -786,7 +941,240 @@ class Map:
         )
 
 
+# Input — composite (Form / Filters) ------------------------------------------
+#
+# ``onChange`` / ``onToggle`` handlers are closures → the ``CLOSURE`` sentinel.
+
+
+@dataclass(frozen=True)
+class TextField:
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("Text", {"onChange": CLOSURE, "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class NumberField:
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("Number", {"onChange": CLOSURE, "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class CheckboxField:
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("Checkbox", {"onToggle": CLOSURE, "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class TextAreaField:
+    value: Binding
+    rows: int
+
+    def to_wire(self) -> Value:
+        return Obj("TextArea", {"onChange": CLOSURE, "rows": self.rows, "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class RangedNumber:
+    value: Binding
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "RangedNumber",
+            {"max": self.max, "min": self.min, "onChange": CLOSURE, "step": self.step, "value": self.value},
+        )
+
+
+@dataclass(frozen=True)
+class ChoiceField:
+    options: Binding
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("Choice", {"onChange": CLOSURE, "options": _lower(self.options), "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class SegmentedChoice:
+    options: Binding
+    value: Binding
+    orientation: Orientation = "Horizontal"
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "SegmentedChoice",
+            {
+                "onChange": CLOSURE,
+                "options": _lower(self.options),
+                "orientation": self.orientation,
+                "value": _lower(self.value),
+            },
+        )
+
+
+FormFieldKind = TextField | NumberField | CheckboxField | TextAreaField | RangedNumber | ChoiceField | SegmentedChoice
+
+
+@dataclass(frozen=True)
+class FormField:
+    id: str
+    label: TextSource
+    kind: FormFieldKind
+    required: bool = False
+    help: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            None, {"help": self.help, "id": self.id, "kind": self.kind, "label": self.label, "required": self.required}
+        )
+
+
+@dataclass(frozen=True)
+class Form:
+    fields: tuple[FormField, ...] = ()
+    on_submit: Action = field(default_factory=Chain)
+    submit_label: TextSource = field(default_factory=lambda: LiteralText("Submit"))
+    disabled: Binding | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Form",
+            {
+                "disabled": self.disabled,
+                "fields": list(self.fields),
+                "onSubmit": self.on_submit,
+                "submitLabel": self.submit_label,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class TextFilter:
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("TextFilter", {"onChange": CLOSURE, "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class ChoiceFilter:
+    options: Binding
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return Obj("ChoiceFilter", {"onChange": CLOSURE, "options": _lower(self.options), "value": _lower(self.value)})
+
+
+@dataclass(frozen=True)
+class SegmentedFilter:
+    options: Binding
+    value: Binding
+    orientation: Orientation = "Horizontal"
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "SegmentedFilter",
+            {
+                "onChange": CLOSURE,
+                "options": _lower(self.options),
+                "orientation": self.orientation,
+                "value": _lower(self.value),
+            },
+        )
+
+
+FilterKind = TextFilter | ChoiceFilter | SegmentedFilter
+
+
+@dataclass(frozen=True)
+class FilterSpec:
+    name: str
+    label: TextSource
+    kind: FilterKind
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"kind": _lower(self.kind), "label": _lower(self.label), "name": self.name})
+
+
+@dataclass(frozen=True)
+class Filters:
+    items: tuple[FilterSpec, ...] = ()
+
+    def to_wire(self) -> Obj:
+        return _obj("Filters", {"items": list(self.items)})
+
+
+# Visualisation — DataGrid (row-typed columns erase to closures) --------------
+
+
+@dataclass(frozen=True)
+class ColumnWidth:
+    kind: str = "Auto"
+
+    def to_wire(self) -> Value:
+        return Obj(self.kind, {})
+
+
+@dataclass(frozen=True)
+class ColumnKind:
+    kind: str = "Text"
+
+    def to_wire(self) -> Value:
+        return Obj(self.kind, {})
+
+
+@dataclass(frozen=True)
+class Column:
+    label: str
+    format: CellFormat = field(default_factory=FormatNone)
+    kind: ColumnKind = field(default_factory=ColumnKind)
+    width: ColumnWidth = field(default_factory=ColumnWidth)
+
+    def to_wire(self) -> Value:
+        return Obj(
+            None,
+            {
+                "format": _lower(self.format),
+                "kind": _lower(self.kind),
+                "label": self.label,
+                "value": CLOSURE,
+                "width": _lower(self.width),
+            },
+        )
+
+
+@dataclass(frozen=True)
+class DataGrid:
+    source: Binding
+    columns: tuple[Column, ...] = ()
+    editable: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "DataGrid",
+            {"columns": list(self.columns), "editable": self.editable, "rowKey": CLOSURE, "source": self.source},
+        )
+
+
 # Structural ------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ContentHash:
+    algorithm: str
+    hash: str
+    strictness: str
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"algorithm": self.algorithm, "hash": self.hash, "strictness": self.strictness})
 
 
 @dataclass(frozen=True)
@@ -794,6 +1182,7 @@ class Custom:
     module_id: str
     component_id: str
     props: dict[str, Value] = field(default_factory=dict)
+    content_hash: ContentHash | None = None
     exposed_node_ids: tuple[str, ...] | None = None
 
     def to_wire(self) -> Obj:
@@ -801,6 +1190,7 @@ class Custom:
             "Custom",
             {
                 "componentId": self.component_id,
+                "contentHash": self.content_hash,
                 "exposedNodeIds": list(self.exposed_node_ids) if self.exposed_node_ids is not None else None,
                 "moduleId": self.module_id,
                 "props": self.props,
@@ -817,21 +1207,171 @@ class ErrorBoundary:
         return _obj("ErrorBoundary", {"child": self.child, "fallback": self.fallback})
 
 
+# Fragment parameterisation (holes / effect / args) — WIRE_FORMAT.md §3.2 -----
+
+HostEffect = Literal["Pure", "ReadsHost", "WritesHost"]
+Determinism = Literal["Deterministic", "Clock", "Random", "Network"]
+
+
+@dataclass(frozen=True)
+class ScalarInt:
+    value: int
+
+    def to_wire(self) -> Value:
+        return Obj("Int", {"value": self.value})
+
+
+@dataclass(frozen=True)
+class ScalarFloat:
+    value: float
+
+    def to_wire(self) -> Value:
+        return Obj("Float", {"value": self.value})
+
+
+@dataclass(frozen=True)
+class ScalarBool:
+    value: bool
+
+    def to_wire(self) -> Value:
+        return Obj("Bool", {"value": self.value})
+
+
+@dataclass(frozen=True)
+class ScalarStr:
+    value: str
+
+    def to_wire(self) -> Value:
+        return Obj("Str", {"value": self.value})
+
+
+Scalar = ScalarInt | ScalarFloat | ScalarBool | ScalarStr
+
+
+@dataclass(frozen=True)
+class IntRange:
+    min: int
+    max: int
+
+    def to_wire(self) -> Value:
+        return Obj("IntRange", {"max": self.max, "min": self.min})
+
+
+@dataclass(frozen=True)
+class FloatRange:
+    min: float
+    max: float
+
+    def to_wire(self) -> Value:
+        return Obj("FloatRange", {"max": self.max, "min": self.min})
+
+
+@dataclass(frozen=True)
+class StringLen:
+    min_len: int
+    max_len: int
+
+    def to_wire(self) -> Value:
+        return Obj("StringLen", {"maxLen": self.max_len, "minLen": self.min_len})
+
+
+@dataclass(frozen=True)
+class EnumSpace:
+    choices: tuple[str, ...]
+
+    def to_wire(self) -> Value:
+        return _obj("Enum", {"choices": list(self.choices)})
+
+
+@dataclass(frozen=True)
+class AnyString:
+    def to_wire(self) -> Value:
+        return Obj("AnyString", {})
+
+
+HoleValueSpace = IntRange | FloatRange | StringLen | EnumSpace | AnyString
+
+
+@dataclass(frozen=True)
+class ValueHole:
+    name: str
+    space: HoleValueSpace
+    default: Scalar | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Value", {"default": self.default, "name": self.name, "space": self.space})
+
+
+@dataclass(frozen=True)
+class SlotHole:
+    name: str
+    kind_constraint: str | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Slot", {"kindConstraint": self.kind_constraint, "name": self.name})
+
+
+@dataclass(frozen=True)
+class RepeatHole:
+    name: str
+    count_space: HoleValueSpace
+
+    def to_wire(self) -> Value:
+        return Obj("Repeat", {"countSpace": _lower(self.count_space), "name": self.name})
+
+
+HoleDecl = ValueHole | SlotHole | RepeatHole
+
+
+@dataclass(frozen=True)
+class EffectClass:
+    host_effect: HostEffect
+    determinism: Determinism
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"determinism": self.determinism, "hostEffect": self.host_effect})
+
+
+@dataclass(frozen=True)
+class SlotArg:
+    tree: UiNode
+
+    def to_wire(self) -> Value:
+        return Obj("SlotArg", {"tree": _lower(self.tree)})
+
+
+FragmentArg = Scalar | SlotArg
+
+
 @dataclass(frozen=True)
 class FragmentDecl:
     name: str
     body: UiNode
+    holes: tuple[HoleDecl, ...] = ()
+    effect: EffectClass | None = None
 
     def to_wire(self) -> Obj:
-        return _obj("FragmentDecl", {"body": self.body, "name": self.name})
+        return _obj(
+            "FragmentDecl",
+            {
+                "body": self.body,
+                "effect": self.effect,
+                "holes": list(self.holes) if self.holes else None,
+                "name": self.name,
+            },
+        )
 
 
 @dataclass(frozen=True)
 class FragmentRef:
     name: str
+    args: dict[str, FragmentArg] | None = None
 
     def to_wire(self) -> Obj:
-        return _obj("FragmentRef", {"name": self.name})
+        args = None
+        if self.args:
+            args = Obj(None, {k: _lower(v) for k, v in self.args.items()})
+        return _obj("FragmentRef", {"args": args, "name": self.name})
 
 
 # ── The node envelope ───────────────────────────────────────────────────────

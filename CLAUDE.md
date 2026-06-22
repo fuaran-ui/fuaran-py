@@ -1,12 +1,23 @@
 # CLAUDE.md — fuaran-py (Python reference implementation)
 
-This repo is the **Python host of the Fuaran UI wire format**: the
-canonical-JSON codec (`decode_node` / `encode_node` / `decode_op` / `encode_op`),
-a pre-emit validator, and a corpus conformance harness — what a Python AI
-orchestrator needs to read and write Fuaran UI trees. The codec core is
-**headless** (no rendering dependency); an **optional, stdlib-only server-HTML
-renderer** (`fuaran_py.renderer`, Phase 239) ships alongside it for hosts that
-want to render a decoded tree to HTML with no client runtime.
+This repo is the **Python host of the Fuaran UI language** — a **co-equal sibling
+to the F# (`Fuaran.UI`) and TypeScript (`@fuaran-ui/*`) tiers**, not merely a
+codec. The target identity is a full authoring + rendering host: an ergonomic
+`fuaran_py.ui` smart-constructor authoring surface (roadmap Phase 278), a tree-op
+apply engine (279), a server-HTML renderer (`fuaran_py.renderer`, Phase 239 —
+shipped) plus an interactive Pyodide client runtime (280), all conformant to the
+shared wire format. What ships **today** is the floor: the canonical-JSON codec
+(`decode_node` / `encode_node` / `decode_op` / `encode_op`), a pre-emit validator,
+the corpus conformance harness, and the headless renderer; the authoring +
+interactive surfaces are the Wave 35 co-equality expansion (Phases 278–281).
+
+**Framing — load-bearing, do not regress.** The LLM's emission surface is the
+**canonical JSON wire format, for every host**. The three language tiers (F#, TS,
+Python) are **human-developer authoring surfaces** that produce that JSON; the AI
+never authors host-language code (cf. the eval suite's `PyBare` condition, which
+exists as the structure-free *baseline to beat*, not a direction). Python being
+the language AI orchestrators are written in is a reason it is *valuable*, not a
+reason to make it a lesser, codec-only kind of artefact than F#/TS.
 
 This is a sibling repo under the Fuaran-UI sub-estate at `../` (alongside
 `fuaran`, `fuaran-ts`, `orchestration`, `orchestrator-demo`, `eval-suite`).

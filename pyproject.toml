@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "fuaran-py"
 version = "0.0.1"
-description = "Headless Python host of the Fuaran UI wire format — canonical-JSON codec + pre-emit validator."
+description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"

@@ -23,6 +23,7 @@ without a client runtime.
 | `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |
 | `fuaran_py.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
+| `fuaran_py.runtime` | Interactive Pyodide client runtime — the in-browser mount + dispatch→apply→re-render loop, behind an injectable `BrowserDeps` seam. |
 
 ## Install
 
@@ -95,8 +96,25 @@ The renderer is stdlib-only and inert by design: `Action`-bearing nodes render
 dead until a client hydrates them, a `Link` is a real crawlable `<a href>`, and
 every string-to-DOM seam (URLs, markdown, attributes) is sanitised. The host owns
 the document shell (`<html>` / `<head>` / the `<link>` to the stylesheet); the
-renderer emits the body fragment only. An interactive (client-framework) target
-is a deliberate non-goal of this baseline.
+renderer emits the body fragment only.
+
+## Run (interactive, optional)
+
+Under **Pyodide** (CPython-on-WASM), `fuaran_py.runtime` adds the live loop the F#
+(Fable) and TypeScript (React) hosts provide: mount a decoded tree, wire DOM events
+to a host update function, fold the returned `TreeOp`s through `apply`, and
+re-render — reusing the renderer (markup + class vocabulary) and the apply engine
+(op semantics), never a parallel copy.
+
+```python
+from fuaran_py.runtime import counter_runtime
+
+counter_runtime().mount("fuaran-root")   # clicking "+1" re-renders the count
+```
+
+Browser-API access is behind an injectable `BrowserDeps` seam (default: the Pyodide
+`js` interop module), so the package stays stdlib-only and importable under plain
+CPython; tests drive the loop against a fake DOM.
 
 ## The canonical number form (the make-or-break)
 

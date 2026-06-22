@@ -15,8 +15,9 @@ Python analogue of the reference invocable-capability registry.
    Until that ships and lands its corpus fixtures, this host-side registry has **no
    canonical encode/decode** — there is no fixed wire to match yet, and guessing it
    would risk a parity break. ``decode``/``encode`` for ``Capability`` / ``Binding.Invoke``
-   / ``Action.Invoke`` / ``Placement`` / ``Deferred`` land here as a follow-up, against
-   that phase's fixtures. The registration seam below is wire-independent and usable now.
+   The **``Invoke`` wire** (``Binding.Invoke`` / ``Action.Invoke``) ships here now that its
+   canonical shape is fixed: :func:`invoke` authors it and :func:`parse_invocation` decodes
+   it. The wider ``Placement`` / ``Deferred`` surface follows as those fixtures are exercised.
 """
 
 from __future__ import annotations
@@ -25,8 +26,15 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from ..canonical import encode_value
+from ..model import Arr, Obj
+from ..model import Value as WireValue
+
 # A capability body: typed args (by name) → a realized value.
 CapabilityBody = Callable[[Mapping[str, Any]], Any]
+
+# An invocation argument's value — a bare JSON scalar (the wire carries it untyped).
+InvokeArgValue = str | int | float | bool
 
 
 @dataclass(frozen=True)
@@ -135,6 +143,11 @@ class CapabilityRegistry:
             raise InvokeError(f"invalid invocation of '{capability_id}': {reason}")
         return cap.body(args)
 
+    def invoke_wire(self, parsed: object) -> Any:
+        """Decode a parsed ``Invoke`` wire object and dispatch it (validate → body)."""
+        inv = parse_invocation(parsed)
+        return self.invoke(inv.capability_id, inv.args)
+
 
 # Hole-space constructors (the polars-author-facing vocabulary).
 
@@ -157,3 +170,69 @@ def enum(*choices: str) -> HoleSpace:
 
 def any_string() -> HoleSpace:
     return HoleSpace("anyString")
+
+
+# ── The Invoke wire (Binding.Invoke / Action.Invoke) ─────────────────────────
+#
+# A capability reference by id + ordered ``(addr, value)`` args. The wire shape is
+# identical in a binding position (a value source) and an action position (an effect):
+# ``{"$type":"Invoke","args":[{"addr":…,"value":…}],"capabilityId":…}``.
+
+
+@dataclass(frozen=True)
+class Invoke:
+    """An ``Invoke`` authoring value — usable as a node ``source`` (binding) or an
+    ``onClick`` / action (effect); both lower to the same canonical wire."""
+
+    capability_id: str
+    args: tuple[tuple[str, InvokeArgValue], ...] = ()
+
+    def to_wire(self) -> WireValue:
+        return Obj(
+            "Invoke",
+            {
+                "args": Arr([Obj(None, {"addr": addr, "value": value}) for addr, value in self.args]),
+                "capabilityId": self.capability_id,
+            },
+        )
+
+    def to_json(self) -> str:
+        return encode_value(self.to_wire())
+
+
+def invoke(capability_id: str, **args: InvokeArgValue) -> Invoke:
+    """Author an ``Invoke`` — ``invoke("forecast.revenue", horizon="12", scenario="base")``.
+
+    Argument order is preserved (kwargs are ordered); it is the wire ``args`` order."""
+    return Invoke(capability_id, tuple(args.items()))
+
+
+@dataclass(frozen=True)
+class Invocation:
+    """A decoded invocation — the capability id + its args as a name→value mapping."""
+
+    capability_id: str
+    args: dict[str, Any]
+
+
+def parse_invocation(parsed: object) -> Invocation:
+    """Decode a parsed ``Invoke`` wire object into a typed :class:`Invocation`.
+
+    Raises :class:`InvokeError` on a malformed shape (a default-deny decode)."""
+    if not isinstance(parsed, dict) or parsed.get("$type") != "Invoke":
+        raise InvokeError("not an Invoke object")
+    cap = parsed.get("capabilityId")
+    if not isinstance(cap, str):
+        raise InvokeError("Invoke.capabilityId must be a string")
+    raw_args = parsed.get("args")
+    if not isinstance(raw_args, list):
+        raise InvokeError("Invoke.args must be an array")
+    args: dict[str, Any] = {}
+    for entry in raw_args:
+        if not isinstance(entry, dict) or "addr" not in entry or "value" not in entry:
+            raise InvokeError("each Invoke arg needs 'addr' and 'value'")
+        addr = entry["addr"]
+        if not isinstance(addr, str):
+            raise InvokeError("Invoke arg 'addr' must be a string")
+        args[addr] = entry["value"]
+    return Invocation(cap, args)

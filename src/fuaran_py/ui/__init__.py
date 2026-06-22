@@ -663,6 +663,7 @@ def encode(n: UiNode) -> str:
 # ``when``) that emits canonical ``Transform`` JSON, plus the Python capability
 # host-registration seam. The wire codec lives in :mod:`fuaran_py.dataframe`.
 from . import capability as capability  # noqa: E402, PLC0414 — append-only re-export at module foot
+from .capability import invoke  # noqa: E402 — the Invoke wire ctor (Binding.Invoke / Action.Invoke)
 from .compute import (  # noqa: E402 — append-only: kept below the existing surface (integration-lane convention)
     AggExpr,
     Expr,
@@ -700,4 +701,5 @@ __all__ = [
     "AggExpr",
     "TransformBinding",
     "capability",
+    "invoke",
 ]

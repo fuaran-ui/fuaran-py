@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "Diametrical Pty Ltd" }]
+authors = [{ name = "Diametrical Ltd" }]
 keywords = ["fuaran", "wire-format", "canonical-json", "ui", "codec"]
 classifiers = [
   "Development Status :: 3 - Alpha",

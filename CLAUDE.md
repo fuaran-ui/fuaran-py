@@ -54,7 +54,7 @@ fuaran-py/
 ├── tests/                # pytest: number form, full-corpus round-trip + reject, validator
 ├── docs/                 # fable-python-decision.md (the build-vs-port decision record)
 ├── pyproject.toml        # dependency-light; dev extras = pytest / mypy / ruff
-├── LICENSE               # Apache 2.0 + Diametrical Pty Ltd copyright
+├── LICENSE               # Apache 2.0 + Diametrical Ltd copyright
 └── run.ps1               # Stage-0 entry point — lint + format-check + type-check + test
 ```
 

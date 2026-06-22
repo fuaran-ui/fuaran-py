@@ -8,7 +8,8 @@ Public surface:
 
 from __future__ import annotations
 
+from . import types
 from .decode import KIND_SCHEMAS, KNOWN_KINDS, decode_node
 from .encode import encode_node
 
-__all__ = ["decode_node", "encode_node", "KNOWN_KINDS", "KIND_SCHEMAS"]
+__all__ = ["decode_node", "encode_node", "KNOWN_KINDS", "KIND_SCHEMAS", "types"]

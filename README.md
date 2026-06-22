@@ -16,7 +16,8 @@ without a client runtime.
 
 | Module | Role |
 |---|---|
-| `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec). |
+| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`). See [docs/AUTHORING.md](docs/AUTHORING.md). |
+| `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
 | `fuaran_py.ops` | The `TreeOp` algebra + `decode_op` / `encode_op`. |
 | `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
 | `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
@@ -48,6 +49,29 @@ Decoding never throws on malformed input — it returns `Ok(value)` or
 `Err(DecodeError)` carrying one of the six canonical codes (`INVALID_JSON`,
 `MISSING_FIELD`, `WRONG_TYPE`, `UNKNOWN_DU_CASE`, `WRONG_NODE_KIND`,
 `EMPTY_NODE_ID`) and a `$`-rooted path.
+
+## Author (ergonomic, typed)
+
+`fuaran_py.ui` is the Python analogue of `@fuaran-ui/ui` / `Fuaran.UI` — smart
+constructors over a typed per-kind model, with per-kind defaults + ARIA injection.
+A human developer authors a tree the same way an F#/TS developer does; `encode`
+serialises it byte-identically to the corpus.
+
+```python
+from fuaran_py.ui import fuaran, format, encode
+
+tree = fuaran.dashboard(
+    "root",
+    children=[
+        fuaran.metric("rev", label="Revenue", value=1234.5, format=format.currency("GBP")),
+        fuaran.markdown("note", "Updated hourly."),
+    ],
+)
+wire = encode(tree)   # canonical JSON
+```
+
+This is the **human** authoring surface; the AI's emission surface is the wire
+format itself, for every host. Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
 
 ## Render (optional)
 

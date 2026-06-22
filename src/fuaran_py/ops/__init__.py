@@ -8,7 +8,8 @@ Public surface:
 
 from __future__ import annotations
 
+from .apply import ApplyErr, ApplyError, ApplyResult, apply
 from .decode import OP_CASES, decode_op
 from .encode import encode_op
 
-__all__ = ["decode_op", "encode_op", "OP_CASES"]
+__all__ = ["decode_op", "encode_op", "OP_CASES", "apply", "ApplyError", "ApplyErr", "ApplyResult"]

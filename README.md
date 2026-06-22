@@ -18,7 +18,7 @@ without a client runtime.
 |---|---|
 | `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`). See [docs/AUTHORING.md](docs/AUTHORING.md). |
 | `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
-| `fuaran_py.ops` | The `TreeOp` algebra + `decode_op` / `encode_op`. |
+| `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops). |
 | `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
 | `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |

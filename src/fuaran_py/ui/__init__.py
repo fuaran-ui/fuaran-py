@@ -528,8 +528,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         label: t.TextInput,
         accept: list[str] | None = None,
         multiple: bool = False,
+        disabled: Binding | None = None,
     ) -> UiNode:
-        return _node(id, t.FileUpload(_text(label), tuple(accept or ()), multiple), accessibility.file_upload)
+        kind = t.FileUpload(_text(label), tuple(accept or ()), multiple, disabled)
+        return _node(id, kind, accessibility.file_upload)
 
     @staticmethod
     def form(

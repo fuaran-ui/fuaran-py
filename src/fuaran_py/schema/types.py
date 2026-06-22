@@ -876,11 +876,18 @@ class FileUpload:
     label: TextSource
     accept: tuple[str, ...] = ()
     multiple: bool = False
+    disabled: Binding | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
             "FileUpload",
-            {"accept": list(self.accept), "label": self.label, "multiple": self.multiple, "onSelect": CLOSURE},
+            {
+                "accept": list(self.accept),
+                "disabled": self.disabled,
+                "label": self.label,
+                "multiple": self.multiple,
+                "onSelect": CLOSURE,
+            },
         )
 
 

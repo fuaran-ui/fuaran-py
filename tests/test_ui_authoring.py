@@ -271,6 +271,14 @@ def _authored() -> dict[str, t.UiNode]:
                 ],
             )
         ),
+        "upload-1": node.bare(
+            fuaran.file_upload(
+                "upload-1",
+                label="Upload CSV",
+                accept=[".csv", "text/csv"],
+                disabled=binding.state("uploadBusy", False),
+            )
+        ),
         "form-local-debounce": node.bare(
             fuaran.form(
                 "form-local-debounce",

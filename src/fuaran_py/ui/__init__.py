@@ -657,6 +657,25 @@ def encode(n: UiNode) -> str:
     return encode_value(n.to_wire())
 
 
+# ── Compute-layer authoring (Phase 285) — the polars-like surface ────────────
+#
+# Append-only: the ergonomic transform-pipeline DSL (``frame`` / ``col`` / ``lit`` /
+# ``when``) that emits canonical ``Transform`` JSON, plus the Python capability
+# host-registration seam. The wire codec lives in :mod:`fuaran_py.dataframe`.
+from . import capability as capability  # noqa: E402, PLC0414 — append-only re-export at module foot
+from .compute import (  # noqa: E402 — append-only: kept below the existing surface (integration-lane convention)
+    AggExpr,
+    Expr,
+    Frame,
+    TransformBinding,
+    col,
+    frame,
+    lit,
+    source_ref,
+    transform,
+    when,
+)
+
 __all__ = [
     "fuaran",
     "binding",
@@ -669,4 +688,16 @@ __all__ = [
     "Accessibility",
     "SemanticStyle",
     "StateBehaviour",
+    # Compute-layer authoring (Phase 285)
+    "frame",
+    "col",
+    "lit",
+    "when",
+    "transform",
+    "source_ref",
+    "Frame",
+    "Expr",
+    "AggExpr",
+    "TransformBinding",
+    "capability",
 ]

@@ -122,7 +122,27 @@ STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
 FONT_VOICE = frozenset({"Default", "Display", "Structural"})
 
 TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
-BINDING_CASES = frozenset({"Static", "Query", "Filter", "Selection", "State", "Computed", "I18n", "Local", "Format"})
+# The Compute-layer binding cases are recognised so a data-bound node's source round-trips
+# byte-exactly: ``Transform`` (the dataframe-pipeline source) + the ``Data`` embedded-source
+# and ``Invoke`` capability bindings. They decode *structurally* (validated discriminator, fields
+# preserved) — the same pass-through every non-``Static`` binding case takes here. A fully typed
+# ``Invoke`` decode (capabilityId + typed args) lands with the capability/invoke wire surface.
+BINDING_CASES = frozenset(
+    {
+        "Static",
+        "Query",
+        "Filter",
+        "Selection",
+        "State",
+        "Computed",
+        "I18n",
+        "Local",
+        "Format",
+        "Data",
+        "Transform",
+        "Invoke",
+    }
+)
 CELL_FORMAT_CASES = frozenset({"None", "Number", "Currency", "Percent", "SignificantDigits", "Date", "Custom"})
 
 # Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2). A kind not in

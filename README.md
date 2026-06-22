@@ -16,9 +16,10 @@ without a client runtime.
 
 | Module | Role |
 |---|---|
-| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`). See [docs/AUTHORING.md](docs/AUTHORING.md). |
+| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. See [docs/AUTHORING.md](docs/AUTHORING.md) and [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py). |
 | `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
 | `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops). |
+| `fuaran_py.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
 | `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
 | `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |

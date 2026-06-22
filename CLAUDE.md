@@ -48,7 +48,9 @@ fuaran-py/
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
 │   ├── conformance/      # corpus round-trip smoke harness
-│   └── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
+│   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
+│   ├── style_observer/   # computed-style observer: pure flag tier + InMemory + Pyodide live read-back
+│   └── theme_manifest/   # DTCG-compatible theme contract (tokens + role bindings + invariants)
 ├── tests/                # pytest: number form, full-corpus round-trip + reject, validator
 ├── docs/                 # fable-python-decision.md (the build-vs-port decision record)
 ├── pyproject.toml        # dependency-light; dev extras = pytest / mypy / ruff
@@ -124,6 +126,33 @@ Sanitisation matches the F#/TS posture (`fuaran_py.renderer.sanitize` ports
 markdown escaped-first then swept. The `Custom` host-renderer registry is a host
 trust boundary — the baseline ships no registry seam, so `Custom` renders an
 inert labelled placeholder.
+
+## Computed-style observer + theme manifest
+
+`fuaran_py.style_observer` is the Python twin of `Fuaran.UI.StyleObserver`: it
+reads back a rendered tree's resolved computed styles and derives a fixed
+vocabulary of resolved-style flags (contrast-below-AA, invisible-text,
+accent-indistinct, plus the four manifest-aware checks) the semantic-state channel
+is blind to — as small typed facts, deterministically. The flag + observation
+JSON encode is **byte-identical** to the F# and TypeScript hosts.
+
+- `InMemoryStyleObserver` — fixture-driven, substrate-free (tests / headless).
+- `BrowserStyleObserver` — reads **live** `getComputedStyle` under **Pyodide**
+  (CPython compiled to WASM running client-side in the browser — the Python
+  analogue of the F# Fable / TS browser observers). Browser-API access is behind
+  an injectable `BrowserDeps` (default: the `js` interop module, imported lazily so
+  the package stays stdlib-only at install time and importable under plain CPython;
+  tests inject a fake DOM). `connect()` wires a live `MutationObserver`
+  (Pyodide-only) so a theme toggle re-derives automatically.
+
+`fuaran_py.theme_manifest` is the Python twin of `Fuaran.UI.ThemeManifest`: a
+DTCG-compatible token model + semantic role bindings + quantified invariants
+(per-role contrast floors, 60-30-10 usage budgets, motion voice). It is the
+contract the observer's manifest-aware tier (`per_node_flags` /
+`verify_usage_budgets`) verifies resolved style against. Both modules are
+stdlib-only; the Pyodide-only `js` / `pyodide.ffi` imports are lazy and
+import-guarded (the `#if FABLE_COMPILER` analogue). Manifest JSON encode + the F#
+`ThemeBridge` (typed-`Theme` projector) are not yet ported (follow-up).
 
 ## Cross-repo dependencies
 

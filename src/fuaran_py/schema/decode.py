@@ -123,6 +123,7 @@ FONT_VOICE = frozenset({"Default", "Display", "Structural"})
 IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
+MATH_DISPLAY = frozenset({"Inline", "Block"})
 
 TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
 # The Compute-layer binding cases are recognised so a data-bound node's source round-trips
@@ -181,6 +182,8 @@ KNOWN_KINDS = frozenset(
         "List",
         "Divider",
         "Toast",
+        "CodeBlock",
+        "Math",
         # Input
         "Form",
         "Button",
@@ -260,6 +263,11 @@ def _decode_children(value: object, path: str) -> Value:
 def _decode_text_source_array(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
     return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
+
+
+def _decode_int_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_expect_int(item, f"{path}.{i}") for i, item in enumerate(arr)])
 
 
 # Action cases (WIRE_FORMAT.md §3.3 / §4). Wire-survivable actions (e.g. a Modal's
@@ -376,6 +384,28 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("message", True, _decode_text_source),
         ("open", True, _decode_binding),
         ("tone", True, _enum_decoder(TONE, "tone")),
+    ],
+    "CodeBlock": [
+        ("code", True, _decode_string),
+        ("copyable", True, _decode_bool),
+        ("highlightLines", True, _decode_int_array),
+        ("language", True, _decode_string),
+        ("lineNumbers", True, _decode_bool),
+    ],
+    "Math": [
+        ("display", True, _enum_decoder(MATH_DISPLAY, "display")),
+        ("source", True, _decode_string),
+    ],
+    "Select": [
+        ("label", True, _decode_text_source),
+        ("onChange", True, _decode_string),
+        ("source", True, _decode_binding),
+        ("value", True, _decode_binding),
+        ("disabled", False, _decode_binding),
+        ("placeholder", False, _decode_text_source),
+        # Multi-select (Phase 291) — both optional; omitted on a single-select.
+        ("multiple", False, _decode_bool),
+        ("values", False, _decode_binding),
     ],
     "Modal": [
         ("children", True, _decode_children),

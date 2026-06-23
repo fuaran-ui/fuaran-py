@@ -518,6 +518,55 @@ class Renderer:
             attrs.append(("hidden", ""))
         return element("div", attrs, "".join(parts))
 
+    def _code_block(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 290 — deterministic `<pre><code>` (HTML-escaped, no markdown).
+        # Syntax highlighting is a client-only enhancement targeting
+        # `.language-{x}`, so it is outside the parity output.
+        language = fields.get("language")
+        language = language if isinstance(language, str) else ""
+        line_numbers = fields.get("lineNumbers") is True
+        container_class = "fuaran-codeblock fuaran-codeblock-numbered" if line_numbers else "fuaran-codeblock"
+        attrs: list[tuple[str, str]] = [("class", container_class), ("data-language", language)]
+        highlight = fields.get("highlightLines")
+        if isinstance(highlight, Arr) and highlight.items:
+            attrs.append(("data-highlight-lines", ",".join(str(n) for n in highlight.items)))
+        parts: list[str] = []
+        if fields.get("copyable") is True:
+            parts.append(
+                text_element(
+                    "button",
+                    [("class", "fuaran-codeblock-copy"), ("type", "button"), ("aria-label", "Copy")],
+                    "Copy",
+                )
+            )
+        code = fields.get("code")
+        code = code if isinstance(code, str) else ""
+        code_el = text_element(
+            "code",
+            [("class", f"fuaran-codeblock-code language-{language}")],
+            code,
+        )
+        parts.append(element("pre", [("class", "fuaran-codeblock-pre")], code_el))
+        return element("div", attrs, "".join(parts))
+
+    def _math(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 293 — deterministic escaped-source fallback; KaTeX is a
+        # client-only enhancement targeting `.fuaran-math-source` (outside parity).
+        source = fields.get("source")
+        source = source if isinstance(source, str) else ""
+        source_span = text_element("span", [("class", "fuaran-math-source")], source)
+        if fields.get("display") == "Inline":
+            return element(
+                "span",
+                [("class", "fuaran-math fuaran-math-inline"), ("data-math-display", "inline")],
+                source_span,
+            )
+        return element(
+            "div",
+            [("class", "fuaran-math fuaran-math-block"), ("data-math-display", "block")],
+            source_span,
+        )
+
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────
 
     def _button(self, node: Node, fields: dict[str, Value]) -> str:
@@ -536,6 +585,10 @@ class Renderer:
         options_html = self._render_options(fields.get("source"), fields.get("placeholder"))
         disabled = resolve_binding(fields.get("disabled"), self.sources)
         select_attrs: list[tuple[str, str]] = [("class", "fuaran-select-control")]
+        # Phase 291 — a multi-select emits the `multiple` attribute; a controlled
+        # `<select multiple>` rejects a scalar `value`, so none is emitted here.
+        if fields.get("multiple") is True:
+            select_attrs.append(("multiple", ""))
         if disabled is True:
             select_attrs.append(("disabled", ""))
         control = element("select", select_attrs, options_html)
@@ -747,6 +800,8 @@ _DISPATCH: dict[str, _KindHandler] = {
     "List": Renderer._list,
     "Divider": Renderer._divider,
     "Toast": Renderer._toast,
+    "CodeBlock": Renderer._code_block,
+    "Math": Renderer._math,
     "Button": Renderer._button,
     "Select": Renderer._select,
     "Form": Renderer._form,

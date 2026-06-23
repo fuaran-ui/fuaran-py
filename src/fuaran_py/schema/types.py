@@ -47,6 +47,7 @@ LiveRegion = Literal["polite", "assertive", "off"]
 ImageVariant = Literal["Default", "Avatar", "Rounded"]
 ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
 DateVariant = Literal["Date", "Time", "DateTime"]
+MathDisplay = Literal["Inline", "Block"]
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -914,6 +915,36 @@ class Toast:
         )
 
 
+@dataclass(frozen=True)
+class CodeBlock:
+    code: str
+    language: str
+    copyable: bool = False
+    line_numbers: bool = False
+    highlight_lines: tuple[int, ...] = ()
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "CodeBlock",
+            {
+                "code": self.code,
+                "copyable": self.copyable,
+                "highlightLines": list(self.highlight_lines),
+                "language": self.language,
+                "lineNumbers": self.line_numbers,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class Math:
+    source: str
+    display: MathDisplay = "Block"
+
+    def to_wire(self) -> Obj:
+        return _obj("Math", {"display": self.display, "source": self.source})
+
+
 # Input -----------------------------------------------------------------------
 
 
@@ -946,6 +977,12 @@ class Select:
     value: Binding
     placeholder: TextSource | None = None
     disabled: Binding | None = None
+    # Multi-select (Phase 291): ``multiple`` is emitted only when ``True`` (a
+    # single-select stays byte-identical to the pre-multi corpus); ``values``
+    # is the ``Binding<string list>`` of selected option values, emitted only
+    # when present. The multi onChange is a closure → no separate wire key.
+    multiple: bool = False
+    values: Binding | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -953,10 +990,12 @@ class Select:
             {
                 "disabled": self.disabled,
                 "label": self.label,
+                "multiple": self.multiple if self.multiple else None,
                 "onChange": CLOSURE,
                 "placeholder": self.placeholder,
                 "source": self.source,
                 "value": self.value,
+                "values": self.values,
             },
         )
 

@@ -55,6 +55,8 @@ KIND_CLASS: dict[str, str] = {
     "List": "fuaran-kind-list",
     "Divider": "fuaran-kind-divider",
     "Toast": "fuaran-kind-toast",
+    "CodeBlock": "fuaran-kind-code-block",
+    "Math": "fuaran-kind-math",
     "Markdown": "fuaran-kind-markdown",
     "Metric": "fuaran-kind-metric",
     "Badge": "fuaran-kind-badge",

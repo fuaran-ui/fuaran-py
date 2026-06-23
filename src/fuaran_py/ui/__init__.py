@@ -517,6 +517,23 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.Toast(_text(message), op, tone, dismissable), accessibility.toast)
 
     @staticmethod
+    def code_block(
+        id: str,  # noqa: A002
+        *,
+        code: str,
+        language: str = "",
+        copyable: bool = False,
+        line_numbers: bool = False,
+        highlight_lines: list[int] | None = None,
+    ) -> UiNode:
+        kind = t.CodeBlock(code, language, copyable, line_numbers, tuple(highlight_lines or ()))
+        return _node(id, kind, accessibility.none)
+
+    @staticmethod
+    def math(id: str, source: str, *, display: t.MathDisplay = "Block") -> UiNode:  # noqa: A002
+        return _node(id, t.Math(source, display), accessibility.none)
+
+    @staticmethod
     def sparkline(id: str, *, source: Binding) -> UiNode:  # noqa: A002
         return _node(id, t.Sparkline(source), accessibility.none)
 
@@ -583,8 +600,18 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         value: Binding,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
+        multiple: bool = False,
+        values: Binding | None = None,
     ) -> UiNode:
-        kind = t.Select(_text(label), source, value, _text(placeholder) if placeholder is not None else None, disabled)
+        kind = t.Select(
+            _text(label),
+            source,
+            value,
+            _text(placeholder) if placeholder is not None else None,
+            disabled,
+            multiple,
+            values,
+        )
         return _node(id, kind, accessibility.select)
 
     @staticmethod

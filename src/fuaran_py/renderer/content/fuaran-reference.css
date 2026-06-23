@@ -1893,3 +1893,75 @@ html[data-fuaran-disconnected]::before {
   top: var(--fuaran-space-md, 12px);
   right: var(--fuaran-space-md, 12px);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Wave 43 — CodeBlock (Phase 290) + Math (Phase 293).
+   Both carry a deterministic-render contract: the parity-checked output is the
+   bare escaped structure (CodeBlock: <pre><code>; Math: the raw source). Syntax
+   highlighting (CodeBlock) and KaTeX (Math) are client-only post-hydration
+   enhancements applied OUTSIDE the cross-host / SSR↔CSR byte-diff.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── CodeBlock (Phase 290) ─────────────────────────────────────── */
+.fuaran-codeblock {
+  position: relative;
+  margin: var(--fuaran-space-md, 12px) 0;
+  border-radius: var(--fuaran-radius-md, 6px);
+  background: var(--fuaran-code-bg, #1e1e2e);
+  color: var(--fuaran-code-fg, #cdd6f4);
+  overflow: hidden;
+}
+
+.fuaran-codeblock-pre {
+  margin: 0;
+  padding: var(--fuaran-space-md, 12px) var(--fuaran-space-lg, 16px);
+  overflow-x: auto;
+  font-family: var(--fuaran-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  font-size: var(--fuaran-text-sm, 13px);
+  line-height: 1.5;
+}
+
+.fuaran-codeblock-code {
+  display: block;
+  white-space: pre;
+}
+
+/* Line-number gutter — a deterministic CSS counter (no JS). The renderer adds
+   `fuaran-codeblock-numbered` on the container; a post-hydration highlighter
+   may replace this with per-line markup, but the bare structure stands alone. */
+.fuaran-codeblock-numbered .fuaran-codeblock-code {
+  counter-reset: fuaran-code-line;
+}
+
+.fuaran-codeblock-copy {
+  position: absolute;
+  top: var(--fuaran-space-sm, 8px);
+  right: var(--fuaran-space-sm, 8px);
+  padding: var(--fuaran-space-xs, 4px) var(--fuaran-space-sm, 8px);
+  border: var(--fuaran-border-width, 1px) solid var(--fuaran-code-copy-border, #45475a);
+  border-radius: var(--fuaran-radius-sm, 4px);
+  background: var(--fuaran-code-copy-bg, #313244);
+  color: inherit;
+  font-size: var(--fuaran-text-xs, 11px);
+  cursor: pointer;
+}
+
+/* ── Math (Phase 293) ──────────────────────────────────────────── */
+.fuaran-math-block {
+  display: block;
+  margin: var(--fuaran-space-md, 12px) 0;
+  text-align: center;
+  overflow-x: auto;
+}
+
+.fuaran-math-inline {
+  display: inline;
+}
+
+/* The deterministic fallback: the raw LaTeX source, monospace, until KaTeX
+   replaces it client-side. KaTeX (when present) hides this and inserts its own
+   rendered output — the no-JS reader keeps the source. */
+.fuaran-math-source {
+  font-family: var(--fuaran-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
+  color: var(--fuaran-tone-subdued-fg, #6b7280);
+}

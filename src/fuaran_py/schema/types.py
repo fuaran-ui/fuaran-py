@@ -44,6 +44,9 @@ ChartKind = Literal["Line", "Bar", "Area", "Pie", "Scatter", "Heatmap"]
 StyleRole = Literal["None", "Eyebrow", "Data", "Lede", "Caption"]
 FontVoice = Literal["Default", "Display", "Structural"]
 LiveRegion = Literal["polite", "assertive", "off"]
+ImageVariant = Literal["Default", "Avatar", "Rounded"]
+ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
+DateVariant = Literal["Date", "Time", "DateTime"]
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -655,6 +658,46 @@ class Disclosure:
         )
 
 
+@dataclass(frozen=True)
+class Modal:
+    children: tuple[UiNode, ...] = ()
+    open: Binding = field(default_factory=lambda: Static(False))
+    dismissable: bool = False
+    on_dismiss: Action = field(default_factory=Chain)
+    heading: TextSource | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Modal",
+            {
+                "children": list(self.children),
+                "dismissable": self.dismissable,
+                "heading": self.heading,
+                "onDismiss": self.on_dismiss,
+                "open": self.open,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class ScrollArea:
+    children: tuple[UiNode, ...] = ()
+    orientation: ScrollOrientation = "Vertical"
+    max_height: int | None = None
+    max_width: int | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "ScrollArea",
+            {
+                "children": list(self.children),
+                "maxHeight": self.max_height,
+                "maxWidth": self.max_width,
+                "orientation": self.orientation,
+            },
+        )
+
+
 # Display ---------------------------------------------------------------------
 
 
@@ -820,6 +863,53 @@ class Link:
                 "label": self.label,
                 "rel": self.rel,
                 "target": self.target,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class Image:
+    alt: TextSource
+    src: Binding
+    variant: ImageVariant = "Default"
+
+    def to_wire(self) -> Obj:
+        return _obj("Image", {"alt": self.alt, "src": self.src, "variant": self.variant})
+
+
+@dataclass(frozen=True)
+class List:
+    items: tuple[TextSource, ...] = ()
+    ordered: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj("List", {"items": list(self.items), "ordered": self.ordered})
+
+
+@dataclass(frozen=True)
+class Divider:
+    orientation: Orientation = "Horizontal"
+    label: TextSource | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj("Divider", {"label": self.label, "orientation": self.orientation})
+
+
+@dataclass(frozen=True)
+class Toast:
+    message: TextSource
+    open: Binding = field(default_factory=lambda: Static(False))
+    tone: Tone = "Default"
+    dismissable: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Toast",
+            {
+                "dismissable": self.dismissable,
+                "message": self.message,
+                "open": self.open,
+                "tone": self.tone,
             },
         )
 
@@ -1001,6 +1091,28 @@ class RangedNumber:
 
 
 @dataclass(frozen=True)
+class DateField:
+    value: Binding
+    variant: DateVariant = "Date"
+    min: str | None = None
+    max: str | None = None
+    step: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Date",
+            {
+                "max": self.max,
+                "min": self.min,
+                "onChange": CLOSURE,
+                "step": self.step,
+                "value": self.value,
+                "variant": self.variant,
+            },
+        )
+
+
+@dataclass(frozen=True)
 class ChoiceField:
     options: Binding
     value: Binding
@@ -1027,7 +1139,9 @@ class SegmentedChoice:
         )
 
 
-FormFieldKind = TextField | NumberField | CheckboxField | TextAreaField | RangedNumber | ChoiceField | SegmentedChoice
+FormFieldKind = (
+    TextField | NumberField | CheckboxField | TextAreaField | RangedNumber | DateField | ChoiceField | SegmentedChoice
+)
 
 
 @dataclass(frozen=True)

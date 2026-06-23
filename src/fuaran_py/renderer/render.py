@@ -298,6 +298,52 @@ class Renderer:
         )
         return element("div", [("class", "fuaran-layout-stepper")], numbers + body)
 
+    def _modal(self, node: Node, fields: dict[str, Value]) -> str:
+        # Overlay render-fidelity contract (server half): the overlay is ALWAYS
+        # emitted (no portal), positioned + z-indexed by CSS; closed = the
+        # `hidden` attribute. role="dialog" + aria-modal — byte-identical structure
+        # to the client renderer so hydration finds the DOM it expects.
+        is_open = resolve_binding(fields.get("open"), self.sources) is True
+        parts: list[str] = []
+        heading = fields.get("heading")
+        if heading is not None:
+            parts.append(text_element("h2", [("class", "fuaran-modal-heading")], self._text(heading)))
+        if fields.get("dismissable") is True:
+            parts.append(
+                text_element(
+                    "button",
+                    [("class", "fuaran-modal-dismiss"), ("type", "button"), ("aria-label", "Close")],
+                    "×",
+                )
+            )
+        parts.append(element("div", [("class", "fuaran-modal-body")], self._children_html(fields)))
+        dialog = element(
+            "div",
+            [("class", "fuaran-modal-dialog"), ("role", "dialog"), ("aria-modal", "true")],
+            "".join(parts),
+        )
+        overlay_attrs: list[tuple[str, str]] = [("class", "fuaran-modal-overlay")]
+        if not is_open:
+            overlay_attrs.append(("hidden", ""))
+        return element("div", overlay_attrs, dialog)
+
+    def _scroll_area(self, node: Node, fields: dict[str, Value]) -> str:
+        axis = {"Horizontal": "horizontal", "Both": "both"}.get(str(fields.get("orientation")), "vertical")
+        attrs: list[tuple[str, str]] = [
+            ("class", f"fuaran-scrollarea fuaran-scrollarea-{axis}"),
+            ("tabindex", "0"),
+        ]
+        style_parts: list[str] = []
+        max_height = fields.get("maxHeight")
+        if isinstance(max_height, int):
+            style_parts.append(f"max-height:{max_height}px")
+        max_width = fields.get("maxWidth")
+        if isinstance(max_width, int):
+            style_parts.append(f"max-width:{max_width}px")
+        if style_parts:
+            attrs.append(("style", ";".join(style_parts)))
+        return element("div", attrs, self._children_html(fields))
+
     # ── displays ─────────────────────────────────────────────────────────────
 
     def _heading(self, node: Node, fields: dict[str, Value]) -> str:
@@ -402,6 +448,75 @@ class Renderer:
         if fields.get("download") is True:
             attrs.append(("download", ""))
         return text_element("a", attrs, self._text(fields.get("label")))
+
+    def _image(self, node: Node, fields: dict[str, Value]) -> str:
+        src_value = resolve_binding(fields.get("src"), self.sources)
+        src = sanitize_url_or_blank(src_value if isinstance(src_value, str) else "")
+        variant = fields.get("variant")
+        cls = {
+            "Avatar": "fuaran-image fuaran-image-avatar",
+            "Rounded": "fuaran-image fuaran-image-rounded",
+        }.get(str(variant), "fuaran-image")
+        return void_element(
+            "img",
+            [("class", cls), ("src", src), ("alt", self._text(fields.get("alt")))],
+        )
+
+    def _list(self, node: Node, fields: dict[str, Value]) -> str:
+        raw = fields.get("items")
+        items_html = ""
+        if isinstance(raw, Arr):
+            items_html = "".join(
+                text_element("li", [("class", "fuaran-list-item")], self._text(item)) for item in raw.items
+            )
+        if fields.get("ordered") is True:
+            return element("ol", [("class", "fuaran-list fuaran-list-ordered")], items_html)
+        return element("ul", [("class", "fuaran-list fuaran-list-unordered")], items_html)
+
+    def _divider(self, node: Node, fields: dict[str, Value]) -> str:
+        vertical = fields.get("orientation") == "Vertical"
+        label = fields.get("label")
+        if vertical:
+            return element(
+                "div",
+                [
+                    ("class", "fuaran-divider fuaran-divider-vertical"),
+                    ("role", "separator"),
+                    ("aria-orientation", "vertical"),
+                ],
+                "",
+            )
+        if label is not None:
+            inner = text_element("span", [("class", "fuaran-divider-label")], self._text(label))
+            return element(
+                "div",
+                [("class", "fuaran-divider fuaran-divider-labelled"), ("role", "separator")],
+                inner,
+            )
+        return void_element("hr", [("class", "fuaran-divider fuaran-divider-horizontal")])
+
+    def _toast(self, node: Node, fields: dict[str, Value]) -> str:
+        # Overlay render-fidelity contract (server half): ALWAYS emitted; closed =
+        # the `hidden` attribute. role="status" + aria-live="polite".
+        is_open = resolve_binding(fields.get("open"), self.sources) is True
+        tone = str(fields.get("tone", "Default")).lower()
+        parts = [text_element("span", [("class", "fuaran-toast-message")], self._text(fields.get("message")))]
+        if fields.get("dismissable") is True:
+            parts.append(
+                text_element(
+                    "button",
+                    [("class", "fuaran-toast-dismiss"), ("type", "button"), ("aria-label", "Dismiss")],
+                    "×",
+                )
+            )
+        attrs: list[tuple[str, str]] = [
+            ("class", f"fuaran-toast fuaran-toast-{tone}"),
+            ("role", "status"),
+            ("aria-live", "polite"),
+        ]
+        if not is_open:
+            attrs.append(("hidden", ""))
+        return element("div", attrs, "".join(parts))
 
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────
 
@@ -615,6 +730,8 @@ _DISPATCH: dict[str, _KindHandler] = {
     "SummaryList": Renderer._summary_list,
     "Disclosure": Renderer._disclosure,
     "Stepper": Renderer._stepper,
+    "Modal": Renderer._modal,
+    "ScrollArea": Renderer._scroll_area,
     "Heading": Renderer._heading,
     "Markdown": Renderer._markdown,
     "Metric": Renderer._metric,
@@ -626,6 +743,10 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Sparkline": Renderer._sparkline,
     "LabelValueRow": Renderer._label_value_row,
     "Link": Renderer._link,
+    "Image": Renderer._image,
+    "List": Renderer._list,
+    "Divider": Renderer._divider,
+    "Toast": Renderer._toast,
     "Button": Renderer._button,
     "Select": Renderer._select,
     "Form": Renderer._form,

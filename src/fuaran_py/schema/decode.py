@@ -120,6 +120,9 @@ BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical",
 HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
 STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
 FONT_VOICE = frozenset({"Default", "Display", "Structural"})
+IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
+SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
+DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 
 TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
 # The Compute-layer binding cases are recognised so a data-bound node's source round-trips
@@ -160,6 +163,8 @@ KNOWN_KINDS = frozenset(
         "Stepper",
         "SummaryList",
         "Disclosure",
+        "Modal",
+        "ScrollArea",
         # Display
         "Heading",
         "Markdown",
@@ -172,6 +177,10 @@ KNOWN_KINDS = frozenset(
         "Skeleton",
         "LabelValueRow",
         "Link",
+        "Image",
+        "List",
+        "Divider",
+        "Toast",
         # Input
         "Form",
         "Button",
@@ -248,6 +257,41 @@ def _decode_children(value: object, path: str) -> Value:
     return Arr([_decode_node_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
 
 
+def _decode_text_source_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
+
+
+# Action cases (WIRE_FORMAT.md §3.3 / §4). Wire-survivable actions (e.g. a Modal's
+# ``onDismiss``) carry a real ``$type`` — validated here, then preserved structurally
+# (the same pass-through Form.onSubmit takes, which has no typed schema).
+ACTION_CASES = frozenset(
+    {
+        "Chain",
+        "Dispatch",
+        "Navigate",
+        "SetState",
+        "Notify",
+        "WriteToClipboard",
+        "ReadFileBody",
+    }
+)
+
+
+def _decode_action(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    _dispatch(obj, path, ACTION_CASES)
+    return from_json(value)  # action cases: structural (validated discriminator)
+
+
+def _decode_number(value: object, path: str) -> Value:
+    # A JSON number — an ``int`` or ``float`` (e.g. Date.step in seconds). bool is an
+    # int subclass; reject it as it is never a numeric value here.
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(WRONG_TYPE, path, f"expected a number at {path}")
+    return value  # type: ignore[return-value]
+
+
 # ── Per-kind field schemas: (field, required, decoder) ─────────────────────
 
 FieldDecoder = Callable[[object, str], Value]
@@ -313,6 +357,38 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("label", True, _decode_text_source),
         ("rel", False, _decode_string),
         ("target", False, _decode_string),
+    ],
+    "Image": [
+        ("alt", True, _decode_text_source),
+        ("src", True, _decode_binding),
+        ("variant", True, _enum_decoder(IMAGE_VARIANT, "variant")),
+    ],
+    "List": [
+        ("items", True, _decode_text_source_array),
+        ("ordered", True, _decode_bool),
+    ],
+    "Divider": [
+        ("orientation", True, _enum_decoder(ORIENTATION, "orientation")),
+        ("label", False, _decode_text_source),
+    ],
+    "Toast": [
+        ("dismissable", True, _decode_bool),
+        ("message", True, _decode_text_source),
+        ("open", True, _decode_binding),
+        ("tone", True, _enum_decoder(TONE, "tone")),
+    ],
+    "Modal": [
+        ("children", True, _decode_children),
+        ("dismissable", True, _decode_bool),
+        ("onDismiss", True, _decode_action),
+        ("open", True, _decode_binding),
+        ("heading", False, _decode_text_source),
+    ],
+    "ScrollArea": [
+        ("children", True, _decode_children),
+        ("orientation", True, _enum_decoder(SCROLL_ORIENTATION, "orientation")),
+        ("maxHeight", False, _decode_int),
+        ("maxWidth", False, _decode_int),
     ],
     "Dashboard": [
         ("children", True, _decode_children),

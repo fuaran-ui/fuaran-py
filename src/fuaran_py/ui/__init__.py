@@ -203,6 +203,9 @@ class accessibility:  # noqa: N801 — namespace object
     card = Accessibility(role="region")
     summary_list = Accessibility(role="region")
     disclosure = Accessibility(role="region")
+    modal = Accessibility(role="dialog")
+    scroll_area = Accessibility(role="region")
+    toast = Accessibility(role="status", live_region="polite")
     tabs = Accessibility(role="tablist")
     grid = Accessibility(role="region")
     chart = Accessibility(role="region", live_region="polite")
@@ -377,6 +380,38 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             id, t.Disclosure(tuple(children or ()), _text(heading), op, default_open), accessibility.disclosure
         )
 
+    @staticmethod
+    def modal(
+        id: str,  # noqa: A002
+        *,
+        children: list[UiNode] | None = None,
+        open: Binding | bool = False,  # noqa: A002
+        dismissable: bool = False,
+        on_dismiss: Action | None = None,
+        heading: t.TextInput | None = None,
+    ) -> UiNode:
+        op = t.Static(open) if isinstance(open, bool) else open
+        kind = t.Modal(
+            tuple(children or ()),
+            op,
+            dismissable,
+            on_dismiss if on_dismiss is not None else t.Chain(),
+            _text(heading) if heading is not None else None,
+        )
+        return _node(id, kind, accessibility.modal)
+
+    @staticmethod
+    def scroll_area(
+        id: str,  # noqa: A002
+        *,
+        children: list[UiNode] | None = None,
+        orientation: t.ScrollOrientation = "Vertical",
+        max_height: int | None = None,
+        max_width: int | None = None,
+    ) -> UiNode:
+        kind = t.ScrollArea(tuple(children or ()), orientation, max_height, max_width)
+        return _node(id, kind, accessibility.scroll_area)
+
     # ── Display ──────────────────────────────────────────────────────────────
     @staticmethod
     def heading(id: str, text: t.TextInput, *, level: int = 2, variant: t.HeadingVariant = "Standard") -> UiNode:  # noqa: A002
@@ -449,6 +484,37 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         download: bool = False,
     ) -> UiNode:
         return _node(id, t.Link(_str_binding(href), _text(label), download, rel, target), accessibility.none)
+
+    @staticmethod
+    def image(
+        id: str,  # noqa: A002
+        *,
+        src: t.StringInput,
+        alt: t.TextInput,
+        variant: t.ImageVariant = "Default",
+    ) -> UiNode:
+        return _node(id, t.Image(_text(alt), _str_binding(src), variant), accessibility.none)
+
+    @staticmethod
+    def divider(
+        id: str,  # noqa: A002
+        *,
+        orientation: t.Orientation = "Horizontal",
+        label: t.TextInput | None = None,
+    ) -> UiNode:
+        return _node(id, t.Divider(orientation, _text(label) if label is not None else None), accessibility.none)
+
+    @staticmethod
+    def toast(
+        id: str,  # noqa: A002
+        *,
+        message: t.TextInput,
+        open: Binding | bool = False,  # noqa: A002
+        tone: t.Tone = "Default",
+        dismissable: bool = False,
+    ) -> UiNode:
+        op = t.Static(open) if isinstance(open, bool) else open
+        return _node(id, t.Toast(_text(message), op, tone, dismissable), accessibility.toast)
 
     @staticmethod
     def sparkline(id: str, *, source: Binding) -> UiNode:  # noqa: A002
@@ -642,6 +708,18 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         args: dict[str, t.FragmentArg] | None = None,
     ) -> UiNode:
         return _node(id, t.FragmentRef(name, args), accessibility.none)
+
+    # ── Display (defined last: ``list`` shadows the ``list`` builtin used as a
+    #     type annotation by the constructors above, so it sits at the class foot
+    #     where no later annotation resolves the name) ──────────────────────────
+    @staticmethod
+    def list(  # noqa: A003 — wire kind name (cross-tier parity with F#/TS ``list``)
+        id: str,  # noqa: A002
+        *,
+        items: list[t.TextInput] | None = None,
+        ordered: bool = False,
+    ) -> UiNode:
+        return _node(id, t.List(tuple(_text(i) for i in (items or ())), ordered), accessibility.none)
 
 
 # ── Encoding ─────────────────────────────────────────────────────────────────

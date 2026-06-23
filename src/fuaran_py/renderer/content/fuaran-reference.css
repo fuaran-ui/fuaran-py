@@ -1705,3 +1705,191 @@ html[data-fuaran-disconnected]::before {
   color: var(--fuaran-tone-warning-fg, #b45309);
   border-bottom: 1px solid var(--fuaran-tone-warning-border, #fcd34d);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Wave 43 — component-vocabulary completion (Phases 287–289).
+   Image / List / Divider (Display); Modal / Toast / ScrollArea (overlays +
+   overflow). The overlay classes carry the SSR↔CSR render-fidelity contract:
+   overlays render INLINE (no portal), positioned + z-indexed purely by CSS,
+   so the server and client emit byte-identical structure (no hydration
+   mismatch). Closed overlays use the native `[hidden]` attribute.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Image (Phase 287) ─────────────────────────────────────────── */
+.fuaran-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--fuaran-radius-md, 6px);
+}
+
+.fuaran-image-avatar {
+  width: var(--fuaran-avatar-size, 40px);
+  height: var(--fuaran-avatar-size, 40px);
+  border-radius: var(--fuaran-radius-full, 9999px);
+  object-fit: cover;
+}
+
+.fuaran-image-rounded {
+  border-radius: var(--fuaran-radius-lg, 8px);
+}
+
+/* ── List (Phase 287) ──────────────────────────────────────────── */
+.fuaran-list {
+  margin: 0;
+  padding-left: var(--fuaran-space-xl, 20px);
+  color: var(--fuaran-tone-default-fg, #1f2937);
+}
+
+.fuaran-list-item {
+  margin: var(--fuaran-space-xs, 4px) 0;
+}
+
+/* ── Divider (Phase 287) ───────────────────────────────────────── */
+.fuaran-divider-horizontal {
+  border: none;
+  border-top: var(--fuaran-border-width, 1px) solid var(--fuaran-tone-default-border, #e5e7eb);
+  margin: var(--fuaran-space-md, 12px) 0;
+}
+
+.fuaran-divider-vertical {
+  display: inline-block;
+  width: var(--fuaran-border-width, 1px);
+  align-self: stretch;
+  background: var(--fuaran-tone-default-border, #e5e7eb);
+  margin: 0 var(--fuaran-space-md, 12px);
+}
+
+.fuaran-divider-labelled {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--fuaran-tone-subdued-fg, #6b7280);
+  font-size: var(--fuaran-text-sm, 13px);
+  margin: var(--fuaran-space-md, 12px) 0;
+}
+
+.fuaran-divider-labelled::before,
+.fuaran-divider-labelled::after {
+  content: "";
+  flex: 1;
+  border-top: var(--fuaran-border-width, 1px) solid var(--fuaran-tone-default-border, #e5e7eb);
+}
+
+.fuaran-divider-label {
+  padding: 0 var(--fuaran-space-md, 12px);
+}
+
+/* ── ScrollArea (Phase 289) ────────────────────────────────────── */
+.fuaran-scrollarea {
+  position: relative;
+}
+
+.fuaran-scrollarea-vertical {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.fuaran-scrollarea-horizontal {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.fuaran-scrollarea-both {
+  overflow: auto;
+}
+
+/* ── Toast (Phase 289 — overlay render-fidelity contract) ──────── */
+/* Inline (no portal); CSS owns position + stacking so SSR and CSR agree. */
+.fuaran-toast {
+  position: fixed;
+  bottom: var(--fuaran-space-lg, 16px);
+  right: var(--fuaran-space-lg, 16px);
+  z-index: var(--fuaran-z-toast, 1100);
+  display: flex;
+  align-items: center;
+  gap: var(--fuaran-space-md, 12px);
+  max-width: var(--fuaran-toast-max-width, 360px);
+  padding: var(--fuaran-space-md, 12px) var(--fuaran-space-lg, 16px);
+  border-radius: var(--fuaran-radius-md, 6px);
+  box-shadow: var(--fuaran-shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1));
+  background: var(--fuaran-tone-default-bg, #ffffff);
+  border: var(--fuaran-border-width, 1px) solid var(--fuaran-tone-default-border, #e5e7eb);
+  color: var(--fuaran-tone-default-fg, #1f2937);
+}
+
+.fuaran-toast[hidden] {
+  display: none;
+}
+
+.fuaran-toast-info {
+  border-color: var(--fuaran-tone-info-border, #93c5fd);
+}
+.fuaran-toast-success {
+  border-color: var(--fuaran-tone-success-border, #86efac);
+}
+.fuaran-toast-warning {
+  border-color: var(--fuaran-tone-warning-border, #fcd34d);
+}
+.fuaran-toast-critical {
+  border-color: var(--fuaran-tone-critical-border, #fca5a5);
+}
+
+.fuaran-toast-message {
+  flex: 1;
+}
+
+.fuaran-toast-dismiss,
+.fuaran-modal-dismiss {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--fuaran-text-lg, 16px);
+  line-height: 1;
+  color: var(--fuaran-tone-subdued-fg, #6b7280);
+  padding: var(--fuaran-space-xs, 4px);
+}
+
+/* ── Modal (Phase 289 — overlay render-fidelity contract) ──────── */
+/* Inline (no portal); the overlay is ALWAYS in the DOM, closed via [hidden].
+   CSS owns the fixed-position backdrop + centring + z-index so the server and
+   client emit identical structure. Focus-trap is a client-only enhancement
+   that does not alter the hydrated DOM. */
+.fuaran-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--fuaran-z-modal, 1000);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fuaran-space-lg, 16px);
+  background: var(--fuaran-modal-backdrop, rgba(0, 0, 0, 0.5));
+}
+
+.fuaran-modal-overlay[hidden] {
+  display: none;
+}
+
+.fuaran-modal-dialog {
+  position: relative;
+  max-width: var(--fuaran-modal-max-width, 560px);
+  width: 100%;
+  max-height: calc(100% - var(--fuaran-space-xl, 20px));
+  overflow-y: auto;
+  background: var(--fuaran-tone-default-bg, #ffffff);
+  border-radius: var(--fuaran-radius-lg, 8px);
+  box-shadow: var(--fuaran-shadow-xl, 0 20px 25px -5px rgba(0, 0, 0, 0.1));
+  padding: var(--fuaran-space-xl, 20px);
+}
+
+.fuaran-modal-heading {
+  margin: 0 0 var(--fuaran-space-md, 12px) 0;
+  font-size: var(--fuaran-text-xl, 18px);
+  font-weight: var(--fuaran-font-weight-semibold, 600);
+}
+
+.fuaran-modal-dismiss {
+  position: absolute;
+  top: var(--fuaran-space-md, 12px);
+  right: var(--fuaran-space-md, 12px);
+}

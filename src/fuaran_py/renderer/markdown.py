@@ -817,11 +817,11 @@ def _parse_blocks(lines: list[str]) -> list:
         elif (
             "|" in line
             and i + 1 < n
-            and _parse_align_row(lines[i + 1]) is not None
-            and len(_parse_align_row(lines[i + 1])) == len(_split_table_row(line))
+            and (align_row := _parse_align_row(lines[i + 1])) is not None
+            and len(align_row) == len(_split_table_row(line))
         ):
             headers = _split_table_row(line)
-            aligns = _parse_align_row(lines[i + 1])
+            aligns = align_row
             rows: list[list[str]] = []
             j = i + 2
             while j < n and not _is_blank(lines[j]) and "|" in lines[j]:

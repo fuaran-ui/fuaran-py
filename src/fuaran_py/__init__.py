@@ -17,6 +17,7 @@ Canonical imports::
 from __future__ import annotations
 
 from .dag import DagOpRecord, DagResultEnvelope, decode_dag_record, encode_dag_record
+from .merge import MergeConflict, MergeConflicts, MergeOk, MergeResult, merge_3way
 from .model import Arr, Node, Obj, from_json
 from .ops import decode_op, encode_op
 from .result import (
@@ -40,6 +41,11 @@ __all__ = [
     "encode_dag_record",
     "DagOpRecord",
     "DagResultEnvelope",
+    "merge_3way",
+    "MergeOk",
+    "MergeConflicts",
+    "MergeConflict",
+    "MergeResult",
     "validate_node",
     "Finding",
     "Node",

@@ -19,6 +19,9 @@ CORPUS_ROOT = Path(__file__).resolve().parents[2] / "wire-format-fixtures"
 # The additive DAG-record sub-corpus carries its own manifest under dag/.
 DAG_CORPUS_ROOT = CORPUS_ROOT / "dag"
 
+# The additive merge-conformance sub-corpus carries its own manifest.
+MERGE_CORPUS_ROOT = CORPUS_ROOT / "merge-conformance"
+
 
 def corpus_available() -> bool:
     return (CORPUS_ROOT / "manifest.json").is_file()
@@ -26,6 +29,10 @@ def corpus_available() -> bool:
 
 def dag_corpus_available() -> bool:
     return (DAG_CORPUS_ROOT / "manifest.json").is_file()
+
+
+def merge_corpus_available() -> bool:
+    return (MERGE_CORPUS_ROOT / "manifest.json").is_file()
 
 
 corpus_required = pytest.mark.skipif(
@@ -51,4 +58,17 @@ def dag_fixtures() -> list[dict]:
     if not dag_corpus_available():
         return []
     manifest = json.loads((DAG_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    return list(manifest["fixtures"])
+
+
+merge_corpus_required = pytest.mark.skipif(
+    not merge_corpus_available(),
+    reason=f"merge-conformance sub-corpus not found at {MERGE_CORPUS_ROOT}",
+)
+
+
+def merge_fixtures() -> list[dict]:
+    if not merge_corpus_available():
+        return []
+    manifest = json.loads((MERGE_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
     return list(manifest["fixtures"])

@@ -16,9 +16,16 @@ import pytest
 # tests/_corpus.py → tests → fuaran-py → Fuaran-UI → wire-format-fixtures
 CORPUS_ROOT = Path(__file__).resolve().parents[2] / "wire-format-fixtures"
 
+# The additive DAG-record sub-corpus carries its own manifest under dag/.
+DAG_CORPUS_ROOT = CORPUS_ROOT / "dag"
+
 
 def corpus_available() -> bool:
     return (CORPUS_ROOT / "manifest.json").is_file()
+
+
+def dag_corpus_available() -> bool:
+    return (DAG_CORPUS_ROOT / "manifest.json").is_file()
 
 
 corpus_required = pytest.mark.skipif(
@@ -32,3 +39,16 @@ def fixtures_of(*kinds: str) -> list[dict]:
         return []
     manifest = json.loads((CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
     return [fx for fx in manifest["fixtures"] if fx["kind"] in kinds]
+
+
+dag_corpus_required = pytest.mark.skipif(
+    not dag_corpus_available(),
+    reason=f"DAG sub-corpus not found at {DAG_CORPUS_ROOT}",
+)
+
+
+def dag_fixtures() -> list[dict]:
+    if not dag_corpus_available():
+        return []
+    manifest = json.loads((DAG_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    return list(manifest["fixtures"])

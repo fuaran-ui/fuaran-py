@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..dag import decode_dag_record, encode_dag_record
 from ..ops import decode_op, encode_op
 from ..schema import decode_node, encode_node
 
@@ -58,6 +59,16 @@ def run_fixture(fixture: dict, corpus_root: Path) -> FixtureResult:
 
     input_text = (corpus_root / fixture["inputFile"]).read_text(encoding="utf-8")
 
+    if kind == "dag-record-round-trip":
+        dag_result: Any = decode_dag_record(input_text)
+        if not dag_result.ok:
+            return FixtureResult(fid, kind, False, f"expected decode to succeed, got {dag_result.error}")
+        reencoded = encode_dag_record(dag_result.value)
+        expected = _canon((corpus_root / fixture["expectedFile"]).read_text(encoding="utf-8"))
+        if reencoded == expected:
+            return FixtureResult(fid, kind, True, "byte-identical round-trip")
+        return FixtureResult(fid, kind, False, _first_diff(reencoded, expected))
+
     if kind in ("node-round-trip", "op-round-trip"):
         result = decode(input_text)
         if not result.ok:
@@ -87,3 +98,10 @@ def run_fixture(fixture: dict, corpus_root: Path) -> FixtureResult:
 def run_corpus(corpus_root: Path) -> list[FixtureResult]:
     manifest = json.loads((corpus_root / "manifest.json").read_text(encoding="utf-8"))
     return [run_fixture(fx, corpus_root) for fx in manifest["fixtures"]]
+
+
+def run_dag_corpus(dag_root: Path) -> list[FixtureResult]:
+    """Run the additive ``dag/`` sub-corpus (its own ``manifest.json``), whose
+    fixtures are ``dag-record-round-trip`` and resolve relative to ``dag_root``."""
+    manifest = json.loads((dag_root / "manifest.json").read_text(encoding="utf-8"))
+    return [run_fixture(fx, dag_root) for fx in manifest["fixtures"]]

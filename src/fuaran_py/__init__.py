@@ -9,12 +9,14 @@ corpus, not a transpile of any other host.
 Canonical imports::
 
     from fuaran_py import decode_node, encode_node, decode_op, encode_op
+    from fuaran_py import decode_dag_record, encode_dag_record   # branching op-stream
     from fuaran_py import Ok, Err, DecodeError
     from fuaran_py.renderer import render_html      # optional headless renderer
 """
 
 from __future__ import annotations
 
+from .dag import DagOpRecord, DagResultEnvelope, decode_dag_record, encode_dag_record
 from .model import Arr, Node, Obj, from_json
 from .ops import decode_op, encode_op
 from .result import (
@@ -34,6 +36,10 @@ __all__ = [
     "encode_node",
     "decode_op",
     "encode_op",
+    "decode_dag_record",
+    "encode_dag_record",
+    "DagOpRecord",
+    "DagResultEnvelope",
     "validate_node",
     "Finding",
     "Node",

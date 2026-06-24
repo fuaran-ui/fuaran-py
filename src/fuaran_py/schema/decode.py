@@ -282,6 +282,10 @@ ACTION_CASES = frozenset(
         "Notify",
         "WriteToClipboard",
         "ReadFileBody",
+        "Call",
+        "AiTool",
+        "CommitLocal",
+        "Invoke",
     }
 )
 

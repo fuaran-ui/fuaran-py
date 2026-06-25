@@ -14,14 +14,13 @@ interactive surfaces are the Wave 35 co-equality expansion (Phases 278–281).
 **Framing — load-bearing, do not regress.** The LLM's emission surface is the
 **canonical JSON wire format, for every host**. The three language tiers (F#, TS,
 Python) are **human-developer authoring surfaces** that produce that JSON; the AI
-never authors host-language code (cf. the eval suite's `PyBare` condition, which
-exists as the structure-free *baseline to beat*, not a direction). Python being
+never authors host-language code — a structure-free baseline exists only as the
+*thing to beat*, not a direction. Python being
 the language AI orchestrators are written in is a reason it is *valuable*, not a
 reason to make it a lesser, codec-only kind of artefact than F#/TS.
 
-This is a sibling repo under the Fuaran-UI sub-estate at `../` (alongside
-`fuaran`, `fuaran-ts`, `orchestration`, `orchestrator-demo`, `eval-suite`).
-Cross-repo conventions (port allocation, Sync All, strategic commands, the
+This repo sits under the Fuaran-UI sub-estate at `../`, alongside the public
+`fuaran` and `fuaran-ts` tiers. Cross-repo conventions (port allocation, Sync All, strategic commands, the
 formatting mandate, the language-baseline pinning, the OSS publication boundary)
 live in the workspace `CLAUDE.md` (`../../../CLAUDE.md`) and the Fuaran-UI
 sub-estate `CLAUDE.md` (`../CLAUDE.md`). Read those first.
@@ -176,7 +175,8 @@ the repo is standalone-testable). It produces a Python package, not a NuGet pack
 
 `fuaran-py` is OSS-public (Apache 2.0). Per the workspace OSS publication
 boundary, **shipped artefacts** (source, README, package metadata) reference only
-"the Fuaran UI wire format" generically — never a private sibling/package name
-(`orchestration`, `orchestrator-demo`, `eval-suite`, the `Fuaran.UI.Orchestration.*`
-/ `ToolUp.Fuaran.Adapter.*` packages), commercial product names, or the
-strategic-command names. This `CLAUDE.md` is workspace-internal and not shipped.
+"the Fuaran UI wire format" generically — never a private sibling/package name,
+commercial product names, or the strategic-command names. The specific banned
+list lives in the workspace OSS publication boundary doc, not here. This
+`CLAUDE.md` lives in the public repo, so it observes the same boundary — it names
+no private sibling, package, product, or command.

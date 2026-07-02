@@ -12,6 +12,7 @@ Canonical imports::
     from fuaran_py import decode_dag_record, encode_dag_record   # branching op-stream
     from fuaran_py import Ok, Err, DecodeError
     from fuaran_py.renderer import render_html      # optional headless renderer
+    from fuaran_py.client import FuaranClient, FuaranSession   # generation-endpoint client
 """
 
 from __future__ import annotations

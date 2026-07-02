@@ -25,6 +25,7 @@ without a client runtime.
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |
 | `fuaran_py.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
 | `fuaran_py.runtime` | Interactive Pyodide client runtime — the in-browser mount + dispatch→apply→re-render loop, behind an injectable `BrowserDeps` seam. |
+| `fuaran_py.client` | Typed client over the Fuaran generation endpoint — `FuaranClient.generate` + the `FuaranSession` turn loop (holds the tree → repair diffs). See [Generate](#generate-client-for-the-hosted-endpoint-optional) below and [examples/quickstart_client.py](examples/quickstart_client.py). |
 
 ## Install
 
@@ -116,6 +117,75 @@ counter_runtime().mount("fuaran-root")   # clicking "+1" re-renders the count
 Browser-API access is behind an injectable `BrowserDeps` seam (default: the Pyodide
 `js` interop module), so the package stays stdlib-only and importable under plain
 CPython; tests drive the loop against a fake DOM.
+
+## Generate (client for the hosted endpoint, optional)
+
+The **Fuaran generation endpoint** is a paid, stateless, bring-your-own-key
+(BYOK) HTTPS surface: it takes a prompt (+ an optional current tree) and returns
+a new canonical wire-format tree. `fuaran_py.client` is a thin, typed,
+stdlib-only layer over it that collapses the integration to **call, hold the
+tree, repair**:
+
+```python
+import os
+from fuaran_py.client import FuaranClient, FuaranSession, Produced
+
+client = FuaranClient(
+    "https://<your-endpoint>/generate",
+    access_token=os.environ["FUARAN_ACCESS_TOKEN"],   # the paid credential
+    provider_key=os.environ["PROVIDER_API_KEY"],      # your BYOK LLM key
+)
+session = FuaranSession(client)
+result = session.next("a metric card showing revenue")   # fresh generation
+if isinstance(result, Produced):
+    tree = result.decode_tree()                # typed Node via the wire codec
+result = session.next("rename the metric to ARR")  # a cheap repair diff
+```
+
+Every call returns a typed three-way result — `Produced` (the new tree JSON +
+the ops applied + the surface-version echo), `AccessDenied` (the token was
+rejected at the edge, before your BYOK key was touched), or `TurnFailed` (a
+recoverable stage-tagged envelope; for the `apply` stage its message carries the
+hint the next prompt can re-emit against). The client never raises for an
+endpoint-level outcome; transport errors surface as a `TurnFailed` with a
+`NETWORK` code. `Produced.decode_tree()` / `AppliedOp.decode()` hand back typed
+values through the same codec the corpus certifies — you never parse raw model
+output by hand.
+
+The session holds the current tree between turns, so each subsequent prompt is
+a **repair** against it (a cheap diff) rather than a from-scratch regeneration
+— the token-saving ergonomic the loop is built around. `session.reset()`
+forgets the tree; `FuaranSession(client, initial_tree_json=...)` seeds it so
+the first turn is already a repair.
+
+### BYOK key and access token — where each credential lives
+
+Two credentials cross the wire, and they are not the same kind of secret:
+
+- the **access token** — the paid credential for the endpoint. Sent in the
+  request body and (by default) as an `Authorization: Bearer` header.
+- the **BYOK provider key** — your own LLM-provider API key. Sent in the
+  request body only, **never in a header**; the endpoint uses it in memory for
+  the one call and never stores, logs, or meters it. The client mirrors that
+  posture: the key appears in no header, no error envelope, and no `repr` —
+  a logged client object cannot leak it.
+
+Pick the placement by who can see the calling environment:
+
+- **Direct** (a server-side script, a notebook, a backend service you control):
+  pass both credentials to `FuaranClient(...)`, sourced from environment
+  variables or a secret store. Never commit either; never bundle the BYOK key
+  into anything you ship.
+- **Server-proxied** (anything user-facing or multi-user — a web app, a
+  Pyodide/browser host, a shared tool): point `endpoint` at **your own proxy
+  path** and pass **no credentials** client-side. Your proxy injects both
+  server-side (`wire.to_wire_body` / `wire.parse_turn_response` are exported
+  for exactly this), so the BYOK key never reaches the calling environment.
+
+The contract this client is built against is stamped
+`fuaran_py.client.SURFACE_VERSION`; a produced result echoes the live surface's
+version, and `is_surface_version_compatible(echoed)` tells you whether the
+shape is one this client understands (major-version check).
 
 ## The canonical number form (the make-or-break)
 

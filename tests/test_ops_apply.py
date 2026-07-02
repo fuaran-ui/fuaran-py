@@ -18,7 +18,7 @@ from fuaran_py.model import Arr, Node, Obj
 from fuaran_py.ops import apply, decode_op
 from fuaran_py.ops.apply import ApplyErr
 from fuaran_py.schema import types as t
-from fuaran_py.ui import encode, fuaran, node
+from fuaran_py.ui import binding, encode, fuaran, node
 
 
 def _full_metric(node_id: str = "metric-1", *, label: str = "Revenue", source: t.Binding | None = None) -> t.UiNode:
@@ -215,7 +215,7 @@ def test_unknown_field() -> None:
     assert _err(_apply_op(op, base)) == "FieldNotFound"
 
 
-def test_nested_path_not_supported() -> None:
+def test_nested_path_without_a_nested_surface_not_supported() -> None:
     base = fuaran.markdown("md", "x")
     op = Obj("UpdateProp", {"path": "Spec.Text", "target": "md", "value": "v"})
     assert _err(_apply_op(op, base)) == "PathNotSupportedYet"
@@ -275,3 +275,118 @@ def test_every_op_fixture_applies_against_a_stack(name: str) -> None:
     base = fuaran.stack("stack-1", children=[_full_metric(), _MARKDOWN_1])
     result = _apply_fixture(name, base)
     assert getattr(result, "ok", False), result
+
+
+# ── Nested paths (WIRE_FORMAT.md §3.4 — Phase-364 parity) ────────────────────
+
+
+def _channel_grid(*, first_label: str = "Channel") -> t.UiNode:
+    return node.bare(
+        fuaran.grid(
+            "grid-1",
+            source=binding.opaque(),
+            columns=[t.Column(first_label), t.Column("Spend")],
+        )
+    )
+
+
+def _mix_chart(*, y_fields: list[str]) -> t.UiNode:
+    return node.bare(fuaran.chart("chart-1", source=binding.opaque(), x_field="month", y_fields=y_fields))
+
+
+def _signup_form(*, name_required: bool) -> t.UiNode:
+    return node.bare(
+        fuaran.form(
+            "form-1",
+            fields=[
+                t.FormField("name", t.LiteralText("Name"), t.TextField(t.Static("")), name_required),
+                t.FormField("age", t.LiteralText("Age"), t.NumberField(t.Static(0)), False),
+            ],
+        )
+    )
+
+
+@corpus_required
+def test_nested_column_label_renames_a_grid_column() -> None:
+    base = _channel_grid()
+    expected = _channel_grid(first_label="Channel name")
+    _assert_tree(_apply_fixture("op-updateprop-nested-column0-label", base), expected)
+
+
+@corpus_required
+def test_nested_yfield_rewrites_an_indexed_scalar_leaf() -> None:
+    base = _mix_chart(y_fields=["revenue", "cost"])
+    expected = _mix_chart(y_fields=["revenue", "profit"])
+    _assert_tree(_apply_fixture("op-updateprop-nested-yfield1", base), expected)
+
+
+@corpus_required
+def test_nested_field_required_flips_a_form_field_flag() -> None:
+    base = _signup_form(name_required=False)
+    expected = _signup_form(name_required=True)
+    _assert_tree(_apply_fixture("op-updateprop-nested-field0-required", base), expected)
+
+
+@corpus_required
+def test_nested_bad_index_is_position_out_of_range() -> None:
+    op = decode_op(_op_text("op-updateprop-nested-badindex"))
+    assert op.ok, op
+    assert _err(apply(op.value, _decode_tree(_channel_grid()))) == "PositionOutOfRange"
+
+
+@corpus_required
+def test_nested_bad_field_is_field_not_found() -> None:
+    op = decode_op(_op_text("op-updateprop-nested-badfield"))
+    assert op.ok, op
+    assert _err(apply(op.value, _decode_tree(_channel_grid()))) == "FieldNotFound"
+
+
+@corpus_required
+def test_nested_malformed_index_is_path_invalid() -> None:
+    op = decode_op(_op_text("op-updateprop-nested-malformed"))
+    assert op.ok, op
+    assert _err(apply(op.value, _decode_tree(_channel_grid()))) == "PathInvalid"
+
+
+def test_nested_tab_header_label_renames_the_second_header() -> None:
+    def tabs_with(second_label: str) -> t.UiNode:
+        return node.bare(
+            fuaran.tabs(
+                "analysis-tabs",
+                children=[fuaran.markdown("tab-a", "A"), fuaran.markdown("tab-b", "B")],
+                tab_headers=[
+                    t.TabHeader(label=t.LiteralText("Overview")),
+                    t.TabHeader(label=t.LiteralText(second_label)),
+                ],
+            )
+        )
+
+    op = Obj(
+        "UpdateProp",
+        {
+            "path": "TabHeaders[1].Label",
+            "target": "analysis-tabs",
+            "value": Obj("Literal", {"text": "Breakdown"}),
+        },
+    )
+    result = _apply_op(op, tabs_with("Detail"))
+    _assert_tree(result, tabs_with("Breakdown"))
+
+
+def test_nested_tab_headers_absent_is_position_out_of_range() -> None:
+    base = fuaran.tabs("bare-tabs", children=[fuaran.markdown("only", "x")])
+    op = Obj(
+        "UpdateProp",
+        {"path": "TabHeaders[0].Label", "target": "bare-tabs", "value": Obj("Literal", {"text": "X"})},
+    )
+    assert _err(_apply_op(op, node.bare(base))) == "PositionOutOfRange"
+
+
+def test_nested_list_segment_without_index_is_path_invalid() -> None:
+    op = Obj("UpdateProp", {"path": "Columns.Label", "target": "grid-1", "value": "X"})
+    assert _err(_apply_op(op, _channel_grid())) == "PathInvalid"
+
+
+def test_nested_closure_leaf_is_path_not_supported() -> None:
+    op = Obj("UpdateProp", {"path": "Columns[0].Kind", "target": "grid-1", "value": "Text"})
+    assert _err(_apply_op(op, _channel_grid())) == "PathNotSupportedYet"

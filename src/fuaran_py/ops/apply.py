@@ -10,8 +10,11 @@ This is a sibling port of the F# (``Fuaran.UI.Ops.Apply``) and TypeScript
 (``@fuaran-ui/ops`` ``apply``) engines, built to match their semantics: structural
 child ops (``InsertChild`` / ``RemoveNode`` / ``MoveNode`` / ``ReorderChildren``)
 address layout kinds only (every layout spec carries an ordered ``children`` list);
-``UpdateProp`` is top-level-path-only in v1; ``ReplaceRoot`` is the only op that may
-change the root id; ``Batch`` is recursive and all-or-nothing.
+``UpdateProp`` paths follow the WIRE_FORMAT.md §3.4 grammar — dot-separated field
+segments with optional 0-based ``[i]`` list indices, traversed through the same
+per-kind nested surface the sibling engines implement (grid ``Columns[i]``, chart
+``YFields[i]``, tabs ``TabHeaders[i]``, form ``Fields[i]``); ``ReplaceRoot`` is the
+only op that may change the root id; ``Batch`` is recursive and all-or-nothing.
 
 The engine folds over the **generic structural model** (:mod:`fuaran_py.model`) the
 codec produces — the wire is flat, so a layout's children are just the ``children``
@@ -422,6 +425,193 @@ def _update_field(field: str, value: Value, kind: Obj) -> _Outcome:
     return _Outcome("updated", Obj(kind.tag, fields))
 
 
+# ── UpdateProp path parser (WIRE_FORMAT.md §3.4 grammar — Phase-364 parity) ──
+#
+#   path     := segment ( "." segment )*
+#   segment  := field ( "[" index "]" )?
+#   field    := [A-Za-z_][A-Za-z0-9_]*
+#   index    := "0" | [1-9][0-9]*
+#
+# Hand-rolled (no regex) to mirror the F#/TS reference parsers exactly;
+# character classes are strict ASCII per the grammar.
+
+
+@dataclass(frozen=True)
+class _PathSeg:
+    field: str
+    index: int | None = None
+
+
+def _is_field_start(c: str) -> bool:
+    return "A" <= c <= "Z" or "a" <= c <= "z" or c == "_"
+
+
+def _is_field_char(c: str) -> bool:
+    return _is_field_start(c) or "0" <= c <= "9"
+
+
+def _parse_segment(raw: str) -> _PathSeg | str:
+    """Parse one path segment; returns the segment or an error-reason string."""
+    if raw == "":
+        return "empty segment"
+    bracket = raw.find("[")
+    field_part = raw if bracket < 0 else raw[:bracket]
+    if field_part == "" or not _is_field_start(field_part[0]) or not all(_is_field_char(c) for c in field_part):
+        return f"segment '{raw}' is not a field name"
+    if bracket < 0:
+        return _PathSeg(field_part)
+    index_part = raw[bracket:]
+    if len(index_part) < 3 or index_part[-1] != "]":
+        return f"malformed index in segment '{raw}'"
+    digits = index_part[1:-1]
+    if digits == "" or not all("0" <= c <= "9" for c in digits):
+        return f"index in segment '{raw}' must be a non-negative decimal integer"
+    if len(digits) > 1 and digits[0] == "0":
+        return f"index in segment '{raw}' has a leading zero"
+    return _PathSeg(field_part, int(digits))
+
+
+def _parse_path(path: str) -> list[_PathSeg] | str:
+    """Parse a full path; returns the segments or an error-reason string."""
+    if path.strip() == "":
+        return "empty path"
+    segs: list[_PathSeg] = []
+    for raw in path.split("."):
+        seg = _parse_segment(raw)
+        if isinstance(seg, str):
+            return seg
+        segs.append(seg)
+    return segs
+
+
+# ── UpdateProp nested surface (Phase-364 parity) ─────────────────────────────
+#
+# Mirrors the F#/TS nested legs: grid ``Columns[i].{Label,Format,Width}``,
+# chart ``YFields[i]`` (indexed scalar leaf), tabs
+# ``TabHeaders[i].{Label,Icon,Disabled}``, form
+# ``Fields[i].{Label,Required,Help}``. Closure-bearing sub-fields
+# (``Value`` / ``Kind`` / ``Id``) are never addressable.
+
+_COLUMN_WIDTH_CASES = frozenset({"Auto", "Fixed", "Flex"})
+
+
+def _coerce_column_width(v: Value) -> _Coerced:
+    if isinstance(v, Obj) and v.tag in _COLUMN_WIDTH_CASES:
+        return _Coerced(True, v)
+    return _Coerced(False, detail="expected a ColumnWidth object (Auto | Fixed | Flex)")
+
+
+@dataclass(frozen=True)
+class _NestedOutcome:
+    tag: str  # "updated" | "fieldNotFound" | "missingIndex" | "indexOutOfRange" | "notSupported" | "typeMismatch"
+    kind: Obj | None = None
+    detail: str = ""
+    list_field: str = ""
+    count: int = 0
+    requested: int = 0
+    segment: str = ""
+    available: tuple[str, ...] = ()
+
+
+# (PascalCase list field) per kind tag -> (camelCase wire key,
+#   { PascalCase leaf: (camelCase wire key, coercer) }, closure-bearing leaves).
+_NESTED_RECORD_LISTS: dict[str, dict[str, tuple[str, dict[str, tuple[str, _Coercer]], frozenset[str]]]] = {
+    "DataGrid": {
+        "Columns": (
+            "columns",
+            {
+                "Label": ("label", _coerce_string),
+                "Format": ("format", _coerce_cell_format),
+                "Width": ("width", _coerce_column_width),
+            },
+            frozenset({"Value", "Kind"}),
+        )
+    },
+    "Tabs": {
+        "TabHeaders": (
+            "tabHeaders",
+            {
+                "Label": ("label", _coerce_text_source),
+                "Icon": ("icon", _coerce_string),
+                "Disabled": ("disabled", _coerce_binding_bool),
+            },
+            frozenset(),
+        )
+    },
+    "Form": {
+        "Fields": (
+            "fields",
+            {
+                "Label": ("label", _coerce_text_source),
+                "Required": ("required", _coerce_bool),
+                "Help": ("help", _coerce_text_source),
+            },
+            frozenset({"Id", "Kind"}),
+        )
+    },
+}
+
+
+def _update_nested(segs: list[_PathSeg], value: Value, kind: Obj) -> _NestedOutcome:
+    head, rest = segs[0], segs[1:]
+
+    # Chart YFields — the indexed scalar-leaf case (the element IS the string).
+    if kind.tag == "Chart":
+        if head.field != "YFields":
+            return _NestedOutcome("fieldNotFound", segment=head.field, available=("YFields",))
+        y = kind.fields.get("yFields")
+        items = list(y.items) if isinstance(y, Arr) else []
+        if head.index is None:
+            return _NestedOutcome("missingIndex", list_field="YFields", count=len(items))
+        if head.index >= len(items):
+            return _NestedOutcome("indexOutOfRange", list_field="YFields", count=len(items), requested=head.index)
+        if rest:
+            return _NestedOutcome("notSupported")
+        coerced = _coerce_string(value)
+        if not coerced.ok:
+            return _NestedOutcome("typeMismatch", detail=coerced.detail)
+        items[head.index] = coerced.value
+        fields = dict(kind.fields)
+        fields["yFields"] = Arr(items)
+        return _NestedOutcome("updated", Obj(kind.tag, fields))
+
+    table = _NESTED_RECORD_LISTS.get(kind.tag or "")
+    if table is None:
+        return _NestedOutcome("notSupported")
+    entry = table.get(head.field)
+    if entry is None:
+        return _NestedOutcome("fieldNotFound", segment=head.field, available=tuple(table))
+    wire_key, leaves, closure_leaves = entry
+    raw_list = kind.fields.get(wire_key)
+    # An absent optional list (e.g. tabHeaders) addresses like an empty one.
+    items = list(raw_list.items) if isinstance(raw_list, Arr) else []
+    if head.index is None:
+        return _NestedOutcome("missingIndex", list_field=head.field, count=len(items))
+    if head.index >= len(items):
+        return _NestedOutcome("indexOutOfRange", list_field=head.field, count=len(items), requested=head.index)
+    leaf = rest[0].field if len(rest) == 1 and rest[0].index is None else None
+    if leaf is None:
+        return _NestedOutcome("notSupported")
+    if leaf in closure_leaves:
+        return _NestedOutcome("notSupported")
+    leaf_entry = leaves.get(leaf)
+    if leaf_entry is None:
+        return _NestedOutcome("fieldNotFound", segment=leaf, available=tuple(leaves))
+    leaf_key, coercer = leaf_entry
+    coerced = coercer(value)
+    if not coerced.ok:
+        return _NestedOutcome("typeMismatch", detail=coerced.detail)
+    element = items[head.index]
+    if not isinstance(element, Obj):
+        return _NestedOutcome("notSupported")
+    element_fields = dict(element.fields)
+    element_fields[leaf_key] = coerced.value
+    items[head.index] = Obj(element.tag, element_fields)
+    fields = dict(kind.fields)
+    fields[wire_key] = Arr(items)
+    return _NestedOutcome("updated", Obj(kind.tag, fields))
+
+
 # ── ReplaceBinding slot surface ──────────────────────────────────────────────
 
 # (kind tag, op slot) -> camelCase binding-bearing wire key.
@@ -470,34 +660,71 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
         path = _as_str(fields["path"])
         target = _as_str(fields["target"])
         value = fields["value"]
-        if path.strip() == "":
-            return _fail(PATH_INVALID, f"Path '{path}' is structurally invalid (empty or malformed).")
-        if "." in path:
-            return _fail(PATH_NOT_SUPPORTED_YET, f"Nested path '{path}' is not yet supported (v1 = top-level only).")
+        segs = _parse_path(path)
+        if isinstance(segs, str):
+            return _fail(PATH_INVALID, f"Path '{path}' is structurally invalid: {segs}.")
         node = _find(target, root)
         if node is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
-        outcome = _update_field(path, value, node.kind)
-        if outcome.tag == "updated":
-            assert outcome.kind is not None
-            nk: Obj = outcome.kind
 
+        def _finish(nk: Obj) -> ApplyResult:
             def _retag(n: Node) -> Node:
                 return Node(n.id, nk, n.extras)
 
             tree = _map(target, _retag, root)
             assert tree is not None
             return _ok(tree)
-        if outcome.tag == "unknownField":
-            return _fail(FIELD_NOT_FOUND, f"Field '{path}' not found on node '{target}'.")
-        if outcome.tag == "notSupported":
+
+        if len(segs) == 1 and segs[0].index is None:
+            # Top-level path — the original per-kind field dispatch.
+            outcome = _update_field(path, value, node.kind)
+            if outcome.tag == "updated":
+                assert outcome.kind is not None
+                return _finish(outcome.kind)
+            if outcome.tag == "unknownField":
+                return _fail(FIELD_NOT_FOUND, f"Field '{path}' not found on node '{target}'.")
+            if outcome.tag == "notSupported":
+                return _fail(
+                    PATH_NOT_SUPPORTED_YET,
+                    f"Path '{path}' on node '{target}' is not yet supported by the apply engine.",
+                )
+            return _fail(
+                KIND_MISMATCH,
+                f"UpdateProp value for '{path}' on '{target}' does not match the field's "
+                f"expected type: {outcome.detail}",
+            )
+
+        # Nested path (WIRE_FORMAT.md §3.4) — the per-kind typed traversal.
+        nested = _update_nested(segs, value, node.kind)
+        if nested.tag == "updated":
+            assert nested.kind is not None
+            return _finish(nested.kind)
+        if nested.tag == "missingIndex":
+            return _fail(
+                PATH_INVALID,
+                f"Field '{nested.list_field}' on node '{target}' is a list — address an element with a "
+                f"0-based index (the list has {nested.count} element(s)).",
+            )
+        if nested.tag == "indexOutOfRange":
+            bounds = "the list is empty" if nested.count == 0 else f"valid: 0..{nested.count - 1}"
+            return _fail(
+                POSITION_OUT_OF_RANGE,
+                f"Index {nested.requested} is out of range for '{nested.list_field}' on node '{target}' ({bounds}).",
+            )
+        if nested.tag == "fieldNotFound":
+            return _fail(
+                FIELD_NOT_FOUND,
+                f"Field '{nested.segment}' (in path '{path}') not found on node '{target}'. "
+                f"Available at this segment: {', '.join(nested.available)}.",
+            )
+        if nested.tag == "notSupported":
             return _fail(
                 PATH_NOT_SUPPORTED_YET,
                 f"Path '{path}' on node '{target}' is not yet supported by the apply engine.",
             )
         return _fail(
             KIND_MISMATCH,
-            f"UpdateProp value for '{path}' on '{target}' does not match the field's expected type: {outcome.detail}",
+            f"UpdateProp value for '{path}' on '{target}' does not match the field's expected type: {nested.detail}",
         )
 
     if tag == "ReplaceBinding":

@@ -98,13 +98,20 @@ one of those hosts.
 
 ### Conformance coverage (v0 bootstrap)
 
-The codec **round-trips the full corpus** (55 nodes + 11 ops) and rejects all 28
-malformed fixtures with the canonical code + path. Typed field-level validation
-is implemented for the common kinds; recognised-but-not-yet-typed kinds are
-accepted structurally (still byte-exact on round-trip). The formal certification
-harness (offline corpus snapshot + drift guard, schema validation, a
-language-agnostic certification bridge, a CI leg, and generative parity) is
-follow-up work.
+The codec **round-trips the full corpus** and rejects the malformed fixtures
+with the canonical code + path (fixture counts drift as the corpus grows —
+`../wire-format-fixtures/manifest.json` is the authoritative enumeration, now
+spanning four families: node round-trips, op round-trips, rejects, and
+`lenient-accept` per WIRE_FORMAT §16's normative block). **Known parity debt
+(2026-07-05):** the `Mount` NodeKind is not yet decoded (4 red corpus tests);
+the §16 bare-string TextSource shorthand is rejected where the spec now says
+MUST-accept; JSON null is accepted in structured JVal positions where rule 12
+says reject — all tracked for the next parity pass. Typed field-level
+validation is implemented for the common kinds; recognised-but-not-yet-typed
+kinds are accepted structurally (still byte-exact on round-trip). The formal
+certification harness (offline corpus snapshot + drift guard, schema
+validation, a language-agnostic certification bridge, a CI leg, and generative
+parity) is follow-up work.
 
 ## Renderer (Phase 239)
 

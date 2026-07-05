@@ -200,6 +200,7 @@ KNOWN_KINDS = frozenset(
         "ErrorBoundary",
         "FragmentDecl",
         "FragmentRef",
+        "Mount",
     }
 )
 
@@ -208,12 +209,26 @@ KNOWN_KINDS = frozenset(
 
 
 def _decode_text_source(value: object, path: str) -> Value:
+    # §16.1 lenient shorthand (WIRE_FORMAT §16, normative — MUST accept): a bare
+    # JSON string in any TextSource position IS TextSource.Literal. It decodes to
+    # exactly the value the verbose form denotes and re-encodes to the verbose
+    # canonical bytes (the corpus lenient-accept family asserts this).
+    if isinstance(value, str):
+        return Obj("Literal", {"text": value})
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, TEXT_SOURCE_CASES)
     if tag == "Literal":
         text = _expect_string(_require(obj, "text", path), f"{path}.text")
         return Obj("Literal", {"text": text})
-    return from_json(value)  # Bound / I18n: structural (validated discriminator)
+    if tag == "I18n":
+        # I18n args are structured JVal positions (rule 12: no null) — the
+        # structural pass-through goes null-strict, rejecting at the null's
+        # exact path (`$.….args.<name>`), byte-behaviour otherwise unchanged.
+        return _from_json_strict(value, path)
+    # Bound: structural (validated discriminator). NOT null-strict — a Bound
+    # binding may carry a Static whose obj-erased value is null (the deliberate
+    # §5 opaque-seam exception, mirrored by every host).
+    return from_json(value)
 
 
 def _decode_binding(value: object, path: str) -> Value:
@@ -232,8 +247,67 @@ def _decode_cell_format(value: object, path: str) -> Value:
     return from_json(value)
 
 
-def _decode_json_value(value: object, path: str) -> Value:
+GUEST_CHANNEL_DIRECTION = frozenset({"OutOnly", "TwoWay"})
+
+
+def _decode_guest_channel(value: object, path: str) -> Value:
+    """Mount's guest channel: ``direction`` is a closed DU (OutOnly | TwoWay);
+    ``messageShape`` is an optional string riding on TwoWay."""
+    obj = _expect_object(value, path)
+    direction = _expect_string(_require(obj, "direction", path), f"{path}.direction")
+    if direction not in GUEST_CHANNEL_DIRECTION:
+        _fail(
+            UNKNOWN_DU_CASE,
+            f"{path}.direction",
+            f"unknown channel direction '{direction}'",
+            "OutOnly | TwoWay",
+        )
+    result: dict[str, Value] = {"direction": direction}
+    if "messageShape" in obj:
+        result["messageShape"] = _expect_string(obj["messageShape"], f"{path}.messageShape")
+    return Obj(None, result)
+
+
+def _decode_json_passthrough(value: object, path: str) -> Value:
+    # Structural pass-through WITHOUT null-strictness — for positions that can
+    # legitimately carry a §5 obj-erased opaque seam (Mount inputs embed whole
+    # node trees, whose Binding.Static values may be null).
     return from_json(value)
+
+
+def _from_json_strict(value: object, path: str) -> Value:
+    """``from_json`` for structured JVal positions (rule 12: the wire model has
+    no null). A JSON null at ANY depth rejects as ``WRONG_TYPE`` at the null's
+    exact path — matching the F# reference (``jsonToJValStrict``) and the
+    corpus ``reject-null-*`` fixtures. The plain ``from_json`` stays available
+    for the §5 obj-erased opaque seams (``Binding.Static.value``), where a
+    boxed null legitimately occurs."""
+    if value is None:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "null is not representable in the Fuaran wire model — omit the field instead",
+            "any JSON value except null (rule 12: the wire model has no null)",
+        )
+    if isinstance(value, bool) or isinstance(value, (int, float, str)):
+        return value
+    if isinstance(value, list):
+        return Arr([_from_json_strict(item, f"{path}[{i}]") for i, item in enumerate(value)])
+    if isinstance(value, dict):
+        tag = value.get("$type")
+        if isinstance(tag, str):
+            return Obj(
+                tag,
+                {k: _from_json_strict(v, f"{path}.{k}") for k, v in value.items() if k != "$type"},
+            )
+        return Obj(None, {k: _from_json_strict(v, f"{path}.{k}") for k, v in value.items()})
+    raise TypeError(f"value is not a JSON-shaped object: {type(value)!r}")
+
+
+def _decode_json_value(value: object, path: str) -> Value:
+    # Custom props / contentHash / exposedNodeIds — structured JVal positions,
+    # null-strict per rule 12.
+    return _from_json_strict(value, path)
 
 
 def _decode_string(value: object, path: str) -> Value:
@@ -293,7 +367,12 @@ ACTION_CASES = frozenset(
 def _decode_action(value: object, path: str) -> Value:
     obj = _expect_object(value, path)
     _dispatch(obj, path, ACTION_CASES)
-    return from_json(value)  # action cases: structural (validated discriminator)
+    # Structural (validated discriminator) but NULL-STRICT: the action payload
+    # positions (SetState.value / Notify.payload / AiTool.args) are structured
+    # JVal positions per rule 12, and no action case carries a §5 opaque seam —
+    # so a null anywhere in an action rejects at its exact path, matching the
+    # F# reference and the corpus reject-null-action-* fixtures.
+    return _from_json_strict(value, path)
 
 
 def _decode_number(value: object, path: str) -> Value:
@@ -436,12 +515,34 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("children", True, _decode_children),
         ("heading", False, _decode_text_source),
     ],
+    # Button gets a (minimal) typed schema so its two contract-bearing fields
+    # route through the typed decoders: `label` picks up the §16 bare-string
+    # leniency, and `onClick` goes through the null-strict action decoder
+    # (rule 12 — the corpus reject-null-action-* fixtures pin the paths).
+    # The remaining fields (variant / icon / disabled / tooltip / …) pass
+    # through structurally like any unlisted key.
+    "Button": [
+        ("label", True, _decode_text_source),
+        ("onClick", True, _decode_action),
+    ],
     "Custom": [
         ("moduleId", True, _decode_string),
         ("componentId", True, _decode_string),
         ("props", False, _decode_json_value),
         ("contentHash", False, _decode_json_value),
         ("exposedNodeIds", False, _decode_json_value),
+    ],
+    # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
+    # capabilities + the onBubble closure sentinel are always present on the
+    # canonical wire; inputs (a FragmentArg map, additive) passes through
+    # structurally WITHOUT null-strictness (it embeds whole node trees whose
+    # Binding.Static values are §5 opaque seams).
+    "Mount": [
+        ("scopeId", True, _decode_string),
+        ("channel", True, _decode_guest_channel),
+        ("capabilities", True, _decode_json_value),
+        ("onBubble", True, _decode_string),
+        ("inputs", False, _decode_json_passthrough),
     ],
 }
 

@@ -12,8 +12,8 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 
-from ..model import Arr, Obj, Value, from_json
-from ..result import INVALID_JSON, MISSING_FIELD, DecodeError, DecodeResult, Err, Ok
+from ..model import Arr, Obj, Value
+from ..result import INVALID_JSON, MISSING_FIELD, WRONG_TYPE, DecodeError, DecodeResult, Err, Ok
 from ..schema.decode import (
     _decode_binding,
     _decode_kind,
@@ -27,6 +27,7 @@ from ..schema.decode import (
     _expect_string,
     _Fail,
     _fail,
+    _from_json_strict,
 )
 
 OP_CASES = frozenset(
@@ -59,7 +60,22 @@ def _op_int(value: object, path: str) -> Value:
 
 
 def _op_json_value(value: object, path: str) -> Value:
-    return from_json(value)
+    # UpdateProp's value is a structured JVal position (rule 12: no null) —
+    # null-strict at the null's exact path, matching the F# reference and the
+    # corpus reject-null-updateprop-value fixture. A top-level reserved
+    # sentinel ("<opaque>" / "<closure>") is the canonical encoder's marker
+    # for an in-process-only Native payload that was never wire-representable:
+    # replaying it would apply the sentinel TEXT as live data, so it rejects
+    # by name (same gate as the F# decoder).
+    if isinstance(value, str) and value in ("<opaque>", "<closure>"):
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"'{value}' is the reserved in-process-only sentinel, not a wire value"
+            " — the op was logged from a Native payload that cannot replay",
+            "a wire-representable JSON value (the sentinels are reserved vocabulary)",
+        )
+    return _from_json_strict(value, path)
 
 
 def _op_kind(value: object, path: str) -> Value:

@@ -69,7 +69,11 @@ def run_fixture(fixture: dict, corpus_root: Path) -> FixtureResult:
             return FixtureResult(fid, kind, True, "byte-identical round-trip")
         return FixtureResult(fid, kind, False, _first_diff(reencoded, expected))
 
-    if kind in ("node-round-trip", "op-round-trip"):
+    # lenient-accept (WIRE_FORMAT §16, normative): the shorthand inputFile MUST
+    # decode, and MUST re-encode to the verbose canonical expectedFile — the
+    # same decode → encode → byte-compare leg as a round-trip fixture, with
+    # inputFile ≠ expectedFile.
+    if kind in ("node-round-trip", "op-round-trip", "lenient-accept"):
         result = decode(input_text)
         if not result.ok:
             return FixtureResult(fid, kind, False, f"expected decode to succeed, got {result.error}")

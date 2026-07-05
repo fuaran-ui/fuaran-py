@@ -56,6 +56,7 @@ fuaran-py/
 │   ├── result.py         # Ok / Err + the six DecodeError codes
 │   ├── schema/           # decode_node / encode_node + the per-kind field schemas
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
+│   ├── op_stream/        # hash-chained provenance log: StreamEntry envelope + SHA-256 chain + in-memory sink + replay
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
 │   ├── conformance/      # corpus round-trip smoke harness
 │   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
@@ -136,6 +137,29 @@ Sanitisation matches the F#/TS posture (`fuaran_py.renderer.sanitize` ports
 markdown escaped-first then swept. The `Custom` host-renderer registry is a host
 trust boundary — the baseline ships no registry seam, so `Custom` renders an
 inert labelled placeholder.
+
+## Op-stream (hash chain)
+
+`fuaran_py.op_stream` is the Python host of the op-stream **hash-chained provenance
+log** — the twin of the F# and TypeScript op-stream tiers. A stream's applied
+`TreeOp` edits are an append-only sequence of `OpRecord` envelopes; a host-side
+SHA-256 chain (`sha256(previousHash | payload)`) links them so the stream is
+tamper-evident. The pre-image is byte-identical across hosts: the versioned
+`StreamEntry` envelope leads with `{"v":2,…}` (the chain format version folded in
+first), wrapped in the canonical delimited `{"seq":…,"actor":…,"op":…}` payload,
+with the op encoded by the shared `fuaran_py.ops.encode_op` + `fuaran_py.canonical`
+(never a re-implemented encoder). The module is **stdlib-only** — unlike the
+Fable-constrained hosts it uses `hashlib.sha256` directly.
+
+- **Conformance is the contract.** `tests/test_op_stream.py` loads the shared
+  `chain/chain-corpus.json` golden and asserts every computed chain hash equals the
+  committed value byte-for-byte — the same corpus the F# and TypeScript hosts
+  certify against. A mismatch is a bug in this host's encoder/chain, **never** the
+  corpus; do not regenerate the golden to make a test pass.
+- **Version lock-step.** `CHAIN_FORMAT_VERSION` is pinned to the corpus `version`;
+  bump it in lock-step with the other hosts + the golden whenever the pre-image
+  formula, envelope shape, or hash function changes (the wire-format forward-coupling
+  rule now spans the chain envelope too).
 
 ## Computed-style observer + theme manifest
 

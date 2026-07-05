@@ -21,6 +21,7 @@ without a client runtime.
 | `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops). |
 | `fuaran_py.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
 | `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
+| `fuaran_py.op_stream` | The hash-chained provenance log — the `StreamEntry` envelope, a host-side SHA-256 chain, an in-memory sink, and replay. Reproduces the committed cross-host chain hashes byte-for-byte. |
 | `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |
 | `fuaran_py.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
@@ -117,6 +118,38 @@ counter_runtime().mount("fuaran-root")   # clicking "+1" re-renders the count
 Browser-API access is behind an injectable `BrowserDeps` seam (default: the Pyodide
 `js` interop module), so the package stays stdlib-only and importable under plain
 CPython; tests drive the loop against a fake DOM.
+
+## Op-stream (hash-chained provenance, optional)
+
+A stream's applied `TreeOp` edits form an append-only, **hash-chained** sequence of
+`OpRecord` envelopes: each record folds its op, timestamp, author, prompt
+correlation, and apply outcome into a versioned `StreamEntry` envelope, and a
+host-side SHA-256 chain (`sha256(previousHash | payload)`) links records so the
+stream is tamper-evident and its authorship answerable from the record sequence
+alone. `apply_and_persist` is the write path (apply once, then persist a chained
+record on success); `replay_stream` folds a stream back into a tree; `verify_chain`
+proves integrity.
+
+```python
+from fuaran_py import decode_node
+from fuaran_py.model import Obj
+from fuaran_py.op_stream import InMemorySink, PersistContext, apply_and_persist, verify_chain
+
+sink = InMemorySink()
+ctx = PersistContext(stream_id="doc-1", user_id="alice")
+tree = decode_node(wire_json).value
+
+result = apply_and_persist(sink, ctx, Obj("RemoveNode", {"target": "leaf"}), tree)
+records = sink.replay("doc-1", 1, sink.latest_sequence("doc-1"))
+assert verify_chain(records) is None          # a clean, untampered chain
+```
+
+The chain is **byte-stable across hosts**: the pre-image envelope leads with
+`{"v":2,…}` (the chain format version, folded in first so the format is
+self-describing) and this host reproduces the committed golden hashes in the shared
+`chain/` conformance corpus exactly — the same golden the F# and TypeScript hosts
+certify against. The module is stdlib-only (`hashlib.sha256`); a genuinely
+I/O-backed sink is a follow-up implementing the same `OpStreamSink` protocol.
 
 ## Generate (client for the hosted endpoint, optional)
 

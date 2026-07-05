@@ -22,6 +22,9 @@ DAG_CORPUS_ROOT = CORPUS_ROOT / "dag"
 # The additive merge-conformance sub-corpus carries its own manifest.
 MERGE_CORPUS_ROOT = CORPUS_ROOT / "merge-conformance"
 
+# The op-stream hash-chain sub-corpus is a single golden file (no manifest dir).
+CHAIN_CORPUS_FILE = CORPUS_ROOT / "chain" / "chain-corpus.json"
+
 
 def corpus_available() -> bool:
     return (CORPUS_ROOT / "manifest.json").is_file()
@@ -72,3 +75,23 @@ def merge_fixtures() -> list[dict]:
         return []
     manifest = json.loads((MERGE_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
     return list(manifest["fixtures"])
+
+
+def chain_corpus_available() -> bool:
+    return CHAIN_CORPUS_FILE.is_file()
+
+
+chain_corpus_required = pytest.mark.skipif(
+    not chain_corpus_available(),
+    reason=f"op-stream chain corpus not found at {CHAIN_CORPUS_FILE}",
+)
+
+
+def chain_corpus() -> dict:
+    if not chain_corpus_available():
+        return {"records": []}
+    return json.loads(CHAIN_CORPUS_FILE.read_text(encoding="utf-8"))
+
+
+def chain_records() -> list[dict]:
+    return list(chain_corpus().get("records", []))

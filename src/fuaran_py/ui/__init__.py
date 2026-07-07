@@ -496,13 +496,17 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.Image(_text(alt), _str_binding(src), variant), accessibility.none)
 
     @staticmethod
-    def divider(
-        id: str,  # noqa: A002
-        *,
-        orientation: t.Orientation = "Horizontal",
-        label: t.TextInput | None = None,
-    ) -> UiNode:
-        return _node(id, t.Divider(orientation, _text(label) if label is not None else None), accessibility.none)
+    def divider(id: str) -> UiNode:  # noqa: A002
+        """A separator — a plain horizontal rule (Phase 459: the retired ``Divider``,
+        now a ``Box`` with the ``Separator`` role). Renders
+        ``<hr class="fuaran-layout-separator">``. For a labelled / vertical separator,
+        author a :func:`box` with ``role="Separator"`` directly (mirrors ``Fuaran.divider``).
+        """
+        return _node(
+            id,
+            t.Box(children=(), layout=t.FlexLayout(direction="Horizontal", wrap=False), role="Separator"),
+            accessibility.none,
+        )
 
     @staticmethod
     def toast(
@@ -536,10 +540,6 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     @staticmethod
     def sparkline(id: str, *, source: Binding) -> UiNode:  # noqa: A002
         return _node(id, t.Sparkline(source), accessibility.none)
-
-    @staticmethod
-    def spacer(id: str, *, size: t.SpacerSize = "Medium") -> UiNode:  # noqa: A002
-        return _node(id, t.Spacer(size), accessibility.none)
 
     @staticmethod
     def callout(

@@ -36,7 +36,6 @@ Tone = Literal["Default", "Subdued", "Brand", "Success", "Warning", "Critical", 
 Weight = Literal["Compact", "Standard", "Spacious"]
 Emphasis = Literal["Quiet", "Normal", "Loud"]
 Orientation = Literal["Vertical", "Horizontal"]
-SpacerSize = Literal["Small", "Medium", "Large"]
 BadgeVariant = Literal["Neutral", "Brand", "Success", "Warning", "Critical", "Info"]
 HeadingVariant = Literal["Standard", "Eyebrow", "Caption", "Lead"]
 ButtonVariant = Literal["Primary", "Secondary", "Tertiary", "Destructive"]
@@ -829,14 +828,6 @@ class Sparkline:
 
 
 @dataclass(frozen=True)
-class Spacer:
-    size: SpacerSize = "Medium"
-
-    def to_wire(self) -> Obj:
-        return _obj("Spacer", {"size": self.size})
-
-
-@dataclass(frozen=True)
 class Callout:
     body: TextSource
     tone: Tone = "Info"
@@ -945,15 +936,6 @@ class List:
 
     def to_wire(self) -> Obj:
         return _obj("List", {"items": list(self.items), "ordered": self.ordered})
-
-
-@dataclass(frozen=True)
-class Divider:
-    orientation: Orientation = "Horizontal"
-    label: TextSource | None = None
-
-    def to_wire(self) -> Obj:
-        return _obj("Divider", {"label": self.label, "orientation": self.orientation})
 
 
 @dataclass(frozen=True)

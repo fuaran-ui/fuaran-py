@@ -180,20 +180,28 @@ class Renderer:
                 cols = lf.get("cols")
                 cols = cols if isinstance(cols, int) else 1
                 template = f"repeat({cols}, 1fr)"
+            # `gap` (Phase 459) emits only when set — a gap-free grid stays
+            # byte-identical to the pre-459 emission (mirrors F# Render.fs).
+            style = f"grid-template-columns:{template}"
+            gap = lf.get("gap")
+            if isinstance(gap, int):
+                style = f"{style};gap:{gap}px"
             return element(
                 "div",
-                [("class", "fuaran-layout-grid"), ("style", f"grid-template-columns:{template}")],
+                [("class", "fuaran-layout-grid"), ("style", style)],
                 self._children_html(fields),
             )
         # Group + Flex (the default / fallthrough).
         lf = layout_obj.fields if layout_obj is not None else {}
         dir_class = "fuaran-stack-horizontal" if lf.get("direction") == "Horizontal" else "fuaran-stack-vertical"
         wrap = " fuaran-stack-wrap" if lf.get("wrap") is True else ""
-        return element(
-            "div",
-            [("class", f"fuaran-layout-stack {dir_class}{wrap}")],
-            self._children_html(fields),
-        )
+        # `gap` (Phase 459) emits only when set — a gap-free stack carries no
+        # `style` attribute, byte-identical to the pre-459 emission.
+        attrs: list[tuple[str, str]] = [("class", f"fuaran-layout-stack {dir_class}{wrap}")]
+        gap = lf.get("gap")
+        if isinstance(gap, int):
+            attrs.append(("style", f"gap:{gap}px"))
+        return element("div", attrs, self._children_html(fields))
 
     def _split_panel(self, node: Node, fields: dict[str, Value]) -> str:
         weight = fields.get("weight")
@@ -426,10 +434,6 @@ class Renderer:
         parts.append(element("div", [("class", "fuaran-progress-bar")], fill))
         return element("div", [("class", f"fuaran-progress fuaran-progress-{tone}{indeterminate}")], "".join(parts))
 
-    def _spacer(self, node: Node, fields: dict[str, Value]) -> str:
-        size = str(fields.get("size", "Medium")).lower()
-        return element("div", [("class", f"fuaran-spacer fuaran-spacer-{size}")], "")
-
     def _skeleton(self, node: Node, fields: dict[str, Value]) -> str:
         rows = fields.get("rows")
         rows = rows if isinstance(rows, int) and rows > 0 else 1
@@ -484,28 +488,6 @@ class Renderer:
         if fields.get("ordered") is True:
             return element("ol", [("class", "fuaran-list fuaran-list-ordered")], items_html)
         return element("ul", [("class", "fuaran-list fuaran-list-unordered")], items_html)
-
-    def _divider(self, node: Node, fields: dict[str, Value]) -> str:
-        vertical = fields.get("orientation") == "Vertical"
-        label = fields.get("label")
-        if vertical:
-            return element(
-                "div",
-                [
-                    ("class", "fuaran-divider fuaran-divider-vertical"),
-                    ("role", "separator"),
-                    ("aria-orientation", "vertical"),
-                ],
-                "",
-            )
-        if label is not None:
-            inner = text_element("span", [("class", "fuaran-divider-label")], self._text(label))
-            return element(
-                "div",
-                [("class", "fuaran-divider fuaran-divider-labelled"), ("role", "separator")],
-                inner,
-            )
-        return void_element("hr", [("class", "fuaran-divider fuaran-divider-horizontal")])
 
     def _toast(self, node: Node, fields: dict[str, Value]) -> str:
         # Overlay render-fidelity contract (server half): ALWAYS emitted; closed =
@@ -800,14 +782,12 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Badge": Renderer._badge,
     "Callout": Renderer._callout,
     "Progress": Renderer._progress,
-    "Spacer": Renderer._spacer,
     "Skeleton": Renderer._skeleton,
     "Sparkline": Renderer._sparkline,
     "LabelValueRow": Renderer._label_value_row,
     "Link": Renderer._link,
     "Image": Renderer._image,
     "List": Renderer._list,
-    "Divider": Renderer._divider,
     "Toast": Renderer._toast,
     "CodeBlock": Renderer._code_block,
     "Math": Renderer._math,

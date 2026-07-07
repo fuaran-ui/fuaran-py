@@ -53,7 +53,6 @@ def _authored() -> dict[str, t.UiNode]:
         "markdown-1": markdown_1,
         "badge-1": fuaran.badge("badge-1", label="Beta", variant="Info"),
         "link-1": fuaran.link("link-1", href="/about", label="About us", rel="noopener", target="_blank"),
-        "spacer-1": fuaran.spacer("spacer-1", size="Medium"),
         "spark-1": spark_1,
         "skel-1": fuaran.skeleton("skel-1", 3),
         "lvr-1": lvr_1,
@@ -362,7 +361,7 @@ def test_smart_constructors_inject_per_kind_aria() -> None:
     assert fuaran.tabs("t").accessibility == accessibility.tabs
     # Decorative / structural kinds default to no ARIA.
     assert fuaran.markdown("md", "body").accessibility is None
-    assert fuaran.spacer("sp").accessibility is None
+    assert fuaran.divider("dv").accessibility is None
 
 
 def test_ergonomic_coercions() -> None:

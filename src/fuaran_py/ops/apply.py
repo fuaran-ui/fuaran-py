@@ -35,7 +35,6 @@ from ..schema.decode import (
     EMPHASIS,
     HEADING_VARIANT,
     ORIENTATION,
-    SPACER_SIZE,
     TEXT_SOURCE_CASES,
     TONE,
     WEIGHT,
@@ -323,7 +322,6 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Label": ("label", _coerce_text_source),
         "Variant": ("variant", _coerce_enum(BADGE_VARIANT)),
     },
-    "Spacer": {"Size": ("size", _coerce_enum(SPACER_SIZE))},
     "Skeleton": {"Rows": ("rows", _coerce_int)},
     "Callout": {
         "Tone": ("tone", _coerce_enum(TONE)),

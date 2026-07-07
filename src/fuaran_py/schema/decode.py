@@ -115,7 +115,6 @@ TONE = frozenset({"Default", "Subdued", "Brand", "Success", "Warning", "Critical
 WEIGHT = frozenset({"Compact", "Standard", "Spacious"})
 EMPHASIS = frozenset({"Quiet", "Normal", "Loud"})
 ORIENTATION = frozenset({"Vertical", "Horizontal"})
-SPACER_SIZE = frozenset({"Small", "Medium", "Large"})
 BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical", "Info"})
 HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
 STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
@@ -177,7 +176,6 @@ KNOWN_KINDS = frozenset(
         "Metric",
         "Badge",
         "Sparkline",
-        "Spacer",
         "Callout",
         "Progress",
         "Skeleton",
@@ -185,7 +183,6 @@ KNOWN_KINDS = frozenset(
         "Link",
         "Image",
         "List",
-        "Divider",
         "Toast",
         "CodeBlock",
         "Math",
@@ -431,9 +428,6 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("label", False, _decode_text_source),
         ("caveat", False, _decode_text_source),
     ],
-    "Spacer": [
-        ("size", True, _enum_decoder(SPACER_SIZE, "size")),
-    ],
     "Skeleton": [
         ("rows", True, _decode_int),
     ],
@@ -462,10 +456,6 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
     "List": [
         ("items", True, _decode_text_source_array),
         ("ordered", True, _decode_bool),
-    ],
-    "Divider": [
-        ("orientation", True, _enum_decoder(ORIENTATION, "orientation")),
-        ("label", False, _decode_text_source),
     ],
     "Toast": [
         ("dismissable", True, _decode_bool),

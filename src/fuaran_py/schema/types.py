@@ -512,6 +512,53 @@ class StateBehaviour:
         )
 
 
+# ── Typed Static payloads (WIRE_FORMAT.md §"Typed Static payloads", Phase 429) ─
+#
+# The language enumerates a handful of ``Binding.Static`` payload shapes — a
+# Select/Filter/Choice options list, a Map marker list — that ride the wire as
+# their *typed* form rather than the ``"<opaque>"`` catch-all. Authoring a
+# ``Static`` of one of these lowers structurally (via ``_lower``): a
+# :class:`SelectOption` / :class:`MapMarker` carries a ``to_wire`` so a bare
+# ``Static([SelectOption(...)])`` serialises to the typed array the F#/TS tiers
+# emit. A ``Static`` of a genuinely host-typed value (grid/table rows, Mount
+# inputs, ``PropValue.Native``) still lowers to the residual ``"<opaque>"`` seam.
+
+
+@dataclass(frozen=True)
+class SelectOption:
+    """A single option in a Select / Choice / Filter options list.
+
+    ``label`` is a :class:`TextSource` (a bare ``str`` is coerced to
+    :class:`LiteralText`); ``value`` is the option's string key.
+    """
+
+    label: TextSource
+    value: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.label, str):
+            object.__setattr__(self, "label", LiteralText(self.label))
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"label": _lower(self.label), "value": self.value})
+
+
+@dataclass(frozen=True)
+class MapMarker:
+    """A single marker in a Map ``source`` (a typed ``Static`` payload)."""
+
+    label: TextSource
+    latitude: float
+    longitude: float
+
+    def __post_init__(self) -> None:
+        if isinstance(self.label, str):
+            object.__setattr__(self, "label", LiteralText(self.label))
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"label": _lower(self.label), "latitude": self.latitude, "longitude": self.longitude})
+
+
 # ── TabHeader (a tag-less record nested in TabsSpec) ─────────────────────────
 
 

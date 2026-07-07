@@ -28,6 +28,10 @@ from ..result import (
     Ok,
 )
 
+# ── Reserved unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ───────────
+OPAQUE = "<opaque>"
+"""A ``Binding.Static`` payload the encoder cannot decompose (the §5 obj-erased seam)."""
+
 
 class _Fail(Exception):
     """Internal short-circuit carrying a :class:`DecodeError`."""
@@ -243,6 +247,115 @@ def _decode_binding(value: object, path: str) -> Value:
     return from_json(value)  # other binding cases: structural (validated discriminator)
 
 
+# ── Typed Binding.Static positions (WIRE_FORMAT.md §"Typed Static payloads", Phase 429) ─
+#
+# A handful of ``Binding.Static`` positions carry a *typed* payload rather than the
+# ``"<opaque>"`` obj-erased seam: a Select/Choice/Filter options list, a scalar
+# string option, a string list, a Sparkline float series, a Map marker list. The
+# encoder emits the typed form; the decoder mirrors it, and — crucially —
+# *normalises* the two legacy inputs each such position may still carry:
+#
+#   * a legacy ``"value":"<opaque>"`` sentinel (the pre-429 obj-erased placeholder), and
+#   * a legacy ``"value":null`` (the pre-429 ``box []`` / ``box None`` null-reference form),
+#
+# into the typed form the corpus now expects, so a round-trip is byte-stable AND
+# value-faithful. The normalisation is per-position (the ``lenient-opaque-static-*``
+# / ``lenient-null-static-*`` fixtures pin each). Positions whose payload is a
+# genuinely host-typed value (Chart/DataGrid rows, Mount inputs) keep the residual
+# ``"<opaque>"`` seam and use the plain ``_decode_binding`` above.
+
+
+def _typed_static_binding(
+    value: object,
+    path: str,
+    on_typed: Callable[[object, str], Value],
+    on_opaque: Value,
+    on_null: Value,
+) -> Value:
+    """Decode a ``Binding`` whose ``Static`` payload is a typed position.
+
+    ``Static`` normalises per the three input forms (typed / ``"<opaque>"`` /
+    ``null``); every other binding case passes through structurally (validated
+    discriminator), exactly as :func:`_decode_binding`.
+    """
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BINDING_CASES)
+    if tag == "Static":
+        if "value" not in obj:
+            _fail(MISSING_FIELD, f"{path}.value", "Static binding missing value")
+        raw = obj["value"]
+        if raw == OPAQUE:
+            normalised = on_opaque
+        elif raw is None:
+            normalised = on_null
+        else:
+            normalised = on_typed(raw, f"{path}.value")
+        return Obj("Static", {"value": normalised})
+    return from_json(value)
+
+
+def _decode_select_option(value: object, path: str) -> Value:
+    """A single SelectOption record: ``{"label":<TextSource>,"value":"<str>"}``."""
+    obj = _expect_object(value, path)
+    label = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    opt_value = _expect_string(_require(obj, "value", path), f"{path}.value")
+    return Obj(None, {"label": label, "value": opt_value})
+
+
+def _decode_select_option_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_select_option(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_select_options(value: object, path: str) -> Value:
+    # `<opaque>` → a tagged one-element placeholder; `null` → the empty typed array.
+    opaque_placeholder = Arr([Obj(None, {"label": Obj("Literal", {"text": OPAQUE}), "value": OPAQUE})])
+    return _typed_static_binding(value, path, _decode_select_option_array, opaque_placeholder, Arr([]))
+
+
+def _decode_binding_string_opt(value: object, path: str) -> Value:
+    # `<opaque>` → the scalar sentinel string; `null` → null (a genuine `None` option).
+    return _typed_static_binding(value, path, lambda v, p: _expect_string(v, p), OPAQUE, None)
+
+
+def _decode_string_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_string_list(value: object, path: str) -> Value:
+    # `<opaque>` → a one-element placeholder list; `null` → the empty typed array.
+    return _typed_static_binding(value, path, _decode_string_array, Arr([OPAQUE]), Arr([]))
+
+
+def _decode_float_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_number(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_float_seq(value: object, path: str) -> Value:
+    # Both `<opaque>` and `null` → the empty typed array (a seq has no placeholder element).
+    return _typed_static_binding(value, path, _decode_float_array, Arr([]), Arr([]))
+
+
+def _decode_map_marker(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    label = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    lat = _decode_number(_require(obj, "latitude", path), f"{path}.latitude")
+    lon = _decode_number(_require(obj, "longitude", path), f"{path}.longitude")
+    return Obj(None, {"label": label, "latitude": lat, "longitude": lon})
+
+
+def _decode_marker_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_map_marker(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_marker_seq(value: object, path: str) -> Value:
+    # Both `<opaque>` and `null` → the empty typed array.
+    return _typed_static_binding(value, path, _decode_marker_array, Arr([]), Arr([]))
+
+
 def _decode_cell_format(value: object, path: str) -> Value:
     obj = _expect_object(value, path)
     _dispatch(obj, path, CELL_FORMAT_CASES)
@@ -432,7 +545,13 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("rows", True, _decode_int),
     ],
     "Sparkline": [
-        ("source", True, _decode_binding),
+        # Phase 429 — `source` is a typed Static float-series position.
+        ("source", True, _decode_binding_float_seq),
+    ],
+    # Phase 429 — Map `source` is a typed Static marker-list position. The three
+    # numeric envelope fields pass through structurally like any unlisted key.
+    "Map": [
+        ("source", True, _decode_binding_marker_seq),
     ],
     "LabelValueRow": [
         ("emphasis", True, _decode_bool),
@@ -476,19 +595,29 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
     ],
     "Select": [
         ("label", True, _decode_text_source),
-        ("onChange", True, _decode_string),
-        ("source", True, _decode_binding),
-        ("value", True, _decode_binding),
+        # Phase 426 — the handler fields are OPTIONAL: omitted on the wire when the
+        # control is declarative (AI-authored), where the renderer arms a write-back
+        # default against the paired `value` slot. Present → the `"<closure>"`
+        # sentinel; absent → decodes to nothing (the field simply isn't carried).
+        ("onChange", False, _decode_string),
+        ("onChangeMulti", False, _decode_string),
+        # Phase 429 — `source`/`value`/`values` are typed Static positions: a
+        # SelectOption list, a scalar string option, a string list respectively.
+        ("source", True, _decode_binding_select_options),
+        ("value", True, _decode_binding_string_opt),
         ("disabled", False, _decode_binding),
         ("placeholder", False, _decode_text_source),
         # Multi-select (Phase 291) — both optional; omitted on a single-select.
         ("multiple", False, _decode_bool),
-        ("values", False, _decode_binding),
+        ("values", False, _decode_binding_string_list),
     ],
     "Modal": [
         ("children", True, _decode_children),
         ("dismissable", True, _decode_bool),
-        ("onDismiss", True, _decode_action),
+        # Phase 426 — `onDismiss` is OPTIONAL (omitted when declarative). Unlike the
+        # closure-sentinel handlers it is a genuine wire-survivable Action, so it
+        # decodes through the null-strict action decoder when present.
+        ("onDismiss", False, _decode_action),
         ("open", True, _decode_binding),
         ("heading", False, _decode_text_source),
     ],

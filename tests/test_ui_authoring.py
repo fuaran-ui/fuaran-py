@@ -41,7 +41,7 @@ def _authored() -> dict[str, t.UiNode]:
         )
     )
     markdown_1 = fuaran.markdown("markdown-1", "Updated hourly.")
-    spark_1 = fuaran.sparkline("spark-1", source=binding.opaque())
+    spark_1 = fuaran.sparkline("spark-1", source=binding.static([1.0, 2.0, 3.0, 2.0, 4.0]))
     lvr_1 = fuaran.label_value_row(
         "lvr-1", label="Total", value=42, format=format.number(2), emphasis=True, help="Last 30 days"
     )
@@ -112,8 +112,8 @@ def _authored() -> dict[str, t.UiNode]:
             fuaran.select(
                 "select-1",
                 label="Region",
-                source=binding.opaque(),
-                value=binding.opaque(),
+                source=binding.static([t.SelectOption("UK", "uk")]),
+                value=binding.static("uk"),
                 placeholder="Choose one",
                 disabled=binding.state("selectBusy", False),
             )
@@ -194,7 +194,11 @@ def _authored() -> dict[str, t.UiNode]:
             "filters-1",
             items=[
                 t.FilterSpec("q", t.LiteralText("Search"), t.TextFilter(t.Static(""))),
-                t.FilterSpec("tier", t.LiteralText("Tier"), t.ChoiceFilter(binding.opaque(), binding.opaque())),
+                t.FilterSpec(
+                    "tier",
+                    t.LiteralText("Tier"),
+                    t.ChoiceFilter(t.Static([t.SelectOption("All", "all")]), t.Static("all")),
+                ),
             ],
         ),
         "filters-segmented": fuaran.filters(
@@ -203,7 +207,11 @@ def _authored() -> dict[str, t.UiNode]:
                 t.FilterSpec(
                     "view",
                     t.LiteralText("View"),
-                    t.SegmentedFilter(binding.opaque(), binding.opaque(), "Horizontal"),
+                    t.SegmentedFilter(
+                        t.Static([t.SelectOption("Table", "table"), t.SelectOption("Chart", "chart")]),
+                        t.Static("table"),
+                        "Horizontal",
+                    ),
                 )
             ],
         ),
@@ -219,7 +227,13 @@ def _authored() -> dict[str, t.UiNode]:
                     t.FormField("age", t.LiteralText("Age"), t.NumberField(t.Static(0)), False),
                     t.FormField("agree", t.LiteralText("I agree"), t.CheckboxField(t.Static(False)), True),
                     t.FormField(
-                        "tier", t.LiteralText("Tier"), t.ChoiceField(binding.opaque(), binding.opaque()), False
+                        "tier",
+                        t.LiteralText("Tier"),
+                        t.ChoiceField(
+                            t.Static([t.SelectOption("Basic", "basic"), t.SelectOption("Pro", "pro")]),
+                            t.Static("basic"),
+                        ),
+                        False,
                     ),
                     t.FormField("notes", t.LiteralText("Notes"), t.TextAreaField(t.Static(""), 5), False),
                 ],
@@ -244,13 +258,27 @@ def _authored() -> dict[str, t.UiNode]:
                     t.FormField(
                         "metric",
                         t.LiteralText("Metric"),
-                        t.SegmentedChoice(binding.opaque(), binding.opaque(), "Horizontal"),
+                        t.SegmentedChoice(
+                            t.Static(
+                                [
+                                    t.SelectOption("Effective", "effective"),
+                                    t.SelectOption("Marginal", "marginal"),
+                                    t.SelectOption("Take-home", "takeHome"),
+                                ]
+                            ),
+                            t.Static("effective"),
+                            "Horizontal",
+                        ),
                         False,
                     ),
                     t.FormField(
                         "tier",
                         t.LiteralText("Tier"),
-                        t.SegmentedChoice(binding.opaque(), t.Static(None), "Vertical"),
+                        t.SegmentedChoice(
+                            t.Static([t.SelectOption("Low", "low"), t.SelectOption("High", "high")]),
+                            t.Static(None),
+                            "Vertical",
+                        ),
                         True,
                     ),
                 ],

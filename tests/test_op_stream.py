@@ -206,10 +206,10 @@ def test_verify_chain_catches_out_of_order() -> None:
 def _two_child_card() -> Node:
     """A tiny two-child card the structural ops can act on."""
     result = decode_node(
-        '{"id":"root","kind":{"$type":"Card","children":['
+        '{"id":"root","kind":{"$type":"Box","children":['
         '{"id":"leaf","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"a"}}},'
         '{"id":"leaf2","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"b"}}}'
-        "]}}"
+        '],"layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Card"}}'
     )
     assert result.ok, result
     return result.value

@@ -36,12 +36,12 @@ _NO_VOICE = frozenset({"Default"})
 # `fuaran-kind-grid`.
 KIND_CLASS: dict[str, str] = {
     # Layout
-    "Dashboard": "fuaran-kind-dashboard",
-    "Stack": "fuaran-kind-stack",
-    "GridLayout": "fuaran-kind-grid-layout",
+    # `Box` (Phase 390) is NOT in this flat map — its `fuaran-kind-*` hook is
+    # derived from role + layout mode by `_box_kind_class` (mirrors F# kindClass),
+    # so the reference CSS (`.fuaran-kind-stack` / `-grid-layout` / `-dashboard` /
+    # `-card`) is unchanged and rendered output stays byte-identical.
     "SplitPanel": "fuaran-kind-split-panel",
     "Tabs": "fuaran-kind-tabs",
-    "Card": "fuaran-kind-card",
     "Stepper": "fuaran-kind-stepper",
     "SummaryList": "fuaran-kind-summary-list",
     "Disclosure": "fuaran-kind-disclosure",
@@ -90,9 +90,32 @@ def sanitise_class_fragment(raw: str) -> str:
     return _CLASS_FRAGMENT.sub("-", raw)
 
 
+def _box_kind_class(kind: Obj) -> str:
+    """The `fuaran-kind-*` hook for a Box, derived from role + layout mode.
+
+    Mirrors F# `Theme.kindClass`: Dashboard→dashboard, Card→card,
+    Separator→divider, Group+Grid→grid-layout, Group+(Flex|Auto)→stack.
+    """
+    role = kind.fields.get("role")
+    layout = kind.fields.get("layout")
+    layout_mode = layout.tag if isinstance(layout, Obj) else None
+    if role == "Dashboard":
+        return "fuaran-kind-dashboard"
+    if role == "Card":
+        return "fuaran-kind-card"
+    if role == "Separator":
+        return "fuaran-kind-divider"
+    if role == "Group" and layout_mode == "Grid":
+        return "fuaran-kind-grid-layout"
+    # Group + (Flex | Auto), and any unexpected role, fall to stack.
+    return "fuaran-kind-stack"
+
+
 def kind_class(kind: Obj) -> str:
     """The ``fuaran-kind-*`` class for a decoded node ``kind`` object."""
     tag = kind.tag or ""
+    if tag == "Box":
+        return _box_kind_class(kind)
     if tag == "Custom":
         module_id = sanitise_class_fragment(str(kind.fields.get("moduleId", "")))
         component_id = sanitise_class_fragment(str(kind.fields.get("componentId", "")))

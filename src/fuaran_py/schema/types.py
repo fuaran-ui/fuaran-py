@@ -543,38 +543,102 @@ class Kind(Protocol):
 # Layout ----------------------------------------------------------------------
 
 
+# ── Box — the unified container primitive (Phase 390) ───────────────────────
+#
+# The four retired near-synonym containers (Stack / GridLayout / Dashboard /
+# Card) collapse into one ``Box`` kind whose *layout mode* names how children
+# arrange and whose *role* names what the container means (element + ARIA
+# landmark + ``fuaran-*`` chrome). Mirrors the F# ``BoxSpec`` / ``BoxLayout`` /
+# ``BoxRole``. The retired author-facing constructors (:func:`Stack` /
+# :func:`GridLayout` / :func:`Dashboard` / :func:`Card`) survive as thin
+# Box-emitting conveniences below.
+
+BoxRole = Literal["Group", "Card", "Dashboard", "Separator"]
+"""What a ``Box`` means — drives the emitted element, ARIA landmark, and chrome."""
+
+
 @dataclass(frozen=True)
-class Dashboard:
-    children: tuple[UiNode, ...] = ()
+class FlexLayout:
+    """Flex flow — the retired ``Stack``. ``$type`` = ``Flex``."""
 
-    def to_wire(self) -> Obj:
-        return _obj("Dashboard", {"children": list(self.children)})
-
-
-@dataclass(frozen=True)
-class Stack:
-    children: tuple[UiNode, ...] = ()
-    orientation: Orientation = "Vertical"
+    direction: Orientation = "Vertical"
     wrap: bool = False
+    gap: int | None = None
 
-    def to_wire(self) -> Obj:
-        return _obj(
-            "Stack",
-            {"children": list(self.children), "orientation": self.orientation, "wrap": self.wrap},
-        )
+    def to_wire(self) -> Value:
+        # Ordinal key order (direction < gap < wrap); the canonical encoder
+        # re-sorts, so ``_obj`` drops the ``None`` gap and the rest sort.
+        return _obj("Flex", {"direction": self.direction, "gap": self.gap, "wrap": self.wrap})
 
 
 @dataclass(frozen=True)
-class GridLayout:
-    children: tuple[UiNode, ...] = ()
+class GridTemplate:
+    """Explicit grid — the retired ``GridLayout``. ``$type`` = ``Grid``."""
+
     cols: int = 12
     template_columns: str | None = None
+    gap: int | None = None
+
+    def to_wire(self) -> Value:
+        # Ordinal key order (cols < gap < templateColumns); gap /
+        # templateColumns omitted when ``None``.
+        return _obj("Grid", {"cols": self.cols, "gap": self.gap, "templateColumns": self.template_columns})
+
+
+@dataclass(frozen=True)
+class AutoLayout:
+    """Responsive auto-tile — the retired ``Dashboard``. ``$type`` = ``Auto``."""
+
+    def to_wire(self) -> Value:
+        return Obj("Auto", {})
+
+
+BoxLayout = FlexLayout | GridTemplate | AutoLayout
+"""How a ``Box`` arranges its children (``Flex`` | ``Grid`` | ``Auto``)."""
+
+
+@dataclass(frozen=True)
+class Box:
+    """The unified container — lowers to ``{"$type":"Box",…}``.
+
+    Ordinal key order children < heading < layout < role; ``heading`` emits
+    only when set (the retired Card heading).
+    """
+
+    children: tuple[UiNode, ...] = ()
+    layout: BoxLayout = field(default_factory=FlexLayout)
+    role: BoxRole = "Group"
+    heading: TextSource | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
-            "GridLayout",
-            {"children": list(self.children), "cols": self.cols, "templateColumns": self.template_columns},
+            "Box",
+            {
+                "children": list(self.children),
+                "heading": self.heading,
+                "layout": self.layout.to_wire(),
+                "role": self.role,
+            },
         )
+
+
+def Dashboard(children: tuple[UiNode, ...] = ()) -> Box:  # noqa: N802
+    """Retired ``Dashboard`` — a ``Box`` with ``Auto`` layout + ``Dashboard`` role."""
+    return Box(children=children, layout=AutoLayout(), role="Dashboard")
+
+
+def Stack(  # noqa: N802
+    children: tuple[UiNode, ...] = (), orientation: Orientation = "Vertical", wrap: bool = False
+) -> Box:
+    """Retired ``Stack`` — a ``Box`` with ``Flex`` layout + ``Group`` role."""
+    return Box(children=children, layout=FlexLayout(direction=orientation, wrap=wrap), role="Group")
+
+
+def GridLayout(  # noqa: N802
+    children: tuple[UiNode, ...] = (), cols: int = 12, template_columns: str | None = None
+) -> Box:
+    """Retired ``GridLayout`` — a ``Box`` with ``Grid`` layout + ``Group`` role."""
+    return Box(children=children, layout=GridTemplate(cols=cols, template_columns=template_columns), role="Group")
 
 
 @dataclass(frozen=True)
@@ -610,13 +674,9 @@ class Tabs:
         )
 
 
-@dataclass(frozen=True)
-class Card:
-    children: tuple[UiNode, ...] = ()
-    heading: TextSource | None = None
-
-    def to_wire(self) -> Obj:
-        return _obj("Card", {"children": list(self.children), "heading": self.heading})
+def Card(children: tuple[UiNode, ...] = (), heading: TextSource | None = None) -> Box:  # noqa: N802
+    """Retired ``Card`` — a ``Box`` with ``Flex{Vertical,false}`` layout + ``Card`` role + heading."""
+    return Box(children=children, layout=FlexLayout(direction="Vertical", wrap=False), role="Card", heading=heading)
 
 
 @dataclass(frozen=True)

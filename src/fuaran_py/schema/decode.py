@@ -124,6 +124,8 @@ IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
+BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
+BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Auto"})  # Phase 390
 
 TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
 # The Compute-layer binding cases are recognised so a data-bound node's source round-trips
@@ -155,6 +157,9 @@ CELL_FORMAT_CASES = frozenset({"None", "Number", "Currency", "Percent", "Signifi
 KNOWN_KINDS = frozenset(
     {
         # Layout
+        "Box",  # Phase 390 — the unified container
+        # The four retired container tags stay recognised for legacy
+        # decode-upgrade (they never re-encode to their old form → Box).
         "Dashboard",
         "Stack",
         "GridLayout",
@@ -503,18 +508,10 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("maxHeight", False, _decode_int),
         ("maxWidth", False, _decode_int),
     ],
-    "Dashboard": [
-        ("children", True, _decode_children),
-    ],
-    "Stack": [
-        ("children", True, _decode_children),
-        ("orientation", True, _enum_decoder(ORIENTATION, "orientation")),
-        ("wrap", True, _decode_bool),
-    ],
-    "Card": [
-        ("children", True, _decode_children),
-        ("heading", False, _decode_text_source),
-    ],
+    # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
+    # field schema, because it re-nests `layout` and role-validates. The four
+    # retired container tags (Dashboard / Stack / GridLayout / Card) are handled
+    # by `_decode_legacy_container`, which decode-upgrades each to a `Box`.
     # Button gets a (minimal) typed schema so its two contract-bearing fields
     # route through the typed decoders: `label` picks up the §16 bare-string
     # leniency, and `onClick` goes through the null-strict action decoder
@@ -547,9 +544,84 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
 }
 
 
+# ── Box (Phase 390) — the unified container + legacy decode-upgrade ─────────
+#
+# The wire is: {"$type":"Box","children":[…],"heading":<TextSource>?,
+#   "layout":{…},"role":"Group|Card|Dashboard|Separator"}. The nested `layout`
+# is `$type`-discriminated (Flex | Grid | Auto). Mirrors the F# `decodeLayoutKind`
+# "Box" branch: role-validated, layout re-built, heading optional. The four
+# retired container tags decode-upgrade to the equivalent Box on read (a legacy
+# tag never re-encodes to its old form — it round-trips as Box).
+
+
+def _decode_box_layout(value: object, path: str) -> Obj:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BOX_LAYOUT_CASES)
+    if tag == "Flex":
+        fields: dict[str, Value] = {
+            "direction": _enum(_require(obj, "direction", path), f"{path}.direction", ORIENTATION, "direction"),
+            "wrap": _expect_bool(_require(obj, "wrap", path), f"{path}.wrap"),
+        }
+        if "gap" in obj:
+            fields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        return Obj("Flex", fields)
+    if tag == "Grid":
+        gfields: dict[str, Value] = {"cols": _expect_int(_require(obj, "cols", path), f"{path}.cols")}
+        if "gap" in obj:
+            gfields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        if "templateColumns" in obj:
+            gfields["templateColumns"] = _expect_string(obj["templateColumns"], f"{path}.templateColumns")
+        return Obj("Grid", gfields)
+    # Auto
+    return Obj("Auto", {})
+
+
+def _decode_box(obj: dict, path: str) -> Obj:
+    children = _decode_children(_require(obj, "children", path), f"{path}.children")
+    role = _enum(_require(obj, "role", path), f"{path}.role", BOX_ROLE, "role")
+    layout = _decode_box_layout(_require(obj, "layout", path), f"{path}.layout")
+    fields: dict[str, Value] = {"children": children}
+    if "heading" in obj:
+        fields["heading"] = _decode_text_source(obj["heading"], f"{path}.heading")
+    fields["layout"] = layout
+    fields["role"] = role
+    return Obj("Box", fields)
+
+
+def _decode_legacy_container(tag: str, obj: dict, path: str) -> Obj:
+    """Decode-upgrade a retired container tag to the equivalent Box (Phase 390)."""
+    children = _decode_children(_require(obj, "children", path), f"{path}.children")
+    if tag == "Dashboard":
+        return Obj("Box", {"children": children, "layout": Obj("Auto", {}), "role": "Dashboard"})
+    if tag == "Stack":
+        direction = _enum(_require(obj, "orientation", path), f"{path}.orientation", ORIENTATION, "orientation")
+        wrap = _expect_bool(_require(obj, "wrap", path), f"{path}.wrap")
+        layout = Obj("Flex", {"direction": direction, "wrap": wrap})
+        return Obj("Box", {"children": children, "layout": layout, "role": "Group"})
+    if tag == "GridLayout":
+        gfields: dict[str, Value] = {"cols": _expect_int(_require(obj, "cols", path), f"{path}.cols")}
+        if "templateColumns" in obj:
+            gfields["templateColumns"] = _expect_string(obj["templateColumns"], f"{path}.templateColumns")
+        return Obj("Box", {"children": children, "layout": Obj("Grid", gfields), "role": "Group"})
+    # Card
+    fields: dict[str, Value] = {"children": children}
+    if "heading" in obj:
+        fields["heading"] = _decode_text_source(obj["heading"], f"{path}.heading")
+    fields["layout"] = Obj("Flex", {"direction": "Vertical", "wrap": False})
+    fields["role"] = "Card"
+    return Obj("Box", fields)
+
+
+_LEGACY_CONTAINER_TAGS = frozenset({"Dashboard", "Stack", "GridLayout", "Card"})
+
+
 def _decode_kind(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, KNOWN_KINDS, code_unknown=WRONG_NODE_KIND)
+    if tag == "Box":
+        return _decode_box(obj, path)
+    if tag in _LEGACY_CONTAINER_TAGS:
+        return _decode_legacy_container(tag, obj, path)
     schema = KIND_SCHEMAS.get(tag)
     if schema is None:
         # Recognised kind without a typed schema yet — accept structurally.

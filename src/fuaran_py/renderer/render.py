@@ -149,38 +149,49 @@ class Renderer:
     def _children_html(self, fields: dict[str, Value]) -> str:
         return "".join(self.render_node(c) for c in _child_nodes(fields))
 
-    def _dashboard(self, node: Node, fields: dict[str, Value]) -> str:
-        return element("div", [("class", "fuaran-layout-dashboard")], self._children_html(fields))
+    def _box(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 390 — the unified container. Role + layout mode drive the emitted
+        # element + classes so each retired kind's HTML/a11y is byte-identical:
+        # Card role → <section class="fuaran-layout-card">; Dashboard role (or
+        # Group+Auto) → <div class="fuaran-layout-dashboard">; Group+Grid → grid
+        # div; Group+Flex → stack div; Separator → <hr> (reserved).
+        role = fields.get("role")
+        layout = fields.get("layout")
+        layout_obj = layout if isinstance(layout, Obj) else None
+        layout_mode = layout_obj.tag if layout_obj is not None else None
 
-    def _stack(self, node: Node, fields: dict[str, Value]) -> str:
-        orientation = fields.get("orientation")
-        dir_class = "fuaran-stack-horizontal" if orientation == "Horizontal" else "fuaran-stack-vertical"
-        wrap = " fuaran-stack-wrap" if fields.get("wrap") is True else ""
+        if role == "Card":
+            heading = fields.get("heading")
+            header = (
+                text_element("header", [("class", "fuaran-card-heading")], self._text(heading))
+                if heading is not None
+                else ""
+            )
+            body = element("div", [("class", "fuaran-card-body")], self._children_html(fields))
+            return element("section", [("class", "fuaran-layout-card")], header + body)
+        if role == "Dashboard" or (role == "Group" and layout_mode == "Auto"):
+            return element("div", [("class", "fuaran-layout-dashboard")], self._children_html(fields))
+        if role == "Separator":
+            return element("hr", [("class", "fuaran-layout-separator")], "")
+        if role == "Group" and layout_mode == "Grid":
+            lf = layout_obj.fields if layout_obj is not None else {}
+            template = lf.get("templateColumns")
+            if not isinstance(template, str):
+                cols = lf.get("cols")
+                cols = cols if isinstance(cols, int) else 1
+                template = f"repeat({cols}, 1fr)"
+            return element(
+                "div",
+                [("class", "fuaran-layout-grid"), ("style", f"grid-template-columns:{template}")],
+                self._children_html(fields),
+            )
+        # Group + Flex (the default / fallthrough).
+        lf = layout_obj.fields if layout_obj is not None else {}
+        dir_class = "fuaran-stack-horizontal" if lf.get("direction") == "Horizontal" else "fuaran-stack-vertical"
+        wrap = " fuaran-stack-wrap" if lf.get("wrap") is True else ""
         return element(
             "div",
             [("class", f"fuaran-layout-stack {dir_class}{wrap}")],
-            self._children_html(fields),
-        )
-
-    def _card(self, node: Node, fields: dict[str, Value]) -> str:
-        heading = fields.get("heading")
-        header = (
-            text_element("header", [("class", "fuaran-card-heading")], self._text(heading))
-            if heading is not None
-            else ""
-        )
-        body = element("div", [("class", "fuaran-card-body")], self._children_html(fields))
-        return element("section", [("class", "fuaran-layout-card")], header + body)
-
-    def _grid_layout(self, node: Node, fields: dict[str, Value]) -> str:
-        template = fields.get("templateColumns")
-        if not isinstance(template, str):
-            cols = fields.get("cols")
-            cols = cols if isinstance(cols, int) else 1
-            template = f"repeat({cols}, 1fr)"
-        return element(
-            "div",
-            [("class", "fuaran-layout-grid"), ("style", f"grid-template-columns:{template}")],
             self._children_html(fields),
         )
 
@@ -204,7 +215,8 @@ class Renderer:
         return element("div", [("class", "fuaran-layout-split-panel")], left_html + right_html)
 
     def _tab_label(self, child: Node) -> str:
-        if child.kind.tag == "Card":
+        # A Box with role=Card and a heading names its tab (mirrors F# render).
+        if child.kind.tag == "Box" and child.kind.fields.get("role") == "Card":
             heading = child.kind.fields.get("heading")
             if heading is not None:
                 return self._text(heading)
@@ -774,10 +786,7 @@ def _seq_len(value: object) -> int:
 _KindHandler = Callable[["Renderer", Node, dict[str, Value]], str]
 
 _DISPATCH: dict[str, _KindHandler] = {
-    "Dashboard": Renderer._dashboard,
-    "Stack": Renderer._stack,
-    "Card": Renderer._card,
-    "GridLayout": Renderer._grid_layout,
+    "Box": Renderer._box,
     "SplitPanel": Renderer._split_panel,
     "Tabs": Renderer._tabs,
     "SummaryList": Renderer._summary_list,

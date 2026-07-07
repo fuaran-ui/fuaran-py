@@ -22,7 +22,17 @@ def test_empty_id_is_flagged() -> None:
 def test_duplicate_child_id_is_flagged() -> None:
     child_a = Node("dup", Obj("Markdown", {"text": Obj("Literal", {"text": "x"})}))
     child_b = Node("dup", Obj("Markdown", {"text": Obj("Literal", {"text": "y"})}))
-    root = Node("root", Obj("Stack", {"children": Arr([child_a, child_b])}))
+    root = Node(
+        "root",
+        Obj(
+            "Box",
+            {
+                "children": Arr([child_a, child_b]),
+                "layout": Obj("Flex", {"direction": "Vertical", "wrap": False}),
+                "role": "Group",
+            },
+        ),
+    )
     findings = validate_node(root)
     assert any(f.code == "DUPLICATE_NODE_ID" for f in findings)
 

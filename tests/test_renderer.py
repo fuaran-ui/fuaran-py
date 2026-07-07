@@ -84,9 +84,12 @@ def test_metric_query_binding_resolves_from_sources() -> None:
 
 
 def test_nested_layout_recurses_and_wraps_each_child() -> None:
+    # Box with role=Card (Phase 390 — the retired Card).
     html = _render(
-        '{"id":"card","kind":{"$type":"Card","heading":{"$type":"Literal","text":"Insights"},'
-        '"children":[{"id":"kid","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}}]}}'
+        '{"id":"card","kind":{"$type":"Box","children":['
+        '{"id":"kid","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}}],'
+        '"heading":{"$type":"Literal","text":"Insights"},'
+        '"layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Card"}}'
     )
     assert "fuaran-layout-card" in html
     assert "fuaran-card-heading" in html
@@ -97,7 +100,11 @@ def test_nested_layout_recurses_and_wraps_each_child() -> None:
 
 
 def test_stack_orientation_and_wrap_classes() -> None:
-    html = _render('{"id":"s","kind":{"$type":"Stack","orientation":"Horizontal","wrap":true,"children":[]}}')
+    # Box with role=Group + Flex layout (Phase 390 — the retired Stack).
+    html = _render(
+        '{"id":"s","kind":{"$type":"Box","children":[],'
+        '"layout":{"$type":"Flex","direction":"Horizontal","wrap":true},"role":"Group"}}'
+    )
     assert "fuaran-layout-stack" in html
     assert "fuaran-stack-horizontal" in html
     assert "fuaran-stack-wrap" in html

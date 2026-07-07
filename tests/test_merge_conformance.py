@@ -72,8 +72,9 @@ def _tone(node: Node) -> str:
 
 def _gated_validator(tree: Node) -> list[MergeDefect]:
     """Sample domain validator: "at most one Brand-toned pane per dashboard".
-    Inspects the root node only (not recursive), mirroring the F#/TS walker."""
-    if tree.kind.tag != "Dashboard":
+    Inspects the root node only (not recursive), mirroring the F#/TS walker.
+    Post-Phase-390 the dashboard is a ``Box`` with ``role == "Dashboard"``."""
+    if tree.kind.tag != "Box" or tree.kind.fields.get("role") != "Dashboard":
         return []
     brand_kids = [c for c in _children(tree) if _tone(c) == "Brand"]
     if len(brand_kids) <= 1:

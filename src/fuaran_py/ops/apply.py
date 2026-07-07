@@ -91,9 +91,7 @@ def _fail(code: str, message: str, batch_index: int | None = None) -> ApplyErr:
 
 # ── The layout-kind set (the kinds that carry an ordered `children` array) ───
 
-LAYOUT_KINDS = frozenset(
-    {"Dashboard", "Stack", "GridLayout", "SplitPanel", "Tabs", "Card", "Stepper", "SummaryList", "Disclosure"}
-)
+LAYOUT_KINDS = frozenset({"Box", "SplitPanel", "Tabs", "Stepper", "SummaryList", "Disclosure"})
 
 
 # ── Structural node helpers (over the flat generic model) ────────────────────
@@ -356,26 +354,16 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Download": ("download", _coerce_bool),
     },
     # Layout (Children -> structural child ops)
-    "Stack": {
-        "Orientation": ("orientation", _coerce_enum(ORIENTATION)),
-        "Wrap": ("wrap", _coerce_bool),
-        "Children": ("children", _NOT_SUPPORTED),
-    },
-    "GridLayout": {
-        "Cols": ("cols", _coerce_int),
-        "TemplateColumns": ("templateColumns", _coerce_string),
-        "Children": ("children", _NOT_SUPPORTED),
-    },
+    # Box (Phase 390) is NOT in this flat table — its legacy-compat field surface
+    # (Orientation / Wrap / Cols / TemplateColumns / Heading) mutates the *nested*
+    # `layout` object (or top-level `heading`) and is layout-mode-sensitive, so it
+    # is handled by `_update_box` in `_update_field`.
     "SplitPanel": {
         "Weight": ("weight", _coerce_float),
         "Children": ("children", _NOT_SUPPORTED),
     },
     "Tabs": {
         "Orientation": ("orientation", _coerce_enum(ORIENTATION)),
-        "Children": ("children", _NOT_SUPPORTED),
-    },
-    "Card": {
-        "Heading": ("heading", _coerce_text_source),
         "Children": ("children", _NOT_SUPPORTED),
     },
     "Stepper": {
@@ -392,7 +380,6 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "DefaultOpen": ("defaultOpen", _coerce_bool),
         "Children": ("children", _NOT_SUPPORTED),
     },
-    "Dashboard": {"Children": ("children", _NOT_SUPPORTED)},
     # Structural
     "FragmentDecl": {"Name": ("name", _coerce_string)},
     "FragmentRef": {"Name": ("name", _coerce_string)},
@@ -406,7 +393,62 @@ class _Outcome:
     detail: str = ""
 
 
+def _update_box(field: str, value: Value, kind: Obj) -> _Outcome:
+    """Box (Phase 390) UpdateProp — mirrors F# ``updateBox``.
+
+    The retired kinds' field names stay addressable so pre-merge op-streams
+    replaying against an upgraded Box keep working: ``Orientation`` / ``Wrap``
+    mutate a Flex box's nested layout; ``Cols`` / ``TemplateColumns`` mutate a
+    Grid box's; ``Heading`` sets the top-level heading. A field that does not
+    match the box's current layout mode is UnknownField.
+    """
+    layout = kind.fields.get("layout")
+    layout_obj = layout if isinstance(layout, Obj) else None
+    mode = layout_obj.tag if layout_obj is not None else None
+
+    def with_layout_field(camel: str, coerced_value: Value) -> _Outcome:
+        assert layout_obj is not None
+        lf = dict(layout_obj.fields)
+        lf[camel] = coerced_value
+        fields = dict(kind.fields)
+        fields["layout"] = Obj(layout_obj.tag, lf)
+        return _Outcome("updated", Obj(kind.tag, fields))
+
+    if field == "Heading":
+        result = _coerce_text_source(value)
+        if not result.ok:
+            return _Outcome("typeMismatch", detail=result.detail)
+        fields = dict(kind.fields)
+        fields["heading"] = result.value
+        return _Outcome("updated", Obj(kind.tag, fields))
+    if field == "Orientation" and mode == "Flex":
+        result = _coerce_enum(ORIENTATION)(value)
+        return (
+            with_layout_field("direction", result.value)
+            if result.ok
+            else _Outcome("typeMismatch", detail=result.detail)
+        )
+    if field == "Wrap" and mode == "Flex":
+        result = _coerce_bool(value)
+        return with_layout_field("wrap", result.value) if result.ok else _Outcome("typeMismatch", detail=result.detail)
+    if field == "Cols" and mode == "Grid":
+        result = _coerce_int(value)
+        return with_layout_field("cols", result.value) if result.ok else _Outcome("typeMismatch", detail=result.detail)
+    if field == "TemplateColumns" and mode == "Grid":
+        result = _coerce_string(value)
+        return (
+            with_layout_field("templateColumns", result.value)
+            if result.ok
+            else _Outcome("typeMismatch", detail=result.detail)
+        )
+    if field == "Children":
+        return _Outcome("notSupported")
+    return _Outcome("unknownField")
+
+
 def _update_field(field: str, value: Value, kind: Obj) -> _Outcome:
+    if kind.tag == "Box":
+        return _update_box(field, value, kind)
     table = _FIELDS.get(kind.tag or "")
     if table is None:
         return _Outcome("notSupported")

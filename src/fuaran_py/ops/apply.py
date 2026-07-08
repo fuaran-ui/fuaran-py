@@ -154,6 +154,28 @@ def _child_slots(node: Node) -> list[ChildSlot]:
             slots.append((eb_child, lambda c: _set_kind_field(node, "child", c)))
         if isinstance(eb_fallback, Node):
             slots.append((eb_fallback, lambda c: _set_kind_field(node, "fallback", c)))
+    elif tag == "Switch":
+        # Phase 392: the default child + each case child are editable slots
+        # (mirrors the ErrorBoundary handling above); a case's `match` is
+        # preserved on rebuild.
+        default_node = fields.get("default")
+        if isinstance(default_node, Node):
+            slots.append((default_node, lambda c: _set_kind_field(node, "default", c)))
+        cases = fields.get("cases")
+        if isinstance(cases, Arr):
+            for i, case in enumerate(cases.items):
+                if isinstance(case, Obj):
+                    case_child = case.fields.get("child")
+                    if isinstance(case_child, Node):
+
+                        def rebuild_case(c: Node, i: int = i, cases: Arr = cases) -> Node:
+                            new_items = list(cases.items)
+                            old = new_items[i]
+                            assert isinstance(old, Obj)
+                            new_items[i] = Obj(old.tag, {**old.fields, "child": c})
+                            return _set_kind_field(node, "cases", Arr(new_items))
+
+                        slots.append((case_child, rebuild_case))
     elif tag == "FragmentDecl":
         body = fields.get("body")
         if isinstance(body, Node):

@@ -716,6 +716,19 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.ErrorBoundary(child, fallback), accessibility.none)
 
     @staticmethod
+    def switch(  # noqa: A003
+        id: str,  # noqa: A002
+        *,
+        state_key: str,
+        cases: list[tuple[str, UiNode]],
+        default: UiNode,
+    ) -> UiNode:
+        """State-bound conditional child (Phase 392). ``cases`` is a list of
+        ``(match_value, child)`` pairs; ``default`` renders when none match."""
+        switch_cases = tuple(t.SwitchCase(match=m, child=child) for m, child in cases)
+        return _node(id, t.Switch(state_key, switch_cases, default), accessibility.none)
+
+    @staticmethod
     def fragment_decl(
         id: str,  # noqa: A002
         *,

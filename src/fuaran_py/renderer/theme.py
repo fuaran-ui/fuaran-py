@@ -76,6 +76,7 @@ KIND_CLASS: dict[str, str] = {
     "Map": "fuaran-kind-map",
     # Structural
     "ErrorBoundary": "fuaran-kind-error-boundary",
+    "Switch": "fuaran-kind-switch",
     "FragmentDecl": "fuaran-kind-fragment-decl",
     "FragmentRef": "fuaran-kind-fragment-ref",
 }

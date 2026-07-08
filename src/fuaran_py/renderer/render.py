@@ -75,6 +75,17 @@ def _collect_fragments(node: Node, acc: dict[str, Node]) -> None:
     boundary_child = _as_node(kind.fields.get("child"))
     if boundary_child is not None:
         _collect_fragments(boundary_child, acc)
+    if kind.tag == "Switch":
+        cases = kind.fields.get("cases")
+        if isinstance(cases, Arr):
+            for case in cases.items:
+                if isinstance(case, Obj):
+                    case_child = _as_node(case.fields.get("child"))
+                    if case_child is not None:
+                        _collect_fragments(case_child, acc)
+        switch_default = _as_node(kind.fields.get("default"))
+        if switch_default is not None:
+            _collect_fragments(switch_default, acc)
 
 
 class Renderer:
@@ -722,6 +733,29 @@ class Renderer:
         child = _as_node(fields.get("child"))
         return self.render_node(child) if child is not None else ""
 
+    def _switch(self, node: Node, fields: dict[str, Value]) -> str:
+        # State-bound conditional child (Phase 392). Resolve the initial state
+        # value at `stateKey` from the host sources; render the first case whose
+        # `match` equals its string form (first-match-wins), else the default.
+        # Server + client first render read the same initial state → hydration
+        # parity; the Pyodide client re-renders on a SetState state change.
+        state_key = fields.get("stateKey")
+        cases = fields.get("cases")
+        default = _as_node(fields.get("default"))
+
+        current: object | None = None
+        if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
+            current = self.sources[state_key]
+        value_str = "" if current is None else str(current)
+
+        if isinstance(cases, Arr):
+            for case in cases.items:
+                if isinstance(case, Obj) and case.fields.get("match") == value_str:
+                    child = _as_node(case.fields.get("child"))
+                    if child is not None:
+                        return self.render_node(child)
+        return self.render_node(default) if default is not None else ""
+
     def _fragment_decl(self, node: Node, fields: dict[str, Value]) -> str:
         return ""  # zero-paint — the decl is a template, not visible output.
 
@@ -801,6 +835,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Chart": Renderer._chart,
     "Map": Renderer._map,
     "ErrorBoundary": Renderer._error_boundary,
+    "Switch": Renderer._switch,
     "FragmentDecl": Renderer._fragment_decl,
     "FragmentRef": Renderer._fragment_ref,
     "Custom": Renderer._custom,

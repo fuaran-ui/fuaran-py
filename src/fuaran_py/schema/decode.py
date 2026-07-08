@@ -204,6 +204,7 @@ KNOWN_KINDS = frozenset(
         # Structural
         "Custom",
         "ErrorBoundary",
+        "Switch",
         "FragmentDecl",
         "FragmentRef",
         "Mount",
@@ -449,6 +450,25 @@ def _decode_children(value: object, path: str) -> Value:
     return Arr([_decode_node_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
 
 
+def _decode_switch_case(value: object, path: str) -> Value:
+    # One Switch case (Phase 392): ``{"child":<Node>,"match":<string>}``.
+    obj = _expect_object(value, path)
+    child = _decode_node_value(_require(obj, "child", path), f"{path}.child")
+    match = _expect_string(_require(obj, "match", path), f"{path}.match")
+    return Obj(None, {"child": child, "match": match})
+
+
+def _decode_switch_cases(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_switch_case(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_single_node(value: object, path: str) -> Value:
+    # Deferred wrapper so KIND_SCHEMAS (built before `_decode_node_value` is
+    # defined) can decode a single-Node field; the call resolves at decode time.
+    return _decode_node_value(value, path)
+
+
 def _decode_text_source_array(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
     return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
@@ -647,6 +667,15 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
         ("props", False, _decode_json_value),
         ("contentHash", False, _decode_json_value),
         ("exposedNodeIds", False, _decode_json_value),
+    ],
+    # State-bound conditional child (Phase 392). `cases` is an array of
+    # `{child,match}` objects; `default` a Node; `stateKey` a string — all
+    # required (the reject fixtures pin MISSING_FIELD at each). Duplicate `match`
+    # values are NOT a decode error (first-match-wins; the validator flags them).
+    "Switch": [
+        ("cases", True, _decode_switch_cases),
+        ("default", True, _decode_single_node),
+        ("stateKey", True, _decode_string),
     ],
     # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
     # capabilities + the onBubble closure sentinel are always present on the

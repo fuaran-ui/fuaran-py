@@ -44,8 +44,42 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     if node.kind.tag not in KNOWN_KINDS:
         findings.append(Finding("UNKNOWN_NODE_KIND", f"{path}.kind.$type", f"unrecognised node kind '{node.kind.tag}'"))
 
+    if node.kind.tag == "Switch":
+        _check_switch(node.kind, f"{path}.kind", findings)
+
     for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
         _walk(child, child_path, findings, seen_ids)
+
+
+def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
+    """Switch-specific structural checks (Phase 392): duplicate match values
+    (dead cases, FUARAN082) and an empty/ungrounded state key (FUARAN083)."""
+    if kind.fields.get("stateKey") == "":
+        findings.append(
+            Finding(
+                "UNGROUNDED_SWITCH_STATE_KEY",
+                f"{path}.stateKey",
+                "switch stateKey is empty — it can never resolve a case and is stuck on its default (FUARAN083)",
+            )
+        )
+    cases = kind.fields.get("cases")
+    if isinstance(cases, Arr):
+        seen: set[str] = set()
+        reported: set[str] = set()
+        for case in cases.items:
+            if isinstance(case, Obj):
+                match = case.fields.get("match")
+                if isinstance(match, str):
+                    if match in seen and match not in reported:
+                        findings.append(
+                            Finding(
+                                "DUPLICATE_SWITCH_MATCH",
+                                f"{path}.cases",
+                                f"duplicate switch match '{match}' (FUARAN082)",
+                            )
+                        )
+                        reported.add(match)
+                    seen.add(match)
 
 
 def _child_nodes(value: Value, path: str) -> list[tuple[Node, str]]:

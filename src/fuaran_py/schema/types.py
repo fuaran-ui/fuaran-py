@@ -1456,6 +1456,41 @@ class ErrorBoundary:
         return _obj("ErrorBoundary", {"child": self.child, "fallback": self.fallback})
 
 
+@dataclass(frozen=True)
+class SwitchCase:
+    """One case in a :class:`Switch` (Phase 392): render ``child`` when the state
+    value's string form equals ``match``. Wire: ``{"child":<Node>,"match":<str>}``."""
+
+    match: str
+    child: UiNode
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"child": self.child, "match": self.match})
+
+
+@dataclass(frozen=True)
+class Switch:
+    """State-bound conditional child (Phase 392) — render one of several child
+    subtrees based on a reactive state key. ``state_key`` selects the case (first
+    match on the value's string form wins); ``default`` renders when none match
+    (and is the SSR / first-paint surface). Wire: ``{"$type":"Switch","cases":[…],
+    "default":<Node>,"stateKey":<str>}``."""
+
+    state_key: str
+    cases: tuple[SwitchCase, ...]
+    default: UiNode
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Switch",
+            {
+                "cases": list(self.cases),
+                "default": self.default,
+                "stateKey": self.state_key,
+            },
+        )
+
+
 # Fragment parameterisation (holes / effect / args) — WIRE_FORMAT.md §3.2 -----
 
 HostEffect = Literal["Pure", "ReadsHost", "WritesHost"]

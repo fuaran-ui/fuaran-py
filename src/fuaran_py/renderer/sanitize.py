@@ -118,7 +118,24 @@ def sanitize_url_or_blank(url: str) -> str:
 
 _DANGEROUS_ELEMENTS = ("script", "iframe", "object", "embed", "form", "link", "meta")
 _EVENT_HANDLER = re.compile(r"\son[a-zA-Z]+(\s*=\s*(\"[^\"]*\"|'[^']*'|[^\s>]*))?", re.IGNORECASE)
+# A `<...>` start-tag span. The event-handler sweep runs only *inside* these, never
+# over body text — see `_strip_event_handlers`.
+_TAG_SPAN = re.compile(r"<[^>]*>")
 _DANGEROUS_PROTOCOL = re.compile(r"(?i)(javascript|vbscript):")
+
+
+def _strip_event_handlers(html: str) -> str:
+    """Remove ``on*=`` handlers, but only inside tag interiors.
+
+    The tag-interior anchor is load-bearing: the ``\\son<letter>`` pattern also
+    matches the leading-whitespace-``on`` of ordinary English words — "one",
+    "only", "once", "onto", "online", … — so running the regex globally deletes
+    those words from body text. Because the render path constrains the input to
+    the deterministic markdown emitter's output (raw HTML already escaped), a
+    real event-handler attribute only appears inside a tag the renderer emitted,
+    so scoping the sweep to ``<...>`` spans is both correct and false-positive-free.
+    """
+    return _TAG_SPAN.sub(lambda m: _EVENT_HANDLER.sub("", m.group(0)), html)
 
 
 def sanitize_markdown_html(html: str) -> str:
@@ -145,6 +162,6 @@ def sanitize_markdown_html(html: str) -> str:
             else:
                 end = result.find(">", i)
                 result = result[:i] + (result[end + 1 :] if end >= 0 else "")
-    result = _EVENT_HANDLER.sub("", result)
+    result = _strip_event_handlers(result)
     result = _DANGEROUS_PROTOCOL.sub("about:blank", result)
     return result

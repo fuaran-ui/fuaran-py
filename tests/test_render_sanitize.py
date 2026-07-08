@@ -91,6 +91,23 @@ def test_markdown_neutralises_event_handlers_and_js_urls() -> None:
     assert "about:blank" in cleaned
 
 
+def test_markdown_preserves_body_words_beginning_with_on() -> None:
+    # Regression: the ` on<letter>` sweep must be anchored to tag interiors, else
+    # it deletes ordinary English words from prose (one/only/once/onto/…).
+    prose = "<p>they are one design decision, only once, back onto the path, and ongoing</p>"
+    assert sanitize_markdown_html(prose) == prose
+
+
+def test_markdown_strips_genuine_handler_next_to_prose_on_words() -> None:
+    dirty = '<p>only one</p><a href="https://x" onclick="steal()">once</a>'
+    cleaned = sanitize_markdown_html(dirty)
+    assert "onclick" not in cleaned.lower()
+    assert "steal()" not in cleaned
+    assert "only one" in cleaned
+    assert ">once<" in cleaned
+    assert 'href="https://x"' in cleaned
+
+
 def test_markdown_node_renders_escaped_then_sanitised() -> None:
     wire = (
         '{"id":"md","kind":{"$type":"Markdown","text":{"$type":"Literal",'

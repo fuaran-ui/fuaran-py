@@ -1,0 +1,1 @@
+{"id":"btn-read-workbook","kind":{"$type":"Button","label":{"$type":"Literal","text":"Load workbook"},"onClick":{"$type":"ReadFileBody","encoding":"Base64","fileRef":"workbook-upload:0","onRead":"<closure>"},"variant":"Primary"}}

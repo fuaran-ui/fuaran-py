@@ -1,0 +1,1 @@
+{"id":"list-1","kind":{"$type":"List","items":[{"$type":"Literal","text":"First"},{"$type":"Literal","text":"Second"}],"ordered":true}}

@@ -1,0 +1,1 @@
+{"id":"frag-decl-1","kind":{"$type":"FragmentDecl","body":{"id":"frag-body","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Template body"}}},"name":"card-template"}}

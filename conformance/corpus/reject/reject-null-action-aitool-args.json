@@ -1,0 +1,1 @@
+{"id":"b3","kind":{"$type":"Button","label":{"$type":"Literal","text":"Go"},"onClick":{"$type":"AiTool","args":null,"toolName":"fuaran.getNodeState"},"variant":"Primary"}}

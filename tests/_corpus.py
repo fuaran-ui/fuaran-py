@@ -14,7 +14,15 @@ from pathlib import Path
 import pytest
 
 # tests/_corpus.py → tests → fuaran-py → Fuaran-UI → wire-format-fixtures
-CORPUS_ROOT = Path(__file__).resolve().parents[2] / "wire-format-fixtures"
+AUTHORITY_ROOT = Path(__file__).resolve().parents[2] / "wire-format-fixtures"
+# The committed offline snapshot (conformance/sync_corpus.py) — used when the
+# authority is absent (a standalone fuaran-py checkout), so the suite is
+# runnable without the side-by-side workspace. tests/test_corpus_sync.py pins
+# the snapshot to the authority so the two can never silently diverge.
+SNAPSHOT_ROOT = Path(__file__).resolve().parents[1] / "conformance" / "corpus"
+
+# Prefer the authority (CI + normal side-by-side dev); fall back to the snapshot.
+CORPUS_ROOT = AUTHORITY_ROOT if (AUTHORITY_ROOT / "manifest.json").is_file() else SNAPSHOT_ROOT
 
 # The additive DAG-record sub-corpus carries its own manifest under dag/.
 DAG_CORPUS_ROOT = CORPUS_ROOT / "dag"

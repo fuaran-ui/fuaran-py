@@ -1,0 +1,1 @@
+{"id":"btn-1","kind":{"$type":"Button","disabled":{"$type":"State","defaultValue":false,"key":"loading"},"icon":"refresh","label":{"$type":"Literal","text":"Refresh"},"onClick":{"$type":"Chain","ops":[]},"variant":"Primary"}}

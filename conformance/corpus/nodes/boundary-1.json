@@ -1,0 +1,1 @@
+{"id":"boundary-1","kind":{"$type":"ErrorBoundary","child":{"id":"boundary-child","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Child body"}}},"fallback":{"id":"boundary-fallback","kind":{"$type":"Callout","body":{"$type":"Literal","text":"Fallback rendered"},"dismissable":false,"heading":{"$type":"Literal","text":"Couldn't render"},"tone":"Warning"}}}}

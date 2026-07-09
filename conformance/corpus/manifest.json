@@ -1,0 +1,1304 @@
+{
+  "version": 1,
+  "schema": "schema.json",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. See fuaran/docs/WIRE_FORMAT.md.",
+  "fixtures": [
+    {
+      "id": "envelope-foreign-major",
+      "kind": "envelope-reject",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-foreign-major.json",
+      "expectedErrorCode": "FOREIGN_PROFILE",
+      "expectedPath": "$.$profile",
+      "description": "Foreign (major-ahead core@2.0) — hard-refuse, never silently mis-decode (WIRE_FORMAT 15.2)"
+    },
+    {
+      "id": "envelope-foreign-namespace",
+      "kind": "envelope-reject",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-foreign-namespace.json",
+      "expectedErrorCode": "FOREIGN_PROFILE",
+      "expectedPath": "$.$profile",
+      "description": "Foreign (different namespace music@1.0) — hard-refuse (WIRE_FORMAT 15.2)"
+    },
+    {
+      "id": "envelope-known-current",
+      "kind": "envelope-round-trip",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-known-current.json",
+      "expectedFile": "envelope/envelope-known-current.json",
+      "description": "enveloped Current (core@1.0) known payload — decode + re-render byte-identical (WIRE_FORMAT 15.1)"
+    },
+    {
+      "id": "envelope-unknown-behind",
+      "kind": "envelope-round-trip",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-unknown-behind.json",
+      "expectedFile": "envelope/envelope-unknown-behind.json",
+      "description": "Behind (core@1.1) unknown-kind payload — tolerant decode preserves bytes verbatim (WIRE_FORMAT 15.3)"
+    },
+    {
+      "id": "envelope-unknown-malformed-required-profile",
+      "kind": "envelope-round-trip",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-unknown-malformed-required-profile.json",
+      "expectedFile": "envelope/envelope-unknown-malformed-required-profile.json",
+      "description": "Behind unknown kind with a malformed requiredProfile — no label, bytes still preserved (WIRE_FORMAT 15.3)"
+    },
+    {
+      "id": "envelope-unknown-required-profile",
+      "kind": "envelope-round-trip",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-unknown-required-profile.json",
+      "expectedFile": "envelope/envelope-unknown-required-profile.json",
+      "description": "Behind unknown kind declaring requiredProfile core@1.4 — preserved + degrade label surfaced (WIRE_FORMAT 15.3)"
+    },
+    {
+      "id": "legacy-upgrade-card",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/legacy-upgrade-card.json",
+      "expectedFile": "lenient/legacy-upgrade-card.expected.json",
+      "description": "Legacy `Card` tag decode-upgrades to a Flex/Card Box preserving the heading (Phase 390)"
+    },
+    {
+      "id": "legacy-upgrade-dashboard",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/legacy-upgrade-dashboard.json",
+      "expectedFile": "lenient/legacy-upgrade-dashboard.expected.json",
+      "description": "Legacy `Dashboard` tag decode-upgrades to an Auto/Dashboard Box (Phase 390)"
+    },
+    {
+      "id": "legacy-upgrade-gridlayout",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/legacy-upgrade-gridlayout.json",
+      "expectedFile": "lenient/legacy-upgrade-gridlayout.expected.json",
+      "description": "Legacy `GridLayout` tag decode-upgrades to a Grid/Group Box (Phase 390)"
+    },
+    {
+      "id": "legacy-upgrade-stack",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/legacy-upgrade-stack.json",
+      "expectedFile": "lenient/legacy-upgrade-stack.expected.json",
+      "description": "Legacy `Stack` tag decode-upgrades to a Flex/Group Box (Phase 390)"
+    },
+    {
+      "id": "lenient-bare-text-button-label",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-bare-text-button-label.json",
+      "expectedFile": "lenient/lenient-bare-text-button-label.expected.json",
+      "description": "Button.label as a bare JSON string (§16.1)"
+    },
+    {
+      "id": "lenient-bare-text-callout",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-bare-text-callout.json",
+      "expectedFile": "lenient/lenient-bare-text-callout.expected.json",
+      "description": "Callout.body (required) + Callout.heading (optional position) as bare strings (§16.1)"
+    },
+    {
+      "id": "lenient-bare-text-heading",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-bare-text-heading.json",
+      "expectedFile": "lenient/lenient-bare-text-heading.expected.json",
+      "description": "Heading.text as a bare JSON string (§16.1)"
+    },
+    {
+      "id": "lenient-bare-text-markdown",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-bare-text-markdown.json",
+      "expectedFile": "lenient/lenient-bare-text-markdown.expected.json",
+      "description": "Markdown.text as a bare JSON string (§16.1) — the highest-frequency saving"
+    },
+    {
+      "id": "lenient-null-static-options",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-null-static-options.json",
+      "expectedFile": "lenient/lenient-null-static-options.expected.json",
+      "description": "Pre-429 boxes-to-null empty options list decodes to the typed empty array (value None stays null)"
+    },
+    {
+      "id": "lenient-opaque-static-markers",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-opaque-static-markers.json",
+      "expectedFile": "lenient/lenient-opaque-static-markers.expected.json",
+      "description": "Pre-429 opaque Map markers decode to the typed empty array"
+    },
+    {
+      "id": "lenient-opaque-static-options",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-opaque-static-options.json",
+      "expectedFile": "lenient/lenient-opaque-static-options.expected.json",
+      "description": "Pre-429 opaque Static options + value decode to the tagged placeholder forms and re-encode typed"
+    },
+    {
+      "id": "lenient-opaque-static-series",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-opaque-static-series.json",
+      "expectedFile": "lenient/lenient-opaque-static-series.expected.json",
+      "description": "Pre-429 opaque Sparkline series decodes to the typed empty array"
+    },
+    {
+      "id": "lenient-opaque-static-values",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-opaque-static-values.json",
+      "expectedFile": "lenient/lenient-opaque-static-values.expected.json",
+      "description": "Pre-429 opaque multi-select values decode to the tagged placeholder list and re-encode typed"
+    },
+    {
+      "id": "badge-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/badge-1.json",
+      "expectedFile": "nodes/badge-1.json",
+      "description": "Display/Badge"
+    },
+    {
+      "id": "boundary-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/boundary-1.json",
+      "expectedFile": "nodes/boundary-1.json",
+      "description": "ErrorBoundary (Markdown child + Callout fallback)"
+    },
+    {
+      "id": "btn-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-1.json",
+      "expectedFile": "nodes/btn-1.json",
+      "description": "Input/Button"
+    },
+    {
+      "id": "btn-copy-link",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-copy-link.json",
+      "expectedFile": "nodes/btn-copy-link.json",
+      "description": "Input/Button (Action.WriteToClipboard chained with Dispatch)"
+    },
+    {
+      "id": "btn-invoke",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-invoke.json",
+      "expectedFile": "nodes/btn-invoke.json",
+      "description": "Input/Button (Phase 283 — Action.Invoke capability effect)"
+    },
+    {
+      "id": "btn-read-workbook",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-read-workbook.json",
+      "expectedFile": "nodes/btn-read-workbook.json",
+      "description": "Input/Button (Action.ReadFileBody base64)"
+    },
+    {
+      "id": "call-into",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/call-into.json",
+      "expectedFile": "nodes/call-into.json",
+      "description": "Layout/Stack (Phase 428 — Action.Call result targets: closure / into State / into Query)"
+    },
+    {
+      "id": "callout-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/callout-1.json",
+      "expectedFile": "nodes/callout-1.json",
+      "description": "Display/Callout"
+    },
+    {
+      "id": "card-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/card-1.json",
+      "expectedFile": "nodes/card-1.json",
+      "description": "Layout/Card"
+    },
+    {
+      "id": "chart-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-1.json",
+      "expectedFile": "nodes/chart-1.json",
+      "description": "Visualisation/Chart"
+    },
+    {
+      "id": "code-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/code-1.json",
+      "expectedFile": "nodes/code-1.json",
+      "description": "Display/CodeBlock (fsharp, line numbers + highlights)"
+    },
+    {
+      "id": "composite-root",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/composite-root.json",
+      "expectedFile": "nodes/composite-root.json",
+      "description": "Composite (Dashboard ⊃ Card ⊃ Metric + Stack)"
+    },
+    {
+      "id": "controls-closure",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/controls-closure.json",
+      "expectedFile": "nodes/controls-closure.json",
+      "description": "Layout/Stack (Phase 426 — closure-authored onSelectTag / onToggle / onChangeMulti sentinels)"
+    },
+    {
+      "id": "controls-declarative",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/controls-declarative.json",
+      "expectedFile": "nodes/controls-declarative.json",
+      "description": "Layout/Stack (Phase 426 — declarative tabs + modal + disclosure + select, handlers omitted)"
+    },
+    {
+      "id": "custom-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/custom-1.json",
+      "expectedFile": "nodes/custom-1.json",
+      "description": "Custom"
+    },
+    {
+      "id": "custom-bounded-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/custom-bounded-1.json",
+      "expectedFile": "nodes/custom-bounded-1.json",
+      "description": "Custom (bounded escape, StrictReplay hash + exposed-ids)"
+    },
+    {
+      "id": "custom-bounded-advisory",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/custom-bounded-advisory.json",
+      "expectedFile": "nodes/custom-bounded-advisory.json",
+      "description": "Custom (bounded escape, AdvisoryWarning hash + no exposed-ids)"
+    },
+    {
+      "id": "dash-empty",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/dash-empty.json",
+      "expectedFile": "nodes/dash-empty.json",
+      "description": "Layout/Dashboard (empty)"
+    },
+    {
+      "id": "discl-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/discl-1.json",
+      "expectedFile": "nodes/discl-1.json",
+      "description": "Layout/Disclosure"
+    },
+    {
+      "id": "filters-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-1.json",
+      "expectedFile": "nodes/filters-1.json",
+      "description": "Input/Filters (text + choice)"
+    },
+    {
+      "id": "filters-declarative",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-declarative.json",
+      "expectedFile": "nodes/filters-declarative.json",
+      "description": "Input/Filters (declarative — omitted onChange + typed range bounds)"
+    },
+    {
+      "id": "filters-segmented",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-segmented.json",
+      "expectedFile": "nodes/filters-segmented.json",
+      "description": "Input/Filters (SegmentedFilter horizontal)"
+    },
+    {
+      "id": "form-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-1.json",
+      "expectedFile": "nodes/form-1.json",
+      "description": "Input/Form (all fields)"
+    },
+    {
+      "id": "form-date",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-date.json",
+      "expectedFile": "nodes/form-date.json",
+      "description": "Input/Form (Date — date/time/datetime variants + bounds)"
+    },
+    {
+      "id": "form-declarative",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-declarative.json",
+      "expectedFile": "nodes/form-declarative.json",
+      "description": "Input/Form (Phase 426 — handler-free write-back fields, State-bound)"
+    },
+    {
+      "id": "form-local-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-local-1.json",
+      "expectedFile": "nodes/form-local-1.json",
+      "description": "Input/Form (Local-bound text, OnBlur)"
+    },
+    {
+      "id": "form-local-debounce",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-local-debounce.json",
+      "expectedFile": "nodes/form-local-debounce.json",
+      "description": "Input/Form (Local-bound text, OnDebounce 250)"
+    },
+    {
+      "id": "form-ranged",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-ranged.json",
+      "expectedFile": "nodes/form-ranged.json",
+      "description": "Input/Form (RangedNumber — all/min-only/no bounds)"
+    },
+    {
+      "id": "form-segmented",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-segmented.json",
+      "expectedFile": "nodes/form-segmented.json",
+      "description": "Input/Form (SegmentedChoice horizontal + vertical)"
+    },
+    {
+      "id": "format-bindings",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/format-bindings.json",
+      "expectedFile": "nodes/format-bindings.json",
+      "description": "Binding.Format (number/currency/percent/date/relativeTime across locales)"
+    },
+    {
+      "id": "frag-decl-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-decl-1.json",
+      "expectedFile": "nodes/frag-decl-1.json",
+      "description": "FragmentDecl (named template with Markdown body)"
+    },
+    {
+      "id": "frag-decl-param",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-decl-param.json",
+      "expectedFile": "nodes/frag-decl-param.json",
+      "description": "FragmentDecl (parameterised — value/slot/repeat holes + effect class)"
+    },
+    {
+      "id": "frag-ref-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-ref-1.json",
+      "expectedFile": "nodes/frag-ref-1.json",
+      "description": "FragmentRef (name-only wire shape)"
+    },
+    {
+      "id": "frag-ref-args",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-ref-args.json",
+      "expectedFile": "nodes/frag-ref-args.json",
+      "description": "FragmentRef (parameterised — value + slot args)"
+    },
+    {
+      "id": "glayout-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/glayout-1.json",
+      "expectedFile": "nodes/glayout-1.json",
+      "description": "Layout/Grid"
+    },
+    {
+      "id": "glayout-tpl-autofit",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/glayout-tpl-autofit.json",
+      "expectedFile": "nodes/glayout-tpl-autofit.json",
+      "description": "Layout/Grid (TemplateColumns auto-fit minmax)"
+    },
+    {
+      "id": "glayout-tpl-fixed",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/glayout-tpl-fixed.json",
+      "expectedFile": "nodes/glayout-tpl-fixed.json",
+      "description": "Layout/Grid (TemplateColumns 100px + repeat fixed-plus-flex)"
+    },
+    {
+      "id": "glayout-tpl-ratio",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/glayout-tpl-ratio.json",
+      "expectedFile": "nodes/glayout-tpl-ratio.json",
+      "description": "Layout/Grid (TemplateColumns 1fr 2fr ratio)"
+    },
+    {
+      "id": "grid-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-1.json",
+      "expectedFile": "nodes/grid-1.json",
+      "description": "Visualisation/Grid"
+    },
+    {
+      "id": "grid-field-named",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-field-named.json",
+      "expectedFile": "nodes/grid-field-named.json",
+      "description": "Visualisation/Grid (Phase 425 — field-named columns + RowKeyField, closure-free)"
+    },
+    {
+      "id": "grid-transform",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform.json",
+      "expectedFile": "nodes/grid-transform.json",
+      "description": "Visualisation/Grid (Phase 282 — Binding.Transform compute source)"
+    },
+    {
+      "id": "grid-transform-param",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-param.json",
+      "expectedFile": "nodes/grid-transform-param.json",
+      "description": "Visualisation/Grid (Phase 424 — parameterised Binding.Transform, filter param from a chip)"
+    },
+    {
+      "id": "heading-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/heading-1.json",
+      "expectedFile": "nodes/heading-1.json",
+      "description": "Display/Heading"
+    },
+    {
+      "id": "image-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-1.json",
+      "expectedFile": "nodes/image-1.json",
+      "description": "Display/Image (Avatar variant)"
+    },
+    {
+      "id": "link-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/link-1.json",
+      "expectedFile": "nodes/link-1.json",
+      "description": "Display/Link"
+    },
+    {
+      "id": "list-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/list-1.json",
+      "expectedFile": "nodes/list-1.json",
+      "description": "Display/List (ordered)"
+    },
+    {
+      "id": "lvr-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/lvr-1.json",
+      "expectedFile": "nodes/lvr-1.json",
+      "description": "Display/LabelValueRow"
+    },
+    {
+      "id": "map-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/map-1.json",
+      "expectedFile": "nodes/map-1.json",
+      "description": "Visualisation/Map"
+    },
+    {
+      "id": "markdown-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/markdown-1.json",
+      "expectedFile": "nodes/markdown-1.json",
+      "description": "Display/Markdown"
+    },
+    {
+      "id": "math-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/math-1.json",
+      "expectedFile": "nodes/math-1.json",
+      "description": "Display/Math (block LaTeX)"
+    },
+    {
+      "id": "metric-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-1.json",
+      "expectedFile": "nodes/metric-1.json",
+      "description": "Display/Metric"
+    },
+    {
+      "id": "metric-float-17sig",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-float-17sig.json",
+      "expectedFile": "nodes/metric-float-17sig.json",
+      "description": "Display/Metric (float divergence-zone — 17 significant digits)"
+    },
+    {
+      "id": "metric-float-bigint",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-float-bigint.json",
+      "expectedFile": "nodes/metric-float-bigint.json",
+      "description": "Display/Metric (float divergence-zone — integer > 2^53)"
+    },
+    {
+      "id": "metric-float-exp-neg",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-float-exp-neg.json",
+      "expectedFile": "nodes/metric-float-exp-neg.json",
+      "description": "Display/Metric (float divergence-zone — 1e-7 scientific)"
+    },
+    {
+      "id": "metric-float-exp-pos",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-float-exp-pos.json",
+      "expectedFile": "nodes/metric-float-exp-pos.json",
+      "description": "Display/Metric (float divergence-zone — 1e21 scientific)"
+    },
+    {
+      "id": "metric-invoke",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-invoke.json",
+      "expectedFile": "nodes/metric-invoke.json",
+      "description": "Display/Metric (Phase 283 — Binding.Invoke capability source)"
+    },
+    {
+      "id": "modal-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/modal-1.json",
+      "expectedFile": "nodes/modal-1.json",
+      "description": "Layout/Modal (heading + child + onDismiss)"
+    },
+    {
+      "id": "mount-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/mount-1.json",
+      "expectedFile": "nodes/mount-1.json",
+      "description": "Mount (§4o — out-only, default-deny, zero-input degenerate)"
+    },
+    {
+      "id": "mount-2",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/mount-2.json",
+      "expectedFile": "nodes/mount-2.json",
+      "description": "Mount (§4o — capabilities + TwoWay message shape + value/slot inputs)"
+    },
+    {
+      "id": "multiselect-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/multiselect-1.json",
+      "expectedFile": "nodes/multiselect-1.json",
+      "description": "Input/Select (multi-select — list value)"
+    },
+    {
+      "id": "progress-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/progress-1.json",
+      "expectedFile": "nodes/progress-1.json",
+      "description": "Display/Progress"
+    },
+    {
+      "id": "query-dependson",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/query-dependson.json",
+      "expectedFile": "nodes/query-dependson.json",
+      "description": "Display/Metric (Phase 421 — Binding.Query with a declared dependsOn filter edge)"
+    },
+    {
+      "id": "scroll-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/scroll-1.json",
+      "expectedFile": "nodes/scroll-1.json",
+      "description": "Layout/ScrollArea (vertical, maxHeight)"
+    },
+    {
+      "id": "select-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/select-1.json",
+      "expectedFile": "nodes/select-1.json",
+      "description": "Input/Select"
+    },
+    {
+      "id": "skel-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/skel-1.json",
+      "expectedFile": "nodes/skel-1.json",
+      "description": "Display/Skeleton"
+    },
+    {
+      "id": "spark-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/spark-1.json",
+      "expectedFile": "nodes/spark-1.json",
+      "description": "Display/Sparkline"
+    },
+    {
+      "id": "split-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/split-1.json",
+      "expectedFile": "nodes/split-1.json",
+      "description": "Layout/SplitPanel"
+    },
+    {
+      "id": "stack-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/stack-1.json",
+      "expectedFile": "nodes/stack-1.json",
+      "description": "Layout/Stack"
+    },
+    {
+      "id": "step-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/step-1.json",
+      "expectedFile": "nodes/step-1.json",
+      "description": "Layout/Stepper"
+    },
+    {
+      "id": "style-role-voice-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/style-role-voice-1.json",
+      "expectedFile": "nodes/style-role-voice-1.json",
+      "description": "Display/Markdown (Phase 147 Role=Data + Voice=Display)"
+    },
+    {
+      "id": "summary-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/summary-1.json",
+      "expectedFile": "nodes/summary-1.json",
+      "description": "Layout/SummaryList"
+    },
+    {
+      "id": "switch-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-1.json",
+      "expectedFile": "nodes/switch-1.json",
+      "description": "Switch (view state → details/summary cases + info default)"
+    },
+    {
+      "id": "table-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/table-1.json",
+      "expectedFile": "nodes/table-1.json",
+      "description": "Visualisation/Table"
+    },
+    {
+      "id": "tabs-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tabs-1.json",
+      "expectedFile": "nodes/tabs-1.json",
+      "description": "Layout/Tabs"
+    },
+    {
+      "id": "tabs-explicit-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tabs-explicit-1.json",
+      "expectedFile": "nodes/tabs-explicit-1.json",
+      "description": "Layout/Tabs (explicit headers + tags + activeTag)"
+    },
+    {
+      "id": "toast-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/toast-1.json",
+      "expectedFile": "nodes/toast-1.json",
+      "description": "Display/Toast (Success tone, open)"
+    },
+    {
+      "id": "upload-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-1.json",
+      "expectedFile": "nodes/upload-1.json",
+      "description": "Input/FileUpload"
+    },
+    {
+      "id": "op-batch",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-batch.json",
+      "expectedFile": "ops/op-batch.json",
+      "description": "Batch"
+    },
+    {
+      "id": "op-editnode",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-editnode.json",
+      "expectedFile": "ops/op-editnode.json",
+      "description": "EditNode"
+    },
+    {
+      "id": "op-insertchild",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-insertchild.json",
+      "expectedFile": "ops/op-insertchild.json",
+      "description": "InsertChild"
+    },
+    {
+      "id": "op-movenode",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-movenode.json",
+      "expectedFile": "ops/op-movenode.json",
+      "description": "MoveNode"
+    },
+    {
+      "id": "op-removenode",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-removenode.json",
+      "expectedFile": "ops/op-removenode.json",
+      "description": "RemoveNode"
+    },
+    {
+      "id": "op-reorderchildren",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-reorderchildren.json",
+      "expectedFile": "ops/op-reorderchildren.json",
+      "description": "ReorderChildren"
+    },
+    {
+      "id": "op-replacebinding",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-replacebinding.json",
+      "expectedFile": "ops/op-replacebinding.json",
+      "description": "ReplaceBinding"
+    },
+    {
+      "id": "op-replaceroot",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-replaceroot.json",
+      "expectedFile": "ops/op-replaceroot.json",
+      "description": "ReplaceRoot"
+    },
+    {
+      "id": "op-updateprop",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop.json",
+      "expectedFile": "ops/op-updateprop.json",
+      "description": "UpdateProp"
+    },
+    {
+      "id": "op-updateprop-nested-badfield",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-badfield.json",
+      "expectedFile": "ops/op-updateprop-nested-badfield.json",
+      "description": "UpdateProp-nested-badfield"
+    },
+    {
+      "id": "op-updateprop-nested-badindex",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-badindex.json",
+      "expectedFile": "ops/op-updateprop-nested-badindex.json",
+      "description": "UpdateProp-nested-badindex"
+    },
+    {
+      "id": "op-updateprop-nested-column0-label",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-column0-label.json",
+      "expectedFile": "ops/op-updateprop-nested-column0-label.json",
+      "description": "UpdateProp-nested-column0-label"
+    },
+    {
+      "id": "op-updateprop-nested-column1-label",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-column1-label.json",
+      "expectedFile": "ops/op-updateprop-nested-column1-label.json",
+      "description": "UpdateProp-nested-column1-label"
+    },
+    {
+      "id": "op-updateprop-nested-field0-required",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-field0-required.json",
+      "expectedFile": "ops/op-updateprop-nested-field0-required.json",
+      "description": "UpdateProp-nested-field0-required"
+    },
+    {
+      "id": "op-updateprop-nested-field1-required",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-field1-required.json",
+      "expectedFile": "ops/op-updateprop-nested-field1-required.json",
+      "description": "UpdateProp-nested-field1-required"
+    },
+    {
+      "id": "op-updateprop-nested-malformed",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-malformed.json",
+      "expectedFile": "ops/op-updateprop-nested-malformed.json",
+      "description": "UpdateProp-nested-malformed"
+    },
+    {
+      "id": "op-updateprop-nested-object-value",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-object-value.json",
+      "expectedFile": "ops/op-updateprop-nested-object-value.json",
+      "description": "UpdateProp-nested-object-value"
+    },
+    {
+      "id": "op-updateprop-nested-yfield0",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-yfield0.json",
+      "expectedFile": "ops/op-updateprop-nested-yfield0.json",
+      "description": "UpdateProp-nested-yfield0"
+    },
+    {
+      "id": "op-updateprop-nested-yfield1",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updateprop-nested-yfield1.json",
+      "expectedFile": "ops/op-updateprop-nested-yfield1.json",
+      "description": "UpdateProp-nested-yfield1"
+    },
+    {
+      "id": "op-updatestate",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updatestate.json",
+      "expectedFile": "ops/op-updatestate.json",
+      "description": "UpdateState"
+    },
+    {
+      "id": "op-updatestyle",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updatestyle.json",
+      "expectedFile": "ops/op-updatestyle.json",
+      "description": "UpdateStyle"
+    },
+    {
+      "id": "op-updatestyle (phase 147 role=eyebrow + voice=structural)",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
+      "expectedFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
+      "description": "UpdateStyle (Phase 147 Role=Eyebrow + Voice=Structural)"
+    },
+    {
+      "id": "reject-emptynodeid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-emptynodeid.json",
+      "expectedErrorCode": "EMPTY_NODE_ID",
+      "expectedPath": "$.id",
+      "description": "Empty top-level id"
+    },
+    {
+      "id": "reject-invalid-empty",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-invalid-empty.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "empty string"
+    },
+    {
+      "id": "reject-invalid-garbage",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-invalid-garbage.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "garbage input"
+    },
+    {
+      "id": "reject-invalid-truncated",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-invalid-truncated.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "truncated object"
+    },
+    {
+      "id": "reject-missing-binding-type",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-binding-type.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.source.$type",
+      "description": "Binding missing $type"
+    },
+    {
+      "id": "reject-missing-custom-moduleid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-custom-moduleid.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.moduleId",
+      "description": "Custom missing moduleId"
+    },
+    {
+      "id": "reject-missing-markdown-text",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-markdown-text.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text",
+      "description": "Markdown spec missing text"
+    },
+    {
+      "id": "reject-missing-metric-source",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-metric-source.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.source",
+      "description": "Metric spec missing source"
+    },
+    {
+      "id": "reject-missing-mount-scopeid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-mount-scopeid.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.scopeId",
+      "description": "Mount missing scopeId (§4o)"
+    },
+    {
+      "id": "reject-missing-node-id",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-node-id.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.id",
+      "description": "Node missing id"
+    },
+    {
+      "id": "reject-missing-node-kind",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-node-kind.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind",
+      "description": "Node missing kind"
+    },
+    {
+      "id": "reject-missing-style-tone",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-style-tone.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.style.tone",
+      "description": "Style missing tone"
+    },
+    {
+      "id": "reject-missing-switch-cases",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-switch-cases.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.cases",
+      "description": "Switch missing cases"
+    },
+    {
+      "id": "reject-missing-switch-default",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-switch-default.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.default",
+      "description": "Switch missing default Node"
+    },
+    {
+      "id": "reject-missing-switch-statekey",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-switch-statekey.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.stateKey",
+      "description": "Switch missing stateKey"
+    },
+    {
+      "id": "reject-null-action-aitool-args",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-null-action-aitool-args.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.args",
+      "description": "null Action.AiTool args (structured JVal position)"
+    },
+    {
+      "id": "reject-null-action-notify-payload",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-null-action-notify-payload.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.payload",
+      "description": "null Action.Notify payload (structured JVal position)"
+    },
+    {
+      "id": "reject-null-action-setstate-value",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-null-action-setstate-value.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.value",
+      "description": "null Action.SetState value (structured JVal position)"
+    },
+    {
+      "id": "reject-null-custom-prop",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-null-custom-prop.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.props.k",
+      "description": "null Custom prop value (structured JVal position)"
+    },
+    {
+      "id": "reject-null-i18n-arg",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-null-i18n-arg.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.text.args.name",
+      "description": "null I18n arg value (structured JVal position)"
+    },
+    {
+      "id": "reject-null-updateprop-value",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-null-updateprop-value.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.value",
+      "description": "null UpdateProp value (structured JVal position)"
+    },
+    {
+      "id": "reject-op-insertchild-empty-childid",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-insertchild-empty-childid.json",
+      "expectedErrorCode": "EMPTY_NODE_ID",
+      "expectedPath": "$.child.id",
+      "description": "InsertChild child carries empty id"
+    },
+    {
+      "id": "reject-op-insertchild-missing-parentid",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-insertchild-missing-parentid.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.parentId",
+      "description": "InsertChild missing parentId"
+    },
+    {
+      "id": "reject-op-missing-type",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-missing-type.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.$type",
+      "description": "Op missing $type entirely"
+    },
+    {
+      "id": "reject-op-reorderchildren-wrongtype",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-reorderchildren-wrongtype.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.newOrder",
+      "description": "ReorderChildren newOrder is string not array"
+    },
+    {
+      "id": "reject-op-unknown-yeet",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-unknown-yeet.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.$type",
+      "description": "Unknown op discriminator 'Yeet'"
+    },
+    {
+      "id": "reject-op-updateprop-missing-path",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updateprop-missing-path.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.path",
+      "description": "UpdateProp missing path"
+    },
+    {
+      "id": "reject-unknown-binding",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-binding.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.source.$type",
+      "description": "Binding $type 'Bogus'"
+    },
+    {
+      "id": "reject-unknown-mount-direction",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-mount-direction.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.channel.direction",
+      "description": "Mount ChannelDirection value 'Sideways' (§4o)"
+    },
+    {
+      "id": "reject-unknown-textsource",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-textsource.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.text.$type",
+      "description": "TextSource $type 'TemplateString'"
+    },
+    {
+      "id": "reject-unknown-tone",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-tone.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.style.tone",
+      "description": "ToneVariant value 'Magenta'"
+    },
+    {
+      "id": "reject-wrongnodekind-sparkler",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongnodekind-sparkler.json",
+      "expectedErrorCode": "WRONG_NODE_KIND",
+      "expectedPath": "$.kind.$type",
+      "description": "Plausible-but-invalid kind 'Sparkler' — on the flat wire an unknown primitive is WRONG_NODE_KIND, not a nested DisplayKind miss"
+    },
+    {
+      "id": "reject-wrongnodekind-widget",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongnodekind-widget.json",
+      "expectedErrorCode": "WRONG_NODE_KIND",
+      "expectedPath": "$.kind.$type",
+      "description": "Top-level kind 'Widget' is not a recognised node kind"
+    },
+    {
+      "id": "reject-wrongtype-dashboard-children",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-dashboard-children.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.children",
+      "description": "Dashboard children is object not array"
+    },
+    {
+      "id": "reject-wrongtype-discriminator",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-discriminator.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.text.$type",
+      "description": "Discriminator under Style is number"
+    },
+    {
+      "id": "reject-wrongtype-heading-level",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-heading-level.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.level",
+      "description": "Heading level is string not number"
+    },
+    {
+      "id": "reject-wrongtype-id",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-id.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.id",
+      "description": "Node id is integer not string"
+    },
+    {
+      "id": "reject-wrongtype-kind",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-kind.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind",
+      "description": "Node kind is a bare string not an object"
+    },
+    {
+      "id": "reject-wrongtype-style-tone",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-style-tone.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.style.tone",
+      "description": "Style.tone is integer not string"
+    }
+  ]
+}

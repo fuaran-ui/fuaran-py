@@ -1,0 +1,1 @@
+{"id":"custom-bounded-1","kind":{"$type":"Custom","componentId":"QualityRing","contentHash":{"algorithm":"SHA256","hash":"abc123def456","strictness":"StrictReplay"},"exposedNodeIds":["quality-ring-segment-1","quality-ring-segment-2"],"moduleId":"deal-flow","props":{}}}

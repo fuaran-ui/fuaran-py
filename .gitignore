@@ -25,5 +25,8 @@ coverage.xml
 .DS_Store
 Thumbs.db
 
-# Synced corpus snapshot (follow-up: offline snapshot + drift guard)
-conformance/corpus/
+# The synced corpus snapshot (conformance/corpus/) IS committed — it makes
+# fuaran-py standalone-testable offline and gives the drift guard
+# (tests/test_corpus_sync.py) a committed baseline to pin against the authority.
+# Re-sync + re-commit it whenever the authoritative corpus regenerates
+# (python conformance/sync_corpus.py), per the §11 forward-coupling rule.

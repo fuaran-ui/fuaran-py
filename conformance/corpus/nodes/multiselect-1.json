@@ -1,0 +1,1 @@
+{"id":"multiselect-1","kind":{"$type":"Select","label":{"$type":"Literal","text":"Tags"},"multiple":true,"onChange":"<closure>","source":{"$type":"Static","value":[{"label":{"$type":"Literal","text":"Red"},"value":"red"},{"label":{"$type":"Literal","text":"Green"},"value":"green"}]},"value":{"$type":"Static","value":null},"values":{"$type":"Static","value":["red","green"]}}}

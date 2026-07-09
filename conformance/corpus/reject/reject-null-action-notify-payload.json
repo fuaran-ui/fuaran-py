@@ -1,0 +1,1 @@
+{"id":"b2","kind":{"$type":"Button","label":{"$type":"Literal","text":"Go"},"onClick":{"$type":"Notify","channel":"toast","payload":null},"variant":"Primary"}}

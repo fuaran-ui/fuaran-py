@@ -1,0 +1,4031 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fuaran.dev/wire-format/v1/schema.json",
+  "title": "Fuaran UI wire format (v1)",
+  "description": "Canonical JSON wire format for the Fuaran UI tree (Node) and tree edits (TreeOp), wire format v1. Generated from Fuaran.UI.Types via Fuaran.UI.Ops.SchemaGen; describes the output of CanonicalJson.encode* / the input JsonDecode.decode* accepts. See fuaran/docs/WIRE_FORMAT.md.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Node"
+    },
+    {
+      "$ref": "#/$defs/TreeOp"
+    }
+  ],
+  "$defs": {
+    "Orientation": {
+      "type": "string",
+      "enum": [
+        "Vertical",
+        "Horizontal"
+      ]
+    },
+    "BadgeVariant": {
+      "type": "string",
+      "enum": [
+        "Neutral",
+        "Brand",
+        "Success",
+        "Warning",
+        "Critical",
+        "Info"
+      ]
+    },
+    "ButtonVariant": {
+      "type": "string",
+      "enum": [
+        "Primary",
+        "Secondary",
+        "Tertiary",
+        "Destructive"
+      ]
+    },
+    "HeadingVariant": {
+      "type": "string",
+      "enum": [
+        "Standard",
+        "Eyebrow",
+        "Caption",
+        "Lead"
+      ]
+    },
+    "ImageVariant": {
+      "type": "string",
+      "enum": [
+        "Default",
+        "Avatar",
+        "Rounded"
+      ]
+    },
+    "ScrollOrientation": {
+      "type": "string",
+      "enum": [
+        "Vertical",
+        "Horizontal",
+        "Both"
+      ]
+    },
+    "DateVariant": {
+      "type": "string",
+      "enum": [
+        "Date",
+        "Time",
+        "DateTime"
+      ]
+    },
+    "MathDisplay": {
+      "type": "string",
+      "enum": [
+        "Inline",
+        "Block"
+      ]
+    },
+    "ToneVariant": {
+      "type": "string",
+      "enum": [
+        "Default",
+        "Subdued",
+        "Brand",
+        "Success",
+        "Warning",
+        "Critical",
+        "Info"
+      ]
+    },
+    "StyleWeight": {
+      "type": "string",
+      "enum": [
+        "Compact",
+        "Standard",
+        "Spacious"
+      ]
+    },
+    "Emphasis": {
+      "type": "string",
+      "enum": [
+        "Quiet",
+        "Normal",
+        "Loud"
+      ]
+    },
+    "StyleRole": {
+      "type": "string",
+      "enum": [
+        "None",
+        "Eyebrow",
+        "Data",
+        "Lede",
+        "Caption"
+      ]
+    },
+    "FontVoice": {
+      "type": "string",
+      "enum": [
+        "Default",
+        "Display",
+        "Structural"
+      ]
+    },
+    "ChartKind": {
+      "type": "string",
+      "enum": [
+        "Line",
+        "Bar",
+        "Area",
+        "Pie",
+        "Scatter",
+        "Heatmap"
+      ]
+    },
+    "LiveRegionKind": {
+      "type": "string",
+      "enum": [
+        "polite",
+        "assertive",
+        "off"
+      ]
+    },
+    "HashStrictness": {
+      "type": "string",
+      "enum": [
+        "StrictReplay",
+        "AdvisoryWarning",
+        "Enforced"
+      ]
+    },
+    "DateStyle": {
+      "type": "string",
+      "enum": [
+        "Short",
+        "Medium",
+        "Long",
+        "Full"
+      ]
+    },
+    "RelativeTimeUnit": {
+      "type": "string",
+      "enum": [
+        "Second",
+        "Minute",
+        "Hour",
+        "Day",
+        "Week",
+        "Month",
+        "Year"
+      ]
+    },
+    "FileReadEncoding": {
+      "type": "string",
+      "enum": [
+        "Text",
+        "Base64",
+        "DataUrl"
+      ]
+    },
+    "AriaRole": {
+      "type": "string"
+    },
+    "TextSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Literal"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Bound"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "binding"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "I18n"
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "args",
+            "key"
+          ]
+        }
+      ]
+    },
+    "Binding": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Static"
+            },
+            "value": true
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Query"
+            },
+            "accessor": {
+              "const": "<closure>"
+            },
+            "dependsOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "accessor",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Filter"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Selection"
+            },
+            "accessor": {
+              "const": "<closure>"
+            },
+            "nodeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "accessor",
+            "nodeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "State"
+            },
+            "defaultValue": true,
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "defaultValue",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Computed"
+            },
+            "fn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "fn"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "I18n"
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/Binding"
+              }
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Local"
+            },
+            "flushOn": {
+              "$ref": "#/$defs/LocalFlushTrigger"
+            },
+            "format": {
+              "const": "<closure>"
+            },
+            "initialFrom": {
+              "$ref": "#/$defs/Binding"
+            },
+            "onCommit": {
+              "const": "<closure>"
+            },
+            "parse": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "flushOn",
+            "format",
+            "initialFrom",
+            "onCommit",
+            "parse"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Format"
+            },
+            "format": {
+              "$ref": "#/$defs/Format"
+            },
+            "locale": {
+              "$ref": "#/$defs/LocaleSource"
+            },
+            "source": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "format",
+            "locale",
+            "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Transform"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            },
+            "pipeline": {
+              "type": "array",
+              "items": true
+            },
+            "source": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "$type",
+            "pipeline",
+            "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Invoke"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "capabilityId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "args",
+            "capabilityId"
+          ]
+        }
+      ]
+    },
+    "LocalFlushTrigger": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "OnBlur"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "OnSubmit"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "OnCommitAction"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "OnDebounce"
+            },
+            "milliseconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "milliseconds"
+          ]
+        }
+      ]
+    },
+    "CallResultTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "State"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Query"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        }
+      ]
+    },
+    "Action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Dispatch"
+            },
+            "msg": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "msg"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Call"
+            },
+            "endpoint": {
+              "type": "string"
+            },
+            "onResult": {
+              "const": "<closure>"
+            },
+            "into": {
+              "$ref": "#/$defs/CallResultTarget"
+            }
+          },
+          "required": [
+            "$type",
+            "endpoint"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Notify"
+            },
+            "channel": {
+              "type": "string"
+            },
+            "payload": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "channel",
+            "payload"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Navigate"
+            },
+            "route": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "route"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "SetState"
+            },
+            "key": {
+              "type": "string"
+            },
+            "value": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "key",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "AiTool"
+            },
+            "args": {
+              "not": {
+                "type": "null"
+              }
+            },
+            "toolName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "args",
+            "toolName"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Chain"
+            },
+            "ops": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Action"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "ops"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "CommitLocal"
+            },
+            "nodeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "nodeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "WriteToClipboard"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "text"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReadFileBody"
+            },
+            "encoding": {
+              "$ref": "#/$defs/FileReadEncoding"
+            },
+            "fileRef": {
+              "type": "string"
+            },
+            "onRead": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "encoding",
+            "fileRef",
+            "onRead"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Invoke"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "capabilityId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "args",
+            "capabilityId"
+          ]
+        }
+      ]
+    },
+    "CellFormat": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "None"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Number"
+            },
+            "decimals": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Currency"
+            },
+            "code": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "code"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Percent"
+            },
+            "decimals": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "SignificantDigits"
+            },
+            "digits": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "digits"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            },
+            "format": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "format"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Custom"
+            },
+            "fn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "fn"
+          ]
+        }
+      ]
+    },
+    "CellValue": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Numeric"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Text"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Bool"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            },
+            "unixSeconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "unixSeconds"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Empty"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        }
+      ]
+    },
+    "ColumnWidth": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Auto"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Fixed"
+            },
+            "pixels": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "pixels"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Flex"
+            },
+            "weight": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "weight"
+          ]
+        }
+      ]
+    },
+    "Format": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Number"
+            },
+            "decimals": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Currency"
+            },
+            "isoCode": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "isoCode"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Percent"
+            },
+            "decimals": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            },
+            "dateStyle": {
+              "$ref": "#/$defs/DateStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "dateStyle"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RelativeTime"
+            },
+            "unit": {
+              "$ref": "#/$defs/RelativeTimeUnit"
+            }
+          },
+          "required": [
+            "$type",
+            "unit"
+          ]
+        }
+      ]
+    },
+    "LocaleSource": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Ambient"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Explicit"
+            },
+            "tag": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "tag"
+          ]
+        }
+      ]
+    },
+    "FormFieldKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Text"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Number"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Checkbox"
+            },
+            "onToggle": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Choice"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "options": {
+              "$ref": "#/$defs/Binding"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "options",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RangedNumber"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            },
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "SegmentedChoice"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "options": {
+              "$ref": "#/$defs/Binding"
+            },
+            "orientation": {
+              "$ref": "#/$defs/Orientation"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "options",
+            "orientation",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "TextArea"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "rows": {
+              "type": "integer"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "rows",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            },
+            "variant": {
+              "$ref": "#/$defs/DateVariant"
+            },
+            "min": {
+              "type": "string"
+            },
+            "max": {
+              "type": "string"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "value",
+            "variant"
+          ]
+        }
+      ]
+    },
+    "FilterKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "TextFilter"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ChoiceFilter"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "options": {
+              "$ref": "#/$defs/Binding"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "options",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RangeFilter"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "min": {
+                      "type": "number"
+                    },
+                    "max": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "max",
+                    "min"
+                  ]
+                },
+                {
+                  "const": "<opaque>"
+                }
+              ]
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "SegmentedFilter"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "options": {
+              "$ref": "#/$defs/Binding"
+            },
+            "orientation": {
+              "$ref": "#/$defs/Orientation"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type",
+            "options",
+            "orientation",
+            "value"
+          ]
+        }
+      ]
+    },
+    "CellKindErased": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Text"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Numeric"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Editable"
+            },
+            "onEdit": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "onEdit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Checkbox"
+            },
+            "get": {
+              "const": "<closure>"
+            },
+            "onToggle": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "get",
+            "onToggle"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Button"
+            },
+            "label": {
+              "$ref": "#/$defs/TextSource"
+            },
+            "onClick": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "label",
+            "onClick"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ButtonGroup"
+            },
+            "buttons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "$ref": "#/$defs/TextSource"
+                  },
+                  "onClick": {
+                    "const": "<closure>"
+                  }
+                },
+                "required": [
+                  "label",
+                  "onClick"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "buttons"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Link"
+            },
+            "hrefFn": {
+              "const": "<closure>"
+            },
+            "labelFn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "hrefFn",
+            "labelFn"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Pill"
+            },
+            "labelFn": {
+              "const": "<closure>"
+            },
+            "toneFn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "labelFn",
+            "toneFn"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Progress"
+            },
+            "fractionFn": {
+              "const": "<closure>"
+            },
+            "labelFn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "fractionFn",
+            "labelFn"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Custom"
+            },
+            "fn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "fn"
+          ]
+        }
+      ]
+    },
+    "MetricSpec": {
+      "type": "object",
+      "properties": {
+        "emphasis": {
+          "$ref": "#/$defs/Emphasis"
+        },
+        "format": {
+          "$ref": "#/$defs/CellFormat"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "weight": {
+          "$ref": "#/$defs/StyleWeight"
+        },
+        "trend": {
+          "$ref": "#/$defs/Binding"
+        },
+        "trendFormat": {
+          "$ref": "#/$defs/CellFormat"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "subtext": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "emphasis",
+        "format",
+        "label",
+        "source",
+        "tone",
+        "weight"
+      ]
+    },
+    "HeadingSpec": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "integer"
+        },
+        "text": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "variant": {
+          "$ref": "#/$defs/HeadingVariant"
+        }
+      },
+      "required": [
+        "level",
+        "text",
+        "variant"
+      ]
+    },
+    "MarkdownSpec": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
+    "BadgeSpec": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "variant": {
+          "$ref": "#/$defs/BadgeVariant"
+        }
+      },
+      "required": [
+        "label",
+        "variant"
+      ]
+    },
+    "LinkSpec": {
+      "type": "object",
+      "properties": {
+        "href": {
+          "$ref": "#/$defs/Binding"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "download": {
+          "type": "boolean"
+        },
+        "rel": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "download",
+        "href",
+        "label"
+      ]
+    },
+    "ImageSpec": {
+      "type": "object",
+      "properties": {
+        "alt": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "src": {
+          "$ref": "#/$defs/Binding"
+        },
+        "variant": {
+          "$ref": "#/$defs/ImageVariant"
+        }
+      },
+      "required": [
+        "alt",
+        "src",
+        "variant"
+      ]
+    },
+    "ListSpec": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TextSource"
+          }
+        },
+        "ordered": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "ordered"
+      ]
+    },
+    "ToastSpec": {
+      "type": "object",
+      "properties": {
+        "dismissable": {
+          "type": "boolean"
+        },
+        "message": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "open": {
+          "$ref": "#/$defs/Binding"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        }
+      },
+      "required": [
+        "dismissable",
+        "message",
+        "open",
+        "tone"
+      ]
+    },
+    "CodeBlockSpec": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "copyable": {
+          "type": "boolean"
+        },
+        "highlightLines": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "language": {
+          "type": "string"
+        },
+        "lineNumbers": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "code",
+        "copyable",
+        "highlightLines",
+        "language",
+        "lineNumbers"
+      ]
+    },
+    "MathSpec": {
+      "type": "object",
+      "properties": {
+        "display": {
+          "$ref": "#/$defs/MathDisplay"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "display",
+        "source"
+      ]
+    },
+    "SparklineSpec": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "source"
+      ]
+    },
+    "SkeletonSpec": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "rows"
+      ]
+    },
+    "CalloutSpec": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "dismissable": {
+          "type": "boolean"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "heading": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "body",
+        "dismissable",
+        "tone"
+      ]
+    },
+    "ProgressSpec": {
+      "type": "object",
+      "properties": {
+        "fraction": {
+          "$ref": "#/$defs/Binding"
+        },
+        "indeterminate": {
+          "type": "boolean"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "caveat": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "fraction",
+        "indeterminate",
+        "tone"
+      ]
+    },
+    "LabelValueRowSpec": {
+      "type": "object",
+      "properties": {
+        "emphasis": {
+          "type": "boolean"
+        },
+        "format": {
+          "$ref": "#/$defs/CellFormat"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "help": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "emphasis",
+        "format",
+        "label",
+        "source"
+      ]
+    },
+    "DisplayKind": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Heading"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/HeadingSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Markdown"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/MarkdownSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Metric"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/MetricSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Badge"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/BadgeSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Sparkline"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/SparklineSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Callout"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/CalloutSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Progress"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ProgressSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Skeleton"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/SkeletonSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "LabelValueRow"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/LabelValueRowSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Link"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/LinkSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Image"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ImageSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "List"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ListSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Toast"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ToastSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "CodeBlock"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/CodeBlockSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Math"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/MathSpec"
+            }
+          ]
+        }
+      ]
+    },
+    "SelectOption": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ]
+    },
+    "FormField": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/FormFieldKind"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "help": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "label",
+        "required"
+      ]
+    },
+    "FormSpec": {
+      "type": "object",
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/FormField"
+          }
+        },
+        "onSubmit": {
+          "$ref": "#/$defs/Action"
+        },
+        "submitLabel": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "disabled": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "fields",
+        "onSubmit",
+        "submitLabel"
+      ]
+    },
+    "FilterSpec": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/FilterKind"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "label",
+        "name"
+      ]
+    },
+    "ButtonSpec": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "onClick": {
+          "$ref": "#/$defs/Action"
+        },
+        "variant": {
+          "$ref": "#/$defs/ButtonVariant"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "disabled": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "label",
+        "onClick",
+        "variant"
+      ]
+    },
+    "SelectSpec": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "onChange": {
+          "const": "<closure>"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "value": {
+          "$ref": "#/$defs/Binding"
+        },
+        "placeholder": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "disabled": {
+          "$ref": "#/$defs/Binding"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "values": {
+          "$ref": "#/$defs/Binding"
+        },
+        "onChangeMulti": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "label",
+        "source",
+        "value"
+      ]
+    },
+    "FileUploadSpec": {
+      "type": "object",
+      "properties": {
+        "accept": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "multiple": {
+          "type": "boolean"
+        },
+        "onSelect": {
+          "const": "<closure>"
+        },
+        "disabled": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "accept",
+        "label",
+        "multiple",
+        "onSelect"
+      ]
+    },
+    "InputKind": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Form"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/FormSpec"
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Filters"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/FilterSpec"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "items"
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Button"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ButtonSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "FileUpload"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/FileUploadSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Select"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/SelectSpec"
+            }
+          ]
+        }
+      ]
+    },
+    "ColumnErased": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/CellFormat"
+        },
+        "kind": {
+          "$ref": "#/$defs/CellKindErased"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "const": "<closure>"
+        },
+        "field": {
+          "type": "string"
+        },
+        "width": {
+          "$ref": "#/$defs/ColumnWidth"
+        }
+      },
+      "required": [
+        "format",
+        "kind",
+        "label",
+        "width"
+      ]
+    },
+    "GridSpec": {
+      "type": "object",
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ColumnErased"
+          }
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "rowKey": {
+          "const": "<closure>"
+        },
+        "rowKeyField": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "onRowClick": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "columns",
+        "editable",
+        "source"
+      ]
+    },
+    "ChartSpec": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ChartKind"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "xField": {
+          "type": "string"
+        },
+        "yFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "stacked": {
+          "type": "boolean"
+        },
+        "title": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "onPointClick": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "kind",
+        "source",
+        "xField",
+        "yFields"
+      ]
+    },
+    "TableSpec": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TextSource"
+          }
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/TextSource"
+            }
+          }
+        },
+        "onRowClick": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "headers",
+        "rows"
+      ]
+    },
+    "MapMarker": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "latitude": {
+          "type": "number"
+        },
+        "longitude": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "latitude",
+        "longitude"
+      ]
+    },
+    "MapSpec": {
+      "type": "object",
+      "properties": {
+        "centreLatitude": {
+          "type": "number"
+        },
+        "centreLongitude": {
+          "type": "number"
+        },
+        "source": {
+          "$ref": "#/$defs/Binding"
+        },
+        "zoom": {
+          "type": "integer"
+        },
+        "onMarkerClick": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "centreLatitude",
+        "centreLongitude",
+        "source",
+        "zoom"
+      ]
+    },
+    "VisKind": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "DataGrid"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/GridSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Chart"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ChartSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Table"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/TableSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Map"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/MapSpec"
+            }
+          ]
+        }
+      ]
+    },
+    "BoxSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "heading": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "layout": {
+          "$ref": "#/$defs/BoxLayout"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "Group",
+            "Card",
+            "Dashboard",
+            "Separator"
+          ]
+        }
+      },
+      "required": [
+        "children",
+        "layout",
+        "role"
+      ]
+    },
+    "FlexLayout": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/Orientation"
+        },
+        "gap": {
+          "type": "integer"
+        },
+        "wrap": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "direction",
+        "wrap"
+      ]
+    },
+    "GridTemplate": {
+      "type": "object",
+      "properties": {
+        "cols": {
+          "type": "integer"
+        },
+        "gap": {
+          "type": "integer"
+        },
+        "templateColumns": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cols"
+      ]
+    },
+    "BoxLayout": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Flex"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/FlexLayout"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Grid"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/GridTemplate"
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Auto"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        }
+      ]
+    },
+    "SplitPanelSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "weight": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "children",
+        "weight"
+      ]
+    },
+    "TabHeader": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "icon": {
+          "type": "string"
+        },
+        "disabled": {
+          "$ref": "#/$defs/Binding"
+        }
+      },
+      "required": [
+        "label"
+      ]
+    },
+    "TabsSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "orientation": {
+          "$ref": "#/$defs/Orientation"
+        },
+        "activeIndex": {
+          "$ref": "#/$defs/Binding"
+        },
+        "onSelect": {
+          "const": "<closure>"
+        },
+        "tabHeaders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TabHeader"
+          }
+        },
+        "tabTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "activeTag": {
+          "$ref": "#/$defs/Binding"
+        },
+        "onSelectTag": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "children",
+        "orientation"
+      ]
+    },
+    "StepperSpec": {
+      "type": "object",
+      "properties": {
+        "activeStep": {
+          "$ref": "#/$defs/Binding"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "onSelect": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "activeStep",
+        "children"
+      ]
+    },
+    "SummaryListSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "heading": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "children"
+      ]
+    },
+    "DisclosureSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "defaultOpen": {
+          "type": "boolean"
+        },
+        "heading": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "open": {
+          "$ref": "#/$defs/Binding"
+        },
+        "onToggle": {
+          "const": "<closure>"
+        }
+      },
+      "required": [
+        "children",
+        "defaultOpen",
+        "heading",
+        "open"
+      ]
+    },
+    "ModalSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "dismissable": {
+          "type": "boolean"
+        },
+        "onDismiss": {
+          "$ref": "#/$defs/Action"
+        },
+        "open": {
+          "$ref": "#/$defs/Binding"
+        },
+        "heading": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "children",
+        "dismissable",
+        "open"
+      ]
+    },
+    "ScrollAreaSpec": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Node"
+          }
+        },
+        "orientation": {
+          "$ref": "#/$defs/ScrollOrientation"
+        },
+        "maxHeight": {
+          "type": "integer"
+        },
+        "maxWidth": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "children",
+        "orientation"
+      ]
+    },
+    "LayoutKind": {
+      "oneOf": [
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Box"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/BoxSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "SplitPanel"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/SplitPanelSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Tabs"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/TabsSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Stepper"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/StepperSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "SummaryList"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/SummaryListSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Disclosure"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/DisclosureSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Modal"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ModalSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "ScrollArea"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/ScrollAreaSpec"
+            }
+          ]
+        }
+      ]
+    },
+    "ContentHash": {
+      "type": "object",
+      "properties": {
+        "algorithm": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "strictness": {
+          "$ref": "#/$defs/HashStrictness"
+        }
+      },
+      "required": [
+        "algorithm",
+        "hash",
+        "strictness"
+      ]
+    },
+    "HoleValueSpace": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "IntRange"
+            },
+            "max": {
+              "type": "integer"
+            },
+            "min": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "max",
+            "min"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "FloatRange"
+            },
+            "max": {
+              "type": "number"
+            },
+            "min": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "max",
+            "min"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "StringLen"
+            },
+            "maxLen": {
+              "type": "integer"
+            },
+            "minLen": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "maxLen",
+            "minLen"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Enum"
+            },
+            "choices": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "choices"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "AnyString"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        }
+      ]
+    },
+    "Scalar": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Int"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Float"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Bool"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Str"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        }
+      ]
+    },
+    "HoleDecl": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Value"
+            },
+            "name": {
+              "type": "string"
+            },
+            "space": {
+              "$ref": "#/$defs/HoleValueSpace"
+            },
+            "default": {
+              "$ref": "#/$defs/Scalar"
+            }
+          },
+          "required": [
+            "$type",
+            "name",
+            "space"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Slot"
+            },
+            "name": {
+              "type": "string"
+            },
+            "kindConstraint": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Repeat"
+            },
+            "countSpace": {
+              "$ref": "#/$defs/HoleValueSpace"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "countSpace",
+            "name"
+          ]
+        }
+      ]
+    },
+    "EffectClass": {
+      "type": "object",
+      "properties": {
+        "determinism": {
+          "type": "string",
+          "enum": [
+            "Deterministic",
+            "Clock",
+            "Random",
+            "Network"
+          ]
+        },
+        "hostEffect": {
+          "type": "string",
+          "enum": [
+            "Pure",
+            "ReadsHost",
+            "WritesHost"
+          ]
+        }
+      },
+      "required": [
+        "determinism",
+        "hostEffect"
+      ]
+    },
+    "FragmentArg": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Int"
+            },
+            "value": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Float"
+            },
+            "value": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Bool"
+            },
+            "value": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Str"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "SlotArg"
+            },
+            "tree": {
+              "$ref": "#/$defs/Node"
+            }
+          },
+          "required": [
+            "$type",
+            "tree"
+          ]
+        }
+      ]
+    },
+    "GuestChannel": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "type": "string",
+          "enum": [
+            "OutOnly",
+            "TwoWay"
+          ]
+        },
+        "messageShape": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "direction"
+      ]
+    },
+    "NodeKind": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LayoutKind"
+        },
+        {
+          "$ref": "#/$defs/DisplayKind"
+        },
+        {
+          "$ref": "#/$defs/InputKind"
+        },
+        {
+          "$ref": "#/$defs/VisKind"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Custom"
+            },
+            "componentId": {
+              "type": "string"
+            },
+            "moduleId": {
+              "type": "string"
+            },
+            "props": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {
+                  "type": "null"
+                }
+              }
+            },
+            "contentHash": {
+              "$ref": "#/$defs/ContentHash"
+            },
+            "exposedNodeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "componentId",
+            "moduleId",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ErrorBoundary"
+            },
+            "child": {
+              "$ref": "#/$defs/Node"
+            },
+            "fallback": {
+              "$ref": "#/$defs/Node"
+            }
+          },
+          "required": [
+            "$type",
+            "child",
+            "fallback"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Switch"
+            },
+            "cases": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "child": {
+                    "$ref": "#/$defs/Node"
+                  },
+                  "match": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "child",
+                  "match"
+                ]
+              }
+            },
+            "default": {
+              "$ref": "#/$defs/Node"
+            },
+            "stateKey": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "cases",
+            "default",
+            "stateKey"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "FragmentDecl"
+            },
+            "body": {
+              "$ref": "#/$defs/Node"
+            },
+            "name": {
+              "type": "string"
+            },
+            "holes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/HoleDecl"
+              }
+            },
+            "effect": {
+              "$ref": "#/$defs/EffectClass"
+            }
+          },
+          "required": [
+            "$type",
+            "body",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "FragmentRef"
+            },
+            "name": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/FragmentArg"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Mount"
+            },
+            "capabilities": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "channel": {
+              "$ref": "#/$defs/GuestChannel"
+            },
+            "onBubble": {
+              "const": "<closure>"
+            },
+            "scopeId": {
+              "type": "string"
+            },
+            "inputs": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/FragmentArg"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "capabilities",
+            "channel",
+            "onBubble",
+            "scopeId"
+          ]
+        }
+      ]
+    },
+    "StateBehaviour": {
+      "type": "object",
+      "properties": {
+        "onLoading": {
+          "$ref": "#/$defs/Node"
+        },
+        "onEmpty": {
+          "$ref": "#/$defs/Node"
+        },
+        "onError": {
+          "const": "<closure>"
+        }
+      }
+    },
+    "SemanticStyle": {
+      "type": "object",
+      "properties": {
+        "emphasis": {
+          "$ref": "#/$defs/Emphasis"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "weight": {
+          "$ref": "#/$defs/StyleWeight"
+        },
+        "role": {
+          "$ref": "#/$defs/StyleRole"
+        },
+        "voice": {
+          "$ref": "#/$defs/FontVoice"
+        }
+      },
+      "required": [
+        "emphasis",
+        "tone",
+        "weight"
+      ]
+    },
+    "Accessibility": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/Binding"
+        },
+        "labelledBy": {
+          "type": "string"
+        },
+        "describedBy": {
+          "type": "string"
+        },
+        "role": {
+          "$ref": "#/$defs/AriaRole"
+        },
+        "liveRegion": {
+          "$ref": "#/$defs/LiveRegionKind"
+        },
+        "hidden": {
+          "$ref": "#/$defs/Binding"
+        }
+      }
+    },
+    "Node": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "$ref": "#/$defs/NodeKind"
+        },
+        "state": {
+          "$ref": "#/$defs/StateBehaviour"
+        },
+        "style": {
+          "$ref": "#/$defs/SemanticStyle"
+        },
+        "accessibility": {
+          "$ref": "#/$defs/Accessibility"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ]
+    },
+    "TreeOp": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "EditNode"
+            },
+            "newKind": {
+              "$ref": "#/$defs/NodeKind"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "newKind",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateProp"
+            },
+            "path": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            },
+            "value": {
+              "not": {
+                "type": "null"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "path",
+            "target",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReplaceBinding"
+            },
+            "binding": {
+              "$ref": "#/$defs/Binding"
+            },
+            "slot": {
+              "type": "string"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "binding",
+            "slot",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateStyle"
+            },
+            "style": {
+              "$ref": "#/$defs/SemanticStyle"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateState"
+            },
+            "state": {
+              "$ref": "#/$defs/StateBehaviour"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "state",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "InsertChild"
+            },
+            "child": {
+              "$ref": "#/$defs/Node"
+            },
+            "parentId": {
+              "type": "string"
+            },
+            "position": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "$type",
+            "child",
+            "parentId",
+            "position"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RemoveNode"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "MoveNode"
+            },
+            "newParentId": {
+              "type": "string"
+            },
+            "newPosition": {
+              "type": "integer"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "newParentId",
+            "newPosition",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReorderChildren"
+            },
+            "newOrder": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "parentId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "newOrder",
+            "parentId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReplaceRoot"
+            },
+            "node": {
+              "$ref": "#/$defs/Node"
+            }
+          },
+          "required": [
+            "$type",
+            "node"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Batch"
+            },
+            "ops": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TreeOp"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "ops"
+          ]
+        }
+      ]
+    }
+  }
+}

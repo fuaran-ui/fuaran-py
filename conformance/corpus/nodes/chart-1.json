@@ -1,0 +1,1 @@
+{"id":"chart-1","kind":{"$type":"Chart","kind":"Line","source":{"$type":"Static","value":"<opaque>"},"stacked":true,"title":{"$type":"Literal","text":"Channel mix"},"xField":"month","yFields":["revenue","cost"]}}

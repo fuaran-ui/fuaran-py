@@ -1,0 +1,1 @@
+{"id":"len-opt","kind":{"$type":"Select","label":{"$type":"Literal","text":"Region"},"source":{"$type":"Static","value":[{"label":{"$type":"Literal","text":"<opaque>"},"value":"<opaque>"}]},"value":{"$type":"Static","value":"<opaque>"}}}

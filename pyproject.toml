@@ -23,7 +23,10 @@ classifiers = [
 dependencies = []   # dependency-light: the codec uses only the Python standard library.
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6"]
+# Dev-only tooling. The runtime codec stays standard-library-only (see CLAUDE.md);
+# jsonschema (the schema-validity conformance leg) and hypothesis (generative
+# cross-host parity) are test dependencies, never imported by src/fuaran_py.
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6", "jsonschema>=4.23", "hypothesis>=6.100"]
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"

@@ -1,0 +1,1 @@
+{"id":"table-1","kind":{"$type":"Table","headers":[{"$type":"Literal","text":"Term"},{"$type":"Literal","text":"Definition"}],"rows":[[{"$type":"Literal","text":"MVU"},{"$type":"Literal","text":"Model-View-Update"}],[{"$type":"Literal","text":"DSL"},{"$type":"Literal","text":"Domain-specific language"}]]}}

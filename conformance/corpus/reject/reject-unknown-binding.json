@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Metric","label":{"$type":"Literal","text":"L"},"source":{"$type":"Bogus"},"format":{"$type":"None"},"tone":"Default","weight":"Standard","emphasis":"Normal"},"state":{},"style":{"emphasis":"Normal","tone":"Default","weight":"Standard"}}

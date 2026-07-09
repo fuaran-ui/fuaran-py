@@ -1,0 +1,1 @@
+{"id":"query-dependson","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Query","accessor":"<closure>","dependsOn":["status","region"],"name":"orders"},"subtext":{"$type":"Literal","text":"vs last month"},"tone":"Brand","weight":"Standard"}}

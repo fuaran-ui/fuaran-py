@@ -1,0 +1,1 @@
+{"id":"metric-float-exp-neg","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1E-07},"subtext":{"$type":"Literal","text":"vs last month"},"tone":"Brand","weight":"Standard"}}

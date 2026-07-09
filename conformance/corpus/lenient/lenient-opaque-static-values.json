@@ -1,0 +1,1 @@
+{"id":"len-val","kind":{"$type":"Select","label":{"$type":"Literal","text":"Regions"},"multiple":true,"source":{"$type":"Static","value":[{"label":{"$type":"Literal","text":"UK"},"value":"uk"}]},"value":{"$type":"Static","value":null},"values":{"$type":"Static","value":"<opaque>"}}}

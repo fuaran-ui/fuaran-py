@@ -1,0 +1,1 @@
+{"id":"custom-bounded-advisory","kind":{"$type":"Custom","componentId":"TrendCard","contentHash":{"algorithm":"SHA256","hash":"fedcba654321","strictness":"AdvisoryWarning"},"moduleId":"deal-flow","props":{}}}

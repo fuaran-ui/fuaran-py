@@ -1,0 +1,1 @@
+{"id":"btn-invoke","kind":{"$type":"Button","label":{"$type":"Literal","text":"Run model"},"onClick":{"$type":"Invoke","args":[{"addr":"rows","value":"all"}],"capabilityId":"model.score"},"variant":"Primary"}}

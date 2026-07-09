@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Switch","stateKey":"v","cases":[{"match":"a","child":{"id":"c","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"A"}}}}]},"state":{},"style":{"emphasis":"Normal","tone":"Default","weight":"Standard"}}

@@ -58,7 +58,8 @@ fuaran-py/
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
 │   ├── op_stream/        # hash-chained provenance log: StreamEntry envelope + SHA-256 chain + in-memory sink + replay
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
-│   ├── conformance/      # corpus round-trip smoke harness
+│   ├── ai_tools/         # AI-tools introspection: emittable-surface catalog + value-space + tool schemas + tree introspection + default-deny dispatch gate (Phase 237)
+│   ├── conformance/      # corpus round-trip smoke harness + certification bridge (Phase 236)
 │   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
 │   ├── style_observer/   # computed-style observer: pure flag tier + InMemory + Pyodide live read-back
 │   └── theme_manifest/   # DTCG-compatible theme contract (tokens + role bindings + invariants)

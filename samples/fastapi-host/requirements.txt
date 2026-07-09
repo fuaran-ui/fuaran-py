@@ -1,0 +1,6 @@
+# Sample-only dependencies (fuaran-py itself stays standard-library-only).
+fastapi>=0.110
+uvicorn>=0.29
+# The Fuaran host — from PyPI once published, or an editable install of this repo:
+#   pip install -e ../..
+fuaran-py

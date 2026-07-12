@@ -1137,13 +1137,29 @@ class Chart:
 
 @dataclass(frozen=True)
 class Table:
+    """Author-facing carrier for a static read-only table.
+
+    Phase 393 — no longer a `VisKind` case of its own: `to_wire` lowers it into the
+    `staticRows` mode of `DataGrid` (one tabular kind). The opaque `Static` source
+    re-encodes to ``{"$type":"Static","value":"<opaque>"}`` — byte-identical to the
+    F#/TS static grid.
+    """
+
     headers: tuple[TextSource, ...]
     rows: tuple[tuple[TextSource, ...], ...]
 
     def to_wire(self) -> Obj:
         return _obj(
-            "Table",
-            {"headers": list(self.headers), "rows": [list(r) for r in self.rows]},
+            "DataGrid",
+            {
+                "columns": [],
+                "editable": False,
+                "source": Static(OPAQUE),
+                "staticRows": {
+                    "headers": list(self.headers),
+                    "rows": [list(r) for r in self.rows],
+                },
+            },
         )
 
 

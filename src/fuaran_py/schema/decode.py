@@ -763,6 +763,29 @@ def _decode_legacy_container(tag: str, obj: dict, path: str) -> Obj:
 _LEGACY_CONTAINER_TAGS = frozenset({"Dashboard", "Stack", "GridLayout", "Card"})
 
 
+def _decode_legacy_table(obj: dict, path: str) -> Obj:
+    """Decode-upgrade a retired ``Table`` tag to a static read-only ``DataGrid`` (Phase 393).
+
+    The static text table becomes the ``staticRows`` mode of ``DataGrid``; it is accepted on
+    read but never re-encodes as ``Table`` (the resulting Obj is a ``DataGrid``). Byte-parity
+    with the F#/TS static grid: an empty column set + an opaque ``Static`` source that
+    re-encodes to ``{"$type":"Static","value":"<opaque>"}``.
+    """
+    headers = _decode_text_source_array(_require(obj, "headers", path), f"{path}.headers")
+    rows_arr = _expect_array(_require(obj, "rows", path), f"{path}.rows")
+    rows = Arr([_decode_text_source_array(row, f"{path}.rows[{i}]") for i, row in enumerate(rows_arr)])
+    static_rows = Obj(None, {"headers": headers, "rows": rows})
+    return Obj(
+        "DataGrid",
+        {
+            "columns": Arr([]),
+            "editable": False,
+            "source": Obj("Static", {"value": "<opaque>"}),
+            "staticRows": static_rows,
+        },
+    )
+
+
 def _decode_kind(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, KNOWN_KINDS, code_unknown=WRONG_NODE_KIND)
@@ -770,6 +793,8 @@ def _decode_kind(value: object, path: str) -> Obj:
         return _decode_box(obj, path)
     if tag in _LEGACY_CONTAINER_TAGS:
         return _decode_legacy_container(tag, obj, path)
+    if tag == "Table":
+        return _decode_legacy_table(obj, path)
     schema = KIND_SCHEMAS.get(tag)
     if schema is None:
         # Recognised kind without a typed schema yet — accept structurally.

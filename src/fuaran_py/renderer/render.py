@@ -686,6 +686,11 @@ class Renderer:
         )
 
     def _data_grid(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 393 — a static read-only grid renders the semantic <table> (byte-identical to
+        # the retired Table); a data-bound grid renders a client-hydration placeholder.
+        static_rows = fields.get("staticRows")
+        if isinstance(static_rows, Obj):
+            return self._table(node, static_rows.fields)
         count = _seq_len(resolve_binding(fields.get("source"), self.sources))
         return self._make_vis_placeholder(
             "fuaran-grid fuaran-grid-ssr-placeholder",

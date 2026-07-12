@@ -2509,6 +2509,30 @@
         },
         "onRowClick": {
           "const": "<closure>"
+        },
+        "staticRows": {
+          "type": "object",
+          "properties": {
+            "headers": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TextSource"
+              }
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/TextSource"
+                }
+              }
+            }
+          },
+          "required": [
+            "headers",
+            "rows"
+          ]
         }
       },
       "required": [
@@ -2550,33 +2574,6 @@
         "source",
         "xField",
         "yFields"
-      ]
-    },
-    "TableSpec": {
-      "type": "object",
-      "properties": {
-        "headers": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/TextSource"
-          }
-        },
-        "rows": {
-          "type": "array",
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/TextSource"
-            }
-          }
-        },
-        "onRowClick": {
-          "const": "<closure>"
-        }
-      },
-      "required": [
-        "headers",
-        "rows"
       ]
     },
     "MapMarker": {
@@ -2659,24 +2656,6 @@
             },
             {
               "$ref": "#/$defs/ChartSpec"
-            }
-          ]
-        },
-        {
-          "allOf": [
-            {
-              "type": "object",
-              "properties": {
-                "$type": {
-                  "const": "Table"
-                }
-              },
-              "required": [
-                "$type"
-              ]
-            },
-            {
-              "$ref": "#/$defs/TableSpec"
             }
           ]
         },

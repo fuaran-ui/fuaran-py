@@ -364,6 +364,14 @@
       "description": "Legacy `Stack` tag decode-upgrades to a Flex/Group Box (Phase 390)"
     },
     {
+      "id": "legacy-upgrade-table",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/legacy-upgrade-table.json",
+      "expectedFile": "lenient/legacy-upgrade-table.expected.json",
+      "description": "Legacy `Table` tag decode-upgrades to a static read-only DataGrid (Phase 393)"
+    },
+    {
       "id": "lenient-bare-text-button-label",
       "kind": "lenient-accept",
       "decoder": "node",

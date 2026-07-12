@@ -38,7 +38,7 @@ SNAPSHOT = _HERE.parent / "corpus"
 # The core certification families — the Node/TreeOp/reject/lenient/envelope set
 # the schema + cross-host runner certify. Mirrors sync-corpus.mjs exactly.
 _FILES = ("manifest.json", "schema.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope")
+_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation")
 
 
 def sync() -> Path:

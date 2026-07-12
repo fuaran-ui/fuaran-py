@@ -22,7 +22,7 @@ from _corpus import AUTHORITY_ROOT, SNAPSHOT_ROOT
 
 # The families the snapshot pins — must match conformance/sync_corpus.py.
 _FILES = ("manifest.json", "schema.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope")
+_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation")
 
 authority_present = pytest.mark.skipif(
     not (AUTHORITY_ROOT / "manifest.json").is_file(),

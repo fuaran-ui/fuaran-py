@@ -1,0 +1,1 @@
+{"$elicitation":"1","contract":{"fields":[{"name":"choice","nodeId":"ask-note","required":true,"space":{"$type":"anyString"},"stateKey":"choice"}]},"id":"elc-r","note":"x","tree":{"id":"ask-note","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Which environment should we deploy to?"}}}}

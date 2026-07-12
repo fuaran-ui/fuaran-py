@@ -1,8 +1,286 @@
 {
   "version": 1,
   "schema": "schema.json",
-  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. See fuaran/docs/WIRE_FORMAT.md.",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. See fuaran/docs/WIRE_FORMAT.md.",
   "fixtures": [
+    {
+      "id": "elc-ans-accept-full",
+      "kind": "elicitation-answer-accept",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-accept-full.json",
+      "expectedFile": "elicitation/elc-ans-accept-full.json",
+      "description": "every declared field, all in-space (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-accept-int-for-float",
+      "kind": "elicitation-answer-accept",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-accept-int-for-float.json",
+      "expectedFile": "elicitation/elc-ans-accept-int-for-float.json",
+      "description": "a whole-valued number satisfies a floatRange — JSON has one number type (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-accept-minimal",
+      "kind": "elicitation-answer-accept",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-accept-minimal.json",
+      "expectedFile": "elicitation/elc-ans-accept-minimal.json",
+      "description": "required fields only — optional fields may be omitted (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-enum",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-enum.json",
+      "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
+      "expectedPath": "$.answer.size",
+      "description": "string outside its enum (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-float-range",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-float-range.json",
+      "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
+      "expectedPath": "$.answer.score",
+      "description": "number outside its floatRange (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-int-range",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-int-range.json",
+      "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
+      "expectedPath": "$.answer.rating",
+      "description": "integer outside its intRange (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-missing-required",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-missing-required.json",
+      "expectedErrorCode": "ANSWER_MISSING_FIELD",
+      "expectedPath": "$.answer.rating",
+      "description": "required answer field absent (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-string-len",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-string-len.json",
+      "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
+      "expectedPath": "$.answer.bio",
+      "description": "string longer than its stringLen bound (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-type-mismatch",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-type-mismatch.json",
+      "expectedErrorCode": "ANSWER_TYPE_MISMATCH",
+      "expectedPath": "$.answer.rating",
+      "description": "string where the space demands an integer (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-ans-reject-undeclared",
+      "kind": "elicitation-answer-reject",
+      "decoder": "elicitation-answer",
+      "inputFile": "elicitation/elc-ans-reject-undeclared.json",
+      "expectedErrorCode": "ANSWER_UNDECLARED_FIELD",
+      "expectedPath": "$.answer.color",
+      "description": "undeclared answer key — default-deny by shape (WIRE_FORMAT 18.4)"
+    },
+    {
+      "id": "elc-out-reject-empty-id",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-reject-empty-id.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.elicitationId",
+      "description": "outcome with an empty elicitationId (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-reject-missing-answer",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-reject-missing-answer.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.answer",
+      "description": "Answered outcome without an answer object (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-reject-stray-key",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-reject-stray-key.json",
+      "expectedErrorCode": "UNDECLARED_FIELD",
+      "expectedPath": "$.answer",
+      "description": "Declined outcome carrying an answer — undeclared key, default-deny (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-reject-unknown-type",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-reject-unknown-type.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.$type",
+      "description": "outcome outside the closed set — the outcome DU is total (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-bad-space",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-bad-space.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.contract.fields[0].space.$type",
+      "description": "unknown value-space discriminator (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-bad-timeout",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-bad-timeout.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.timeoutMs",
+      "description": "timeoutMs below 1 (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-bad-version",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-bad-version.json",
+      "expectedErrorCode": "UNSUPPORTED_VERSION",
+      "expectedPath": "$.$elicitation",
+      "description": "unknown elicitation format version — hard-refuse, never mis-decode (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-default-nonconformant",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-default-nonconformant.json",
+      "expectedErrorCode": "DEFAULT_NONCONFORMANT",
+      "expectedPath": "$.default.choice",
+      "description": "default answer violating the contract (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-duplicate-field",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-duplicate-field.json",
+      "expectedErrorCode": "CONTRACT_DUPLICATE_FIELD",
+      "expectedPath": "$.contract.fields[1].name",
+      "description": "two answer fields sharing a name (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-empty-contract",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-empty-contract.json",
+      "expectedErrorCode": "CONTRACT_EMPTY",
+      "expectedPath": "$.contract.fields",
+      "description": "contract with no fields — an elicitation must declare its answer (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-empty-id",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-empty-id.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.id",
+      "description": "empty elicitation id (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-missing-version",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-missing-version.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.$elicitation",
+      "description": "envelope without the $elicitation format tag (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-stray-key",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-stray-key.json",
+      "expectedErrorCode": "UNDECLARED_FIELD",
+      "expectedPath": "$.note",
+      "description": "undeclared envelope key — default-deny by shape (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-tree-decode",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-tree-decode.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.tree",
+      "description": "embedded tree fails the standard 3.1 node decode — error re-rooted under $.tree (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-reject-unknown-node",
+      "kind": "elicitation-reject",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-reject-unknown-node.json",
+      "expectedErrorCode": "CONTRACT_UNKNOWN_NODE",
+      "expectedPath": "$.contract.fields[0].nodeId",
+      "description": "contract field addressing a node absent from the tree (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-full",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-full.json",
+      "expectedFile": "elicitation/elc-full.json",
+      "description": "full envelope — every value-space kind, optional fields, timeoutMs, conforming default (WIRE_FORMAT 18.2)"
+    },
+    {
+      "id": "elc-minimal",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation",
+      "inputFile": "elicitation/elc-minimal.json",
+      "expectedFile": "elicitation/elc-minimal.json",
+      "description": "minimal envelope — one required enum field, no timeout, no default (WIRE_FORMAT 18.2)"
+    },
+    {
+      "id": "elc-out-answered",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-answered.json",
+      "expectedFile": "elicitation/elc-out-answered.json",
+      "description": "Answered outcome — canonical typed answer object (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-declined",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-declined.json",
+      "expectedFile": "elicitation/elc-out-declined.json",
+      "description": "Declined outcome (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-superseded-anon",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-superseded-anon.json",
+      "expectedFile": "elicitation/elc-out-superseded-anon.json",
+      "description": "Superseded outcome without a successor id — 'by' is optional (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-superseded-by",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-superseded-by.json",
+      "expectedFile": "elicitation/elc-out-superseded-by.json",
+      "description": "Superseded outcome naming its successor (WIRE_FORMAT 18.3)"
+    },
+    {
+      "id": "elc-out-timedout",
+      "kind": "elicitation-round-trip",
+      "decoder": "elicitation-outcome",
+      "inputFile": "elicitation/elc-out-timedout.json",
+      "expectedFile": "elicitation/elc-out-timedout.json",
+      "description": "TimedOut outcome — dispatched by the HOST's clock; timeoutMs is data (WIRE_FORMAT 18.3)"
+    },
     {
       "id": "envelope-foreign-major",
       "kind": "envelope-reject",

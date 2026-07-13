@@ -1913,6 +1913,418 @@
         "source"
       ]
     },
+    "ViewBox": {
+      "type": "object",
+      "properties": {
+        "height": {
+          "type": "number"
+        },
+        "minX": {
+          "type": "number"
+        },
+        "minY": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "height",
+        "minX",
+        "minY",
+        "width"
+      ]
+    },
+    "DrawPoint": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ]
+    },
+    "DrawStyle": {
+      "type": "object",
+      "properties": {
+        "fill": {
+          "$ref": "#/$defs/Binding"
+        },
+        "stroke": {
+          "$ref": "#/$defs/Binding"
+        },
+        "strokeWidth": {
+          "$ref": "#/$defs/Binding"
+        },
+        "opacity": {
+          "$ref": "#/$defs/Binding"
+        }
+      }
+    },
+    "CurveCommand": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "MoveTo"
+            },
+            "to": {
+              "$ref": "#/$defs/DrawPoint"
+            }
+          },
+          "required": [
+            "$type",
+            "to"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "LineTo"
+            },
+            "to": {
+              "$ref": "#/$defs/DrawPoint"
+            }
+          },
+          "required": [
+            "$type",
+            "to"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "CubicTo"
+            },
+            "control1": {
+              "$ref": "#/$defs/DrawPoint"
+            },
+            "control2": {
+              "$ref": "#/$defs/DrawPoint"
+            },
+            "to": {
+              "$ref": "#/$defs/DrawPoint"
+            }
+          },
+          "required": [
+            "$type",
+            "control1",
+            "control2",
+            "to"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "QuadraticTo"
+            },
+            "control": {
+              "$ref": "#/$defs/DrawPoint"
+            },
+            "to": {
+              "$ref": "#/$defs/DrawPoint"
+            }
+          },
+          "required": [
+            "$type",
+            "control",
+            "to"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Close"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        }
+      ]
+    },
+    "Shape": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Group"
+            },
+            "children": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/Shape"
+              }
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "children",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Rectangle"
+            },
+            "height": {
+              "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            },
+            "width": {
+              "type": "number"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "cornerRadius": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "height",
+            "style",
+            "width",
+            "x",
+            "y"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Line"
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            },
+            "x1": {
+              "type": "number"
+            },
+            "x2": {
+              "type": "number"
+            },
+            "y1": {
+              "type": "number"
+            },
+            "y2": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "x1",
+            "x2",
+            "y1",
+            "y2"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Polyline"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DrawPoint"
+              }
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "points",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Polygon"
+            },
+            "points": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/DrawPoint"
+              }
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "points",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Curve"
+            },
+            "commands": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CurveCommand"
+              }
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "commands",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Circle"
+            },
+            "cx": {
+              "type": "number"
+            },
+            "cy": {
+              "type": "number"
+            },
+            "r": {
+              "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "cx",
+            "cy",
+            "r",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Ellipse"
+            },
+            "cx": {
+              "type": "number"
+            },
+            "cy": {
+              "type": "number"
+            },
+            "rx": {
+              "type": "number"
+            },
+            "ry": {
+              "type": "number"
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            }
+          },
+          "required": [
+            "$type",
+            "cx",
+            "cy",
+            "rx",
+            "ry",
+            "style"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Label"
+            },
+            "style": {
+              "$ref": "#/$defs/DrawStyle"
+            },
+            "text": {
+              "$ref": "#/$defs/TextSource"
+            },
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "text",
+            "x",
+            "y"
+          ]
+        }
+      ]
+    },
+    "DrawingSpec": {
+      "type": "object",
+      "properties": {
+        "shapes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Shape"
+          }
+        },
+        "style": {
+          "$ref": "#/$defs/DrawStyle"
+        },
+        "viewBox": {
+          "$ref": "#/$defs/ViewBox"
+        },
+        "title": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "description": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "shapes",
+        "style",
+        "viewBox"
+      ]
+    },
     "DisplayKind": {
       "oneOf": [
         {
@@ -2182,6 +2594,24 @@
             },
             {
               "$ref": "#/$defs/MathSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Drawing"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/DrawingSpec"
             }
           ]
         }

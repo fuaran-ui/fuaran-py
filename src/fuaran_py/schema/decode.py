@@ -190,6 +190,7 @@ KNOWN_KINDS = frozenset(
         "Toast",
         "CodeBlock",
         "Math",
+        "Drawing",
         # Input
         "Form",
         "Button",
@@ -518,6 +519,176 @@ def _decode_number(value: object, path: str) -> Value:
     return value  # type: ignore[return-value]
 
 
+# ── Drawing (Phase 524) ────────────────────────────────────────────────────
+#
+# A bounded, typed vector-graphics primitive. Geometry is static numbers (a
+# Drawing is a resolved artefact); only DrawStyle carries Bindings. The Shape
+# and CurveCommand DUs are closed + typed — an unrecognised discriminator is
+# UNKNOWN_DU_CASE via ``_dispatch`` (the typed-surface default-deny). Array
+# positions use ``[i]`` bracket paths to match the F# reference reject paths.
+
+DRAW_SHAPE_CASES = frozenset(
+    {"Group", "Rectangle", "Line", "Polyline", "Polygon", "Curve", "Circle", "Ellipse", "Label"}
+)
+CURVE_COMMAND_CASES = frozenset({"MoveTo", "LineTo", "CubicTo", "QuadraticTo", "Close"})
+
+
+def _decode_view_box(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "height": _decode_number(_require(obj, "height", path), f"{path}.height"),
+            "minX": _decode_number(_require(obj, "minX", path), f"{path}.minX"),
+            "minY": _decode_number(_require(obj, "minY", path), f"{path}.minY"),
+            "width": _decode_number(_require(obj, "width", path), f"{path}.width"),
+        },
+    )
+
+
+def _decode_draw_point(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        },
+    )
+
+
+def _decode_draw_style(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for key in ("fill", "opacity", "stroke", "strokeWidth"):
+        if key in obj:
+            fields[key] = _decode_binding(obj[key], f"{path}.{key}")
+    return Obj(None, fields)
+
+
+def _decode_draw_point_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_draw_point(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_curve_command(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, CURVE_COMMAND_CASES)
+    if tag in ("MoveTo", "LineTo"):
+        return Obj(tag, {"to": _decode_draw_point(_require(obj, "to", path), f"{path}.to")})
+    if tag == "CubicTo":
+        return Obj(
+            tag,
+            {
+                "control1": _decode_draw_point(_require(obj, "control1", path), f"{path}.control1"),
+                "control2": _decode_draw_point(_require(obj, "control2", path), f"{path}.control2"),
+                "to": _decode_draw_point(_require(obj, "to", path), f"{path}.to"),
+            },
+        )
+    if tag == "QuadraticTo":
+        return Obj(
+            tag,
+            {
+                "control": _decode_draw_point(_require(obj, "control", path), f"{path}.control"),
+                "to": _decode_draw_point(_require(obj, "to", path), f"{path}.to"),
+            },
+        )
+    return Obj("Close", {})  # tag == "Close"
+
+
+def _decode_curve_command_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_curve_command(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_shape(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, DRAW_SHAPE_CASES)
+    style = _decode_draw_style(obj["style"], f"{path}.style") if "style" in obj else Obj(None, {})
+    if tag == "Group":
+        return Obj(
+            tag,
+            {
+                "children": _decode_shape_array(_require(obj, "children", path), f"{path}.children"),
+                "style": style,
+            },
+        )
+    if tag == "Rectangle":
+        fields: dict[str, Value] = {
+            "height": _decode_number(_require(obj, "height", path), f"{path}.height"),
+            "style": style,
+            "width": _decode_number(_require(obj, "width", path), f"{path}.width"),
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        }
+        if "cornerRadius" in obj:
+            fields["cornerRadius"] = _decode_number(obj["cornerRadius"], f"{path}.cornerRadius")
+        return Obj(tag, fields)
+    if tag == "Line":
+        return Obj(
+            tag,
+            {
+                "style": style,
+                "x1": _decode_number(_require(obj, "x1", path), f"{path}.x1"),
+                "x2": _decode_number(_require(obj, "x2", path), f"{path}.x2"),
+                "y1": _decode_number(_require(obj, "y1", path), f"{path}.y1"),
+                "y2": _decode_number(_require(obj, "y2", path), f"{path}.y2"),
+            },
+        )
+    if tag in ("Polyline", "Polygon"):
+        return Obj(
+            tag,
+            {
+                "points": _decode_draw_point_array(_require(obj, "points", path), f"{path}.points"),
+                "style": style,
+            },
+        )
+    if tag == "Curve":
+        return Obj(
+            tag,
+            {
+                "commands": _decode_curve_command_array(_require(obj, "commands", path), f"{path}.commands"),
+                "style": style,
+            },
+        )
+    if tag == "Circle":
+        return Obj(
+            tag,
+            {
+                "cx": _decode_number(_require(obj, "cx", path), f"{path}.cx"),
+                "cy": _decode_number(_require(obj, "cy", path), f"{path}.cy"),
+                "r": _decode_number(_require(obj, "r", path), f"{path}.r"),
+                "style": style,
+            },
+        )
+    if tag == "Ellipse":
+        return Obj(
+            tag,
+            {
+                "cx": _decode_number(_require(obj, "cx", path), f"{path}.cx"),
+                "cy": _decode_number(_require(obj, "cy", path), f"{path}.cy"),
+                "rx": _decode_number(_require(obj, "rx", path), f"{path}.rx"),
+                "ry": _decode_number(_require(obj, "ry", path), f"{path}.ry"),
+                "style": style,
+            },
+        )
+    # Label
+    return Obj(
+        tag,
+        {
+            "style": style,
+            "text": _decode_text_source(_require(obj, "text", path), f"{path}.text"),
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        },
+    )
+
+
+def _decode_shape_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_shape(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
 # ── Per-kind field schemas: (field, required, decoder) ─────────────────────
 
 FieldDecoder = Callable[[object, str], Value]
@@ -612,6 +783,15 @@ KIND_SCHEMAS: dict[str, list[tuple[str, bool, FieldDecoder]]] = {
     "Math": [
         ("display", True, _enum_decoder(MATH_DISPLAY, "display")),
         ("source", True, _decode_string),
+    ],
+    "Drawing": [
+        # Phase 524 — geometry static; the closed Shape / CurveCommand DUs
+        # default-deny an unknown discriminator; DrawStyle carries the bindings.
+        ("description", False, _decode_text_source),
+        ("shapes", True, _decode_shape_array),
+        ("style", True, _decode_draw_style),
+        ("title", False, _decode_text_source),
+        ("viewBox", True, _decode_view_box),
     ],
     "Select": [
         ("label", True, _decode_text_source),

@@ -596,6 +596,22 @@
       "description": "Layout/Disclosure"
     },
     {
+      "id": "drawing-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/drawing-1.json",
+      "expectedFile": "nodes/drawing-1.json",
+      "description": "Display/Drawing (all shapes + curve commands + styled bindings)"
+    },
+    {
+      "id": "drawing-empty",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/drawing-empty.json",
+      "expectedFile": "nodes/drawing-empty.json",
+      "description": "Display/Drawing (degenerate — empty)"
+    },
+    {
       "id": "filters-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1486,6 +1502,24 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.source.$type",
       "description": "Binding $type 'Bogus'"
+    },
+    {
+      "id": "reject-unknown-drawing-curve-command",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-drawing-curve-command.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.shapes[0].commands[0].$type",
+      "description": "Drawing CurveCommand $type 'ArcTo' — typed command list default-deny (Phase 524)"
+    },
+    {
+      "id": "reject-unknown-drawing-shape",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-drawing-shape.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.shapes[0].$type",
+      "description": "Drawing Shape $type 'Blob' — the closed-shape default-deny (Phase 524)"
     },
     {
       "id": "reject-unknown-mount-direction",

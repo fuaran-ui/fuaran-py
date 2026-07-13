@@ -18,6 +18,20 @@ Canonical imports::
 from __future__ import annotations
 
 from .dag import DagOpRecord, DagResultEnvelope, decode_dag_record, encode_dag_record
+from .function import (
+    EXACT,
+    SUBSUMES,
+    ComposePath,
+    FunctionEntry,
+    FunctionRegistry,
+    NoPath,
+    SigEntry,
+    Signature,
+    SignatureQuery,
+    function_entry,
+    slot_hole,
+    value_hole,
+)
 from .merge import (
     MergeAuthor,
     MergeConflict,
@@ -66,6 +80,18 @@ __all__ = [
     "Primary",
     "Secondary",
     "diff",
+    "FunctionRegistry",
+    "FunctionEntry",
+    "SigEntry",
+    "Signature",
+    "SignatureQuery",
+    "ComposePath",
+    "NoPath",
+    "value_hole",
+    "slot_hole",
+    "function_entry",
+    "SUBSUMES",
+    "EXACT",
     "validate_node",
     "Finding",
     "Node",

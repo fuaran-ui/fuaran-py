@@ -31,6 +31,8 @@ _REFERENCE_RENDERER_FILES = [
     _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Server" / "Render.fs",
     _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer" / "Render.fs",
     _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Core" / "Theme.fs",
+    # Phase 525 — the Drawing SVG class vocabulary (fuaran-drawing*) lives here.
+    _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Core" / "DrawingSvg.fs",
 ]
 
 _CLASS_TOKEN = re.compile(r"fuaran-[a-zA-Z0-9-]*")

@@ -20,6 +20,7 @@ The renderer emits the **body fragment** only — the host owns ``<html>`` /
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 
 from ..model import Arr, Node, Obj, Value
@@ -31,6 +32,70 @@ from .theme import node_class_name
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
+
+
+# ── Drawing SVG helpers (Phase 525 — ported from F# DrawingSvg) ──────────────
+
+
+def _draw_num(n: object) -> str:
+    """Canonical SVG number form — whole → no decimal (`10`), else the shortest
+    round-trip (`1.5`). Matches the F# / TS hosts byte-for-byte."""
+    if isinstance(n, bool) or n is None:
+        return "0"
+    if isinstance(n, int):
+        return str(n)
+    if isinstance(n, float):
+        if not math.isfinite(n):
+            return "0"
+        if n == math.floor(n) and abs(n) < 1e15:
+            return str(int(n))
+        return repr(n)
+    return "0"
+
+
+def _draw_escape(s: str) -> str:
+    """XML-escape (raw markup rides the innerHTML seam). `&` first."""
+    return (
+        s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;").replace("'", "&#39;")
+    )
+
+
+def _draw_points(points: Value) -> str:
+    if not isinstance(points, Arr):
+        return ""
+    return " ".join(
+        f"{_draw_num(p.fields.get('x', 0))},{_draw_num(p.fields.get('y', 0))}"
+        for p in points.items
+        if isinstance(p, Obj)
+    )
+
+
+def _draw_path_d(commands: Value) -> str:
+    """The typed `CurveCommand` list → an SVG path `d` string."""
+    if not isinstance(commands, Arr):
+        return ""
+
+    def pt(cf: dict[str, Value], key: str) -> str:
+        p = cf.get(key)
+        pf = p.fields if isinstance(p, Obj) else {}
+        return f"{_draw_num(pf.get('x', 0))} {_draw_num(pf.get('y', 0))}"
+
+    parts: list[str] = []
+    for c in commands.items:
+        if not isinstance(c, Obj):
+            continue
+        cf = c.fields
+        if c.tag == "MoveTo":
+            parts.append("M" + pt(cf, "to"))
+        elif c.tag == "LineTo":
+            parts.append("L" + pt(cf, "to"))
+        elif c.tag == "CubicTo":
+            parts.append("C" + pt(cf, "control1") + " " + pt(cf, "control2") + " " + pt(cf, "to"))
+        elif c.tag == "QuadraticTo":
+            parts.append("Q" + pt(cf, "control") + " " + pt(cf, "to"))
+        elif c.tag == "Close":
+            parts.append("Z")
+    return " ".join(parts)
 
 
 # ── Node coercion ───────────────────────────────────────────────────────────
@@ -572,6 +637,115 @@ class Renderer:
             source_span,
         )
 
+    # ── Drawing (Phase 525 — first-party inline SVG) ─────────────────────────
+    #
+    # The Python port of the F# `Fuaran.UI.Renderer.DrawingSvg` builder: static
+    # geometry lowered to inline `<svg>` on the server, byte-identical to the F#
+    # / TS hosts (same path `d`, Ordinal style-attr order, coordinate/number
+    # form, XML escaping, open-shape `fill=none` defaults). `role="img"` +
+    # optional `<title>`/`<desc>` (R3 a11y). First-party, stdlib-only.
+
+    def _draw_style_attrs(self, style: Value, default_fill_none: bool) -> str:
+        fields = style.fields if isinstance(style, Obj) else {}
+        out = ""
+        fill: object | None = None
+        if "fill" in fields:
+            fill = resolve_binding(fields["fill"], self.sources)
+        elif default_fill_none:
+            fill = "none"
+        if fill is not None:
+            out += f' fill="{_draw_escape(str(fill))}"'
+        if "opacity" in fields:
+            v = resolve_binding(fields["opacity"], self.sources)
+            if v is not None:
+                out += f' opacity="{_draw_num(v)}"'
+        if "stroke" in fields:
+            v = resolve_binding(fields["stroke"], self.sources)
+            if v is not None:
+                out += f' stroke="{_draw_escape(str(v))}"'
+        if "strokeWidth" in fields:
+            v = resolve_binding(fields["strokeWidth"], self.sources)
+            if v is not None:
+                out += f' stroke-width="{_draw_num(v)}"'
+        return out
+
+    def _draw_shape(self, sh: Value) -> str:
+        if not isinstance(sh, Obj):
+            return ""
+        tag = sh.tag
+        f = sh.fields
+        style = f.get("style")
+        if tag == "Group":
+            children = f.get("children")
+            inner = "".join(self._draw_shape(c) for c in children.items) if isinstance(children, Arr) else ""
+            return f'<g class="fuaran-drawing-group"{self._draw_style_attrs(style, False)}>{inner}</g>'
+        if tag == "Rectangle":
+            rx = f' rx="{_draw_num(f["cornerRadius"])}"' if "cornerRadius" in f else ""
+            return (
+                f'<rect class="fuaran-drawing-rect" x="{_draw_num(f.get("x", 0))}"'
+                f' y="{_draw_num(f.get("y", 0))}" width="{_draw_num(f.get("width", 0))}"'
+                f' height="{_draw_num(f.get("height", 0))}"{rx}'
+                f"{self._draw_style_attrs(style, False)}/>"
+            )
+        if tag == "Line":
+            return (
+                f'<line class="fuaran-drawing-line" x1="{_draw_num(f.get("x1", 0))}"'
+                f' y1="{_draw_num(f.get("y1", 0))}" x2="{_draw_num(f.get("x2", 0))}"'
+                f' y2="{_draw_num(f.get("y2", 0))}"{self._draw_style_attrs(style, False)}/>'
+            )
+        if tag == "Polyline":
+            return (
+                f'<polyline class="fuaran-drawing-polyline" points="{_draw_points(f.get("points"))}"'
+                f"{self._draw_style_attrs(style, True)}/>"
+            )
+        if tag == "Polygon":
+            return (
+                f'<polygon class="fuaran-drawing-polygon" points="{_draw_points(f.get("points"))}"'
+                f"{self._draw_style_attrs(style, False)}/>"
+            )
+        if tag == "Curve":
+            return (
+                f'<path class="fuaran-drawing-curve" d="{_draw_path_d(f.get("commands"))}"'
+                f"{self._draw_style_attrs(style, True)}/>"
+            )
+        if tag == "Circle":
+            return (
+                f'<circle class="fuaran-drawing-circle" cx="{_draw_num(f.get("cx", 0))}"'
+                f' cy="{_draw_num(f.get("cy", 0))}" r="{_draw_num(f.get("r", 0))}"'
+                f"{self._draw_style_attrs(style, False)}/>"
+            )
+        if tag == "Ellipse":
+            return (
+                f'<ellipse class="fuaran-drawing-ellipse" cx="{_draw_num(f.get("cx", 0))}"'
+                f' cy="{_draw_num(f.get("cy", 0))}" rx="{_draw_num(f.get("rx", 0))}"'
+                f' ry="{_draw_num(f.get("ry", 0))}"{self._draw_style_attrs(style, False)}/>'
+            )
+        if tag == "Label":
+            return (
+                f'<text class="fuaran-drawing-label" x="{_draw_num(f.get("x", 0))}"'
+                f' y="{_draw_num(f.get("y", 0))}"{self._draw_style_attrs(style, False)}>'
+                f"{_draw_escape(self._text(f.get('text')))}</text>"
+            )
+        return ""
+
+    def _drawing(self, node: Node, fields: dict[str, Value]) -> str:
+        vb = fields.get("viewBox")
+        vb_fields = vb.fields if isinstance(vb, Obj) else {}
+        view_box = " ".join(_draw_num(vb_fields.get(k, 0)) for k in ("minX", "minY", "width", "height"))
+        title = ""
+        t = fields.get("title")
+        if t is not None:
+            title = f"<title>{_draw_escape(self._text(t))}</title>"
+        desc = ""
+        d = fields.get("description")
+        if d is not None:
+            desc = f"<desc>{_draw_escape(self._text(d))}</desc>"
+        shapes = fields.get("shapes")
+        body = "".join(self._draw_shape(s) for s in shapes.items) if isinstance(shapes, Arr) else ""
+        root_style = self._draw_style_attrs(fields.get("style"), False)
+        svg = f'<svg class="fuaran-drawing" role="img" viewBox="{view_box}"{root_style}>{title}{desc}{body}</svg>'
+        return element("div", [], svg)
+
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────
 
     def _button(self, node: Node, fields: dict[str, Value]) -> str:
@@ -830,6 +1004,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Toast": Renderer._toast,
     "CodeBlock": Renderer._code_block,
     "Math": Renderer._math,
+    "Drawing": Renderer._drawing,
     "Button": Renderer._button,
     "Select": Renderer._select,
     "Form": Renderer._form,

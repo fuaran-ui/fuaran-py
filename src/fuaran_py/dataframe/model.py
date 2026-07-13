@@ -178,7 +178,19 @@ class ApplyFn:
     args: list[ColExpr]
 
 
-ColExpr = Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn
+@dataclass(frozen=True)
+class Param:
+    """A named hole bound at evaluation time from a host parameter env (Phase 424).
+
+    A compute graph declares ``parameters`` on its ``Transform`` binding; each binds a
+    ``Param`` name to a scalar source (e.g. a filter-store value or state). The evaluator
+    substitutes a bound param with its literal cell; an unbound one prunes its filter (the
+    host leniency) or, if it survives, is a named ``UNBOUND_PARAM`` failure — never a guess."""
+
+    name: str
+
+
+ColExpr = Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param
 
 # Closed vocabularies (wire tags) — additive only.
 BIN_OPS: frozenset[str] = frozenset(
@@ -320,6 +332,7 @@ AGG_ERROR = "AGG_ERROR"
 JOIN_ERROR = "JOIN_ERROR"
 ARITY_ERROR = "ARITY_ERROR"
 UNRESOLVED_SOURCE = "UNRESOLVED_SOURCE"
+UNBOUND_PARAM = "UNBOUND_PARAM"
 
 
 @dataclass(frozen=True)

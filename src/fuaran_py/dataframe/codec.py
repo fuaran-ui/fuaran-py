@@ -57,6 +57,7 @@ from .model import (
     Lit,
     Not,
     Ok,
+    Param,
     Pivot,
     PivotSpec,
     Project,
@@ -174,6 +175,8 @@ def encode_expr_value(e: ColExpr) -> Value:
         return _typed("cast", {"type": e.type, "expr": encode_expr_value(e.expr)})
     if isinstance(e, ApplyFn):
         return _typed("apply", {"fn": e.fn, "args": Arr([encode_expr_value(x) for x in e.args])})
+    if isinstance(e, Param):
+        return _typed("param", {"name": e.name})
     raise TypeError(f"cannot encode ColExpr {type(e)!r}")
 
 
@@ -523,6 +526,13 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
             return ra  # type: ignore[return-value]
         xs = _decode_expr_list(ra.value)
         return xs if not xs.ok else Ok(ApplyFn(rfn.value, xs.value))  # type: ignore[return-value]
+    if k == "param":
+        r = _field(el, "name")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        if not isinstance(r.value, str):
+            return _err(MALFORMED_SHAPE, "param.name: expected string")
+        return Ok(Param(r.value))
     return _err(UNKNOWN_TYPE, f"unknown ColExpr '{k}'")
 
 

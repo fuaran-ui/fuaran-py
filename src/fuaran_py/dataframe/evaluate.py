@@ -30,6 +30,7 @@ from .model import (
     FLOAT,
     INT,
     STRING,
+    UNBOUND_PARAM,
     UNKNOWN_COLUMN,
     UNRESOLVED_SOURCE,
     Agg,
@@ -54,6 +55,7 @@ from .model import (
     Lit,
     Not,
     Ok,
+    Param,
     Pivot,
     Project,
     Ref,
@@ -427,6 +429,10 @@ def _eval_expr(cols: Schema, row: Row, e: ColExpr) -> Result[Cell, EvalError]:  
                 return r
             argv.append(r.value)
         return _apply_scalar(e.fn, argv)
+    if isinstance(e, Param):
+        # Params are substituted from the host env before evaluation (see the compute
+        # layer); one reaching the evaluator is genuinely unbound — a named failure.
+        return Err(EvalError(UNBOUND_PARAM, f"unbound parameter '{e.name}'"))
     return Err(EvalError("TYPE_ERROR", f"unknown ColExpr {type(e)!r}"))
 
 

@@ -19,6 +19,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+from ..compute import ComputeResult, ComputeState, evaluate_tree
 from ..model import Arr, Node, Obj, Value
 from ..ops import ApplyErr, ApplyResult, apply
 from ..renderer import render_html
@@ -131,6 +132,7 @@ class FuaranRuntime:
         sources: BindingSources | None = None,
         deps: BrowserDeps | None = None,
         events: tuple[str, ...] = ("click",),
+        compute_state: ComputeState | None = None,
     ) -> None:
         self._tree = tree
         self._on_event = on_event
@@ -140,14 +142,43 @@ class FuaranRuntime:
         self._root: Any = None
         self._cleanups: list[Callable[[], None]] = []
         self.last_error: object | None = None
+        # The compute-layer state store (parameters bind to it) + the derived rows the
+        # compute graph currently evaluates to. A SetState change recomputes both.
+        self._compute_state: ComputeState = dict(compute_state) if compute_state else {}
+        self.derived: dict[str, ComputeResult] = {}
+        self._recompute()
 
     @property
     def tree(self) -> Node:
         """The current decoded tree (replaced on every successful dispatch)."""
         return self._tree
 
+    @property
+    def compute_state(self) -> ComputeState:
+        """The current compute-layer state store (read-only view)."""
+        return dict(self._compute_state)
+
+    def _recompute(self) -> None:
+        """Re-evaluate every compute-graph source in the tree against the current state."""
+        self.derived = evaluate_tree(self._tree, self._compute_state)
+
+    def set_compute_state(self, updates: ComputeState | None = None, **kwargs: object) -> dict[str, ComputeResult]:
+        """Update the compute-layer state store, recompute the derived cells, and
+        re-render — the reactive Living-Sheet loop. Returns the new derived rows."""
+        if updates:
+            self._compute_state.update(updates)
+        if kwargs:
+            self._compute_state.update(kwargs)
+        self._recompute()
+        if self._root is not None:
+            self._paint()
+        return self.derived
+
     def render(self) -> str:
         """The current body-fragment HTML (the same string :meth:`mount` writes)."""
+        if self._compute_state:
+            merged: BindingSources = {**(self._sources or {}), **self._compute_state}
+            return render_html(self._tree, merged)
         return render_html(self._tree, self._sources)
 
     def mount(self, root_id: str) -> None:
@@ -168,6 +199,7 @@ class FuaranRuntime:
         if isinstance(result, Ok):
             self._tree = result.value
             self.last_error = None
+            self._recompute()  # the tree changed — the compute graph may have too
             if self._root is not None:
                 self._paint()
         else:

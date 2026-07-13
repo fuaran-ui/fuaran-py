@@ -224,6 +224,16 @@
   --fuaran-segmented-active-bg: var(--fuaran-tone-default-bg, #ffffff);
   --fuaran-segmented-active-fg: var(--fuaran-tone-brand-fg, #1d4ed8);
   --fuaran-segmented-divider-color: var(--fuaran-tone-default-border, #e5e7eb);
+
+  /* Phase 58 (2026-07-11): responsive breakpoint thresholds — the min-width
+     boundaries the `@media` rules at the foot of this file collapse layout
+     at. Exposed as tokens so consumer JS / container queries can read the
+     same thresholds; the `@media` conditions below repeat these px values
+     literally because a media condition cannot reference a custom property.
+     Keep the two in sync — see docs/migrations/phase-58-mobile-responsive.md. */
+  --fuaran-breakpoint-sm: 640px;
+  --fuaran-breakpoint-md: 768px;
+  --fuaran-breakpoint-lg: 1024px;
 }
 
 body {
@@ -1964,4 +1974,81 @@ html[data-fuaran-disconnected]::before {
 .fuaran-math-source {
   font-family: var(--fuaran-font-mono, ui-monospace, "SF Mono", Menlo, Consolas, monospace);
   color: var(--fuaran-tone-subdued-fg, #6b7280);
+}
+
+/* ============================================================================
+   Responsive / mobile layout collapse — Phase 58 (2026-07-11)
+
+   The `@media` thresholds below repeat the `--fuaran-breakpoint-{sm|md|lg}`
+   token px values LITERALLY: a media-query condition cannot reference a
+   custom property (`@media (max-width: var(--x))` is invalid CSS). The
+   typed `Theme.Breakpoints` record (mirrored into the `:root` tokens above)
+   is the source of truth these rules are kept in sync with — change both
+   together. See docs/migrations/phase-58-mobile-responsive.md.
+
+   Rules are appended at the end of the file so they win by source order at
+   equal specificity over the desktop base rules above.
+
+   `grid-template-columns` is emitted as an INLINE style by the renderer
+   (Render.fs — column count rides inline so hosts needn't safelist every
+   N), so the grid-collapse rules require `!important` to override it. This
+   is the one sanctioned `!important` in the reference stylesheet, scoped to
+   the narrow-viewport media query.
+   ============================================================================ */
+
+/* ── tablet (≤ md / 768px): halve dense grids ──────────────────── */
+@media (max-width: 768px) {
+  .fuaran-layout-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── phone (≤ sm / 640px): single-column + scrollable overflow ─── */
+@media (max-width: 640px) {
+  /* Stack + split-panel collapse to a single vertical column. Class-driven
+     (not inline), so no `!important` needed. */
+  .fuaran-stack-horizontal {
+    flex-direction: column;
+  }
+
+  .fuaran-layout-split-panel {
+    flex-direction: column;
+  }
+
+  /* Grid collapses to one column (overrides the inline template — see note). */
+  .fuaran-layout-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Tab bar becomes a horizontal scroller instead of overflowing / clipping
+     tabs off-screen — the "scrollable fallback" for narrow viewports. */
+  .fuaran-tabs-bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .fuaran-tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* Wide tabular data scrolls horizontally within its node wrapper rather
+     than forcing the whole page to scroll. The `fuaran-kind-{grid|table}`
+     hook is the outer node wrapper (the `<table>` is its child). */
+  .fuaran-kind-grid,
+  .fuaran-kind-table {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Touch-target floor (WCAG 2.5.5): interactive leaves reach at least
+     44px of tappable height at phone widths. */
+  .fuaran-button,
+  .fuaran-form-input,
+  .fuaran-select-control,
+  .fuaran-file-upload,
+  .fuaran-tab {
+    min-height: 44px;
+  }
 }

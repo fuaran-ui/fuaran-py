@@ -667,6 +667,18 @@ class Renderer:
             v = resolve_binding(fields["strokeWidth"], self.sources)
             if v is not None:
                 out += f' stroke-width="{_draw_num(v)}"'
+        # Text-only attrs (Phase 528.1): text-anchor, font-family, font-size,
+        # font-weight — bare enum / string / number, emitted only when set.
+        if "textAnchor" in fields:
+            anchor = {"Start": "start", "Middle": "middle", "End": "end"}.get(str(fields["textAnchor"]), "start")
+            out += f' text-anchor="{anchor}"'
+        if "fontFamily" in fields:
+            out += f' font-family="{_draw_escape(str(fields["fontFamily"]))}"'
+        if "fontSize" in fields:
+            out += f' font-size="{_draw_num(fields["fontSize"])}px"'
+        if "emphasis" in fields:
+            weight = {"Quiet": "300", "Normal": "400", "Loud": "700"}.get(str(fields["emphasis"]), "400")
+            out += f' font-weight="{weight}"'
         return out
 
     def _draw_shape(self, sh: Value) -> str:

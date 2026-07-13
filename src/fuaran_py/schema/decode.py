@@ -118,6 +118,7 @@ def _enum(value: object, path: str, allowed: frozenset[str], name: str) -> str:
 TONE = frozenset({"Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info"})
 WEIGHT = frozenset({"Compact", "Standard", "Spacious"})
 EMPHASIS = frozenset({"Quiet", "Normal", "Loud"})
+TEXT_ANCHOR = frozenset({"Start", "Middle", "End"})
 ORIENTATION = frozenset({"Vertical", "Horizontal"})
 BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical", "Info"})
 HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
@@ -563,6 +564,16 @@ def _decode_draw_style(value: object, path: str) -> Value:
     for key in ("fill", "opacity", "stroke", "strokeWidth"):
         if key in obj:
             fields[key] = _decode_binding(obj[key], f"{path}.{key}")
+    # Text-only fields (Phase 528.1) — bare enum / number / string, not bindings;
+    # all optional, omitted when unset (byte-unchanged for non-text shapes).
+    if "textAnchor" in obj:
+        fields["textAnchor"] = _enum(obj["textAnchor"], f"{path}.textAnchor", TEXT_ANCHOR, "textAnchor")
+    if "fontSize" in obj:
+        fields["fontSize"] = _decode_number(obj["fontSize"], f"{path}.fontSize")
+    if "emphasis" in obj:
+        fields["emphasis"] = _enum(obj["emphasis"], f"{path}.emphasis", EMPHASIS, "emphasis")
+    if "fontFamily" in obj:
+        fields["fontFamily"] = _expect_string(obj["fontFamily"], f"{path}.fontFamily")
     return Obj(None, fields)
 
 

@@ -1951,6 +1951,14 @@
         "y"
       ]
     },
+    "TextAnchor": {
+      "type": "string",
+      "enum": [
+        "Start",
+        "Middle",
+        "End"
+      ]
+    },
     "DrawStyle": {
       "type": "object",
       "properties": {
@@ -1965,6 +1973,18 @@
         },
         "opacity": {
           "$ref": "#/$defs/Binding"
+        },
+        "textAnchor": {
+          "$ref": "#/$defs/TextAnchor"
+        },
+        "fontSize": {
+          "type": "number"
+        },
+        "emphasis": {
+          "$ref": "#/$defs/Emphasis"
+        },
+        "fontFamily": {
+          "type": "string"
         }
       }
     },

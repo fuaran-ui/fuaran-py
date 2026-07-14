@@ -193,6 +193,87 @@ def _children_ids(node: Node) -> list[Node]:
     return [c for c in children.items if isinstance(c, Node)]
 
 
+# ── non-layout container interiors (Modal / ScrollArea) ──────────────────────
+#
+# Modal and ScrollArea carry a `children` field but are NOT layout kinds — the
+# apply engine addresses no node *inside* them structurally (see
+# ops/apply.py LAYOUT_KINDS). The diff's traversal MUST stay bounded to apply's
+# addressable set: descending into a Modal and emitting an op targeting its
+# interior would break the round-trip law (the target is unaddressable —
+# NodeNotFound). Instead a Modal/ScrollArea-interior change escalates to the
+# coarse-but-correct EditNode floor at the container itself (an addressable
+# layout child). Mirrors the Go producer's layoutKinds-bounded recursion.
+
+
+def _md(node_id: str, text: str) -> Node:
+    return Node(node_id, Obj("Markdown", {"text": Obj("Literal", {"text": text})}), {})
+
+
+def _box_of(child: Node) -> Node:
+    return Node("root", Obj("Box", {"children": Arr([child]), "layout": Obj("Auto", {}), "role": "Group"}), {})
+
+
+@corpus_required
+def test_modal_interior_change_round_trips() -> None:
+    """A text change inside a Modal round-trips (floored to EditNode at the Modal).
+
+    Regression for the traversal/addressing mismatch: the diff's structural-child
+    traversal once treated any `children`-bearing node as addressable, descended
+    into the Modal, and emitted `UpdateProp target=md` — which `apply` could not
+    locate (NodeNotFound), breaking `fold(apply, before, diff(before, after))`.
+    """
+    modal_before = Node(
+        "modal",
+        Obj(
+            "Modal",
+            {
+                "children": Arr([_md("md", "Updated hourly.")]),
+                "dismissable": True,
+                "open": Obj("Static", {"value": True}),
+            },
+        ),
+        {},
+    )
+    modal_after = Node(
+        "modal",
+        Obj(
+            "Modal",
+            {
+                "children": Arr([_md("md", "Updated daily.")]),
+                "dismissable": True,
+                "open": Obj("Static", {"value": True}),
+            },
+        ),
+        {},
+    )
+    before, after = _box_of(modal_before), _box_of(modal_after)
+    ops = diff(before, after)
+    # The op targets the addressable Modal, never the unaddressable interior `md`.
+    assert all(op.fields.get("target") != "md" for op in ops)
+    assert any(op.tag == "EditNode" and op.fields.get("target") == "modal" for op in ops)
+    _round_trips(before, after)
+
+
+@corpus_required
+def test_scrollarea_interior_change_round_trips() -> None:
+    """A text change inside a ScrollArea round-trips (floored to EditNode at the ScrollArea)."""
+    sa_before = Node(
+        "scroll",
+        Obj("ScrollArea", {"children": Arr([_md("md", "Line one.")]), "orientation": "Vertical"}),
+        {},
+    )
+    sa_after = Node(
+        "scroll",
+        Obj("ScrollArea", {"children": Arr([_md("md", "Line two.")]), "orientation": "Vertical"}),
+        {},
+    )
+    before, after = _box_of(sa_before), _box_of(sa_after)
+    ops = diff(before, after)
+    assert all(op.fields.get("target") != "md" for op in ops)
+    assert any(op.tag == "EditNode" and op.fields.get("target") == "scroll" for op in ops)
+    _round_trips(before, after)
+
+
 # ── cross-parent move (the pre-pass) ─────────────────────────────────────────
 
 

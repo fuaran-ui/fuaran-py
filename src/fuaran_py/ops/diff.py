@@ -43,13 +43,33 @@ from __future__ import annotations
 from ..canonical import encode_value
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
-from .apply import _FIELDS, _NOT_SUPPORTED, apply
+from .apply import _FIELDS, _NOT_SUPPORTED, LAYOUT_KINDS, apply
 
 # ── facet-isolation helpers (closure-safe canonical probes) ──────────────────
+#
+# **Traversal must not exceed apply's addressable set.** A ``children`` array is a
+# *structural* (op-addressable) child list only for the ``LAYOUT_KINDS`` — the same
+# six kinds ``apply``'s ``_layout_children`` / ``_child_slots`` descend into. Other
+# kinds carry a ``children`` field too (``Modal`` / ``ScrollArea``), but the apply
+# engine has no structural-child surface for those, so a node inside one is *not*
+# addressable by ``UpdateProp`` / ``RemoveNode`` / ``InsertChild`` / recursion. If the
+# diff descended into a ``Modal`` and emitted an op targeting its interior, the apply
+# engine could not locate the target and the round-trip law would break
+# (``NodeNotFound``). So both the traversal (``_children``) and the kind-change probe
+# (``_childless_kind``, which treats ``children`` as a neutralisable structural facet)
+# bound to ``LAYOUT_KINDS``. A ``Modal``/``ScrollArea``-interior change then reads as a
+# *kind* change and escalates to the coarse-but-correct ``EditNode`` floor at the Modal
+# itself (an addressable layout child) — carrying its whole new subtree. This mirrors
+# the Go producer's `layoutKinds`-bounded recursion (the Rust producer instead extends
+# *apply* to address Modal/ScrollArea; the Python apply engine addresses the six, so the
+# Python producer bounds to match — self-consistency is the contract, not host parity).
 
 
 def _children(node: Node) -> list[Node]:
-    """The ordered structural (layout) child list; ``[]`` for a childless kind."""
+    """The ordered structural (layout) child list; ``[]`` for a kind apply does not
+    address structurally (a non-``LAYOUT_KINDS`` kind, or a childless one)."""
+    if node.kind.tag not in LAYOUT_KINDS:
+        return []
     children = node.kind.fields.get("children")
     if isinstance(children, Arr):
         return [c for c in children.items if isinstance(c, Node)]
@@ -57,8 +77,10 @@ def _children(node: Node) -> list[Node]:
 
 
 def _childless_kind(kind: Obj) -> Obj:
-    """The kind with its ``children`` list emptied (isolates the kind-own fields)."""
-    if isinstance(kind.fields.get("children"), Arr):
+    """The kind with its structural ``children`` list emptied (isolates the kind-own
+    fields). Only a ``LAYOUT_KINDS`` ``children`` is structural; on any other kind the
+    ``children`` field is kind-own content and stays part of the kind-change probe."""
+    if kind.tag in LAYOUT_KINDS and isinstance(kind.fields.get("children"), Arr):
         return Obj(kind.tag, {**kind.fields, "children": Arr([])})
     return kind
 

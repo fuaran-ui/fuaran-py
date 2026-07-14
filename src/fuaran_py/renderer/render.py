@@ -885,8 +885,53 @@ class Renderer:
             f"[Grid: {count} rows {_EM_DASH} hydrates client-side]",
         )
 
+    def _lower_chart(self, node: Node, fields: dict[str, Value], resolved: object) -> str | None:
+        """Lower a resolved Bar/Column/Line chart to a Drawing + render inline SVG.
+
+        Returns ``None`` (fall through to the placeholder) when the kind is not
+        lowerable or the data source did not resolve to embedded rows.
+        """
+        from ..charts import ChartSpec, lower_node
+
+        kind = fields.get("kind")
+        if kind not in ("Bar", "Column", "Line"):
+            return None
+        if not isinstance(resolved, Arr) or not resolved.items:
+            return None
+
+        rows: list[dict[str, object]] = []
+        for item in resolved.items:
+            if not isinstance(item, Obj):
+                return None
+            rows.append(dict(item.fields))
+
+        x_field = fields.get("xField")
+        y_fields_raw = fields.get("yFields")
+        if not isinstance(x_field, str) or not isinstance(y_fields_raw, Arr):
+            return None
+        y_fields = tuple(y for y in y_fields_raw.items if isinstance(y, str))
+
+        title_src = fields.get("title")
+        title: str | None = None
+        if isinstance(title_src, Obj) and title_src.tag == "Literal":
+            text = title_src.fields.get("text")
+            title = text if isinstance(text, str) else None
+
+        spec = ChartSpec(kind=kind, x_field=x_field, y_fields=y_fields, title=title)
+        drawing_node = lower_node(node.id, spec, rows)
+        assert isinstance(drawing_node.kind, Obj)
+        return self._drawing(drawing_node, drawing_node.kind.fields)
+
     def _chart(self, node: Node, fields: dict[str, Value]) -> str:
-        count = _seq_len(resolve_binding(fields.get("source"), self.sources))
+        resolved = resolve_binding(fields.get("source"), self.sources)
+        # First-party lowering (Phase 534): a Bar/Column/Line chart with resolved
+        # rows lowers to a canonical Drawing subtree and renders as real inline SVG,
+        # headless included. Anything unresolved / not-yet-lowered falls through to
+        # the client-hydration placeholder.
+        lowered = self._lower_chart(node, fields, resolved)
+        if lowered is not None:
+            return lowered
+        count = _seq_len(resolved)
         title = fields.get("title")
         title_html = (
             text_element("div", [("class", "fuaran-chart-title")], self._text(title)) if title is not None else ""

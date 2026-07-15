@@ -19,11 +19,8 @@ never authors host-language code — a structure-free baseline exists only as th
 the language AI orchestrators are written in is a reason it is *valuable*, not a
 reason to make it a lesser, codec-only kind of artefact than F#/TS.
 
-This repo sits under the Fuaran-UI sub-estate at `../`, alongside the public
-`fuaran` and `fuaran-ts` tiers. Cross-repo conventions (port allocation, Sync All, strategic commands, the
-formatting mandate, the language-baseline pinning, the OSS publication boundary)
-live in the workspace `CLAUDE.md` (`../../../CLAUDE.md`) and the Fuaran-UI
-sub-estate `CLAUDE.md` (`../CLAUDE.md`). Read those first.
+This repo sits alongside the `fuaran` (F#) and `fuaran-ts` (TypeScript) tiers as a co-equal
+conformant host. Cross-repo development conventions (port allocation, formatting, language-baseline pinning) live at the maintainers' workspace level and are not shipped here.
 
 ## Posture
 

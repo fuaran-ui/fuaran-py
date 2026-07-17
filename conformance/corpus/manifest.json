@@ -412,6 +412,118 @@
       "description": "Legacy `Table` tag decode-upgrades to a static read-only DataGrid (Phase 393)"
     },
     {
+      "id": "lenient-460-alias-emphasis-muted",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-alias-emphasis-muted.json",
+      "expectedFile": "lenient/lenient-460-alias-emphasis-muted.expected.json",
+      "description": "Phase 460 — lenient emphasis alias `Muted` canonicalises to `Quiet`"
+    },
+    {
+      "id": "lenient-460-alias-emphasis-strong",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-alias-emphasis-strong.json",
+      "expectedFile": "lenient/lenient-460-alias-emphasis-strong.expected.json",
+      "description": "Phase 460 — lenient emphasis alias `Strong` canonicalises to `Loud`"
+    },
+    {
+      "id": "lenient-460-alias-tone-danger",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-alias-tone-danger.json",
+      "expectedFile": "lenient/lenient-460-alias-tone-danger.expected.json",
+      "description": "Phase 460 — lenient tone alias `Danger` canonicalises to `Critical`"
+    },
+    {
+      "id": "lenient-460-alias-tone-positive",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-alias-tone-positive.json",
+      "expectedFile": "lenient/lenient-460-alias-tone-positive.expected.json",
+      "description": "Phase 460 — lenient tone alias `Positive` canonicalises to `Success`"
+    },
+    {
+      "id": "lenient-460-explicit-default-column",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-explicit-default-column.json",
+      "expectedFile": "lenient/lenient-460-explicit-default-column.expected.json",
+      "description": "Phase 460 — explicit-default column format/width decode and re-encode minimal (read-compat)"
+    },
+    {
+      "id": "lenient-460-explicit-default-metric",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-explicit-default-metric.json",
+      "expectedFile": "lenient/lenient-460-explicit-default-metric.expected.json",
+      "description": "Phase 460 — explicit-default Metric style fields decode and re-encode minimal (read-compat)"
+    },
+    {
+      "id": "lenient-460-explicit-default-style",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-460-explicit-default-style.json",
+      "expectedFile": "lenient/lenient-460-explicit-default-style.expected.json",
+      "description": "Phase 460 — explicit all-default SemanticStyle re-encodes as an omitted style (read-compat)"
+    },
+    {
+      "id": "lenient-alias-call-url",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-call-url.json",
+      "expectedFile": "lenient/lenient-alias-call-url.expected.json",
+      "description": "Web-prior alias — Call `url`→`endpoint` (the fetch prior)"
+    },
+    {
+      "id": "lenient-alias-card-title-metric-value",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-card-title-metric-value.json",
+      "expectedFile": "lenient/lenient-alias-card-title-metric-value.expected.json",
+      "description": "Web-prior aliases — Box `title`→`heading` (the universal card/modal prior), Metric `value`→`source` (the KPI-card prior), HeadingVariant/BadgeVariant `Default`→identity case"
+    },
+    {
+      "id": "lenient-alias-datagrid-data-column-type",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-datagrid-data-column-type.json",
+      "expectedFile": "lenient/lenient-alias-datagrid-data-column-type.expected.json",
+      "description": "Web-prior aliases — DataGrid `data`→`source` (Chart.js/react-table prior), column `type`→`kind` + `header`→`label` (react-table prior)"
+    },
+    {
+      "id": "lenient-alias-form-field-name",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-form-field-name.json",
+      "expectedFile": "lenient/lenient-alias-form-field-name.expected.json",
+      "description": "Web-prior alias — form field `name`→`id` (the HTML forms prior)"
+    },
+    {
+      "id": "lenient-alias-grid-columns-row",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-grid-columns-row.json",
+      "expectedFile": "lenient/lenient-alias-grid-columns-row.expected.json",
+      "description": "Web-prior aliases — Grid `columns`→`cols` (CSS/Tailwind prior) + Flex direction `row`→`Horizontal` (CSS flex-direction prior)"
+    },
+    {
+      "id": "lenient-alias-navigate-href",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-navigate-href.json",
+      "expectedFile": "lenient/lenient-alias-navigate-href.expected.json",
+      "description": "Web-prior aliases — Navigate `href`→`route` (the 2/2 observed Kimi guess) + ButtonVariant `Danger`→`Destructive`"
+    },
+    {
+      "id": "lenient-alias-select-options-query-deps",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-alias-select-options-query-deps.json",
+      "expectedFile": "lenient/lenient-alias-select-options-query-deps.expected.json",
+      "description": "Web-prior aliases — Select `options`→`source` (the HTML select prior), Query `deps`→`dependsOn` (React hooks prior), State `initialValue`→`defaultValue` (useState prior)"
+    },
+    {
       "id": "lenient-bare-text-button-label",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1389,15 +1501,6 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind",
       "description": "Node missing kind"
-    },
-    {
-      "id": "reject-missing-style-tone",
-      "kind": "reject",
-      "decoder": "node",
-      "inputFile": "reject/reject-missing-style-tone.json",
-      "expectedErrorCode": "MISSING_FIELD",
-      "expectedPath": "$.style.tone",
-      "description": "Style missing tone"
     },
     {
       "id": "reject-missing-switch-cases",

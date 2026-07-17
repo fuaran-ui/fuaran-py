@@ -1,0 +1,1 @@
+{"id":"len-dg","kind":{"$type":"DataGrid","columns":[{"field":"name","header":"Name","type":{"$type":"Text"}}],"data":{"$type":"Static","value":[{"name":"A"}]},"editable":false}}

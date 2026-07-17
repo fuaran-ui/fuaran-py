@@ -1,0 +1,1 @@
+{"id":"len-grid","kind":{"$type":"Box","children":[{"id":"len-flexrow","kind":{"$type":"Box","children":[],"layout":{"$type":"Flex","direction":"Horizontal","wrap":false},"role":"Group"}}],"layout":{"$type":"Grid","cols":2},"role":"Group"}}

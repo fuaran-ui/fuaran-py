@@ -362,7 +362,15 @@ def _merge_style(
     # Absent ⟺ all-default: omit the whole style facet so it encodes byte-identically.
     if tone == "Default" and weight == "Standard" and emphasis == "Normal" and role is None and voice is None:
         return None
-    fields: dict[str, Value] = {"emphasis": emphasis, "tone": tone, "weight": weight}
+    # Phase 460 — each sub-field is omitted-when-default (WIRE_FORMAT §3.6), matching
+    # the decoder/encoder so the blended style re-encodes to its byte-minimal form.
+    fields: dict[str, Value] = {}
+    if emphasis != "Normal":
+        fields["emphasis"] = emphasis
+    if tone != "Default":
+        fields["tone"] = tone
+    if weight != "Standard":
+        fields["weight"] = weight
     if role is not None:
         fields["role"] = role
     if voice is not None:

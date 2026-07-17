@@ -1,0 +1,1 @@
+{"id":"len-460-g","kind":{"$type":"DataGrid","columns":[{"kind":{"$type":"Text"},"label":"Channel"}],"editable":false,"source":{"$type":"Static","value":"<opaque>"}}}

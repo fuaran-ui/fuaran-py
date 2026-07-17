@@ -1,1 +1,1 @@
-{"id":"style-role-voice-1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Q3 revenue"}},"style":{"emphasis":"Normal","role":"Data","tone":"Default","voice":"Display","weight":"Standard"}}
+{"id":"style-role-voice-1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Q3 revenue"}},"style":{"role":"Data","voice":"Display"}}

@@ -1,0 +1,1 @@
+{"id":"len-form","kind":{"$type":"Form","fields":[{"kind":{"$type":"Text","value":{"$type":"State","defaultValue":"","key":"email"}},"label":{"$type":"Literal","text":"Email"},"name":"email","required":true}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":{"$type":"Literal","text":"Save"}}}

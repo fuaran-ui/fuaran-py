@@ -1632,12 +1632,8 @@
         }
       },
       "required": [
-        "emphasis",
-        "format",
         "label",
-        "source",
-        "tone",
-        "weight"
+        "source"
       ]
     },
     "HeadingSpec": {
@@ -1766,8 +1762,7 @@
       "required": [
         "dismissable",
         "message",
-        "open",
-        "tone"
+        "open"
       ]
     },
     "CodeBlockSpec": {
@@ -1858,8 +1853,7 @@
       },
       "required": [
         "body",
-        "dismissable",
-        "tone"
+        "dismissable"
       ]
     },
     "ProgressSpec": {
@@ -1883,8 +1877,7 @@
       },
       "required": [
         "fraction",
-        "indeterminate",
-        "tone"
+        "indeterminate"
       ]
     },
     "LabelValueRowSpec": {
@@ -1908,7 +1901,6 @@
       },
       "required": [
         "emphasis",
-        "format",
         "label",
         "source"
       ]
@@ -2930,10 +2922,8 @@
         }
       },
       "required": [
-        "format",
         "kind",
-        "label",
-        "width"
+        "label"
       ]
     },
     "GridSpec": {
@@ -4176,12 +4166,7 @@
         "voice": {
           "$ref": "#/$defs/FontVoice"
         }
-      },
-      "required": [
-        "emphasis",
-        "tone",
-        "weight"
-      ]
+      }
     },
     "Accessibility": {
       "type": "object",

@@ -1,1 +1,1 @@
-{"$type":"UpdateStyle","style":{"emphasis":"Normal","role":"Eyebrow","tone":"Default","voice":"Structural","weight":"Standard"},"target":"metric-1"}
+{"$type":"UpdateStyle","style":{"role":"Eyebrow","voice":"Structural"},"target":"metric-1"}

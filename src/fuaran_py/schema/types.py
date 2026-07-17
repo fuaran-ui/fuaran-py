@@ -476,16 +476,15 @@ class SemanticStyle:
         )
 
     def to_wire(self) -> Value:
-        role = None if self.role == "None" else self.role
-        voice = None if self.voice == "Default" else self.voice
+        # Phase 460 / Phase 147 — every field is omitted-when-default (WIRE_FORMAT §3.1 / §3.6).
         return _obj(
             None,
             {
-                "emphasis": self.emphasis,
-                "role": role,
-                "tone": self.tone,
-                "voice": voice,
-                "weight": self.weight,
+                "emphasis": None if self.emphasis == "Normal" else self.emphasis,
+                "role": None if self.role == "None" else self.role,
+                "tone": None if self.tone == "Default" else self.tone,
+                "voice": None if self.voice == "Default" else self.voice,
+                "weight": None if self.weight == "Standard" else self.weight,
             },
         )
 
@@ -840,19 +839,20 @@ class Metric:
     trend_format: CellFormat | None = None
 
     def to_wire(self) -> Obj:
+        # Phase 460 — the stylistic fields are omitted-when-default (WIRE_FORMAT §3.6).
         return _obj(
             "Metric",
             {
-                "emphasis": self.emphasis,
-                "format": self.format,
+                "emphasis": None if self.emphasis == "Normal" else self.emphasis,
+                "format": None if isinstance(self.format, FormatNone) else self.format,
                 "icon": self.icon,
                 "label": self.label,
                 "source": self.source,
                 "subtext": self.subtext,
-                "tone": self.tone,
+                "tone": None if self.tone == "Default" else self.tone,
                 "trend": self.trend,
                 "trendFormat": self.trend_format,
-                "weight": self.weight,
+                "weight": None if self.weight == "Standard" else self.weight,
             },
         )
 
@@ -890,7 +890,7 @@ class Callout:
                 "dismissable": self.dismissable,
                 "heading": self.heading,
                 "icon": self.icon,
-                "tone": self.tone,
+                "tone": None if self.tone == "Default" else self.tone,
             },
         )
 
@@ -911,7 +911,7 @@ class Progress:
                 "fraction": self.fraction,
                 "indeterminate": self.indeterminate,
                 "label": self.label,
-                "tone": self.tone,
+                "tone": None if self.tone == "Default" else self.tone,
             },
         )
 
@@ -936,8 +936,10 @@ class LabelValueRow:
         return _obj(
             "LabelValueRow",
             {
+                # `emphasis` is a behavioural bool (always emitted); `format` is
+                # omitted-when-default (Phase 460).
                 "emphasis": self.emphasis,
-                "format": self.format,
+                "format": None if isinstance(self.format, FormatNone) else self.format,
                 "help": self.help,
                 "label": self.label,
                 "source": self.source,
@@ -999,7 +1001,7 @@ class Toast:
                 "dismissable": self.dismissable,
                 "message": self.message,
                 "open": self.open,
-                "tone": self.tone,
+                "tone": None if self.tone == "Default" else self.tone,
             },
         )
 
@@ -1404,14 +1406,16 @@ class Column:
     width: ColumnWidth = field(default_factory=ColumnWidth)
 
     def to_wire(self) -> Value:
-        return Obj(
+        # Phase 460 — `format` / `width` omitted-when-default (`CellFormat.None`
+        # / `ColumnWidth.Auto`); `_obj` drops the `None`-valued entries.
+        return _obj(
             None,
             {
-                "format": _lower(self.format),
-                "kind": _lower(self.kind),
+                "format": None if isinstance(self.format, FormatNone) else self.format,
+                "kind": self.kind,
                 "label": self.label,
                 "value": CLOSURE,
-                "width": _lower(self.width),
+                "width": None if self.width.kind == "Auto" else self.width,
             },
         )
 

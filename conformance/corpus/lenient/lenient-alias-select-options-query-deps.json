@@ -1,0 +1,1 @@
+{"id":"len-sel","kind":{"$type":"Select","label":{"$type":"Literal","text":"Region"},"options":{"$type":"Query","accessor":"<closure>","deps":["region"],"name":"regions"},"value":{"$type":"State","initialValue":"uk","key":"sel"}}}

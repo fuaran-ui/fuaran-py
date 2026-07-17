@@ -1,0 +1,1 @@
+{"id":"len-nav","kind":{"$type":"Button","label":{"$type":"Literal","text":"Browse jobs"},"onClick":{"$type":"Navigate","href":"/jobs"},"variant":"Danger"}}

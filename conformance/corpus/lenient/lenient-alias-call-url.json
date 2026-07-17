@@ -1,0 +1,1 @@
+{"id":"len-url","kind":{"$type":"Button","label":{"$type":"Literal","text":"Refresh"},"onClick":{"$type":"Call","url":"/api/refresh"},"variant":"Primary"}}

@@ -1,1 +1,1 @@
-{"$type":"ReplaceBinding","binding":{"$type":"Static","value":99.5},"slot":"Source","target":"metric-1"}
+{"$type":"ReplaceBinding","binding":{"$type":"Static","value":99.5},"slot":"Value","target":"metric-1"}

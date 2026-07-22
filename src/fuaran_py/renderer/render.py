@@ -25,7 +25,14 @@ from collections.abc import Callable
 
 from ..model import Arr, Node, Obj, Value
 from . import markdown
-from .bindings import BindingSources, format_number, render_text, resolve_binding
+from .bindings import (
+    BindingSources,
+    format_number,
+    render_text,
+    resolve_binding,
+    resolve_scalar_number,
+    resolve_source,
+)
 from .html import element, escape_text, text_element, void_element
 from .sanitize import sanitize_url_or_blank
 from .theme import node_class_name
@@ -460,8 +467,10 @@ class Renderer:
         return element("div", [("class", "fuaran-markdown")], html)
 
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:
-        # 0.2.0 rename law — the scalar displayed value is `value`.
-        value = resolve_binding(fields.get("value"), self.sources)
+        # 0.2.0 rename law — the scalar displayed value is `value`. Phase 648 —
+        # the value/trend are scalar slots: a `Transform` resolves to its 1×1
+        # result cell (the same dispatch as the client renderer).
+        value = resolve_scalar_number(fields.get("value"), self.sources)
         if value is None:
             loading = self._state_loading(node)
             if loading is not None:
@@ -472,6 +481,14 @@ class Renderer:
             text_element("div", [("class", "fuaran-metric-label")], self._text(fields.get("label"))),
             text_element("div", [("class", "fuaran-metric-value")], value_text),
         ]
+        # Phase 648 — the trend div (the client emits it; the server used to omit
+        # it). A resolved trend formats through `trendFormat`; an unresolved one
+        # renders empty, matching the F#/TS hosts.
+        trend_binding = fields.get("trend")
+        if trend_binding is not None:
+            trend = resolve_scalar_number(trend_binding, self.sources)
+            trend_text = format_number(fields.get("trendFormat"), trend) if trend is not None else ""
+            parts.append(text_element("div", [("class", "fuaran-metric-trend")], trend_text))
         subtext = fields.get("subtext")
         if subtext is not None:
             parts.append(text_element("div", [("class", "fuaran-metric-subtext")], self._text(subtext)))
@@ -523,13 +540,38 @@ class Renderer:
         return text_element("div", [("class", "fuaran-sparkline fuaran-sparkline-empty")], _EM_DASH)
 
     def _label_value_row(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 648 — a scalar slot: a `Transform` resolves to its 1×1 result
+        # cell (ambiguity stays loud), matching the client's value projection.
+        value = resolve_scalar_number(fields.get("value"), self.sources)
+        if value is None:
+            loading = self._state_loading(node)
+            if loading is not None:
+                return self.render_node(loading)
         emphasis = " fuaran-label-value-row-emphasis" if fields.get("emphasis") is True else ""
         # 0.2.0 rename law — the scalar displayed value is `value`.
-        value = resolve_binding(fields.get("value"), self.sources)
         value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
         label = text_element("span", [("class", "fuaran-label-value-row-label")], self._text(fields.get("label")))
         val = text_element("span", [("class", "fuaran-label-value-row-value")], value_text)
         return element("div", [("class", f"fuaran-label-value-row{emphasis}")], label + val)
+
+    def _fact(self, node: Node, fields: dict[str, Value]) -> str:
+        # A labeled TEXT fact tile — Metric's chrome for a `TextSource` value.
+        # `render_text` resolves Literal / Bound / I18n identically on both
+        # surfaces, so a `Bound` `Selection` shows its `defaultValue` (Phase 629)
+        # and a `Bound` `Transform` its 1×1 result cell (Phase 632/648).
+        tone = str(fields.get("tone", "Default")).lower()
+        emphasis = " fuaran-fact-emphasis" if fields.get("emphasis") is True else ""
+        icon = fields.get("icon")
+        icon_html = text_element("span", [("class", "fuaran-fact-icon")], icon) if isinstance(icon, str) else ""
+        value_html = icon_html + text_element("span", [], self._text(fields.get("value")))
+        parts = [
+            text_element("div", [("class", "fuaran-fact-label")], self._text(fields.get("label"))),
+            element("div", [("class", "fuaran-fact-value")], value_html),
+        ]
+        help_text = fields.get("help")
+        if help_text is not None:
+            parts.append(text_element("div", [("class", "fuaran-fact-help")], self._text(help_text)))
+        return element("div", [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")], "".join(parts))
 
     def _link(self, node: Node, fields: dict[str, Value]) -> str:
         href_value = resolve_binding(fields.get("href"), self.sources)
@@ -798,7 +840,7 @@ class Renderer:
         items: list[str] = []
         if placeholder is not None:
             items.append(text_element("option", [("value", "")], self._text(placeholder)))
-        resolved = resolve_binding(source, self.sources)
+        resolved = resolve_source(source, self.sources)
         if isinstance(resolved, Arr):
             for opt in resolved.items:
                 if isinstance(opt, Obj):
@@ -886,7 +928,7 @@ class Renderer:
         static_rows = fields.get("staticRows")
         if isinstance(static_rows, Obj):
             return self._table(node, static_rows.fields)
-        count = _seq_len(resolve_binding(fields.get("source"), self.sources))
+        count = _seq_len(resolve_source(fields.get("source"), self.sources))
         return self._make_vis_placeholder(
             "fuaran-grid fuaran-grid-ssr-placeholder",
             "DataGrid",
@@ -938,7 +980,7 @@ class Renderer:
         return self._drawing(drawing_node, drawing_node.kind.fields)
 
     def _chart(self, node: Node, fields: dict[str, Value]) -> str:
-        resolved = resolve_binding(fields.get("source"), self.sources)
+        resolved = resolve_source(fields.get("source"), self.sources)
         # First-party lowering (Phase 534): a Bar/Column/Line chart with resolved
         # rows lowers to a canonical Drawing subtree and renders as real inline SVG,
         # headless included. Anything unresolved / not-yet-lowered falls through to
@@ -967,7 +1009,7 @@ class Renderer:
         )
 
     def _map(self, node: Node, fields: dict[str, Value]) -> str:
-        count = _seq_len(resolve_binding(fields.get("source"), self.sources))
+        count = _seq_len(resolve_source(fields.get("source"), self.sources))
         return text_element(
             "div",
             [
@@ -1070,6 +1112,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Skeleton": Renderer._skeleton,
     "Sparkline": Renderer._sparkline,
     "LabelValueRow": Renderer._label_value_row,
+    "Fact": Renderer._fact,
     "Link": Renderer._link,
     "Image": Renderer._image,
     "List": Renderer._list,

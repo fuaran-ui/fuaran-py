@@ -47,7 +47,7 @@ def counter_runtime(deps: BrowserDeps | None = None) -> FuaranRuntime:
             state["n"] += 1
             return Obj(
                 "ReplaceBinding",
-                {"binding": Obj("Static", {"value": state["n"]}), "slot": "Source", "target": _COUNT_ID},
+                {"binding": Obj("Static", {"value": state["n"]}), "slot": "Value", "target": _COUNT_ID},
             )
         return None
 

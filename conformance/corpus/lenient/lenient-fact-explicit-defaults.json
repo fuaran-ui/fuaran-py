@@ -1,0 +1,1 @@
+{"id":"len-fact","kind":{"$type":"Fact","emphasis":false,"label":{"$type":"Literal","text":"Patient"},"tone":"Default","value":{"$type":"Literal","text":"Alice Smith"}}}

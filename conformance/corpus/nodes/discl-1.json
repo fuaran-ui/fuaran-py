@@ -1,1 +1,1 @@
-{"id":"discl-1","kind":{"$type":"Disclosure","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Updated hourly."}}}],"defaultOpen":true,"heading":{"$type":"Literal","text":"Additional entitlements"},"open":{"$type":"Static","value":false}}}
+{"id":"discl-1","kind":{"$type":"Disclosure","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":"Updated hourly."}}],"defaultOpen":true,"heading":"Additional entitlements","open":{"$type":"Static","value":false}}}

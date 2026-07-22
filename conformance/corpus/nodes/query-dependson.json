@@ -1,1 +1,1 @@
-{"id":"query-dependson","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Query","accessor":"<closure>","dependsOn":["status","region"],"name":"orders"},"subtext":{"$type":"Literal","text":"vs last month"},"tone":"Brand"}}
+{"id":"query-dependson","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":"Revenue","subtext":"vs last month","tone":"Brand","value":{"$type":"Query","dependsOn":["status","region"],"name":"orders"}}}

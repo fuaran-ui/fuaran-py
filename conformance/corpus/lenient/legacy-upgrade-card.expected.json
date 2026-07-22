@@ -1,1 +1,1 @@
-{"id":"legacy-card","kind":{"$type":"Box","children":[],"heading":{"$type":"Literal","text":"Legacy"},"layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Card"}}
+{"id":"legacy-card","kind":{"$type":"Box","children":[],"heading":"Legacy","layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Card"}}

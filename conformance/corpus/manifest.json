@@ -14,6 +14,7 @@
     "Disclosure",
     "Drawing",
     "ErrorBoundary",
+    "Fact",
     "FileUpload",
     "Filters",
     "Form",
@@ -412,6 +413,22 @@
       "description": "Legacy `Table` tag decode-upgrades to a static read-only DataGrid (Phase 393)"
     },
     {
+      "id": "lenient-022-lvr-emphasis-loud",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-022-lvr-emphasis-loud.json",
+      "expectedFile": "lenient/lenient-022-lvr-emphasis-loud.expected.json",
+      "description": "0.2.2 — the Emphasis style-enum string in LabelValueRow's bool slot coerces (Loud→true; Normal/Quiet→false)"
+    },
+    {
+      "id": "lenient-022-lvr-emphasis-normal",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-022-lvr-emphasis-normal.json",
+      "expectedFile": "lenient/lenient-022-lvr-emphasis-normal.expected.json",
+      "description": "0.2.2 — 'Normal' coerces to false, which is the omitted-when-false canonical form"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -468,6 +485,14 @@
       "description": "Phase 460 — explicit all-default SemanticStyle re-encodes as an omitted style (read-compat)"
     },
     {
+      "id": "lenient-596-form-explicit-auto-state",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-596-form-explicit-auto-state.json",
+      "expectedFile": "lenient/lenient-596-form-explicit-auto-state.expected.json",
+      "description": "Phase 596 — a form field's explicit auto-shape value (State(field id, placeholder)) normalises to the omitted-value canonical form"
+    },
+    {
       "id": "lenient-alias-call-url",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -481,7 +506,7 @@
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-card-title-metric-value.json",
       "expectedFile": "lenient/lenient-alias-card-title-metric-value.expected.json",
-      "description": "Web-prior aliases — Box `title`→`heading` (the universal card/modal prior), Metric `value`→`source` (the KPI-card prior), HeadingVariant/BadgeVariant `Default`→identity case"
+      "description": "Web-prior aliases — Box `title`→`heading` (the universal card/modal prior), Metric scalar `value` (0.2.0 canonical; the KPI-card prior IS canon now), HeadingVariant/BadgeVariant `Default`→identity case"
     },
     {
       "id": "lenient-alias-datagrid-data-column-type",
@@ -556,6 +581,30 @@
       "description": "Markdown.text as a bare JSON string (§16.1) — the highest-frequency saving"
     },
     {
+      "id": "lenient-binding-bound-wrapper",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-binding-bound-wrapper.json",
+      "expectedFile": "lenient/lenient-binding-bound-wrapper.expected.json",
+      "description": "pilot-5 n=3 gate — the Bound wrapper unwraps in bare-Binding slots (the TextSource.Bound convention transferred; one payload field, one-to-one); canonical stays the bare binding"
+    },
+    {
+      "id": "lenient-emphasis-cross-vocab",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-emphasis-cross-vocab.json",
+      "expectedFile": "lenient/lenient-emphasis-cross-vocab.expected.json",
+      "description": "2026-07-19 collision sweep — `emphasis` cross-vocabulary coercion, both directions: the style enum + Phase-460 aliases in the Fact/LabelValueRow BOOL slots (Loud/Strong/Bold ⇒ true, Normal/Quiet/Subtle/Muted ⇒ false) and a bool in the style-enum slot (true ⇒ Loud). One-to-one; the encoder still emits the canonical types."
+    },
+    {
+      "id": "lenient-fact-explicit-defaults",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-fact-explicit-defaults.json",
+      "expectedFile": "lenient/lenient-fact-explicit-defaults.expected.json",
+      "description": "Fact (the new labeled text-fact kind) — explicit-default `tone`/`emphasis` decode and canonicalise away (omitted-when-default on both boundaries from day one), and the bare-string TextSource shorthand applies to `label`/`value`. The canonical minimal Fact is exactly the two-field form models want to write."
+    },
+    {
       "id": "lenient-null-static-options",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -594,6 +643,150 @@
       "inputFile": "lenient/lenient-opaque-static-values.json",
       "expectedFile": "lenient/lenient-opaque-static-values.expected.json",
       "description": "Pre-429 opaque multi-select values decode to the tagged placeholder list and re-encode typed"
+    },
+    {
+      "id": "lenient-shape-binding-scalar-fraction",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-binding-scalar-fraction.json",
+      "expectedFile": "lenient/lenient-shape-binding-scalar-fraction.expected.json",
+      "description": "Envelope-confusion coercions, BOTH directions (2026-07-17 launch-eval evidence) — a bare scalar where a Binding is expected coerces to `Static` (`fraction: 0.65`), and a Static envelope where a PLAIN value is expected unwraps (`indeterminate: {\"$type\":\"Static\",\"value\":false}`). Unambiguous both ways; `null` and untyped objects stay strict."
+    },
+    {
+      "id": "lenient-shape-grid-no-cols",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-grid-no-cols.json",
+      "expectedFile": "lenient/lenient-shape-grid-no-cols.expected.json",
+      "description": "Grid with NO column spec (no cols/columns/templateColumns) is the CSS auto-grid prior — accept-and-canonicalise to the language's existing `Auto` responsive auto-tile layout. 35 launch-eval cells across 8 tasks, every provider."
+    },
+    {
+      "id": "lenient-shape-grid-template-no-cols",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-grid-template-no-cols.json",
+      "expectedFile": "lenient/lenient-shape-grid-template-no-cols.expected.json",
+      "description": "Grid with `templateColumns` but no `cols` — `Cols` is documented-ignored when `templateColumns` is present, so absence defaults to 1 instead of MISSING_FIELD (the 0.1.6 pilot residual). Distinct from the no-column-spec-at-all form, which canonicalises to `Auto`."
+    },
+    {
+      "id": "lenient-shape-options-bare-strings",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-options-bare-strings.json",
+      "expectedFile": "lenient/lenient-shape-options-bare-strings.expected.json",
+      "description": "Web-prior SHAPE coercions — a bare array where a Binding is expected coerces to `Static` (the omitted-envelope prior, 2/2 observed eval failures), and a bare string option element coerces to `{value: s, label: Literal s}` (the HTML `<select>` prior). The value→label map form (`{\"A\":\"A\"}`) is deliberately NOT coerced: JSON key order is not contractual, so it could silently reorder visible options."
+    },
+    {
+      "id": "lenient-shape-params-map",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-params-map.json",
+      "expectedFile": "lenient/lenient-shape-params-map.expected.json",
+      "description": "Query-params shape coercion — the name→binding MAP form coerces to the canonical `[{name, from}]` array (params are a name-keyed set, so key order carries no meaning — unlike the options map, which is refused), and `value` aliases `from` at the element. Every provider's first guess in the launch eval; 21/31 failures were repair-proof."
+    },
+    {
+      "id": "lenient-shape-segmented-orientation-omitted",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-segmented-orientation-omitted.json",
+      "expectedFile": "lenient/lenient-shape-segmented-orientation-omitted.expected.json",
+      "description": "Omitted-when-default (the Phase 460 posture applied to `orientation`) — an absent segmented `orientation` restores the language default `Horizontal` (observed omitted in eval emission data); decode-only, the encoder still always emits it. Combined here with the bare-options shape coercion."
+    },
+    {
+      "id": "lenient-shape-static-envelope-plain-scalars",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-static-envelope-plain-scalars.json",
+      "expectedFile": "lenient/lenient-shape-static-envelope-plain-scalars.expected.json",
+      "description": "Static-envelope unwrap GENERALISED to every plain-scalar position (2026-07-18 — the 0.1.6 pilot found `emphasis` wrapped after `indeterminate` was fixed site-locally; the confusion is generic). A well-formed envelope at a plain-scalar position has exactly one reading; the encoder still emits bare scalars."
+    },
+    {
+      "id": "lenient-transform-bare-columns",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-bare-columns.json",
+      "expectedFile": "lenient/lenient-transform-bare-columns.expected.json",
+      "description": "fuaran-core#88 — bare-array columns are the just-the-data shorthand (all-present validity); the wrapped form stays canonical"
+    },
+    {
+      "id": "lenient-transform-epoch-timestamps",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-epoch-timestamps.json",
+      "expectedFile": "lenient/lenient-transform-epoch-timestamps.expected.json",
+      "description": "fuaran-core#94 — epoch numbers in a declared-timestamp column decode to the canonical ISO instant (seconds, and milliseconds via the whole-float path; unit by magnitude)"
+    },
+    {
+      "id": "lenient-transform-expr-spellings",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-expr-spellings.json",
+      "expectedFile": "lenient/lenient-transform-expr-spellings.expected.json",
+      "description": "fuaran-core#93 — predicate/contains-as-$type/call spellings (the tier-a-055 shape) coerce to the canonical nested binary"
+    },
+    {
+      "id": "lenient-transform-flat-contains",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-flat-contains.json",
+      "expectedFile": "lenient/lenient-transform-flat-contains.expected.json",
+      "description": "fuaran-core#90 — the text-search prior: a flat contains step coerces to the canonical nested predicate"
+    },
+    {
+      "id": "lenient-transform-flat-filter",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-flat-filter.json",
+      "expectedFile": "lenient/lenient-transform-flat-filter.expected.json",
+      "description": "fuaran-core#89 — the flat filter step {column, op, param} coerces to the canonical nested predicate"
+    },
+    {
+      "id": "lenient-transform-flat-or",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-flat-or.json",
+      "expectedFile": "lenient/lenient-transform-flat-or.expected.json",
+      "description": "fuaran-core#94 — flat variadic `or` (exprs array) + flat `eq` (left/right) left-fold into the canonical nested `binary` tree"
+    },
+    {
+      "id": "lenient-transform-flat-scalar-fn",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-flat-scalar-fn.json",
+      "expectedFile": "lenient/lenient-transform-flat-scalar-fn.expected.json",
+      "description": "fuaran-core#94 — flat scalar-fn spellings: `fn` aliases `apply` (same fn/args), and a bare fn-name node ({\"$type\":\"lower\",\"expr\":…}) denotes ApplyFn directly; canonical stays `apply`"
+    },
+    {
+      "id": "lenient-transform-schemaless",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-schemaless.json",
+      "expectedFile": "lenient/lenient-transform-schemaless.expected.json",
+      "description": "fuaran-core#88 — an embedded Transform source may omit schema; column types infer from the cells (int/float/bool/string only)"
+    },
+    {
+      "id": "lenient-transform-step-aliases",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-step-aliases.json",
+      "expectedFile": "lenient/lenient-transform-step-aliases.expected.json",
+      "description": "fuaran-core#92 — the SQL/pandas step-field spellings (by/aggregations/op/as/avg, keys/column/descending, count) coerce to the canonical fields"
+    },
+    {
+      "id": "lenient-transform-values-only-columns",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-values-only-columns.json",
+      "expectedFile": "lenient/lenient-transform-values-only-columns.expected.json",
+      "description": "fuaran-core#94 — a values-only column object is the all-present shorthand (the canonical wrapped shape minus the mask); the masked form stays canonical"
+    },
+    {
+      "id": "lenient-window-cumsum-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-window-cumsum-legacy.json",
+      "expectedFile": "lenient/lenient-window-cumsum-legacy.expected.json",
+      "description": "2026-07-19 rename — the legacy cumSum window-fn tag coerces to the canonical cumulSum"
     },
     {
       "id": "badge-1",
@@ -764,6 +957,22 @@
       "description": "Display/Drawing (degenerate — empty)"
     },
     {
+      "id": "fact-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/fact-1.json",
+      "expectedFile": "nodes/fact-1.json",
+      "description": "Display/Fact"
+    },
+    {
+      "id": "filterable-static-dashboard",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filterable-static-dashboard.json",
+      "expectedFile": "nodes/filterable-static-dashboard.json",
+      "description": "Layout/Box (filterable-static dashboard — Filters params wired through Transform to chart + grid)"
+    },
+    {
       "id": "filters-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -810,6 +1019,14 @@
       "inputFile": "nodes/form-declarative.json",
       "expectedFile": "nodes/form-declarative.json",
       "description": "Input/Form (Phase 426 — handler-free write-back fields, State-bound)"
+    },
+    {
+      "id": "form-declarative-minimal",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-declarative-minimal.json",
+      "expectedFile": "nodes/form-declarative-minimal.json",
+      "description": "Input/Form (Phase 596 — symmetric auto-bind, omitted-value fields)"
     },
     {
       "id": "form-local-1",
@@ -1004,6 +1221,14 @@
       "description": "Display/Markdown"
     },
     {
+      "id": "master-detail-preselected",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/master-detail-preselected.json",
+      "expectedFile": "nodes/master-detail-preselected.json",
+      "description": "Layout/Box (master-detail — grid + detail card State-bound with a pre-selected defaultValue)"
+    },
+    {
       "id": "math-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1106,6 +1331,14 @@
       "inputFile": "nodes/query-dependson.json",
       "expectedFile": "nodes/query-dependson.json",
       "description": "Display/Metric (Phase 421 — Binding.Query with a declared dependsOn filter edge)"
+    },
+    {
+      "id": "scalar-transform-composition",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/scalar-transform-composition.json",
+      "expectedFile": "nodes/scalar-transform-composition.json",
+      "description": "Layout/Box (Phase 632 — Transform in scalar slots: selected-row Callout body + Badge count)"
     },
     {
       "id": "scroll-1",
@@ -1445,7 +1678,7 @@
       "decoder": "node",
       "inputFile": "reject/reject-missing-binding-type.json",
       "expectedErrorCode": "MISSING_FIELD",
-      "expectedPath": "$.kind.source.$type",
+      "expectedPath": "$.kind.value.$type",
       "description": "Binding missing $type"
     },
     {
@@ -1467,13 +1700,13 @@
       "description": "Markdown spec missing text"
     },
     {
-      "id": "reject-missing-metric-source",
+      "id": "reject-missing-metric-value",
       "kind": "reject",
       "decoder": "node",
-      "inputFile": "reject/reject-missing-metric-source.json",
+      "inputFile": "reject/reject-missing-metric-value.json",
       "expectedErrorCode": "MISSING_FIELD",
-      "expectedPath": "$.kind.source",
-      "description": "Metric spec missing source"
+      "expectedPath": "$.kind.value",
+      "description": "Metric spec missing value"
     },
     {
       "id": "reject-missing-mount-scopeid",
@@ -1643,7 +1876,7 @@
       "decoder": "node",
       "inputFile": "reject/reject-unknown-binding.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
-      "expectedPath": "$.kind.source.$type",
+      "expectedPath": "$.kind.value.$type",
       "description": "Binding $type 'Bogus'"
     },
     {

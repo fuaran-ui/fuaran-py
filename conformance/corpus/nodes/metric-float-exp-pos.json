@@ -1,1 +1,1 @@
-{"id":"metric-float-exp-pos","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1E+21},"subtext":{"$type":"Literal","text":"vs last month"},"tone":"Brand"}}
+{"id":"metric-float-exp-pos","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":"Revenue","subtext":"vs last month","tone":"Brand","value":{"$type":"Static","value":1E+21}}}

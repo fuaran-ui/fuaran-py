@@ -1,1 +1,1 @@
-{"id":"len-460-m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"None"},"label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1.0},"tone":"Default","weight":"Standard"}}
+{"id":"len-460-m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"None"},"label":{"$type":"Literal","text":"Revenue"},"tone":"Default","weight":"Standard","value":{"$type":"Static","value":1.0}}}

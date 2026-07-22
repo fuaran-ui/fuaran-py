@@ -1,0 +1,1 @@
+{"id":"len-tf-c","kind":{"$type":"DataGrid","columns":[{"field":"desk","kind":{"$type":"Text"},"label":"Desk"}],"rowKeyField":"desk","source":{"$type":"Transform","params":[{"from":{"$type":"Filter","name":"q"},"name":"q"}],"pipeline":[{"$type":"filter","column":"desk","op":"contains","param":"q"}],"source":{"columns":{"desk":["A1","B2"]}}}}}

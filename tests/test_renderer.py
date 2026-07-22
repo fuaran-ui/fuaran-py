@@ -55,7 +55,7 @@ def test_heading_renders_correct_level_and_escapes_text() -> None:
 def test_metric_static_binding_resolves_and_formats_currency() -> None:
     html = _render(
         '{"id":"m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"Currency","code":"GBP"},'
-        '"label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1234.5},'
+        '"label":"Revenue","value":{"$type":"Static","value":1234.5},'
         '"tone":"Brand","weight":"Standard"}}'
     )
     assert "fuaran-metric-brand" in html
@@ -66,7 +66,7 @@ def test_metric_static_binding_resolves_and_formats_currency() -> None:
 def test_metric_unresolved_binding_falls_back_to_em_dash() -> None:
     html = _render(
         '{"id":"m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"None"},'
-        '"label":{"$type":"Literal","text":"x"},"source":{"$type":"Query","key":"sales"},'
+        '"label":"x","value":{"$type":"Query","name":"sales"},'
         '"tone":"Default","weight":"Standard"}}'
     )
     assert "—" in html  # em-dash placeholder for the unresolved Query binding
@@ -75,7 +75,7 @@ def test_metric_unresolved_binding_falls_back_to_em_dash() -> None:
 def test_metric_query_binding_resolves_from_sources() -> None:
     result = decode_node(
         '{"id":"m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"None"},'
-        '"label":{"$type":"Literal","text":"x"},"source":{"$type":"Query","key":"sales"},'
+        '"label":"x","value":{"$type":"Query","name":"sales"},'
         '"tone":"Default","weight":"Standard"}}'
     )
     assert result.ok

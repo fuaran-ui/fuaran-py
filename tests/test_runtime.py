@@ -103,13 +103,13 @@ def test_dispatch_updates_the_live_tree() -> None:
     runtime = counter_runtime(deps=dom.deps())
     runtime.mount("fuaran-root")
     dom.click("inc")
-    # The metric's Source binding now carries the bumped value in the live tree.
+    # The metric's Value binding now carries the bumped value in the live tree.
     metric = None
     for child in runtime.tree.kind.fields["children"].items:  # type: ignore[union-attr]
         if getattr(child, "id", None) == "count":
             metric = child
     assert metric is not None
-    assert metric.kind.fields["source"] == Obj("Static", {"value": 1})
+    assert metric.kind.fields["value"] == Obj("Static", {"value": 1})
 
 
 def test_failed_apply_leaves_tree_and_dom_untouched() -> None:

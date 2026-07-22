@@ -35,10 +35,8 @@ def render_text(text: Value, sources: BindingSources | None = None) -> str:
             value = text.fields.get("text", "")
             return value if isinstance(value, str) else str(value)
         if text.tag == "Bound":
-            key = text.fields.get("key")
-            if sources and isinstance(key, str) and key in sources:
-                return str(sources[key])
-            return ""
+            resolved = resolve_binding(text.fields.get("binding"), sources)
+            return str(resolved) if resolved is not None else ""
         if text.tag == "I18n":
             key = text.fields.get("key", "")
             return f"[i18n:{key}]"
@@ -55,7 +53,11 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
     if isinstance(binding, Obj):
         if binding.tag == "Static":
             return binding.fields.get("value")
+        # `State` keys on `key`; `Query` / `Filter` key on `name` (0.2.0 —
+        # the accessor sentinel is off the wire, the name IS the lookup key).
         key = binding.fields.get("key")
+        if key is None:
+            key = binding.fields.get("name")
         if sources and isinstance(key, str) and key in sources:
             return sources[key]
     return None

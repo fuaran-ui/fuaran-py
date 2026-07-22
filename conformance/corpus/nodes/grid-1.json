@@ -1,1 +1,1 @@
-{"id":"grid-1","kind":{"$type":"DataGrid","columns":[{"kind":{"$type":"Text"},"label":"Channel","value":"<closure>"}],"editable":false,"rowKey":"<closure>","source":{"$type":"Static","value":"<opaque>"}}}
+{"id":"grid-1","kind":{"$type":"DataGrid","columns":[{"kind":{"$type":"Text"},"label":"Channel","value":"<closure>"}],"rowKey":"<closure>","source":{"$type":"Static","value":"<opaque>"}}}

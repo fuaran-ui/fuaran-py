@@ -1,1 +1,1 @@
-{"id":"btn-copy-link","kind":{"$type":"Button","label":{"$type":"Literal","text":"Copy share link"},"onClick":{"$type":"Chain","ops":[{"$type":"WriteToClipboard","text":"https://example.com/share/abc123"},{"$type":"Dispatch","msg":"<closure>"}]},"variant":"Secondary"}}
+{"id":"btn-copy-link","kind":{"$type":"Button","label":"Copy share link","onClick":{"$type":"Chain","ops":[{"$type":"WriteToClipboard","text":"https://example.com/share/abc123"},{"$type":"Dispatch"}]},"variant":"Secondary"}}

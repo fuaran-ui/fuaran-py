@@ -1,1 +1,1 @@
-{"id":"callout-1","kind":{"$type":"Callout","body":{"$type":"Literal","text":"Live data is delayed."},"dismissable":true,"heading":{"$type":"Literal","text":"Heads up"},"icon":"alert","tone":"Warning"}}
+{"id":"callout-1","kind":{"$type":"Callout","body":"Live data is delayed.","dismissable":true,"heading":"Heads up","icon":"alert","tone":"Warning"}}

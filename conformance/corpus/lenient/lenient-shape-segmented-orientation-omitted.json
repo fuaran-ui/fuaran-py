@@ -1,0 +1,1 @@
+{"id":"len-seg","kind":{"$type":"Filters","items":[{"kind":{"$type":"SegmentedChoice","options":["Last 7 days","Last 30 days"]},"label":"Range","name":"range"}]}}

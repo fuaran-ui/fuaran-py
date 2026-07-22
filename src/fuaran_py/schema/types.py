@@ -101,12 +101,12 @@ def _obj(tag: str | None, fields: dict[str, object]) -> Obj:
 
 @dataclass(frozen=True)
 class LiteralText:
-    """A literal ``TextSource`` — ``{"$type":"Literal","text":…}``."""
+    """A literal ``TextSource`` — 0.2.0: the bare JSON string IS the canonical form."""
 
     text: str
 
     def to_wire(self) -> Value:
-        return Obj("Literal", {"text": self.text})
+        return self.text
 
 
 # The ``TextSource`` / ``TextInput`` aliases are defined just after the binding
@@ -321,7 +321,8 @@ class Dispatch:
     msg: object = None
 
     def to_wire(self) -> Value:
-        return Obj("Dispatch", {"msg": CLOSURE})
+        # 0.2.0 — the `msg` closure sentinel is off the wire.
+        return Obj("Dispatch", {})
 
 
 @dataclass(frozen=True)
@@ -712,7 +713,8 @@ class Tabs:
                 "activeTag": self.active_tag,
                 "children": list(self.children),
                 "onSelect": CLOSURE,
-                "orientation": self.orientation,
+                # 0.2.0 — omitted-when-Horizontal (the universal default).
+                "orientation": None if self.orientation == "Horizontal" else self.orientation,
                 "tabHeaders": list(self.tab_headers) if self.tab_headers is not None else None,
                 "tabTags": list(self.tab_tags) if self.tab_tags is not None else None,
             },
@@ -828,7 +830,7 @@ class Markdown:
 @dataclass(frozen=True)
 class Metric:
     label: TextSource
-    source: Binding
+    value: Binding
     format: CellFormat = field(default_factory=FormatNone)
     tone: Tone = "Default"
     weight: Weight = "Standard"
@@ -847,11 +849,11 @@ class Metric:
                 "format": None if isinstance(self.format, FormatNone) else self.format,
                 "icon": self.icon,
                 "label": self.label,
-                "source": self.source,
                 "subtext": self.subtext,
                 "tone": None if self.tone == "Default" else self.tone,
                 "trend": self.trend,
                 "trendFormat": self.trend_format,
+                "value": self.value,
                 "weight": None if self.weight == "Standard" else self.weight,
             },
         )
@@ -887,7 +889,8 @@ class Callout:
             "Callout",
             {
                 "body": self.body,
-                "dismissable": self.dismissable,
+                # 0.2.0 — omitted-when-false.
+                "dismissable": True if self.dismissable else None,
                 "heading": self.heading,
                 "icon": self.icon,
                 "tone": None if self.tone == "Default" else self.tone,
@@ -909,7 +912,8 @@ class Progress:
             {
                 "caveat": self.caveat,
                 "fraction": self.fraction,
-                "indeterminate": self.indeterminate,
+                # 0.2.0 — omitted-when-false.
+                "indeterminate": True if self.indeterminate else None,
                 "label": self.label,
                 "tone": None if self.tone == "Default" else self.tone,
             },
@@ -927,7 +931,7 @@ class Skeleton:
 @dataclass(frozen=True)
 class LabelValueRow:
     label: TextSource
-    source: Binding
+    value: Binding
     format: CellFormat = field(default_factory=FormatNone)
     emphasis: bool = False
     help: TextSource | None = None
@@ -936,13 +940,13 @@ class LabelValueRow:
         return _obj(
             "LabelValueRow",
             {
-                # `emphasis` is a behavioural bool (always emitted); `format` is
-                # omitted-when-default (Phase 460).
-                "emphasis": self.emphasis,
+                # `emphasis` is the behavioural bool — 0.2.2: omitted-when-false;
+                # `format` is omitted-when-default (Phase 460).
+                "emphasis": True if self.emphasis else None,
                 "format": None if isinstance(self.format, FormatNone) else self.format,
                 "help": self.help,
                 "label": self.label,
-                "source": self.source,
+                "value": self.value,
             },
         )
 
@@ -992,13 +996,14 @@ class Toast:
     message: TextSource
     open: Binding = field(default_factory=lambda: Static(False))
     tone: Tone = "Default"
-    dismissable: bool = False
+    dismissable: bool = True
 
     def to_wire(self) -> Obj:
         return _obj(
             "Toast",
             {
-                "dismissable": self.dismissable,
+                # 0.2.0 — the one omit-when-TRUE (a toast defaults dismissable).
+                "dismissable": None if self.dismissable else False,
                 "message": self.message,
                 "open": self.open,
                 "tone": None if self.tone == "Default" else self.tone,
@@ -1155,7 +1160,6 @@ class Table:
             "DataGrid",
             {
                 "columns": [],
-                "editable": False,
                 "source": Static(OPAQUE),
                 "staticRows": {
                     "headers": list(self.headers),
@@ -1323,42 +1327,16 @@ class Form:
         )
 
 
-@dataclass(frozen=True)
-class TextFilter:
-    value: Binding
+# 0.2.0 filters-unification — the `FilterKind` family is retired: a filter
+# chip's control is an ordinary `FormFieldKind` (`Text` / `Choice` /
+# `SegmentedChoice` on the wire). The old names survive as thin aliases of the
+# form-control classes so existing authoring code keeps working while emitting
+# the unified wire.
+TextFilter = TextField
+ChoiceFilter = ChoiceField
+SegmentedFilter = SegmentedChoice
 
-    def to_wire(self) -> Value:
-        return Obj("TextFilter", {"onChange": CLOSURE, "value": _lower(self.value)})
-
-
-@dataclass(frozen=True)
-class ChoiceFilter:
-    options: Binding
-    value: Binding
-
-    def to_wire(self) -> Value:
-        return Obj("ChoiceFilter", {"onChange": CLOSURE, "options": _lower(self.options), "value": _lower(self.value)})
-
-
-@dataclass(frozen=True)
-class SegmentedFilter:
-    options: Binding
-    value: Binding
-    orientation: Orientation = "Horizontal"
-
-    def to_wire(self) -> Value:
-        return Obj(
-            "SegmentedFilter",
-            {
-                "onChange": CLOSURE,
-                "options": _lower(self.options),
-                "orientation": self.orientation,
-                "value": _lower(self.value),
-            },
-        )
-
-
-FilterKind = TextFilter | ChoiceFilter | SegmentedFilter
+FilterKind = FormFieldKind
 
 
 @dataclass(frozen=True)
@@ -1427,9 +1405,15 @@ class DataGrid:
     editable: bool = False
 
     def to_wire(self) -> Obj:
+        # 0.2.0 — `editable` omitted-when-false.
         return _obj(
             "DataGrid",
-            {"columns": list(self.columns), "editable": self.editable, "rowKey": CLOSURE, "source": self.source},
+            {
+                "columns": list(self.columns),
+                "editable": True if self.editable else None,
+                "rowKey": CLOSURE,
+                "source": self.source,
+            },
         )
 
 

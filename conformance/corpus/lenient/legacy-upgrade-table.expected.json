@@ -1,1 +1,1 @@
-{"id":"legacy-table","kind":{"$type":"DataGrid","columns":[],"editable":false,"source":{"$type":"Static","value":"<opaque>"},"staticRows":{"headers":[{"$type":"Literal","text":"A"}],"rows":[[{"$type":"Literal","text":"1"}]]}}}
+{"id":"legacy-table","kind":{"$type":"DataGrid","columns":[],"source":{"$type":"Static","value":"<opaque>"},"staticRows":{"headers":["A"],"rows":[["1"]]}}}

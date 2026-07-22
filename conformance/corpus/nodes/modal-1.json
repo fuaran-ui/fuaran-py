@@ -1,1 +1,1 @@
-{"id":"modal-1","kind":{"$type":"Modal","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Updated hourly."}}}],"dismissable":true,"heading":{"$type":"Literal","text":"Confirm"},"onDismiss":{"$type":"Chain","ops":[]},"open":{"$type":"Static","value":false}}}
+{"id":"modal-1","kind":{"$type":"Modal","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":"Updated hourly."}}],"dismissable":true,"heading":"Confirm","onDismiss":{"$type":"Chain","ops":[]},"open":{"$type":"Static","value":false}}}

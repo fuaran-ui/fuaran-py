@@ -1,0 +1,1 @@
+{"id":"len-seg","kind":{"$type":"Filters","items":[{"kind":{"$type":"SegmentedChoice","options":{"$type":"Static","value":[{"label":"Last 7 days","value":"Last 7 days"},{"label":"Last 30 days","value":"Last 30 days"}]},"orientation":"Horizontal"},"label":"Range","name":"range"}]}}

@@ -1,0 +1,1 @@
+{"id":"len-emph","kind":{"$type":"Box","children":[{"id":"len-emph-row","kind":{"$type":"LabelValueRow","emphasis":true,"label":"Total","value":{"$type":"Static","value":42}},"style":{"emphasis":"Loud"}},{"id":"len-emph-fact","kind":{"$type":"Fact","emphasis":true,"label":"Status","value":"Open"}}],"layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Group"}}

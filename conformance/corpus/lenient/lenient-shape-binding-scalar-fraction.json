@@ -1,0 +1,1 @@
+{"id":"len-prog","kind":{"$type":"Progress","fraction":0.65,"indeterminate":{"$type":"Static","value":false},"label":{"$type":"Literal","text":"Overall completion"}}}

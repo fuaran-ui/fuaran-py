@@ -86,9 +86,16 @@ def test_update_prop() -> None:
 
 @corpus_required
 def test_replace_binding() -> None:
+    # 0.2.0 rename law — the Metric slot is `Value` (the corpus
+    # `op-replacebinding` fixture predates the rename and stays a codec-only
+    # artefact; the apply surface mirrors the reference slot vocabulary).
     base = node.bare(fuaran.dashboard("root", children=[_full_metric()]))
     expected = node.bare(fuaran.dashboard("root", children=[_full_metric(source=t.Static(99.5))]))
-    _assert_tree(_apply_fixture("op-replacebinding", base), expected)
+    op = Obj(
+        "ReplaceBinding",
+        {"binding": Obj("Static", {"value": 99.5}), "slot": "Value", "target": "metric-1"},
+    )
+    _assert_tree(apply(op, _decode_tree(base)), expected)
 
 
 @corpus_required
@@ -261,7 +268,9 @@ def test_batch_aborts_and_reverts() -> None:
     [
         "op-editnode",
         "op-updateprop",
-        "op-replacebinding",
+        # op-replacebinding is omitted: its `slot":"Source"` predates the 0.2.0
+        # rename law (Metric's binding slot is `Value` now) — the fixture stays
+        # a codec round-trip artefact, not an appliable op.
         "op-updatestyle",
         "op-updatestate",
         "op-removenode",

@@ -1,0 +1,1 @@
+{"id":"len-w-cs","kind":{"$type":"DataGrid","columns":[{"field":"running","kind":{"$type":"Text"},"label":"Running"}],"rowKeyField":"running","source":{"$type":"Transform","pipeline":[{"$type":"window","as":"running","fn":"cumSum","of":"salary","orderBy":[{"col":"salary","dir":"asc"}],"partitionBy":["dept"]}],"source":{"columns":{"dept":["ops","eng"],"salary":[100,200]}}}}}

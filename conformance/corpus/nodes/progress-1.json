@@ -1,1 +1,1 @@
-{"id":"progress-1","kind":{"$type":"Progress","fraction":{"$type":"Static","value":0.42},"indeterminate":false,"label":{"$type":"Literal","text":"Loading..."},"tone":"Brand"}}
+{"id":"progress-1","kind":{"$type":"Progress","fraction":{"$type":"Static","value":0.42},"label":"Loading...","tone":"Brand"}}

@@ -1,1 +1,1 @@
-{"id":"len-460-td","kind":{"$type":"Callout","body":{"$type":"Literal","text":"x"},"dismissable":false,"tone":"Critical"}}
+{"id":"len-460-td","kind":{"$type":"Callout","body":"x","tone":"Critical"}}

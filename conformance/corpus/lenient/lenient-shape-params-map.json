@@ -1,0 +1,1 @@
+{"id":"len-params","kind":{"$type":"DataGrid","columns":[],"editable":false,"rowKey":"<closure>","source":{"$type":"Transform","params":{"stockLevel":{"$type":"Filter","name":"stockLevel"},"warehouse":{"$type":"Filter","name":"warehouse"}},"pipeline":[],"source":{"columns":{"sku":{"validity":[true],"values":["A-1"]}},"schema":[{"name":"sku","type":"string"}]}}}}

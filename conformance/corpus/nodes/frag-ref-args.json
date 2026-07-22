@@ -1,1 +1,1 @@
-{"id":"frag-ref-args","kind":{"$type":"FragmentRef","args":{"content":{"$type":"SlotArg","tree":{"id":"slot-tree","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"Bound slot"}}}},"count":{"$type":"Int","value":7}},"name":"stat-card"}}
+{"id":"frag-ref-args","kind":{"$type":"FragmentRef","args":{"content":{"$type":"SlotArg","tree":{"id":"slot-tree","kind":{"$type":"Markdown","text":"Bound slot"}}},"count":{"$type":"Int","value":7}},"name":"stat-card"}}

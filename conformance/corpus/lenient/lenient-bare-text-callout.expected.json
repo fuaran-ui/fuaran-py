@@ -1,1 +1,1 @@
-{"id":"len-call","kind":{"$type":"Callout","body":{"$type":"Literal","text":"Check the numbers"},"dismissable":false,"heading":{"$type":"Literal","text":"Heads up"},"tone":"Warning"}}
+{"id":"len-call","kind":{"$type":"Callout","body":"Check the numbers","heading":"Heads up","tone":"Warning"}}

@@ -1,1 +1,1 @@
-{"id":"link-1","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"/about"},"label":{"$type":"Literal","text":"About us"},"rel":"noopener","target":"_blank"}}
+{"id":"link-1","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"/about"},"label":"About us","rel":"noopener","target":"_blank"}}

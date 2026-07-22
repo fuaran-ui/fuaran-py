@@ -249,8 +249,14 @@ class _Coerced:
 
 
 def _coerce_text_source(v: Value) -> _Coerced:
+    # 0.2.0 — the bare string IS the canonical Literal form; a `Literal`
+    # envelope normalises down to it (§16 op-value spelling).
     if isinstance(v, str):
-        return _Coerced(True, Obj("Literal", {"text": v}))
+        return _Coerced(True, v)
+    if isinstance(v, Obj) and v.tag == "Literal":
+        text = v.fields.get("text")
+        if isinstance(text, str):
+            return _Coerced(True, text)
     if isinstance(v, Obj) and v.tag in TEXT_SOURCE_CASES:
         return _Coerced(True, v)
     return _Coerced(False, detail="expected a string or TextSource")
@@ -324,7 +330,8 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
     # Display
     "Metric": {
         "Label": ("label", _coerce_text_source),
-        "Source": ("source", _coerce_binding_number),
+        # 0.2.0 rename law - the scalar displayed value is `Value`.
+        "Value": ("value", _coerce_binding_number),
         "Format": ("format", _coerce_cell_format),
         "Tone": ("tone", _coerce_enum(TONE)),
         "Weight": ("weight", _coerce_enum(WEIGHT)),
@@ -361,7 +368,8 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
     },
     "LabelValueRow": {
         "Label": ("label", _coerce_text_source),
-        "Source": ("source", _coerce_binding_number),
+        # 0.2.0 rename law - the scalar displayed value is `Value`.
+        "Value": ("value", _coerce_binding_number),
         "Format": ("format", _coerce_cell_format),
         "Emphasis": ("emphasis", _coerce_bool),
         "Help": ("help", _coerce_text_source),
@@ -678,11 +686,12 @@ def _update_nested(segs: list[_PathSeg], value: Value, kind: Obj) -> _NestedOutc
 
 # (kind tag, op slot) -> camelCase binding-bearing wire key.
 _BINDING_SLOTS: dict[tuple[str, str], str] = {
-    ("Metric", "Source"): "source",
+    # 0.2.0 rename law - Metric/LabelValueRow expose `Value` (never `Source`).
+    ("Metric", "Value"): "value",
     ("Metric", "Trend"): "trend",
     ("Sparkline", "Source"): "source",
     ("Progress", "Fraction"): "fraction",
-    ("LabelValueRow", "Source"): "source",
+    ("LabelValueRow", "Value"): "value",
     ("Stepper", "ActiveStep"): "activeStep",
     ("Button", "Disabled"): "disabled",
     ("Select", "Disabled"): "disabled",

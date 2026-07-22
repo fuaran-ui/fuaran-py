@@ -1,0 +1,1 @@
+{"id":"len-optshape","kind":{"$type":"Filters","items":[{"kind":{"$type":"Choice","options":{"$type":"Static","value":[{"label":"Pending","value":"Pending"},{"label":"In Review","value":"In Review"},{"label":"Approved","value":"Approved"}]}},"label":"Status","name":"status"}]}}

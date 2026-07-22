@@ -1,0 +1,1 @@
+{"id":"len-tf-b","kind":{"$type":"DataGrid","columns":[{"field":"dept","kind":{"$type":"Text"},"label":"Dept"}],"rowKeyField":"dept","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"amount":[100,200],"dept":["ops","eng"]}}}}}

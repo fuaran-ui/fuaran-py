@@ -1,1 +1,1 @@
-{"id":"len-nul","kind":{"$type":"Select","label":{"$type":"Literal","text":"Region"},"source":{"$type":"Static","value":[]},"value":{"$type":"Static","value":null}}}
+{"id":"len-nul","kind":{"$type":"Select","label":"Region","source":{"$type":"Static","value":[]},"value":{"$type":"Static","value":null}}}

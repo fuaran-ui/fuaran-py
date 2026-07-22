@@ -1,1 +1,1 @@
-{"id":"len-url","kind":{"$type":"Button","label":{"$type":"Literal","text":"Refresh"},"onClick":{"$type":"Call","endpoint":"/api/refresh"},"variant":"Primary"}}
+{"id":"len-url","kind":{"$type":"Button","label":"Refresh","onClick":{"$type":"Call","endpoint":"/api/refresh"},"variant":"Primary"}}

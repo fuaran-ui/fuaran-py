@@ -1,1 +1,1 @@
-{"$payload":{"id":"m1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}},"$profile":"music@1.0"}
+{"$payload":{"id":"m1","kind":{"$type":"Markdown","text":"hi"}},"$profile":"music@1.0"}

@@ -187,57 +187,64 @@
     "TextSource": {
       "oneOf": [
         {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "Literal"
-            },
-            "text": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "$type",
-            "text"
-          ]
+          "type": "string"
         },
         {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "Bound"
-            },
-            "binding": {
-              "$ref": "#/$defs/Binding"
-            }
-          },
-          "required": [
-            "$type",
-            "binding"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "I18n"
-            },
-            "args": {
+          "oneOf": [
+            {
               "type": "object",
-              "additionalProperties": {
-                "not": {
-                  "type": "null"
+              "properties": {
+                "$type": {
+                  "const": "Literal"
+                },
+                "text": {
+                  "type": "string"
                 }
-              }
+              },
+              "required": [
+                "$type",
+                "text"
+              ]
             },
-            "key": {
-              "type": "string"
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Bound"
+                },
+                "binding": {
+                  "$ref": "#/$defs/Binding"
+                }
+              },
+              "required": [
+                "$type",
+                "binding"
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "I18n"
+                },
+                "args": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "not": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "key": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "$type",
+                "args",
+                "key"
+              ]
             }
-          },
-          "required": [
-            "$type",
-            "args",
-            "key"
           ]
         }
       ]
@@ -263,9 +270,6 @@
             "$type": {
               "const": "Query"
             },
-            "accessor": {
-              "const": "<closure>"
-            },
             "dependsOn": {
               "type": "array",
               "items": {
@@ -278,7 +282,6 @@
           },
           "required": [
             "$type",
-            "accessor",
             "name"
           ]
         },
@@ -288,6 +291,7 @@
             "$type": {
               "const": "Filter"
             },
+            "defaultValue": true,
             "name": {
               "type": "string"
             }
@@ -303,8 +307,9 @@
             "$type": {
               "const": "Selection"
             },
-            "accessor": {
-              "const": "<closure>"
+            "defaultValue": true,
+            "field": {
+              "type": "string"
             },
             "nodeId": {
               "type": "string"
@@ -312,7 +317,6 @@
           },
           "required": [
             "$type",
-            "accessor",
             "nodeId"
           ]
         },
@@ -578,14 +582,10 @@
           "properties": {
             "$type": {
               "const": "Dispatch"
-            },
-            "msg": {
-              "const": "<closure>"
             }
           },
           "required": [
-            "$type",
-            "msg"
+            "$type"
           ]
         },
         {
@@ -1128,8 +1128,7 @@
             }
           },
           "required": [
-            "$type",
-            "value"
+            "$type"
           ]
         },
         {
@@ -1146,8 +1145,31 @@
             }
           },
           "required": [
-            "$type",
-            "value"
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Range"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": true,
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type"
           ]
         },
         {
@@ -1164,8 +1186,7 @@
             }
           },
           "required": [
-            "$type",
-            "value"
+            "$type"
           ]
         },
         {
@@ -1186,8 +1207,7 @@
           },
           "required": [
             "$type",
-            "options",
-            "value"
+            "options"
           ]
         },
         {
@@ -1213,8 +1233,7 @@
             }
           },
           "required": [
-            "$type",
-            "value"
+            "$type"
           ]
         },
         {
@@ -1239,8 +1258,7 @@
           "required": [
             "$type",
             "options",
-            "orientation",
-            "value"
+            "orientation"
           ]
         },
         {
@@ -1261,8 +1279,7 @@
           },
           "required": [
             "$type",
-            "rows",
-            "value"
+            "rows"
           ]
         },
         {
@@ -1292,115 +1309,7 @@
           },
           "required": [
             "$type",
-            "value",
             "variant"
-          ]
-        }
-      ]
-    },
-    "FilterKind": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "TextFilter"
-            },
-            "onChange": {
-              "const": "<closure>"
-            },
-            "value": {
-              "$ref": "#/$defs/Binding"
-            }
-          },
-          "required": [
-            "$type",
-            "value"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "ChoiceFilter"
-            },
-            "onChange": {
-              "const": "<closure>"
-            },
-            "options": {
-              "$ref": "#/$defs/Binding"
-            },
-            "value": {
-              "$ref": "#/$defs/Binding"
-            }
-          },
-          "required": [
-            "$type",
-            "options",
-            "value"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "RangeFilter"
-            },
-            "onChange": {
-              "const": "<closure>"
-            },
-            "value": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "properties": {
-                    "min": {
-                      "type": "number"
-                    },
-                    "max": {
-                      "type": "number"
-                    }
-                  },
-                  "required": [
-                    "max",
-                    "min"
-                  ]
-                },
-                {
-                  "const": "<opaque>"
-                }
-              ]
-            }
-          },
-          "required": [
-            "$type",
-            "value"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "SegmentedFilter"
-            },
-            "onChange": {
-              "const": "<closure>"
-            },
-            "options": {
-              "$ref": "#/$defs/Binding"
-            },
-            "orientation": {
-              "$ref": "#/$defs/Orientation"
-            },
-            "value": {
-              "$ref": "#/$defs/Binding"
-            }
-          },
-          "required": [
-            "$type",
-            "options",
-            "orientation",
-            "value"
           ]
         }
       ]
@@ -1609,7 +1518,7 @@
         "label": {
           "$ref": "#/$defs/TextSource"
         },
-        "source": {
+        "value": {
           "$ref": "#/$defs/Binding"
         },
         "tone": {
@@ -1633,7 +1542,7 @@
       },
       "required": [
         "label",
-        "source"
+        "value"
       ]
     },
     "HeadingSpec": {
@@ -1760,7 +1669,6 @@
         }
       },
       "required": [
-        "dismissable",
         "message",
         "open"
       ]
@@ -1852,8 +1760,7 @@
         }
       },
       "required": [
-        "body",
-        "dismissable"
+        "body"
       ]
     },
     "ProgressSpec": {
@@ -1876,8 +1783,7 @@
         }
       },
       "required": [
-        "fraction",
-        "indeterminate"
+        "fraction"
       ]
     },
     "LabelValueRowSpec": {
@@ -1892,7 +1798,7 @@
         "label": {
           "$ref": "#/$defs/TextSource"
         },
-        "source": {
+        "value": {
           "$ref": "#/$defs/Binding"
         },
         "help": {
@@ -1900,9 +1806,35 @@
         }
       },
       "required": [
-        "emphasis",
         "label",
-        "source"
+        "value"
+      ]
+    },
+    "FactSpec": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "value": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "emphasis": {
+          "type": "boolean"
+        },
+        "help": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "value"
       ]
     },
     "ViewBox": {
@@ -1976,6 +1908,9 @@
           "$ref": "#/$defs/Emphasis"
         },
         "fontFamily": {
+          "type": "string"
+        },
+        "markId": {
           "type": "string"
         }
       }
@@ -2507,6 +2442,24 @@
               "type": "object",
               "properties": {
                 "$type": {
+                  "const": "Fact"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/FactSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
                   "const": "Link"
                 }
               },
@@ -2699,7 +2652,7 @@
       "type": "object",
       "properties": {
         "kind": {
-          "$ref": "#/$defs/FilterKind"
+          "$ref": "#/$defs/FormFieldKind"
         },
         "label": {
           "$ref": "#/$defs/TextSource"
@@ -2977,7 +2930,6 @@
       },
       "required": [
         "columns",
-        "editable",
         "source"
       ]
     },
@@ -3309,8 +3261,7 @@
         }
       },
       "required": [
-        "children",
-        "orientation"
+        "children"
       ]
     },
     "StepperSpec": {

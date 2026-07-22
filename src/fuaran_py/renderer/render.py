@@ -458,7 +458,8 @@ class Renderer:
         return element("div", [("class", "fuaran-markdown")], html)
 
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:
-        value = resolve_binding(fields.get("source"), self.sources)
+        # 0.2.0 rename law — the scalar displayed value is `value`.
+        value = resolve_binding(fields.get("value"), self.sources)
         if value is None:
             loading = self._state_loading(node)
             if loading is not None:
@@ -521,7 +522,8 @@ class Renderer:
 
     def _label_value_row(self, node: Node, fields: dict[str, Value]) -> str:
         emphasis = " fuaran-label-value-row-emphasis" if fields.get("emphasis") is True else ""
-        value = resolve_binding(fields.get("source"), self.sources)
+        # 0.2.0 rename law — the scalar displayed value is `value`.
+        value = resolve_binding(fields.get("value"), self.sources)
         value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
         label = text_element("span", [("class", "fuaran-label-value-row-label")], self._text(fields.get("label")))
         val = text_element("span", [("class", "fuaran-label-value-row-value")], value_text)

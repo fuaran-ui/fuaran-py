@@ -399,10 +399,10 @@ def test_ergonomic_coercions() -> None:
     assert md.kind.text == t.LiteralText("hello")
 
     lvr = fuaran.label_value_row("lvr", label="Net", value=10)
-    assert lvr.kind.source == t.Static(10)  # type: ignore[union-attr]
+    assert lvr.kind.value == t.Static(10)  # type: ignore[union-attr]
 
     metric = fuaran.metric("m", label="Sales", value="£42k")
-    assert metric.kind.source == t.Static(42.0)  # type: ignore[union-attr]
+    assert metric.kind.value == t.Static(42.0)  # type: ignore[union-attr]
 
 
 def test_aria_bearing_node_encodes_canonically() -> None:

@@ -1,1 +1,1 @@
-{"id":"image-1","kind":{"$type":"Image","alt":{"$type":"Literal","text":"User avatar"},"src":{"$type":"Static","value":"/avatar.png"},"variant":"Avatar"}}
+{"id":"image-1","kind":{"$type":"Image","alt":"User avatar","src":{"$type":"Static","value":"/avatar.png"},"variant":"Avatar"}}

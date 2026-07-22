@@ -80,11 +80,14 @@ def test_missing_profile_and_payload() -> None:
 
 
 def test_current_round_trip_via_constructed_envelope() -> None:
+    # 0.2.0 — the Literal envelope stays decode-accepted and normalises to the
+    # bare-string canonical form on re-encode.
     src = (
         '{"$payload":{"id":"m1","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}},'
         '"$profile":"core@1.0"}'
     )
+    canonical = '{"$payload":{"id":"m1","kind":{"$type":"Markdown","text":"hi"}},"$profile":"core@1.0"}'
     result = decode_envelope(src)
     assert result.ok and result.value.negotiation == CURRENT
     assert isinstance(result.value, Envelope)
-    assert encode_envelope(result.value) == src
+    assert encode_envelope(result.value) == canonical

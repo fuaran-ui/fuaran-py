@@ -1,1 +1,1 @@
-{"id":"upload-1","kind":{"$type":"FileUpload","accept":[".csv","text/csv"],"disabled":{"$type":"State","defaultValue":false,"key":"uploadBusy"},"label":{"$type":"Literal","text":"Upload CSV"},"multiple":false,"onSelect":"<closure>"}}
+{"id":"upload-1","kind":{"$type":"FileUpload","accept":[".csv","text/csv"],"disabled":{"$type":"State","defaultValue":false,"key":"uploadBusy"},"label":"Upload CSV","multiple":false,"onSelect":"<closure>"}}

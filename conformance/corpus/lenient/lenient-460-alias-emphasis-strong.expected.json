@@ -1,1 +1,1 @@
-{"id":"len-460-es","kind":{"$type":"Metric","emphasis":"Loud","label":{"$type":"Literal","text":"R"},"source":{"$type":"Static","value":1}}}
+{"id":"len-460-es","kind":{"$type":"Metric","emphasis":"Loud","label":"R","value":{"$type":"Static","value":1}}}

@@ -438,7 +438,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     ) -> UiNode:
         kind = t.Metric(
             label=_text(label),
-            source=_metric_value(value),
+            value=_metric_value(value),
             format=format if format is not None else t.FormatNone(),
             tone=tone,
             weight=weight,
@@ -462,7 +462,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     ) -> UiNode:
         kind = t.LabelValueRow(
             label=_text(label),
-            source=_num_binding(value),
+            value=_num_binding(value),
             format=format if format is not None else t.FormatNone(),
             emphasis=emphasis,
             help=_text(help) if help is not None else None,
@@ -515,7 +515,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         message: t.TextInput,
         open: Binding | bool = False,  # noqa: A002
         tone: t.Tone = "Default",
-        dismissable: bool = False,
+        dismissable: bool = True,
     ) -> UiNode:
         op = t.Static(open) if isinstance(open, bool) else open
         return _node(id, t.Toast(_text(message), op, tone, dismissable), accessibility.toast)

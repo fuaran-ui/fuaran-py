@@ -48,6 +48,18 @@ def _fail(code: str, path: str, message: str, expected: str | None = None) -> No
 # ── Primitive expectations ─────────────────────────────────────────────────
 
 
+def _unwrap_static_envelope(value: object) -> object:
+    """Lenient AI-ingest (WIRE_FORMAT §3.6, generalised): a ``Static`` envelope
+    wrapped around a PLAIN scalar unwraps before the scalar readers — the
+    inverse of the bare-scalar-in-Binding-slot confusion, applied at every
+    plain-scalar position in one place (mirrors the F# ``unwrapStaticEnvelope``).
+    Objects that are not a well-formed Static envelope pass through untouched
+    and fail with the normal error."""
+    if isinstance(value, dict) and value.get("$type") == "Static" and "value" in value:
+        return value["value"]
+    return value
+
+
 def _expect_object(value: object, path: str) -> dict:
     if not isinstance(value, dict):
         _fail(WRONG_TYPE, path, f"expected an object at {path}")
@@ -55,18 +67,21 @@ def _expect_object(value: object, path: str) -> dict:
 
 
 def _expect_string(value: object, path: str) -> str:
+    value = _unwrap_static_envelope(value)
     if not isinstance(value, str):
         _fail(WRONG_TYPE, path, f"expected a string at {path}")
     return value  # type: ignore[return-value]
 
 
 def _expect_int(value: object, path: str) -> int:
+    value = _unwrap_static_envelope(value)
     if isinstance(value, bool) or not isinstance(value, int):
         _fail(WRONG_TYPE, path, f"expected an integer at {path}")
     return value  # type: ignore[return-value]
 
 
 def _expect_bool(value: object, path: str) -> bool:
+    value = _unwrap_static_envelope(value)
     if not isinstance(value, bool):
         _fail(WRONG_TYPE, path, f"expected a boolean at {path}")
     return value  # type: ignore[return-value]
@@ -169,6 +184,15 @@ BADGE_VARIANT_ALIASES = {"Default": "Neutral", "Danger": "Critical"}
 BUTTON_VARIANT_ALIASES = {"Danger": "Destructive"}
 ORIENTATION_ALIASES = {"Row": "Horizontal", "row": "Horizontal", "Column": "Vertical", "column": "Vertical"}
 
+# 0.2.0 cross-vocabulary coercion (2026-07-19 sweep, both directions): the
+# `emphasis` name collides across two vocabularies — the style ENUM
+# (Quiet|Normal|Loud) on SemanticStyle/Metric and the behavioural BOOL on
+# Fact/LabelValueRow. A bool in the enum slot projects one-to-one
+# (true ⇒ Loud, false ⇒ Normal); the enum (and its §3.6 aliases) in the bool
+# slot projects Loud/Strong/Bold ⇒ true, Normal/Quiet/Subtle/Muted ⇒ false.
+_EMPHASIS_TRUE = frozenset({"Loud", "Strong", "Bold"})
+_EMPHASIS_FALSE = frozenset({"Normal", "Quiet", "Subtle", "Muted"})
+
 TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
 # The Compute-layer binding cases are recognised so a data-bound node's source round-trips
 # byte-exactly: ``Transform`` (the dataframe-pipeline source) + the ``Data`` embedded-source
@@ -217,6 +241,7 @@ KNOWN_KINDS = frozenset(
         "Heading",
         "Markdown",
         "Metric",
+        "Fact",
         "Badge",
         "Sparkline",
         "Callout",
@@ -256,38 +281,45 @@ KNOWN_KINDS = frozenset(
 
 
 def _decode_text_source(value: object, path: str) -> Value:
-    # §16.1 lenient shorthand (WIRE_FORMAT §16, normative — MUST accept): a bare
-    # JSON string in any TextSource position IS TextSource.Literal. It decodes to
-    # exactly the value the verbose form denotes and re-encodes to the verbose
-    # canonical bytes (the corpus lenient-accept family asserts this).
+    # 0.2.0 — the bare JSON string IS the canonical `TextSource.Literal` form;
+    # the `{"$type":"Literal","text":…}` envelope stays decode-accepted (§16)
+    # and normalises down to the bare string on re-encode.
     if isinstance(value, str):
-        return Obj("Literal", {"text": value})
+        return value
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, TEXT_SOURCE_CASES)
     if tag == "Literal":
-        text = _expect_string(_require(obj, "text", path), f"{path}.text")
-        return Obj("Literal", {"text": text})
+        return _expect_string(_require(obj, "text", path), f"{path}.text")
     if tag == "I18n":
         # I18n args are structured JVal positions (rule 12: no null) — the
         # structural pass-through goes null-strict, rejecting at the null's
         # exact path (`$.….args.<name>`), byte-behaviour otherwise unchanged.
         return _from_json_strict(value, path)
-    # Bound: structural (validated discriminator). NOT null-strict — a Bound
-    # binding may carry a Static whose obj-erased value is null (the deliberate
-    # §5 opaque-seam exception, mirrored by every host).
-    return from_json(value)
+    # Bound — decode the wrapped binding so it picks up the same normalisation
+    # (accessor sentinels dropped, aliases folded) as any bare-Binding slot.
+    # NOT null-strict — a Bound binding may carry a Static whose obj-erased
+    # value is null (the deliberate §5 opaque-seam exception).
+    binding = _decode_binding(_require(obj, "binding", path), f"{path}.binding")
+    return Obj("Bound", {"binding": binding})
 
 
 def _decode_binding(value: object, path: str) -> Value:
+    # §3.6 lenient shape coercion: a bare JSON array or scalar where a Binding
+    # is expected is `Static` with that value (every Binding case is a
+    # `$type`-discriminated object, so an array/scalar can only mean Static).
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": from_json(value)})
     obj = _expect_object(value, path)
-    tag = _dispatch(obj, path, BINDING_CASES)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
     if tag == "Static":
         if "value" not in obj:
             _fail(MISSING_FIELD, f"{path}.value", "Static binding missing value")
         return Obj("Static", {"value": from_json(obj["value"])})
-    # Other binding cases: structural (validated discriminator) + the §3.6
-    # Query/State field-name aliases.
-    return _normalise_binding_obj(value)
+    if tag == "Bound":
+        # Phase 633 — the `TextSource.Bound` wrapper convention transferred to a
+        # bare-Binding slot unwraps one-to-one: decode the inner binding in place.
+        return _decode_binding(_require(obj, "binding", path), f"{path}.binding")
+    return _normalise_binding_obj(obj, path)
 
 
 # ── Typed Binding.Static positions (WIRE_FORMAT.md §"Typed Static payloads", Phase 429) ─
@@ -318,11 +350,14 @@ def _typed_static_binding(
     """Decode a ``Binding`` whose ``Static`` payload is a typed position.
 
     ``Static`` normalises per the three input forms (typed / ``"<opaque>"`` /
-    ``null``); every other binding case passes through structurally (validated
-    discriminator), exactly as :func:`_decode_binding`.
+    ``null``); a bare array/scalar coerces to ``Static`` (§3.6) and a ``Bound``
+    wrapper unwraps (Phase 633); every other binding case passes through
+    structurally (validated discriminator), exactly as :func:`_decode_binding`.
     """
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": on_typed(value, path)})
     obj = _expect_object(value, path)
-    tag = _dispatch(obj, path, BINDING_CASES)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
     if tag == "Static":
         if "value" not in obj:
             _fail(MISSING_FIELD, f"{path}.value", "Static binding missing value")
@@ -334,11 +369,18 @@ def _typed_static_binding(
         else:
             normalised = on_typed(raw, f"{path}.value")
         return Obj("Static", {"value": normalised})
-    return _normalise_binding_obj(value)
+    if tag == "Bound":
+        return _typed_static_binding(_require(obj, "binding", path), f"{path}.binding", on_typed, on_opaque, on_null)
+    return _normalise_binding_obj(obj, path)
 
 
 def _decode_select_option(value: object, path: str) -> Value:
-    """A single SelectOption record: ``{"label":<TextSource>,"value":"<str>"}``."""
+    """A single SelectOption record: ``{"label":<TextSource>,"value":"<str>"}``.
+
+    §3.6 lenient shape coercion: a bare JSON string ``"A"`` is the HTML
+    ``<select>`` prior and coerces to ``{"label":"A","value":"A"}``."""
+    if isinstance(value, str):
+        return Obj(None, {"label": value, "value": value})
     obj = _expect_object(value, path)
     label = _decode_text_source(_require(obj, "label", path), f"{path}.label")
     opt_value = _expect_string(_require(obj, "value", path), f"{path}.value")
@@ -352,7 +394,7 @@ def _decode_select_option_array(value: object, path: str) -> Value:
 
 def _decode_binding_select_options(value: object, path: str) -> Value:
     # `<opaque>` → a tagged one-element placeholder; `null` → the empty typed array.
-    opaque_placeholder = Arr([Obj(None, {"label": Obj("Literal", {"text": OPAQUE}), "value": OPAQUE})])
+    opaque_placeholder = Arr([Obj(None, {"label": OPAQUE, "value": OPAQUE})])
     return _typed_static_binding(value, path, _decode_select_option_array, opaque_placeholder, Arr([]))
 
 
@@ -522,6 +564,57 @@ def _omit_default_format(value: object, path: str) -> object:
     return _DROP if isinstance(v, Obj) and v.tag == "None" else v
 
 
+def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
+    """0.2.0 behavioural omit-when-default: the flag is omitted at its default
+    on BOTH boundaries (`Toast.dismissable` is the one omit-when-TRUE)."""
+
+    def dec(value: object, path: str) -> object:
+        b = _expect_bool(value, path)
+        return _DROP if b == default else b
+
+    return dec
+
+
+def _decode_emphasis_enum(value: object, path: str) -> str:
+    """The `Emphasis` style ENUM, with the §3.6 aliases and the cross-vocabulary
+    bool projection (true ⇒ Loud, false ⇒ Normal)."""
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, bool):
+        return "Loud" if value else "Normal"
+    return _enum_aliased(value, path, EMPHASIS, EMPHASIS_ALIASES, "emphasis")
+
+
+def _omit_default_emphasis_enum(value: object, path: str) -> object:
+    v = _decode_emphasis_enum(value, path)
+    return _DROP if v == "Normal" else v
+
+
+def _decode_emphasis_flag(value: object, path: str) -> object:
+    """The behavioural `emphasis` BOOL (Fact / LabelValueRow) — the other half
+    of the same-name collision with the `Emphasis` style enum: booleans pass
+    through; the enum AND its aliases project one-to-one; any other string is
+    the didactic reject naming both vocabularies. 0.2.2 — omitted-when-false."""
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, str):
+        if value in _EMPHASIS_TRUE:
+            b = True
+        elif value in _EMPHASIS_FALSE:
+            b = False
+        else:
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected JSON boolean, got '{value}' — this `emphasis` is a BOOL (is this an "
+                "emphasised row/fact?); the Emphasis style enum (Quiet|Normal|Loud) lives on "
+                "style/Metric.emphasis. Write true or false",
+                "JSON boolean",
+            )
+            raise AssertionError("unreachable")
+    else:
+        b = _expect_bool(value, path)
+    return _DROP if not b else True
+
+
 def _omit_default_width(value: object, path: str) -> object:
     # ColumnWidth is a closed `$type` DU; `Auto` is the identity. Non-Auto widths
     # pass through structurally (validated discriminator).
@@ -544,28 +637,110 @@ def _alias_get(obj: dict, canonical: str, aliases: tuple[str, ...]) -> tuple[obj
     return None, False
 
 
-def _normalise_binding_obj(value: object) -> Value:
-    """Decode-only field aliases for Query / State bindings (WIRE_FORMAT §3.6).
+def _normalise_binding_obj(obj: dict, path: str) -> Value:
+    """Normalise a non-``Static`` binding case to its 0.2.0 canonical shape.
 
-    Query: ``dependsOn`` ← ``deps`` / ``dependencies``. State: ``defaultValue`` ←
-    ``initialValue`` / ``default``. The canonical name wins. Every other binding
-    case passes through structurally (validated discriminator upstream)."""
-    if not isinstance(value, dict):
-        return from_json(value)
-    tag = value.get("$type")
-    if tag == "Query" and "dependsOn" not in value:
-        for a in ("deps", "dependencies"):
-            if a in value:
-                d = dict(value)
-                d["dependsOn"] = d.pop(a)
-                return from_json(d)
-    elif tag == "State" and "defaultValue" not in value:
-        for a in ("initialValue", "default"):
-            if a in value:
-                d = dict(value)
-                d["defaultValue"] = d.pop(a)
-                return from_json(d)
-    return from_json(value)
+    Query: ``dependsOn`` ← ``deps`` / ``dependencies`` (§3.6), omitted when
+    empty; the retired ``accessor`` sentinel is dropped (0.2.0). Selection:
+    ``accessor`` dropped; ``defaultValue`` (0.2.9) + ``field`` (Phase 632)
+    preserved. State: ``defaultValue`` ← ``initialValue`` / ``default``.
+    Transform: ``params`` map form coerces to the canonical ``[{from,name}]``
+    array (name-keyed set, §3.6), ``value`` aliases ``from`` at the element,
+    and the embedded source + pipeline normalise through the columnar codec.
+    Everything else passes through structurally (validated discriminator)."""
+    tag = obj.get("$type")
+    if not isinstance(tag, str):
+        return from_json(obj)
+    if tag == "Query":
+        name = _expect_string(_require(obj, "name", path), f"{path}.name")
+        fields: dict[str, Value] = {}
+        depends_raw, depends_present = _alias_get(obj, "dependsOn", ("deps", "dependencies"))
+        if depends_present:
+            arr = _expect_array(depends_raw, f"{path}.dependsOn")
+            if arr:
+                fields["dependsOn"] = Arr([_expect_string(d, f"{path}.dependsOn[{i}]") for i, d in enumerate(arr)])
+        fields["name"] = name
+        return Obj("Query", fields)
+    if tag == "Selection":
+        node_id = _expect_string(_require(obj, "nodeId", path), f"{path}.nodeId")
+        fields = {}
+        if "defaultValue" in obj:
+            fields["defaultValue"] = from_json(obj["defaultValue"])
+        if "field" in obj:
+            fields["field"] = _expect_string(obj["field"], f"{path}.field")
+        fields["nodeId"] = node_id
+        return Obj("Selection", fields)
+    if tag == "State":
+        key = _expect_string(_require(obj, "key", path), f"{path}.key")
+        fields = {}
+        default_raw, default_present = _alias_get(obj, "defaultValue", ("initialValue", "default"))
+        if default_present:
+            fields["defaultValue"] = from_json(default_raw)
+        fields["key"] = key
+        return Obj("State", fields)
+    if tag == "Transform":
+        return _decode_transform_binding(obj, path)
+    return from_json(obj)
+
+
+def _decode_transform_binding(obj: dict, path: str) -> Value:
+    """The `Binding.Transform` case (Phase 282/424): `source` + `pipeline`
+    normalise through the columnar codec (`fuaran_py.dataframe`), which owns the
+    lenient columnar/expression ingest; `params` carries the §3.6 map coercion +
+    the `value` ← `from` element alias."""
+    source_raw = _require(obj, "source", path)
+    pipeline_raw = _require(obj, "pipeline", path)
+    source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
+    fields: dict[str, Value] = {}
+    if "params" in obj:
+        raw_params = obj["params"]
+        entries: list[Value] = []
+        if isinstance(raw_params, dict):
+            # Map form — a name-keyed set, coerced to the canonical array in
+            # key order (deterministic: F# Map.toList is key-sorted).
+            for name in sorted(raw_params):
+                binding = _decode_binding(raw_params[name], f"{path}.params.{name}.from")
+                entries.append(Obj(None, {"from": binding, "name": name}))
+        else:
+            arr = _expect_array(raw_params, f"{path}.params")
+            for i, el in enumerate(arr):
+                el_obj = _expect_object(el, f"{path}.params[{i}]")
+                name = _expect_string(_require(el_obj, "name", f"{path}.params[{i}]"), f"{path}.params[{i}].name")
+                from_raw, from_present = _alias_get(el_obj, "from", ("value",))
+                if not from_present:
+                    _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
+                binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
+                entries.append(Obj(None, {"from": binding, "name": name}))
+        if entries:
+            fields["params"] = Arr(entries)
+    fields["pipeline"] = pipeline
+    fields["source"] = source
+    return Obj("Transform", fields)
+
+
+def _normalise_transform_payload(source_raw: object, pipeline_raw: object, path: str) -> tuple[Value, Value]:
+    """Round the Transform `source` + `pipeline` sub-trees through the typed
+    columnar codec so lenient columnar/expression input re-encodes canonical.
+    The codec owns the lenient ingest (schemaless inference, bare-array
+    columns, flat predicate spellings, step aliases, …)."""
+    from ..dataframe.codec import (
+        decode_pipeline_json,
+        decode_source_json,
+        encode_source_value,
+        encode_transform_value,
+    )
+
+    src_result = decode_source_json(source_raw)
+    if not src_result.ok:
+        _fail(WRONG_TYPE, f"{path}.source", f"{src_result.error.code}: {src_result.error.detail}")
+        raise AssertionError("unreachable")
+    pipe_result = decode_pipeline_json(pipeline_raw)
+    if not pipe_result.ok:
+        _fail(WRONG_TYPE, f"{path}.pipeline", f"{pipe_result.error.code}: {pipe_result.error.detail}")
+        raise AssertionError("unreachable")
+    source = encode_source_value(src_result.value)
+    pipeline = Arr([encode_transform_value(t) for t in pipe_result.value])
+    return source, pipeline
 
 
 def _decode_children(value: object, path: str) -> Value:
@@ -636,6 +811,16 @@ def _decode_action(value: object, path: str) -> Value:
                 obj = {**obj, "route": obj[a]}
                 del obj[a]
                 break
+    elif tag == "Dispatch" and "msg" in obj:
+        # 0.2.0 — the `msg` closure sentinel is off the wire (no decoder ever
+        # read it); a pre-0.2.0 input normalises to the bare `{"$type":"Dispatch"}`.
+        obj = {k: v for k, v in obj.items() if k != "msg"}
+    elif tag == "Chain":
+        # Recurse so nested actions pick up the same normalisation.
+        ops_arr = _expect_array(_require(obj, "ops", path), f"{path}.ops")
+        decoded_ops = Arr([_decode_action(o, f"{path}.ops[{i}]") for i, o in enumerate(ops_arr)])
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "ops")}
+        return Obj("Chain", {"ops": decoded_ops, **rest})
     # Structural (validated discriminator) but NULL-STRICT: the action payload
     # positions (SetState.value / Notify.payload / AiTool.args) are structured
     # JVal positions per rule 12, and no action case carries a §5 opaque seam —
@@ -647,6 +832,7 @@ def _decode_action(value: object, path: str) -> Value:
 def _decode_number(value: object, path: str) -> Value:
     # A JSON number — an ``int`` or ``float`` (e.g. Date.step in seconds). bool is an
     # int subclass; reject it as it is never a numeric value here.
+    value = _unwrap_static_envelope(value)
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(WRONG_TYPE, path, f"expected a number at {path}")
     return value  # type: ignore[return-value]
@@ -837,6 +1023,14 @@ def _decode_shape_array(value: object, path: str) -> Value:
 # (an `object`) for a Phase 460 omit-when-default field. An optional 4th tuple
 # element lists the field's decode-only name aliases (WIRE_FORMAT §3.6).
 
+# 0.2.0 rename law — retired names are a clean break: not aliased, not
+# preserved (`Metric.source` / `LabelValueRow.source`; `source` is reserved
+# for collection feeds).
+_RETIRED_FIELDS: dict[str, frozenset[str]] = {
+    "Metric": frozenset({"source"}),
+    "LabelValueRow": frozenset({"source"}),
+}
+
 FieldDecoder = Callable[[object, str], object]
 SchemaEntry = tuple[str, bool, FieldDecoder] | tuple[str, bool, FieldDecoder, tuple[str, ...]]
 
@@ -857,13 +1051,14 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     "Markdown": [
         ("text", True, _decode_text_source),
     ],
-    # Phase 460 — `format` / `tone` / `weight` / `emphasis` are omitted-when-default;
-    # `source` aliases `value` / `data` (WIRE_FORMAT §3.6).
+    # Phase 460 — `format` / `tone` / `weight` / `emphasis` are omitted-when-default.
+    # 0.2.0 rename law (clean break): the scalar displayed value is `value`
+    # (`data` stays a web-prior alias); the retired `source` is NOT accepted.
     "Metric": [
-        ("emphasis", False, _omit_default_enum(EMPHASIS, EMPHASIS_ALIASES, "Normal", "emphasis")),
+        ("emphasis", False, _omit_default_emphasis_enum),
         ("format", False, _omit_default_format),
         ("label", True, _decode_text_source),
-        ("source", True, _decode_binding, ("value", "data")),
+        ("value", True, _decode_binding, ("data",)),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
         ("weight", False, _omit_default_enum(WEIGHT, {}, "Standard", "weight")),
         ("icon", False, _decode_string),
@@ -871,20 +1066,34 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("trend", False, _decode_binding),
         ("trendFormat", False, _decode_cell_format),
     ],
+    # The labeled TEXT fact (2026-07-17) — Metric's complementary kind: only
+    # `label` + `value` required; `tone` / `emphasis` omitted-when-default on
+    # BOTH boundaries; optional `help` / `icon`. `emphasis` is the behavioural
+    # BOOL (cross-vocab coercion via `_decode_emphasis_flag`).
+    "Fact": [
+        ("emphasis", False, _decode_emphasis_flag),
+        ("help", False, _decode_text_source),
+        ("icon", False, _decode_string),
+        ("label", True, _decode_text_source),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+        ("value", True, _decode_text_source),
+    ],
     "Badge": [
         ("label", True, _decode_text_source),
         ("variant", True, _enum_aliased_decoder(BADGE_VARIANT, BADGE_VARIANT_ALIASES, "variant")),
     ],
     "Callout": [
         ("body", True, _decode_text_source),
-        ("dismissable", True, _decode_bool),
+        # 0.2.0 — omitted-when-false on both boundaries.
+        ("dismissable", False, _omit_default_bool(False)),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
         ("heading", False, _decode_text_source, ("title",)),
         ("icon", False, _decode_string),
     ],
     "Progress": [
         ("fraction", True, _decode_binding),
-        ("indeterminate", True, _decode_bool),
+        # 0.2.0 — omitted-when-false on both boundaries.
+        ("indeterminate", False, _omit_default_bool(False)),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
         ("label", False, _decode_text_source),
         ("caveat", False, _decode_text_source),
@@ -903,12 +1112,13 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("source", True, _decode_binding_marker_seq, ("data", "markers")),
     ],
     "LabelValueRow": [
-        # `emphasis` here is a behavioural bool (not the Emphasis style DU) — stays
-        # required. `format` omitted-when-default; `source` aliases `value` / `data`.
-        ("emphasis", True, _decode_bool),
+        # `emphasis` is the behavioural bool (cross-vocab coerced) — 0.2.2:
+        # omitted-when-false. `format` omitted-when-default. 0.2.0 rename law:
+        # the scalar value is `value` (`data` alias; retired `source` NOT accepted).
+        ("emphasis", False, _decode_emphasis_flag),
         ("format", False, _omit_default_format),
         ("label", True, _decode_text_source),
-        ("source", True, _decode_binding, ("value", "data")),
+        ("value", True, _decode_binding, ("data",)),
         ("help", False, _decode_text_source),
     ],
     "Link": [
@@ -928,7 +1138,8 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("ordered", True, _decode_bool),
     ],
     "Toast": [
-        ("dismissable", True, _decode_bool),
+        # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
+        ("dismissable", False, _omit_default_bool(True)),
         ("message", True, _decode_text_source),
         ("open", True, _decode_binding),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
@@ -1062,9 +1273,15 @@ def _decode_box_layout(value: object, path: str) -> Obj:
     if tag == "Grid":
         # `cols` aliases `columns` (§3.6).
         cols_raw, cols_present = _alias_get(obj, "cols", ("columns",))
-        if not cols_present:
-            _fail(MISSING_FIELD, f"{path}.cols", "missing required field 'cols'")
-        gfields: dict[str, Value] = {"cols": _expect_int(cols_raw, f"{path}.cols")}
+        if not cols_present and "templateColumns" not in obj:
+            # §3.6 lenient shape coercion: a Grid with NO cols/columns/
+            # templateColumns is the CSS auto-grid prior — coerce to the
+            # responsive `Auto` layout (accept-and-canonicalise).
+            return Obj("Auto", {})
+        # 0.1.7 — a Grid with `templateColumns` but no column count defaults
+        # `cols` to 1 (a `Some templateColumns` supersedes `cols`).
+        cols = _expect_int(cols_raw, f"{path}.cols") if cols_present else 1
+        gfields: dict[str, Value] = {"cols": cols}
         if "gap" in obj:
             gfields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
         if "templateColumns" in obj:
@@ -1131,7 +1348,6 @@ def _decode_legacy_table(obj: dict, path: str) -> Obj:
         "DataGrid",
         {
             "columns": Arr([]),
-            "editable": False,
             "source": Obj("Static", {"value": "<opaque>"}),
             "staticRows": static_rows,
         },
@@ -1151,6 +1367,8 @@ def _decode_kind(value: object, path: str) -> Obj:
         return _decode_datagrid(obj, path)
     if tag == "Form":
         return _decode_form(obj, path)
+    if tag == "Filters":
+        return _decode_filters(obj, path)
     if tag == "Chart":
         return _decode_chart(obj, path)
     if tag in _TITLE_TO_HEADING_KINDS:
@@ -1180,8 +1398,11 @@ def _decode_kind(value: object, path: str) -> Obj:
             _fail(MISSING_FIELD, f"{path}.{name}", f"missing required field '{name}'")
     # Preserve any extra (unknown) keys structurally so the round-trip is lossless
     # and tolerant of fields a later spec version adds (decoder tolerance, §2 rule 2).
+    # Retired vocabulary (0.2.0 clean break) is NEVER preserved — the reference
+    # decoder does not read it, so carrying it forward would mint a second dialect.
+    retired = _RETIRED_FIELDS.get(tag, frozenset())
     for key, raw in obj.items():
-        if key != "$type" and key not in known:
+        if key != "$type" and key not in known and key not in retired:
             fields[key] = from_json(raw)
     return Obj(tag, fields)
 
@@ -1212,12 +1433,18 @@ def _decode_cell_kind(value: object, path: str) -> Value:
 
 def _decode_grid_source(value: object, path: str) -> Value:
     """A DataGrid/Chart data source. Its rows are the §5 host-typed opaque seam: a
-    ``Static`` payload erases to ``"<opaque>"`` (byte-stable + value-faithful);
-    every other binding case (Transform/Query/…) passes through structurally (with
-    the §3.6 Query/State field aliases)."""
+    ``Static`` payload erases to ``"<opaque>"`` (byte-stable + value-faithful) —
+    a bare JSON array coerces to that same erased ``Static`` (§3.6); every other
+    binding case (Transform/Query/…) normalises through the binding decoder."""
+    if isinstance(value, list):
+        return Obj("Static", {"value": OPAQUE})
     if isinstance(value, dict) and value.get("$type") == "Static":
         return Obj("Static", {"value": OPAQUE})
-    return _normalise_binding_obj(value)
+    if isinstance(value, dict) and value.get("$type") == "Bound" and "binding" in value:
+        return _decode_grid_source(value["binding"], f"{path}.binding")
+    obj = _expect_object(value, path)
+    _dispatch(obj, path, BINDING_CASES | {"Bound"})
+    return _normalise_binding_obj(obj, path)
 
 
 def _decode_column(value: object, path: str) -> Value:
@@ -1260,7 +1487,10 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     if "columns" in obj:
         arr = _expect_array(obj["columns"], f"{path}.columns")
         fields["columns"] = Arr([_decode_column(c, f"{path}.columns[{i}]") for i, c in enumerate(arr)])
-    _grid_known = frozenset({"$type", "source", "data", "rows", "columns"})
+    # 0.2.0 — `editable` omitted-when-false on both boundaries.
+    if "editable" in obj and _expect_bool(obj["editable"], f"{path}.editable"):
+        fields["editable"] = True
+    _grid_known = frozenset({"$type", "source", "data", "rows", "columns", "editable"})
     for key, raw in obj.items():
         if key not in _grid_known:
             fields[key] = from_json(raw)
@@ -1282,25 +1512,202 @@ def _decode_chart(obj: dict, path: str) -> Obj:
     return Obj("Chart", fields)
 
 
+# ── FormFieldKind — the unified control vocabulary (0.2.0 filters-unification) ──
+#
+# One decoder covers form fields AND filter chips. The auto-bind context
+# (`FilterChip name` | `FormFieldId id` | none) mirrors the F# `ControlAutoBind`:
+# a `value` that is exactly the context's auto-binding — `Filter(name)` on a
+# chip, `State(field id, typed placeholder)` on a form field (0.2.1) — is
+# OMITTED from the model, so the canonical minimal control carries no `value`
+# key at all; an absent `value` simply stays absent (the canonical bytes).
+
+FORM_FIELD_KIND_CASES = frozenset(
+    {"Text", "Number", "Checkbox", "Choice", "RangedNumber", "SegmentedChoice", "TextArea", "Range", "Date"}
+)
+
+# The 0.2.1 typed placeholders (the F# `ControlValueDefaults`): the values the
+# form-field auto-binding `State(field id, <placeholder>)` carries per control.
+_AUTO_TEXT: tuple[Value, ...] = ("",)
+_AUTO_NUMBER: tuple[Value, ...] = (0, 0.0)
+_AUTO_CHECKBOX: tuple[Value, ...] = (False,)
+_AUTO_CHOICE: tuple[Value, ...] = (None,)
+_AUTO_RANGE: tuple[Value, ...] = (Obj(None, {"max": 0, "min": 0}), Obj(None, {"max": 0.0, "min": 0.0}))
+
+
+def _is_auto_value(decoded: Value, auto: tuple[str, str] | None, placeholders: tuple[Value, ...]) -> bool:
+    """Is `decoded` exactly the context's auto-binding (drop it from the model)?"""
+    if auto is None or not isinstance(decoded, Obj):
+        return False
+    context, name = auto
+    if context == "filter":
+        return decoded == Obj("Filter", {"name": name})
+    # form field: State(field id, typed placeholder)
+    if decoded.tag != "State" or decoded.fields.get("key") != name:
+        return False
+    if "defaultValue" not in decoded.fields:
+        return False
+    return any(decoded.fields["defaultValue"] == p for p in placeholders)
+
+
+def _decode_range_pair_value(value: object, path: str) -> Value:
+    """A `FormFieldKind.Range` value: the canonical Static pair rides as the
+    BARE `{"max":…,"min":…}` object (no envelope); a `[min,max]` two-element
+    array and the enveloped `Static` form decode leniently (§3.6); any other
+    binding case passes through the normal binding decode."""
+    raw: object = value
+    if isinstance(raw, dict) and raw.get("$type") == "Static" and "value" in raw:
+        raw = raw["value"]
+    if isinstance(raw, list):
+        if len(raw) != 2:
+            _fail(WRONG_TYPE, path, "a range value array must carry exactly [min, max]")
+        lo = _decode_number(raw[0], f"{path}[0]")
+        hi = _decode_number(raw[1], f"{path}[1]")
+        return Obj(None, {"max": hi, "min": lo})
+    if isinstance(raw, dict) and "$type" not in raw and "min" in raw and "max" in raw:
+        return Obj(
+            None,
+            {
+                "max": _decode_number(raw["max"], f"{path}.max"),
+                "min": _decode_number(raw["min"], f"{path}.min"),
+            },
+        )
+    return _decode_binding(value, path)
+
+
+def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | None) -> Obj:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES)
+    fields: dict[str, Value] = {}
+
+    handler_key = "onToggle" if tag == "Checkbox" else "onChange"
+    if handler_key in obj:
+        # A present handler (any spelling) decodes to the closure placeholder
+        # and re-encodes as the sentinel; an absent one arms the write-back default.
+        fields[handler_key] = "<closure>"
+
+    def value_slot(dec: Callable[[object, str], Value], placeholders: tuple[Value, ...]) -> None:
+        if "value" in obj:
+            decoded = dec(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, placeholders):
+                fields["value"] = decoded
+        # absent: stays absent — the canonical minimal control (auto-bound at
+        # run time to $filters.<name> / $state.<field id>).
+
+    def bound(key: str, dec: Callable[[object, str], Value]) -> None:
+        if key in obj:
+            fields[key] = dec(obj[key], f"{path}.{key}")
+
+    if tag in ("Text", "TextArea", "Date"):
+        value_slot(_decode_binding, _AUTO_TEXT)
+        if tag == "TextArea":
+            fields["rows"] = _expect_int(_require(obj, "rows", path), f"{path}.rows")
+        if tag == "Date":
+            fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+            bound("min", _decode_string)
+            bound("max", _decode_string)
+            bound("step", _decode_number)
+    elif tag in ("Number", "RangedNumber"):
+        value_slot(_decode_binding, _AUTO_NUMBER)
+        if tag == "RangedNumber":
+            bound("min", _decode_number)
+            bound("max", _decode_number)
+            bound("step", _decode_number)
+    elif tag == "Checkbox":
+        value_slot(_decode_binding, _AUTO_CHECKBOX)
+    elif tag in ("Choice", "SegmentedChoice"):
+        fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")
+        value_slot(_decode_binding_string_opt, _AUTO_CHOICE)
+        if tag == "SegmentedChoice":
+            # §3.6 — an absent `orientation` restores the language default
+            # `Horizontal` (the universal segmented-control prior); the
+            # canonical encoder always emits it.
+            if "orientation" in obj:
+                fields["orientation"] = _enum_aliased(
+                    obj["orientation"], f"{path}.orientation", ORIENTATION, ORIENTATION_ALIASES, "orientation"
+                )
+            else:
+                fields["orientation"] = "Horizontal"
+    else:  # Range (0.2.0 — absorbed the retired FilterKind.RangeFilter)
+        if "value" in obj:
+            decoded = _decode_range_pair_value(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, _AUTO_RANGE):
+                fields["value"] = decoded
+        bound("min", _decode_number)
+        bound("max", _decode_number)
+        bound("step", _decode_number)
+
+    known = {"$type", "value", "options", "orientation", "rows", "variant", "min", "max", "step", handler_key}
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj(tag, fields)
+
+
 def _decode_form(obj: dict, path: str) -> Obj:
-    """Form: each field's ``id`` ← ``name`` (WIRE_FORMAT §3.6, HTML-forms prior).
-    Everything else preserved structurally, as the pre-typed decoder did."""
+    """Form: typed fields (id ← name, WIRE_FORMAT §3.6; kind through the shared
+    FormFieldKind decoder with the 0.2.1 `FormFieldId` auto-bind context),
+    `submitLabel` TextSource, `onSubmit` Action, optional `disabled` binding."""
     fields: dict[str, Value] = {}
     if "fields" in obj:
         arr = _expect_array(obj["fields"], f"{path}.fields")
         norm: list[Value] = []
-        for fld in arr:
-            if isinstance(fld, dict) and "id" not in fld and "name" in fld:
-                d = {k: v for k, v in fld.items() if k != "name"}
-                d["id"] = fld["name"]
-                norm.append(from_json(d))
-            else:
-                norm.append(from_json(fld))
+        for i, fld in enumerate(arr):
+            fpath = f"{path}.fields[{i}]"
+            fobj = _expect_object(fld, fpath)
+            id_raw, id_present = _alias_get(fobj, "id", ("name",))
+            if not id_present:
+                _fail(MISSING_FIELD, f"{fpath}.id", "missing required field 'id'")
+            fid = _expect_string(id_raw, f"{fpath}.id")
+            ffields: dict[str, Value] = {"id": fid}
+            ffields["kind"] = _decode_form_field_kind(_require(fobj, "kind", fpath), f"{fpath}.kind", ("state", fid))
+            ffields["label"] = _decode_text_source(_require(fobj, "label", fpath), f"{fpath}.label")
+            ffields["required"] = _expect_bool(_require(fobj, "required", fpath), f"{fpath}.required")
+            if "help" in fobj:
+                ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
+            for key, raw in fobj.items():
+                if key not in ("id", "name", "kind", "label", "required", "help"):
+                    ffields[key] = from_json(raw)
+            norm.append(Obj(None, ffields))
         fields["fields"] = Arr(norm)
+    if "onSubmit" in obj:
+        fields["onSubmit"] = _decode_action(obj["onSubmit"], f"{path}.onSubmit")
+    if "submitLabel" in obj:
+        fields["submitLabel"] = _decode_text_source(obj["submitLabel"], f"{path}.submitLabel")
+    if "disabled" in obj:
+        fields["disabled"] = _decode_binding(obj["disabled"], f"{path}.disabled")
     for key, raw in obj.items():
-        if key not in ("$type", "fields"):
+        if key not in ("$type", "fields", "onSubmit", "submitLabel", "disabled"):
             fields[key] = from_json(raw)
     return Obj("Form", fields)
+
+
+def _decode_filters(obj: dict, path: str) -> Obj:
+    """Filters (0.2.0 unification): each item is `{kind:<FormFieldKind>, label,
+    name}` — the chip's control is an ordinary form control; an absent `value`
+    auto-binds `Filter(<the chip's own name>)`, and the encoder symmetrically
+    omits a `value` that is exactly that auto binding."""
+    fields: dict[str, Value] = {}
+    items_raw = _require(obj, "items", path)
+    arr = _expect_array(items_raw, f"{path}.items")
+    items: list[Value] = []
+    for i, item in enumerate(arr):
+        ipath = f"{path}.items[{i}]"
+        iobj = _expect_object(item, ipath)
+        name = _expect_string(_require(iobj, "name", ipath), f"{ipath}.name")
+        ifields: dict[str, Value] = {
+            "kind": _decode_form_field_kind(_require(iobj, "kind", ipath), f"{ipath}.kind", ("filter", name)),
+            "label": _decode_text_source(_require(iobj, "label", ipath), f"{ipath}.label"),
+            "name": name,
+        }
+        for key, raw in iobj.items():
+            if key not in ("kind", "label", "name"):
+                ifields[key] = from_json(raw)
+        items.append(Obj(None, ifields))
+    fields["items"] = Arr(items)
+    for key, raw in obj.items():
+        if key not in ("$type", "items"):
+            fields[key] = from_json(raw)
+    return Obj("Filters", fields)
 
 
 def _decode_style(value: object, path: str) -> Obj:
@@ -1313,7 +1720,7 @@ def _decode_style(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     fields: dict[str, Value] = {}
     if "emphasis" in obj:
-        v = _enum_aliased(obj["emphasis"], f"{path}.emphasis", EMPHASIS, EMPHASIS_ALIASES, "emphasis")
+        v = _decode_emphasis_enum(obj["emphasis"], f"{path}.emphasis")
         if v != "Normal":
             fields["emphasis"] = v
     if "tone" in obj:

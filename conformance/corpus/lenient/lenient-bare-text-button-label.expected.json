@@ -1,1 +1,1 @@
-{"id":"len-btn","kind":{"$type":"Button","label":{"$type":"Literal","text":"Refresh"},"onClick":{"$type":"Chain","ops":[]},"variant":"Primary"}}
+{"id":"len-btn","kind":{"$type":"Button","label":"Refresh","onClick":{"$type":"Chain","ops":[]},"variant":"Primary"}}

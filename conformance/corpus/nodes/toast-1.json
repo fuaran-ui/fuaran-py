@@ -1,1 +1,1 @@
-{"id":"toast-1","kind":{"$type":"Toast","dismissable":true,"message":{"$type":"Literal","text":"Saved"},"open":{"$type":"Static","value":true},"tone":"Success"}}
+{"id":"toast-1","kind":{"$type":"Toast","message":"Saved","open":{"$type":"Static","value":true},"tone":"Success"}}

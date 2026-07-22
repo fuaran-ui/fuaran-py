@@ -1,1 +1,1 @@
-{"id":"len-460-m","kind":{"$type":"Metric","label":{"$type":"Literal","text":"Revenue"},"source":{"$type":"Static","value":1}}}
+{"id":"len-460-m","kind":{"$type":"Metric","label":"Revenue","value":{"$type":"Static","value":1}}}

@@ -1,0 +1,1 @@
+{"id":"len-tf-f","kind":{"$type":"DataGrid","columns":[{"field":"variety","kind":{"$type":"Text"},"label":"Variety"}],"rowKeyField":"variety","source":{"$type":"Transform","params":[{"from":{"$type":"Filter","name":"variety"},"name":"variety"}],"pipeline":[{"$type":"filter","column":"variety","op":"eq","param":"variety"}],"source":{"columns":{"variety":["Pinot","Chardonnay"]}}}}}

@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.13"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-authors = [{ name = "Andrew J. Willshire", email = "andrew@diametrical.co.uk" }]
+authors = [{ name = "Andrew J. Willshire", email = "andrew@fuaran.com" }]
 keywords = ["fuaran", "wire-format", "canonical-json", "ui", "codec"]
 classifiers = [
   "Development Status :: 3 - Alpha",

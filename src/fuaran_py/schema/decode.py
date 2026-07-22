@@ -892,6 +892,9 @@ def _decode_draw_style(value: object, path: str) -> Value:
         fields["emphasis"] = _enum(obj["emphasis"], f"{path}.emphasis", EMPHASIS, "emphasis")
     if "fontFamily" in obj:
         fields["fontFamily"] = _expect_string(obj["fontFamily"], f"{path}.fontFamily")
+    # Phase 642 — keyed mark identity (`data-fuaran-mark` at render time); optional.
+    if "markId" in obj:
+        fields["markId"] = _expect_string(obj["markId"], f"{path}.markId")
     return Obj(None, fields)
 
 

@@ -101,6 +101,20 @@ every string-to-DOM seam (URLs, markdown, attributes) is sanitised. The host own
 the document shell (`<html>` / `<head>` / the `<link>` to the stylesheet); the
 renderer emits the body fragment only.
 
+### Chart lowering coverage
+
+`fuaran_py.charts` lowers a resolved `Chart` to a canonical `Drawing` subtree
+(first-party inline SVG, headless included), byte-identical to the shared
+`chart-lowering/*` goldens the reference implementation generates. Lowered
+arms: **Bar** (grouped + stacked), **Line**, **Area** (overlaid + stacked
+bands), **Scatter** (linear numeric x-scale, point marks), **Pie** (polar,
+cubic-approximated wedges; single-series). `Heatmap` renders the
+client-hydration placeholder. Data-bearing shapes carry a derivation-based
+`markId` (`series|category`, stable under row reorder) emitted as
+`data-fuaran-mark` for mark addressability; chrome stays unstamped. The pytest
+suite certifies **every** golden pair byte-for-byte, including canonical-float
+formatting of pie arc control points and stacked cumulative sums.
+
 ## Run (interactive, optional)
 
 Under **Pyodide** (CPython-on-WASM), `fuaran_py.runtime` adds the live loop the F#

@@ -85,7 +85,9 @@ def _as_node(value: Value) -> Node | None:
         node_id = value.fields.get("id")
         kind = value.fields["kind"]
         if isinstance(node_id, str) and isinstance(kind, Obj):
-            extras = {k: value.fields[k] for k in ("state", "style", "accessibility") if k in value.fields}
+            extras: dict[str, Value] = {
+                k: value.fields[k] for k in ("state", "style", "accessibility") if k in value.fields
+            }
             return Node(node_id, kind, extras)
     return None
 

@@ -113,7 +113,9 @@ def _as_node(value: Value) -> Node | None:
         node_id = value.fields.get("id")
         kind = value.fields["kind"]
         if isinstance(node_id, str) and isinstance(kind, Obj):
-            extras = {k: value.fields[k] for k in ("state", "style", "accessibility") if k in value.fields}
+            extras: dict[str, Value] = {
+                k: value.fields[k] for k in ("state", "style", "accessibility") if k in value.fields
+            }
             return Node(node_id, kind, extras)
     return None
 
@@ -681,6 +683,11 @@ class Renderer:
         if "emphasis" in fields:
             weight = {"Quiet": "300", "Normal": "400", "Loud": "700"}.get(str(fields["emphasis"]), "400")
             out += f' font-weight="{weight}"'
+        # Phase 642 — keyed mark identity: a data-bearing shape's derivation-based
+        # id rides into the emitted SVG so marks are addressable (object
+        # constancy) — last in the fixed attribute order.
+        if "markId" in fields:
+            out += f' data-fuaran-mark="{_draw_escape(str(fields["markId"]))}"'
         return out
 
     def _draw_shape(self, sh: Value) -> str:
@@ -888,15 +895,16 @@ class Renderer:
         )
 
     def _lower_chart(self, node: Node, fields: dict[str, Value], resolved: object) -> str | None:
-        """Lower a resolved Bar/Column/Line chart to a Drawing + render inline SVG.
+        """Lower a resolved chart (every ``LOWERED_KINDS`` arm) to a Drawing +
+        render inline SVG.
 
         Returns ``None`` (fall through to the placeholder) when the kind is not
         lowerable or the data source did not resolve to embedded rows.
         """
-        from ..charts import ChartSpec, lower_node
+        from ..charts import LOWERED_KINDS, ChartSpec, lower_node
 
         kind = fields.get("kind")
-        if kind not in ("Bar", "Column", "Line"):
+        if not isinstance(kind, str) or (kind not in LOWERED_KINDS and kind != "Column"):
             return None
         if not isinstance(resolved, Arr) or not resolved.items:
             return None
@@ -913,13 +921,18 @@ class Renderer:
             return None
         y_fields = tuple(y for y in y_fields_raw.items if isinstance(y, str))
 
+        # 0.2.0 — the canonical Literal is the bare string (the envelope stays
+        # decode-accepted, so both spellings resolve here).
         title_src = fields.get("title")
         title: str | None = None
-        if isinstance(title_src, Obj) and title_src.tag == "Literal":
+        if isinstance(title_src, str):
+            title = title_src
+        elif isinstance(title_src, Obj) and title_src.tag == "Literal":
             text = title_src.fields.get("text")
             title = text if isinstance(text, str) else None
 
-        spec = ChartSpec(kind=kind, x_field=x_field, y_fields=y_fields, title=title)
+        stacked = fields.get("stacked") is True
+        spec = ChartSpec(kind=kind, x_field=x_field, y_fields=y_fields, title=title, stacked=stacked)
         drawing_node = lower_node(node.id, spec, rows)
         assert isinstance(drawing_node.kind, Obj)
         return self._drawing(drawing_node, drawing_node.kind.fields)

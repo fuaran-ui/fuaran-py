@@ -725,7 +725,7 @@ def _eval_window(f: Frame, spec: WindowSpec) -> Result[Frame, EvalError]:  # noq
             outs = [NULL, *vals[: max(0, n - 1)]]
         elif spec.fn == "lead":
             outs = [*vals[1:], NULL]
-        elif spec.fn == "cumSum":
+        elif spec.fn == "cumulSum":
             outs = []
             total = 0.0
             for v in vals:
@@ -748,7 +748,7 @@ def _eval_window(f: Frame, spec: WindowSpec) -> Result[Frame, EvalError]:  # noq
 
     if spec.fn in ("rowNumber", "rank"):
         ty = INT
-    elif spec.fn in ("cumSum", "rollingMean"):
+    elif spec.fn in ("cumulSum", "rollingMean"):
         ty = FLOAT
     else:
         ty = _col_type(f.cols, spec.of) or STRING

@@ -30,7 +30,6 @@ from .model import (
     NOT_JSON,
     NULL,
     SCALAR_FNS,
-    SORT_DIRS,
     TYPE_MISMATCH,
     UNKNOWN_TYPE,
     WINDOW_FNS,
@@ -52,6 +51,9 @@ from .model import (
     Err,
     Filter,
     GroupBy,
+    InList,
+    InParam,
+    IsNull,
     Join,
     Limit,
     Lit,
@@ -177,6 +179,12 @@ def encode_expr_value(e: ColExpr) -> Value:
         return _typed("apply", {"fn": e.fn, "args": Arr([encode_expr_value(x) for x in e.args])})
     if isinstance(e, Param):
         return _typed("param", {"name": e.name})
+    if isinstance(e, InList):
+        return _typed("in", {"expr": encode_expr_value(e.expr), "items": Arr([encode_expr_value(x) for x in e.items])})
+    if isinstance(e, InParam):
+        return _typed("in", {"expr": encode_expr_value(e.expr), "param": e.param})
+    if isinstance(e, IsNull):
+        return _typed("isNull", {"expr": encode_expr_value(e.expr)})
     raise TypeError(f"cannot encode ColExpr {type(e)!r}")
 
 
@@ -289,12 +297,52 @@ def _kind_of(obj: object) -> Result[str, ColumnError]:
     return Ok(v)
 
 
+def _try_field(obj: object, key: str) -> object | None:
+    if isinstance(obj, dict) and key in obj:
+        return obj[key]
+    return None
+
+
+def _field_aliased(obj: object, canonical: str, alias: str) -> Result[Any, ColumnError]:
+    """fuaran-core#92 (lenient-ingest) — accept exactly one of the canonical
+    field or its observed alias; both present is ambiguous (didactic), neither
+    reports the canonical name."""
+    c = _try_field(obj, canonical)
+    a = _try_field(obj, alias)
+    if c is not None and a is not None:
+        return _err(MALFORMED_SHAPE, f'give "{canonical}" (canonical) or "{alias}" (alias), not both')
+    if c is not None:
+        return Ok(c)
+    if a is not None:
+        return Ok(a)
+    return _err(MISSING_FIELD, canonical)
+
+
+# fuaran-core#94 (lenient-ingest) — render an epoch-seconds instant as the
+# canonical ISO-8601 UTC timestamp string. Pure integer arithmetic
+# (civil-from-days), clock-free; negative epochs (pre-1970) are handled.
+def _iso_of_epoch_seconds(secs: int) -> str:
+    days, sod = divmod(secs, 86400)
+    z = days + 719468
+    era = (z if z >= 0 else z - 146096) // 146097
+    doe = z - era * 146097
+    yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
+    doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
+    mp = (5 * doy + 2) // 153
+    day = doy - (153 * mp + 2) // 5 + 1
+    month = mp + 3 if mp < 10 else mp - 9
+    year = yoe + era * 400 + (1 if month <= 2 else 0)
+    return f"{year:04d}-{month:02d}-{day:02d}T{sod // 3600:02d}:{sod % 3600 // 60:02d}:{sod % 60:02d}Z"
+
+
 # ── cells / sources ──────────────────────────────────────────────────────────
 
 
 def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError]:
     """Decode a present value into a cell of the declared column type. A float column
-    accepts an integer token (lossless widening); every other type requires its kind."""
+    accepts an integer token (lossless widening); a timestamp column accepts an epoch
+    number (fuaran-core#94 — unit by magnitude: ≥ 1e11 ⇒ milliseconds, else seconds);
+    every other type requires its kind."""
     if ty == "int" and isinstance(v, int) and not isinstance(v, bool):
         return Ok(cell_int(v))
     if ty == "float" and isinstance(v, bool) is False and isinstance(v, (int, float)):
@@ -307,6 +355,12 @@ def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError
         return Ok(cell_date(v))
     if ty == "timestamp" and isinstance(v, str):
         return Ok(cell_timestamp(v))
+    if ty == "timestamp" and not isinstance(v, bool) and isinstance(v, (int, float)):
+        f = float(v)
+        if f == float(int(f)) and abs(f) < 9e15:
+            i = int(f)
+            secs = i // 1000 if abs(i) >= 100_000_000_000 else i
+            return Ok(cell_timestamp(_iso_of_epoch_seconds(secs)))
     return _err(TYPE_MISMATCH, f"column '{col}': expected {ty} value, got {_kind_name(v)}")
 
 
@@ -330,21 +384,36 @@ def _decode_schema(el: object) -> Result[Schema, ColumnError]:
     return Ok(out)
 
 
-def _decode_column(columns_obj: object, name: str, ty: str) -> Result[Column, ColumnError]:
-    if not isinstance(columns_obj, dict) or name not in columns_obj:
-        return _err(MISSING_FIELD, f"columns.{name}")
-    col_el = columns_obj[name]
+def _column_parts(name: str, col_el: object) -> Result[tuple[list, list], ColumnError]:
+    """fuaran-core#88 (lenient-ingest) — a column riding as a BARE JSON array is
+    the "just the data" shorthand (`values` with an all-present mask; the wire
+    has no JSON null, so a bare array can only mean every cell present).
+    fuaran-core#94 — a wrapped object carrying `values` but NO `validity` mask
+    is the same all-present statement. Absent cells still require the full
+    wrapped form, which stays canonical."""
+    if isinstance(col_el, list):
+        return Ok((list(col_el), [True] * len(col_el)))
     rv = _field(col_el, "values")
     if not rv.ok:
         return rv  # type: ignore[return-value]
-    rva = _field(col_el, "validity")
-    if not rva.ok:
-        return rva  # type: ignore[return-value]
-    values, validity = rv.value, rva.value
+    values = rv.value
     if not isinstance(values, list):
         return _err(MALFORMED_SHAPE, f"{name}.values: expected array")
-    if not isinstance(validity, list):
+    validity_el = _try_field(col_el, "validity")
+    if validity_el is None:
+        return Ok((values, [True] * len(values)))
+    if not isinstance(validity_el, list):
         return _err(MALFORMED_SHAPE, f"{name}.validity: expected array")
+    return Ok((values, validity_el))
+
+
+def _decode_column(columns_obj: object, name: str, ty: str) -> Result[Column, ColumnError]:
+    if not isinstance(columns_obj, dict) or name not in columns_obj:
+        return _err(MISSING_FIELD, f"columns.{name}")
+    rparts = _column_parts(name, columns_obj[name])
+    if not rparts.ok:
+        return rparts  # type: ignore[return-value]
+    values, validity = rparts.value
     if len(values) != len(validity):
         return _err(
             "LENGTH_MISMATCH", f"column '{name}': values/validity length mismatch ({len(values)} vs {len(validity)})"
@@ -367,15 +436,55 @@ def _null() -> Cell:
     return NULL
 
 
+def _infer_column_type(name: str, values: list) -> Result[str, ColumnError]:
+    """fuaran-core#88 (lenient-ingest) — infer one column's type from its cells.
+    PINNED deterministic rules: all-int numerics ⇒ int, any fractional ⇒ float,
+    all-bool ⇒ bool, all-string ⇒ string — NEVER date/timestamp (temporal types
+    require a declared schema). Empty or mixed is a didactic reject."""
+    if not values:
+        return _err(
+            MALFORMED_SHAPE,
+            f"{name}: cannot infer a column type from an empty / all-null column — declare it in an "
+            'explicit "schema" array',
+        )
+    tags: list[str] = []
+    for v in values:
+        tag = _kind_name(v)
+        if tag not in tags:
+            tags.append(tag)
+    tag_set = set(tags)
+    if tag_set == {"int"}:
+        return Ok("int")
+    if "float" in tag_set and tag_set <= {"int", "float"}:
+        return Ok("float")
+    if tag_set == {"bool"}:
+        return Ok("bool")
+    if tag_set == {"string"}:
+        return Ok("string")
+    return _err(
+        MALFORMED_SHAPE,
+        f"{name}: cannot infer a single column type from mixed cell kinds ({', '.join(tags)}) — "
+        'declare it in an explicit "schema" array',
+    )
+
+
 def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
-    rs = _field(el, "schema")
-    if not rs.ok:
-        return rs  # type: ignore[return-value]
-    rschema = _decode_schema(rs.value)
-    if not rschema.ok:
-        return rschema  # type: ignore[return-value]
-    schema = rschema.value
+    # fuaran-core#88 — `schema` may be OMITTED on an EMBEDDED source (inferred
+    # per `_infer_column_type`, columns in Ordinal key order); a `ref` source
+    # still requires it (no cells to infer from). The canonical encoder always
+    # emits the explicit schema, so the shorthand normalises on re-encode.
+    schema: Schema | None = None
+    if isinstance(el, dict) and "schema" in el:
+        rschema = _decode_schema(el["schema"])
+        if not rschema.ok:
+            return rschema  # type: ignore[return-value]
+        schema = rschema.value
     if isinstance(el, dict) and "ref" in el:
+        if schema is None:
+            return _err(
+                MALFORMED_SHAPE,
+                'a ref source requires an explicit "schema" array — there are no cells to infer column types from',
+            )
         ref = el["ref"]
         if not isinstance(ref, str):
             return _err(MALFORMED_SHAPE, "ref: expected string")
@@ -384,6 +493,18 @@ def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
     if not rc.ok:
         return rc  # type: ignore[return-value]
     columns_obj = rc.value
+    if schema is None:
+        if not isinstance(columns_obj, dict):
+            return _err(MALFORMED_SHAPE, "columns: expected object")
+        schema = []
+        for name in sorted(columns_obj):
+            rparts = _column_parts(name, columns_obj[name])
+            if not rparts.ok:
+                return rparts  # type: ignore[return-value]
+            rty = _infer_column_type(name, rparts.value[0])
+            if not rty.ok:
+                return rty  # type: ignore[return-value]
+            schema.append((name, rty.value))
     cols: list[Column] = []
     for name, ty in schema:
         rcol = _decode_column(columns_obj, name, ty)
@@ -515,7 +636,9 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
             return re  # type: ignore[return-value]
         le = decode_expr(re.value)
         return le if not le.ok else Ok(Cast(rt.value, le.value))  # type: ignore[return-value]
-    if k == "apply":
+    if k in ("apply", "call", "fn"):
+        # fuaran-core#93 — `call` aliases `apply` (same fn/args fields);
+        # fuaran-core#94 adds the third observed spelling `fn`.
         rfn = _field(el, "fn")
         if not rfn.ok:
             return rfn  # type: ignore[return-value]
@@ -533,7 +656,95 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
         if not isinstance(r.value, str):
             return _err(MALFORMED_SHAPE, "param.name: expected string")
         return Ok(Param(r.value))
+    if k == "in":
+        # fuaran-core#91 — membership: exactly one of `items` (literal list) /
+        # `param` (a bound multi-select list param).
+        rsub = _field(el, "expr")
+        if not rsub.ok:
+            return rsub  # type: ignore[return-value]
+        subject = decode_expr(rsub.value)
+        if not subject.ok:
+            return subject  # type: ignore[return-value]
+        items_el = _try_field(el, "items")
+        param_el = _try_field(el, "param")
+        if items_el is not None and param_el is not None:
+            return _err(
+                MALFORMED_SHAPE,
+                'in: give exactly ONE of "items" (a literal list) or "param" (a multi-select list param), not both',
+            )
+        if items_el is not None:
+            if not isinstance(items_el, list):
+                return _err(MALFORMED_SHAPE, "expected array")
+            xs = _decode_expr_list(items_el)
+            return xs if not xs.ok else Ok(InList(subject.value, xs.value))  # type: ignore[return-value]
+        if param_el is not None:
+            if not isinstance(param_el, str):
+                return _err(MALFORMED_SHAPE, "expected string")
+            return Ok(InParam(subject.value, param_el))
+        return _err(MISSING_FIELD, "items")
+    if k == "isNull":
+        r = _field(el, "expr")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        inner = decode_expr(r.value)
+        return inner if not inner.ok else Ok(IsNull(inner.value))  # type: ignore[return-value]
+    if k in ("contains", "startsWith", "endsWith"):
+        # fuaran-core#93 — expression-level string-predicate spellings:
+        # {"$type":"contains","expr":X,"other":Y} (also left/right) denotes
+        # exactly Binary(contains, X, Y). Canonical stays the "binary" form.
+        return _decode_flat_binary(el, k)
+    if k in ("and", "or"):
+        # fuaran-core#94 — flat logical spellings: variadic `exprs` left-folds
+        # into the nested binary form (and/or are associative), or left/right.
+        exprs_el = _try_field(el, "exprs")
+        if exprs_el is not None:
+            if not isinstance(exprs_el, list):
+                return _err(MALFORMED_SHAPE, "expected array")
+            xs = _decode_expr_list(exprs_el)
+            if not xs.ok:
+                return xs  # type: ignore[return-value]
+            if not xs.value:
+                return _err(MALFORMED_SHAPE, f"{k}.exprs: expected a non-empty array")
+            acc = xs.value[0]
+            for e in xs.value[1:]:
+                acc = Binary(k, acc, e)
+            return Ok(acc)
+        return _decode_flat_binary(el, k)
+    if k in ("eq", "ne", "lt", "le", "gt", "ge"):
+        # fuaran-core#94 — flat comparison spellings.
+        return _decode_flat_binary(el, k)
+    if k in SCALAR_FNS:
+        # fuaran-core#94 — flat scalar-fn spellings: {"$type":"lower","expr":X}
+        # / {"$type":"concat","args":[…]} denote ApplyFn(fn, args).
+        args_el = _try_field(el, "args")
+        if args_el is not None:
+            if not isinstance(args_el, list):
+                return _err(MALFORMED_SHAPE, "expected array")
+            xs = _decode_expr_list(args_el)
+            return xs if not xs.ok else Ok(ApplyFn(k, xs.value))  # type: ignore[return-value]
+        r = _field(el, "expr")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        inner = decode_expr(r.value)
+        return inner if not inner.ok else Ok(ApplyFn(k, [inner.value]))  # type: ignore[return-value]
     return _err(UNKNOWN_TYPE, f"unknown ColExpr '{k}'")
+
+
+def _decode_flat_binary(el: object, op: str) -> Result[ColExpr, ColumnError]:
+    """A flat binary spelling: `left`/`right` canonical, `expr`/`other` aliases."""
+    ra = _field_aliased(el, "left", "expr")
+    if not ra.ok:
+        return ra  # type: ignore[return-value]
+    la = decode_expr(ra.value)
+    if not la.ok:
+        return la  # type: ignore[return-value]
+    rb = _field_aliased(el, "right", "other")
+    if not rb.ok:
+        return rb  # type: ignore[return-value]
+    lb = decode_expr(rb.value)
+    if not lb.ok:
+        return lb  # type: ignore[return-value]
+    return Ok(Binary(op, la.value, lb.value))
 
 
 def _decode_expr_list(el: object) -> Result[list[ColExpr], ColumnError]:
@@ -570,16 +781,34 @@ def _pair_of(el: object) -> Result[tuple[str, str], ColumnError]:
 
 
 def _order_of(el: object) -> Result[tuple[str, str], ColumnError]:
-    rc = _field(el, "col")
+    # fuaran-core#92 — sort-key aliases: `column` for `col`, boolean `descending`
+    # for `dir`; #93 — `direction` is a third spelling, and a directionless
+    # entry is the SQL default (asc).
+    rc = _field_aliased(el, "col", "column")
     if not rc.ok:
         return rc  # type: ignore[return-value]
-    rd = _field(el, "dir")
-    if not rd.ok:
-        return rd  # type: ignore[return-value]
-    direction = rd.value if rd.value in SORT_DIRS else "asc"
     if not isinstance(rc.value, str):
         return _err(MALFORMED_SHAPE, "order.col: expected string")
-    return Ok((rc.value, direction))
+    name = rc.value
+    dir_el = _try_field(el, "dir")
+    desc_el = _try_field(el, "descending")
+    direction_el = _try_field(el, "direction")
+    present = [x for x in (dir_el, desc_el, direction_el) if x is not None]
+    if len(present) > 1:
+        return _err(
+            MALFORMED_SHAPE,
+            'give ONE of "dir" (canonical: asc|desc), "descending" (alias boolean), or "direction" (alias: asc|desc)',
+        )
+    if desc_el is not None:
+        if not isinstance(desc_el, bool):
+            return _err(MALFORMED_SHAPE, '"descending" must be a JSON boolean')
+        return Ok((name, "desc" if desc_el else "asc"))
+    chosen = dir_el if dir_el is not None else direction_el
+    if chosen is None:
+        return Ok((name, "asc"))
+    if not isinstance(chosen, str):
+        return _err(MALFORMED_SHAPE, "expected string")
+    return Ok((name, "desc" if chosen == "desc" else "asc"))
 
 
 def _list_of(el: object, ctx: str, f: Any) -> Result[list[Any], ColumnError]:
@@ -594,21 +823,33 @@ def _list_of(el: object, ctx: str, f: Any) -> Result[list[Any], ColumnError]:
     return Ok(out)
 
 
+def _agg_fn_of(tag: object) -> str | None:
+    """The agg-fn vocabulary + the `avg` → `mean` alias (the SQL prior)."""
+    if tag == "avg":
+        return "mean"
+    if isinstance(tag, str) and tag in AGG_FNS:
+        return tag
+    return None
+
+
 def _agg_of(el: object) -> Result[Agg, ColumnError]:
-    rn = _field(el, "name")
+    # fuaran-core#92 — aggregate-entry aliases: `as` for `name`, `op` for `fn`,
+    # `column` for `of`; `avg` aliases `mean`.
+    rn = _field_aliased(el, "name", "as")
     if not rn.ok:
         return rn  # type: ignore[return-value]
-    rf = _field(el, "fn")
+    rf = _field_aliased(el, "fn", "op")
     if not rf.ok:
         return rf  # type: ignore[return-value]
-    ro = _field(el, "of")
+    ro = _field_aliased(el, "of", "column")
     if not ro.ok:
         return ro  # type: ignore[return-value]
-    if rf.value not in AGG_FNS:
+    fn = _agg_fn_of(rf.value)
+    if fn is None:
         return _err(UNKNOWN_TYPE, f"unknown agg fn '{rf.value}'")
     if not isinstance(rn.value, str) or not isinstance(ro.value, str):
         return _err(MALFORMED_SHAPE, "agg: expected strings")
-    return Ok(Agg(rn.value, rf.value, ro.value))
+    return Ok(Agg(rn.value, fn, ro.value))
 
 
 def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C901, PLR0911, PLR0912
@@ -618,11 +859,60 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
     k = rk.value
     assert isinstance(el, dict)
     if k == "filter":
-        r = _field(el, "pred")
-        if not r.ok:
-            return r  # type: ignore[return-value]
-        e = decode_expr(r.value)
-        return e if not e.ok else Ok(Filter(e.value))  # type: ignore[return-value]
+        # fuaran-core#93 — `predicate` aliases `pred`; fuaran-core#89 — the flat
+        # filter-step prior {"$type":"filter","column":C,"op":O,"param":P|"value":V}
+        # coerces to the canonical nested predicate.
+        pred_el = _try_field(el, "pred")
+        predicate_el = _try_field(el, "predicate")
+        if pred_el is not None and predicate_el is not None:
+            return _err(MALFORMED_SHAPE, 'give "pred" (canonical) or "predicate" (alias), not both')
+        chosen = pred_el if pred_el is not None else predicate_el
+        if chosen is not None:
+            e = decode_expr(chosen)
+            return e if not e.ok else Ok(Filter(e.value))  # type: ignore[return-value]
+        col_el = _try_field(el, "column")
+        op_el = _try_field(el, "op")
+        if col_el is not None and op_el is not None:
+            if not isinstance(col_el, str) or not isinstance(op_el, str):
+                return _err(MALFORMED_SHAPE, "expected string")
+            if op_el not in BIN_OPS:
+                return _err(UNKNOWN_TYPE, f"unknown binary op '{op_el}'")
+            param_el = _try_field(el, "param")
+            value_el = "value" in el if isinstance(el, dict) else False
+            if param_el is not None and value_el:
+                return _err(
+                    MALFORMED_SHAPE,
+                    'flat filter step: give exactly ONE of "param" (a pipeline param name) or "value" '
+                    "(a scalar literal), not both",
+                )
+            if param_el is not None:
+                if not isinstance(param_el, str):
+                    return _err(MALFORMED_SHAPE, "expected string")
+                return Ok(Filter(Binary(op_el, Col(col_el), Param(param_el))))
+            if value_el:
+                assert isinstance(el, dict)
+                v = el["value"]
+                if isinstance(v, bool):
+                    cell = cell_bool(v)
+                elif isinstance(v, int):
+                    cell = cell_int(v)
+                elif isinstance(v, float):
+                    cell = cell_float(v)
+                elif isinstance(v, str):
+                    cell = cell_str(v)
+                else:
+                    return _err(MALFORMED_SHAPE, 'flat filter step: "value" must be a scalar (string/int/float/bool)')
+                return Ok(Filter(Binary(op_el, Col(col_el), Lit(cell))))
+            return _err(
+                MALFORMED_SHAPE,
+                'flat filter step: {column, op} needs "param" (a pipeline param name) or "value" '
+                "(a scalar literal) as the right-hand side",
+            )
+        return _err(
+            MALFORMED_SHAPE,
+            'a filter step carries "pred" (a $type-discriminated expression: binary/col/param/lit/apply) — '
+            'or the flat short form {"column":…,"op":…,"param":…|"value":…}',
+        )
     if k == "project":
         r = _field(el, "cols")
         if not r.ok:
@@ -643,13 +933,14 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
             return _err(MALFORMED_SHAPE, "derive.name: expected string")
         return Ok(Derive(rn.value, e.value))
     if k == "groupBy":
-        rkeys = _field(el, "keys")
+        # fuaran-core#92 — `by` (pandas prior) aliases `keys`; `aggregations` aliases `aggs`.
+        rkeys = _field_aliased(el, "keys", "by")
         if not rkeys.ok:
             return rkeys  # type: ignore[return-value]
         keys = _str_list(rkeys.value, "groupBy.keys")
         if not keys.ok:
             return keys  # type: ignore[return-value]
-        raggs = _field(el, "aggs")
+        raggs = _field_aliased(el, "aggs", "aggregations")
         if not raggs.ok:
             return raggs  # type: ignore[return-value]
         aggs = _list_of(raggs.value, "groupBy.aggs", _agg_of)
@@ -689,6 +980,10 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
         rfn = _field(el, "fn")
         if not rfn.ok:
             return rfn  # type: ignore[return-value]
+        # fuaran-core#92 — `cumSum` is the legacy pre-rename tag; normalises to
+        # `cumulSum` on re-encode.
+        if rfn.value == "cumSum":
+            rfn = Ok("cumulSum")
         if rfn.value not in WINDOW_FNS:
             return _err(UNKNOWN_TYPE, f"unknown window fn '{rfn.value}'")
         rof = _field(el, "of")
@@ -714,9 +1009,10 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
         ragg = _field(el, "agg")
         if not ragg.ok:
             return ragg  # type: ignore[return-value]
-        if ragg.value not in AGG_FNS:
+        agg_fn = _agg_fn_of(ragg.value)
+        if agg_fn is None:
             return _err(UNKNOWN_TYPE, f"unknown agg fn '{ragg.value}'")
-        return Ok(Pivot(PivotSpec(index.value, ron.value, rvals.value, ragg.value)))
+        return Ok(Pivot(PivotSpec(index.value, ron.value, rvals.value, agg_fn)))
     if k == "unpivot":
         rid = _field(el, "idVars")
         if not rid.ok:
@@ -730,7 +1026,8 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
         vv = _str_list(rvv.value, "unpivot.valueVars")
         return vv if not vv.ok else Ok(Unpivot(idv.value, vv.value))  # type: ignore[return-value]
     if k == "sort":
-        r = _field(el, "by")
+        # fuaran-core#92 — `keys` (SQL ORDER-BY-list prior) aliases `by`.
+        r = _field_aliased(el, "by", "keys")
         if not r.ok:
             return r  # type: ignore[return-value]
         by = _list_of(r.value, "sort.by", _order_of)
@@ -738,15 +1035,20 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
     if k == "distinct":
         return Ok(Distinct())
     if k == "limit":
-        rn = _field(el, "n")
+        # fuaran-core#92 — `count` aliases `n`; an absent `offset` is unambiguously 0.
+        rn = _field_aliased(el, "n", "count")
         if not rn.ok:
             return rn  # type: ignore[return-value]
-        roff = _field(el, "offset")
-        if not roff.ok:
-            return roff  # type: ignore[return-value]
-        if not isinstance(rn.value, int) or not isinstance(roff.value, int):
+        off_el = _try_field(el, "offset")
+        offset = 0 if off_el is None else off_el
+        if (
+            isinstance(rn.value, bool)
+            or not isinstance(rn.value, int)
+            or isinstance(offset, bool)
+            or not isinstance(offset, int)
+        ):
             return _err(MALFORMED_SHAPE, "limit: expected ints")
-        return Ok(Limit(rn.value, roff.value))
+        return Ok(Limit(rn.value, offset))
     if k == "union":
         r = _field(el, "source")
         if not r.ok:

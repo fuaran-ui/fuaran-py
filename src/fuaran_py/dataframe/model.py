@@ -190,18 +190,75 @@ class Param:
     name: str
 
 
-ColExpr = Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param
+@dataclass(frozen=True)
+class InList:
+    """Membership against a literal list (fuaran-core#91): ``expr IN items``."""
+
+    expr: ColExpr
+    items: list[ColExpr]
+
+
+@dataclass(frozen=True)
+class InParam:
+    """Membership against a bound multi-select list param (fuaran-core#91)."""
+
+    expr: ColExpr
+    param: str
+
+
+@dataclass(frozen=True)
+class IsNull:
+    """Null test (fuaran-core#90): true where the inner expression is null."""
+
+    expr: ColExpr
+
+
+ColExpr = Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param | InList | InParam | IsNull
 
 # Closed vocabularies (wire tags) — additive only.
 BIN_OPS: frozenset[str] = frozenset(
-    {"add", "sub", "mul", "div", "mod", "eq", "ne", "lt", "le", "gt", "ge", "and", "or"}
+    {
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "mod",
+        "eq",
+        "ne",
+        "lt",
+        "le",
+        "gt",
+        "ge",
+        "and",
+        "or",
+        # fuaran-core#90 — the string predicates.
+        "contains",
+        "startsWith",
+        "endsWith",
+    }
 )
 SCALAR_FNS: frozenset[str] = frozenset(
-    {"abs", "round", "floor", "ceil", "length", "lower", "upper", "substr", "datePart"}
+    {
+        "abs",
+        "round",
+        "floor",
+        "ceil",
+        "length",
+        "lower",
+        "upper",
+        "substr",
+        "datePart",
+        # fuaran-core#90 — the string/date builders.
+        "concat",
+        "trim",
+        "replace",
+        "dateDiffDays",
+    }
 )
 AGG_FNS: frozenset[str] = frozenset({"sum", "mean", "min", "max", "count", "median", "stddev", "first", "last"})
 JOIN_KINDS: frozenset[str] = frozenset({"inner", "left", "right", "outer"})
-WINDOW_FNS: frozenset[str] = frozenset({"rowNumber", "rank", "lag", "lead", "cumSum", "rollingMean"})
+# fuaran-core#92 — `cumSum` renamed `cumulSum` (the legacy tag stays a decode alias).
+WINDOW_FNS: frozenset[str] = frozenset({"rowNumber", "rank", "lag", "lead", "cumulSum", "rollingMean"})
 SORT_DIRS: frozenset[str] = frozenset({"asc", "desc"})
 
 

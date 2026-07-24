@@ -1,6 +1,6 @@
 # Fable-Python build-vs-port decision record
 
-**Status:** decided — **hand-write all codec layers** (no Fable-Python transpile).
+**Status:** decided – **hand-write all codec layers** (no Fable-Python transpile).
 **Date:** 2026-06-19. **Scope:** the headless wire-format codec cores
 (schema / ops / validator). The renderer is out of scope (headless host).
 
@@ -15,7 +15,7 @@ alongside it in this repo.
 Hand-write every layer. A Fable-Python transpile buys nothing on the one
 genuinely hard problem (canonical number formatting), produces a non-idiomatic
 Python API that Python consumers would reject, and would add a third
-encoder-parity pipeline to maintain — while the hand-written codec **already
+encoder-parity pipeline to maintain – while the hand-written codec **already
 passes the entire conformance corpus byte-for-byte** (55 node + 11 op
 round-trips, 28 reject cases) at a few hundred lines of dependency-free Python.
 This matches the established sibling-not-port stance of the TypeScript host.
@@ -33,7 +33,7 @@ scientific with an uppercase `E`, an always-present sign, and a ≥2-digit
 zero-padded exponent; `-0` collapses to `0`). This is the project's pivot point:
 if the encoder cannot reproduce this exactly, the host is not a host.
 
-**Finding — it is trivially solvable in hand-written Python, and a transpile does
+**Finding – it is trivially solvable in hand-written Python, and a transpile does
 not help.** CPython's shortest `repr(float)` produces the same significant-digit
 sequence as .NET `"R"` and V8 `Number.toString` (all David-Gay-family
 shortest-round-trip); only the *layout* differs. Re-laying-out those digits into
@@ -46,15 +46,15 @@ divergence-zone values and edge cases:
 | `1e-7` | `1E-07` | `metric-float-exp-neg` |
 | `0.30000000000000004` | `0.30000000000000004` | `metric-float-17sig` |
 | `1.2345678901234568e17` | `1.2345678901234568E+17` | `metric-float-bigint` |
-| `5e-324` (smallest subnormal) | `5E-324` | — |
-| `-0.0` | `0` | — |
+| `5e-324` (smallest subnormal) | `5E-324` | – |
+| `-0.0` | `0` | – |
 
 The decisive observation: **even the F# host's own Fable (JS) pipeline hand-rolls
 this exact algorithm.** Its `formatFiniteDouble` carries an
 `[<Emit("$0.toString()")>]` shim and re-implements the .NET `"R"` layout by hand,
 precisely because neither JS-native nor Fable-native number formatting matches
 the canonical form. A Fable-Python transpile would inherit that hand-rolled
-algorithm — *and* its `Emit` shim emits **JavaScript** `.toString()`, which is
+algorithm – *and* its `Emit` shim emits **JavaScript** `.toString()`, which is
 meaningless on CPython. So the hard part must be written by hand for Python
 **regardless** of transpile-vs-hand-write; transpiling only adds a broken
 JS-emit dependency to fix. `format_finite_double` in `canonical.py` is the
@@ -75,7 +75,7 @@ inputs:
   spike risk is high and the payoff (see §3) is negative.
 
 Rather than chase a brittle transpile of pre-existing JS-fenced code, the host
-implements the **language-neutral spec** (`WIRE_FORMAT.md`) directly — the same
+implements the **language-neutral spec** (`WIRE_FORMAT.md`) directly – the same
 contract the TypeScript host implements without reading F# source.
 
 ### 3. Idiomaticity + the generated API
@@ -83,19 +83,19 @@ contract the TypeScript host implements without reading F# source.
 A Fable-Python transpile would expose F#'s shapes (DU-encoded unions, generated
 `Result` classes, F# naming) to Python callers. Python consumers expect
 `snake_case` functions, dataclasses, and a `{ok, value}` / `{ok, error}` result
-— exactly the `AdapterDecodeResult` shape the conformance contract already
+ – exactly the `AdapterDecodeResult` shape the conformance contract already
 specifies. A transpile cannot produce that surface; a hand-written host produces
 it natively (`Ok` / `Err`, `decode_node`, `DecodeError(code, path, message)`).
 For a host whose entire purpose is to be the *idiomatic Python* surface on the
 wire format, the generated-API gap alone is disqualifying.
 
-### 4. Maintenance cost — the third parity pipeline
+### 4. Maintenance cost – the third parity pipeline
 
 The workspace already maintains one cross-pipeline parity gate
 (Fable-JS-vs-.NET). A Fable-Python transpile would add a **second** parity
 pipeline (Fable-Python-vs-.NET): every Fable toolchain bump, every `Emit`-fence
 change, every F# core refactor would have to be re-verified against the Python
-output. The sibling approach takes on **no new pipeline** — it pins to the
+output. The sibling approach takes on **no new pipeline** – it pins to the
 existing canonical corpus (the same gate the TypeScript host clears), so the only
 coupling is "a wire-format change moves every host," which the forward-coupling
 rule (§11) already mandates.
@@ -115,13 +115,13 @@ No layer benefits from a Fable-Python transpile.
 The hand-written codec this record informs is already in the repo and verified:
 it round-trips the **full** `../wire-format-fixtures/` corpus byte-for-byte (55
 nodes + 11 ops) and rejects all 28 malformed fixtures with the canonical error
-code + `$`-rooted path — i.e. it clears the same conformance bar any chosen
+code + `$`-rooted path – i.e. it clears the same conformance bar any chosen
 approach must clear, today, with zero runtime dependencies. The hard datapoint
 (the canonical number form) is proven by `tests/test_canonical_numbers.py`.
 
 ## What this record does not decide
 
-- The renderer (out of scope — headless host).
+- The renderer (out of scope – headless host).
 - The formal third-host certification machinery (offline corpus snapshot + drift
   guard, schema validation, a language-agnostic certification bridge, a CI leg,
-  and generative parity) — follow-up work that builds on this hand-written codec.
+  and generative parity) – follow-up work that builds on this hand-written codec.

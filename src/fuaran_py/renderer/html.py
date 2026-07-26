@@ -3,7 +3,7 @@
 The renderer emits HTML *strings* — no DOM, no template engine, stdlib only.
 This module is the single seam where a Python string becomes HTML, so the
 escaping floor lives here (mirroring the React-escaping floor the F#/TS
-renderers lean on; see ``fuaran/SANITIZATION.md`` "React's escaping floor").
+renderers lean on; see ``fuaran-dotnet/SANITIZATION.md`` "React's escaping floor").
 
 * :func:`escape_text` — text content (``&`` ``<`` ``>``), the ``prop.text``
   analogue.

@@ -27,7 +27,7 @@ conformant host. Cross-repo development conventions (port allocation, formatting
 - **Apache 2.0 from day one** — same posture as `fuaran-ts`, to make the
   reference-implementation claim unambiguous.
 - **Sibling reference implementation, not a transpile.** `fuaran-py` is built to
-  the language-neutral wire-format spec (`../fuaran/docs/WIRE_FORMAT.md`) +
+  the language-neutral wire-format spec (`../fuaran-dotnet/docs/WIRE_FORMAT.md`) +
   conformance corpus (`../wire-format-fixtures/`), not generated from the F# tier.
   The Fable-Python build-vs-port evaluation that settled this is recorded in
   [`docs/fable-python-decision.md`](docs/fable-python-decision.md).
@@ -86,7 +86,7 @@ changed files. The CI gate is `ruff format --check` + `ruff check`.
 ## Wire format
 
 The canonical wire format is owned by the F# `fuaran` tier
-(`../fuaran/docs/WIRE_FORMAT.md`) with the workspace-level
+(`../fuaran-dotnet/docs/WIRE_FORMAT.md`) with the workspace-level
 `../wire-format-fixtures/` corpus as the executable conformance suite. `fuaran-py`
 is one conformant host: it round-trips the corpus byte-for-byte and surfaces the
 canonical reject code + path for every malformed fixture. The **forward-coupling
@@ -127,7 +127,7 @@ Two disciplines keep it honest:
 
 - **Reference-CSS byte-copy.** `src/fuaran_py/renderer/content/fuaran-reference.css`
   is a byte-for-byte copy of the F# canonical
-  (`../fuaran/src/Fuaran.UI.Renderer/content/fuaran-reference.css`). A test
+  (`../fuaran-dotnet/src/Fuaran.UI.Renderer/content/fuaran-reference.css`). A test
   (`test_render_parity` / the byte-identical check) fails if the copy drifts when
   the F# sibling is checked out alongside. Re-copy it in the same change-set as
   any F#-side CSS change (the §11 forward-coupling rule now spans this host too).

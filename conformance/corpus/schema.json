@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://fuaran.dev/wire-format/v1/schema.json",
   "title": "Fuaran UI wire format (v1)",
-  "description": "Canonical JSON wire format for the Fuaran UI tree (Node) and tree edits (TreeOp), wire format v1. Generated from Fuaran.UI.Types via Fuaran.UI.Ops.SchemaGen; describes the output of CanonicalJson.encode* / the input JsonDecode.decode* accepts. See fuaran/docs/WIRE_FORMAT.md.",
+  "description": "Canonical JSON wire format for the Fuaran UI tree (Node) and tree edits (TreeOp), wire format v1. Generated from Fuaran.UI.Types via Fuaran.UI.Ops.SchemaGen; describes the output of CanonicalJson.encode* / the input JsonDecode.decode* accepts. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
   "oneOf": [
     {
       "$ref": "#/$defs/Node"

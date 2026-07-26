@@ -5,7 +5,7 @@ The wire decoder is best-effort: a malicious AI emission can smuggle an
 ``javascript:`` href through the decode path. This module is the last line of
 defence before bytes reach a browser's HTML parser, and it mirrors the F#/TS
 renderers' posture seam-for-seam so the three hosts cannot drift on safety
-(see ``fuaran/SANITIZATION.md``):
+(see ``fuaran-dotnet/SANITIZATION.md``):
 
 1. **ExtraAttributes** — drop ``on*`` handlers, ``style``, and anything outside
    the ``data-*`` / ``aria-*`` allowlist; reject values carrying control bytes

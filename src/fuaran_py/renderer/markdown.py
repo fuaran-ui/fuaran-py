@@ -6,7 +6,7 @@ output is byte-identical to the F# and TypeScript hosts, verified against the
 shared corpus at ``../wire-format-fixtures/markdown/corpus.json``.
 
 Targets the GFM spec (github.github.com/gfm) at the common-case bar. The three
-buckets (see ``../fuaran/docs/MARKDOWN.md``):
+buckets (see ``../fuaran-dotnet/docs/MARKDOWN.md``):
 
 * IN  — CommonMark core + GFM tables / strikethrough / task lists / bare-URL
         autolinks.

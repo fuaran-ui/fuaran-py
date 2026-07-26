@@ -789,6 +789,14 @@
       "description": "Input/Button (Phase 283 — Action.Invoke capability effect)"
     },
     {
+      "id": "btn-json-payloads",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-json-payloads.json",
+      "expectedFile": "nodes/btn-json-payloads.json",
+      "description": "Input/Button (Notify / SetState / AiTool — JSON payloads)"
+    },
+    {
       "id": "btn-read-workbook",
       "kind": "node-round-trip",
       "decoder": "node",

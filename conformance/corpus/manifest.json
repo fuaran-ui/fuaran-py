@@ -373,46 +373,6 @@
       "description": "Behind unknown kind declaring requiredProfile core@1.4 — preserved + degrade label surfaced (WIRE_FORMAT 15.3)"
     },
     {
-      "id": "legacy-upgrade-card",
-      "kind": "lenient-accept",
-      "decoder": "node",
-      "inputFile": "lenient/legacy-upgrade-card.json",
-      "expectedFile": "lenient/legacy-upgrade-card.expected.json",
-      "description": "Legacy `Card` tag decode-upgrades to a Flex/Card Box preserving the heading (Phase 390)"
-    },
-    {
-      "id": "legacy-upgrade-dashboard",
-      "kind": "lenient-accept",
-      "decoder": "node",
-      "inputFile": "lenient/legacy-upgrade-dashboard.json",
-      "expectedFile": "lenient/legacy-upgrade-dashboard.expected.json",
-      "description": "Legacy `Dashboard` tag decode-upgrades to an Auto/Dashboard Box (Phase 390)"
-    },
-    {
-      "id": "legacy-upgrade-gridlayout",
-      "kind": "lenient-accept",
-      "decoder": "node",
-      "inputFile": "lenient/legacy-upgrade-gridlayout.json",
-      "expectedFile": "lenient/legacy-upgrade-gridlayout.expected.json",
-      "description": "Legacy `GridLayout` tag decode-upgrades to a Grid/Group Box (Phase 390)"
-    },
-    {
-      "id": "legacy-upgrade-stack",
-      "kind": "lenient-accept",
-      "decoder": "node",
-      "inputFile": "lenient/legacy-upgrade-stack.json",
-      "expectedFile": "lenient/legacy-upgrade-stack.expected.json",
-      "description": "Legacy `Stack` tag decode-upgrades to a Flex/Group Box (Phase 390)"
-    },
-    {
-      "id": "legacy-upgrade-table",
-      "kind": "lenient-accept",
-      "decoder": "node",
-      "inputFile": "lenient/legacy-upgrade-table.json",
-      "expectedFile": "lenient/legacy-upgrade-table.expected.json",
-      "description": "Legacy `Table` tag decode-upgrades to a static read-only DataGrid (Phase 393)"
-    },
-    {
       "id": "lenient-022-lvr-emphasis-loud",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1943,13 +1903,13 @@
       "description": "Top-level kind 'Widget' is not a recognised node kind"
     },
     {
-      "id": "reject-wrongtype-dashboard-children",
+      "id": "reject-wrongtype-box-children",
       "kind": "reject",
       "decoder": "node",
-      "inputFile": "reject/reject-wrongtype-dashboard-children.json",
+      "inputFile": "reject/reject-wrongtype-box-children.json",
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.children",
-      "description": "Dashboard children is object not array"
+      "description": "Box children is object not array"
     },
     {
       "id": "reject-wrongtype-discriminator",

@@ -224,14 +224,8 @@ KNOWN_KINDS = frozenset(
     {
         # Layout
         "Box",  # Phase 390 — the unified container
-        # The four retired container tags stay recognised for legacy
-        # decode-upgrade (they never re-encode to their old form → Box).
-        "Dashboard",
-        "Stack",
-        "GridLayout",
         "SplitPanel",
         "Tabs",
-        "Card",
         "Stepper",
         "SummaryList",
         "Disclosure",
@@ -264,7 +258,6 @@ KNOWN_KINDS = frozenset(
         # Visualisation
         "DataGrid",
         "Chart",
-        "Table",
         "Map",
         # Structural
         "Custom",
@@ -1203,9 +1196,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("maxWidth", False, _decode_int),
     ],
     # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
-    # field schema, because it re-nests `layout` and role-validates. The four
-    # retired container tags (Dashboard / Stack / GridLayout / Card) are handled
-    # by `_decode_legacy_container`, which decode-upgrades each to a `Box`.
+    # field schema, because it re-nests `layout` and role-validates.
     # Button gets a (minimal) typed schema so its two contract-bearing fields
     # route through the typed decoders: `label` picks up the §16 bare-string
     # leniency, and `onClick` goes through the null-strict action decoder
@@ -1308,64 +1299,11 @@ def _decode_box(obj: dict, path: str) -> Obj:
     return Obj("Box", fields)
 
 
-def _decode_legacy_container(tag: str, obj: dict, path: str) -> Obj:
-    """Decode-upgrade a retired container tag to the equivalent Box (Phase 390)."""
-    children = _decode_children(_require(obj, "children", path), f"{path}.children")
-    if tag == "Dashboard":
-        return Obj("Box", {"children": children, "layout": Obj("Auto", {}), "role": "Dashboard"})
-    if tag == "Stack":
-        direction = _enum(_require(obj, "orientation", path), f"{path}.orientation", ORIENTATION, "orientation")
-        wrap = _expect_bool(_require(obj, "wrap", path), f"{path}.wrap")
-        layout = Obj("Flex", {"direction": direction, "wrap": wrap})
-        return Obj("Box", {"children": children, "layout": layout, "role": "Group"})
-    if tag == "GridLayout":
-        gfields: dict[str, Value] = {"cols": _expect_int(_require(obj, "cols", path), f"{path}.cols")}
-        if "templateColumns" in obj:
-            gfields["templateColumns"] = _expect_string(obj["templateColumns"], f"{path}.templateColumns")
-        return Obj("Box", {"children": children, "layout": Obj("Grid", gfields), "role": "Group"})
-    # Card
-    fields: dict[str, Value] = {"children": children}
-    if "heading" in obj:
-        fields["heading"] = _decode_text_source(obj["heading"], f"{path}.heading")
-    fields["layout"] = Obj("Flex", {"direction": "Vertical", "wrap": False})
-    fields["role"] = "Card"
-    return Obj("Box", fields)
-
-
-_LEGACY_CONTAINER_TAGS = frozenset({"Dashboard", "Stack", "GridLayout", "Card"})
-
-
-def _decode_legacy_table(obj: dict, path: str) -> Obj:
-    """Decode-upgrade a retired ``Table`` tag to a static read-only ``DataGrid`` (Phase 393).
-
-    The static text table becomes the ``staticRows`` mode of ``DataGrid``; it is accepted on
-    read but never re-encodes as ``Table`` (the resulting Obj is a ``DataGrid``). Byte-parity
-    with the F#/TS static grid: an empty column set + an opaque ``Static`` source that
-    re-encodes to ``{"$type":"Static","value":"<opaque>"}``.
-    """
-    headers = _decode_text_source_array(_require(obj, "headers", path), f"{path}.headers")
-    rows_arr = _expect_array(_require(obj, "rows", path), f"{path}.rows")
-    rows = Arr([_decode_text_source_array(row, f"{path}.rows[{i}]") for i, row in enumerate(rows_arr)])
-    static_rows = Obj(None, {"headers": headers, "rows": rows})
-    return Obj(
-        "DataGrid",
-        {
-            "columns": Arr([]),
-            "source": Obj("Static", {"value": "<opaque>"}),
-            "staticRows": static_rows,
-        },
-    )
-
-
 def _decode_kind(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, KNOWN_KINDS, code_unknown=WRONG_NODE_KIND)
     if tag == "Box":
         return _decode_box(obj, path)
-    if tag in _LEGACY_CONTAINER_TAGS:
-        return _decode_legacy_container(tag, obj, path)
-    if tag == "Table":
-        return _decode_legacy_table(obj, path)
     if tag == "DataGrid":
         return _decode_datagrid(obj, path)
     if tag == "Form":

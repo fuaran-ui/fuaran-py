@@ -16,7 +16,7 @@ from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py import decode_node, encode_node
 from fuaran_py.model import Arr, Node, Obj
 from fuaran_py.ops import apply, decode_op
-from fuaran_py.ops.apply import ApplyErr
+from fuaran_py.ops.apply import ApplyErr, Ok
 from fuaran_py.schema import types as t
 from fuaran_py.ui import binding, encode, fuaran, node
 
@@ -180,6 +180,17 @@ def test_batch() -> None:
 # ── Error paths — typed ApplyError codes (parity with F#/TS) ─────────────────
 
 
+def _child_ids(tree: Node) -> list[str]:
+    """The ordered child ids of a decoded Box — what the placement tests assert."""
+    children = tree.kind.fields["children"]
+    assert isinstance(children, Arr), children
+    ids: list[str] = []
+    for c in children.items:
+        assert isinstance(c, Node), c
+        ids.append(c.id)
+    return ids
+
+
 def _err(result: object) -> str:
     assert isinstance(result, ApplyErr), result
     return result.error.code
@@ -198,21 +209,60 @@ def test_remove_root_is_kind_mismatch() -> None:
 def test_insert_into_childless_kind() -> None:
     base = fuaran.markdown("md", "x")
     child = _decode_tree(fuaran.markdown("new", "y"))
-    op = Obj("InsertChild", {"child": child, "parentId": "md", "position": 0})
+    op = Obj("InsertChild", {"child": child, "parentId": "md"})
     assert _err(_apply_op(op, base)) == "ChildlessKind"
 
 
-def test_insert_position_out_of_range() -> None:
-    base = fuaran.stack("s", children=[fuaran.markdown("a", "x")])
-    child = _decode_tree(fuaran.markdown("new", "y"))
-    op = Obj("InsertChild", {"child": child, "parentId": "s", "position": 5})
-    assert _err(_apply_op(op, base)) == "PositionOutOfRange"
+def test_insert_appends_and_ignores_a_legacy_position() -> None:
+    """0.4.0: InsertChild appends, so there is no out-of-range case to reject.
+
+    A legacy ``position`` is accepted and ignored for the migration window, so a
+    stored v1 op still applies — as an append, wherever its ordinal pointed.
+    """
+    base = fuaran.stack("s", children=[fuaran.markdown("a", "x"), fuaran.markdown("b", "y")])
+    child = _decode_tree(fuaran.markdown("new", "z"))
+    for pos in (0, 5):
+        op = Obj("InsertChild", {"child": child, "parentId": "s", "position": pos})
+        result = _apply_op(op, base)
+        assert isinstance(result, Ok), result
+        assert _child_ids(result.value) == ["a", "b", "new"], f"legacy position {pos} must be ignored"
+
+    # The canonical, positionless form does the same thing.
+    result = _apply_op(Obj("InsertChild", {"child": child, "parentId": "s"}), base)
+    assert isinstance(result, Ok), result
+    assert _child_ids(result.value) == ["a", "b", "new"]
+
+
+def test_batch_insert_then_reorder_places_precisely() -> None:
+    """The pair that supersedes the ordinal: append, then state the order."""
+    base = fuaran.stack("s", children=[fuaran.markdown("a", "x"), fuaran.markdown("b", "y")])
+    child = _decode_tree(fuaran.markdown("new", "z"))
+    batch = Obj(
+        "Batch",
+        {
+            "ops": Arr(
+                [
+                    Obj("InsertChild", {"child": child, "parentId": "s"}),
+                    Obj("ReorderChildren", {"newOrder": Arr(["new", "a", "b"]), "parentId": "s"}),
+                ]
+            )
+        },
+    )
+    result = _apply_op(batch, base)
+    assert isinstance(result, Ok), result
+    assert _child_ids(result.value) == ["new", "a", "b"]
+
+
+def test_reorder_that_is_not_an_exact_permutation() -> None:
+    base = fuaran.stack("s", children=[fuaran.markdown("a", "x"), fuaran.markdown("b", "y")])
+    op = Obj("ReorderChildren", {"newOrder": Arr(["a"]), "parentId": "s"})
+    assert _err(_apply_op(op, base)) == "OrderingMismatch"
 
 
 def test_insert_duplicate_id() -> None:
     base = fuaran.stack("s", children=[fuaran.markdown("dup", "x")])
     child = _decode_tree(fuaran.markdown("dup", "y"))
-    op = Obj("InsertChild", {"child": child, "parentId": "s", "position": 0})
+    op = Obj("InsertChild", {"child": child, "parentId": "s"})
     assert _err(_apply_op(op, base)) == "DuplicateNodeId"
 
 

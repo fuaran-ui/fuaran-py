@@ -829,7 +829,6 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
 
     if tag == "InsertChild":
         parent_id = _as_str(fields["parentId"])
-        position = _as_int(fields["position"])
         child = _as_node(fields["child"])
         parent = _find(parent_id, root)
         if parent is None:
@@ -841,16 +840,13 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
                 f"Node '{parent_id}' (kind={parent.kind.tag}) has no children field — "
                 "only layout kinds accept structural child ops.",
             )
-        if position < 0 or position > len(children):
-            return _fail(
-                POSITION_OUT_OF_RANGE,
-                f"Position {position} is out of range for parent '{parent_id}' (valid: 0..{len(children)}).",
-            )
         existing = set(_all_ids(root))
         duplicate = next((cid for cid in _all_ids(child) if cid in existing), None)
         if duplicate is not None:
             return _fail(DUPLICATE_NODE_ID, f"NodeId '{duplicate}' is already present in the tree; ids must be unique.")
-        new_children = children[:position] + [child] + children[position:]
+        # 0.4.0: InsertChild APPENDS. Placing a node anywhere else is
+        # Batch [InsertChild, ReorderChildren] — order is stated by naming ids.
+        new_children = children + [child]
         tree = _map(parent_id, lambda n: _with_layout_children(n, new_children), root)
         assert tree is not None
         return _ok(tree)
@@ -870,7 +866,6 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
     if tag == "MoveNode":
         target = _as_str(fields["target"])
         new_parent_id = _as_str(fields["newParentId"])
-        new_position = _as_int(fields["newPosition"])
         if target == new_parent_id:
             return _fail(KIND_MISMATCH, "Cannot move a node into itself.")
         if _is_ancestor(target, new_parent_id, root):
@@ -888,7 +883,7 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return after_remove
         assert isinstance(after_remove, Ok)
         inserted = _apply_one(
-            Obj("InsertChild", {"child": moving, "parentId": new_parent_id, "position": new_position}),
+            Obj("InsertChild", {"child": moving, "parentId": new_parent_id}),
             after_remove.value,
         )
         return inserted

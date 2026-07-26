@@ -236,13 +236,13 @@ def _children_diff(a: Node, b: Node) -> list[Obj]:
         if cid not in b_set:
             ops.append(Obj("RemoveNode", {"target": cid}))
 
-    # inserts — after-only children appended at the growing tail
+    # inserts — after-only children appended. This diff already targeted the
+    # growing tail, so 0.4.0's append-only InsertChild changes nothing about the
+    # script it emits; only the ordinal, which merely restated the tail, goes.
     survivors = [cid for cid in a_ids if cid in b_set]
-    position = len(survivors)
     b_only = [c for c in b_kids if c.id not in a_set]
     for child in b_only:
-        ops.append(Obj("InsertChild", {"child": child, "parentId": a.id, "position": position}))
-        position += 1
+        ops.append(Obj("InsertChild", {"child": child, "parentId": a.id}))
 
     # reorder — single op if the post-insert order still differs from the target
     post_insert = survivors + [c.id for c in b_only]

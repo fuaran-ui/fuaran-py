@@ -4283,16 +4283,12 @@
             },
             "parentId": {
               "type": "string"
-            },
-            "position": {
-              "type": "integer"
             }
           },
           "required": [
             "$type",
             "child",
-            "parentId",
-            "position"
+            "parentId"
           ]
         },
         {
@@ -4319,9 +4315,6 @@
             "newParentId": {
               "type": "string"
             },
-            "newPosition": {
-              "type": "integer"
-            },
             "target": {
               "type": "string"
             }
@@ -4329,7 +4322,6 @@
           "required": [
             "$type",
             "newParentId",
-            "newPosition",
             "target"
           ]
         },

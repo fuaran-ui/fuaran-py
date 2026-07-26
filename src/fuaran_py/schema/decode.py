@@ -305,9 +305,13 @@ def _decode_binding(value: object, path: str) -> Value:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
     if tag == "Static":
-        if "value" not in obj:
-            _fail(MISSING_FIELD, f"{path}.value", "Static binding missing value")
-        return Obj("Static", {"value": from_json(obj["value"])})
+        # Phase 677 — absence is structural: a MISSING `value` means the binding
+        # carries none, and the legacy `"value": null` spelling normalises to the
+        # same thing (§16 shorthand). Neither emits a key on re-encode.
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
+            return Obj("Static", {})
+        return Obj("Static", {"value": from_json(raw)})
     if tag == "Bound":
         # Phase 633 — the `TextSource.Bound` wrapper convention transferred to a
         # bare-Binding slot unwraps one-to-one: decode the inner binding in place.
@@ -352,16 +356,20 @@ def _typed_static_binding(
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
     if tag == "Static":
-        if "value" not in obj:
-            _fail(MISSING_FIELD, f"{path}.value", "Static binding missing value")
-        raw = obj["value"]
-        if raw == OPAQUE:
-            normalised = on_opaque
-        elif raw is None:
+        # Phase 677 — a MISSING `value` and an explicit `null` both mean "no
+        # payload" and share the slot's `on_null` normalisation. Where that
+        # normalisation is itself absence (`on_null=None`, e.g. the string slot)
+        # the key is omitted entirely; where the slot has a typed empty (options
+        # normalise to `[]`) that empty is emitted, so "no selection" and
+        # "selected nothing" stay distinguishable.
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
             normalised = on_null
+        elif raw == OPAQUE:
+            normalised = on_opaque
         else:
             normalised = on_typed(raw, f"{path}.value")
-        return Obj("Static", {"value": normalised})
+        return Obj("Static", {} if normalised is None else {"value": normalised})
     if tag == "Bound":
         return _typed_static_binding(_require(obj, "binding", path), f"{path}.binding", on_typed, on_opaque, on_null)
     return _normalise_binding_obj(obj, path)
@@ -667,7 +675,8 @@ def _normalise_binding_obj(obj: dict, path: str) -> Value:
         key = _expect_string(_require(obj, "key", path), f"{path}.key")
         fields = {}
         default_raw, default_present = _alias_get(obj, "defaultValue", ("initialValue", "default"))
-        if default_present:
+        # Phase 677 — an explicit null default is absence, same as omitting it.
+        if default_present and default_raw is not None:
             fields["defaultValue"] = from_json(default_raw)
         fields["key"] = key
         return Obj("State", fields)

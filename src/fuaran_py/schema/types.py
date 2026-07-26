@@ -123,6 +123,10 @@ class Static:
     value: Value
 
     def to_wire(self) -> Value:
+        # Phase 677 — absence is structural: a binding carrying no value omits the
+        # key rather than emitting JSON null, for which the wire model has no case.
+        if self.value is None:
+            return Obj("Static", {})
         return Obj("Static", {"value": _lower(self.value)})
 
 
@@ -134,6 +138,9 @@ class State:
     default_value: Value
 
     def to_wire(self) -> Value:
+        # Phase 677 — same rule as `Static`: absence omits, never null.
+        if self.default_value is None:
+            return Obj("State", {"key": self.key})
         return Obj("State", {"defaultValue": _lower(self.default_value), "key": self.key})
 
 

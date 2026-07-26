@@ -260,8 +260,7 @@
             "value": true
           },
           "required": [
-            "$type",
-            "value"
+            "$type"
           ]
         },
         {
@@ -333,7 +332,6 @@
           },
           "required": [
             "$type",
-            "defaultValue",
             "key"
           ]
         },

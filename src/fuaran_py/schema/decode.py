@@ -1472,7 +1472,18 @@ def _decode_chart(obj: dict, path: str) -> Obj:
 # key at all; an absent `value` simply stays absent (the canonical bytes).
 
 FORM_FIELD_KIND_CASES = frozenset(
-    {"Text", "Number", "Checkbox", "Choice", "RangedNumber", "SegmentedChoice", "TextArea", "Range", "Date"}
+    {
+        "Text",
+        "Number",
+        "Checkbox",
+        "Choice",
+        "RangedNumber",
+        "SegmentedChoice",
+        "TextArea",
+        "Range",
+        "Date",
+        "DateRange",
+    }
 )
 
 # The 0.2.1 typed placeholders (the F# `ControlValueDefaults`): the values the
@@ -1482,6 +1493,8 @@ _AUTO_NUMBER: tuple[Value, ...] = (0, 0.0)
 _AUTO_CHECKBOX: tuple[Value, ...] = (False,)
 _AUTO_CHOICE: tuple[Value, ...] = (None,)
 _AUTO_RANGE: tuple[Value, ...] = (Obj(None, {"max": 0, "min": 0}), Obj(None, {"max": 0.0, "min": 0.0}))
+# 0.7.0 — the DateRange placeholder is the ISO-empty pair at both ends.
+_AUTO_DATE_RANGE: tuple[Value, ...] = (Obj(None, {"from": "", "to": ""}),)
 
 
 def _is_auto_value(decoded: Value, auto: tuple[str, str] | None, placeholders: tuple[Value, ...]) -> bool:
@@ -1520,6 +1533,51 @@ def _decode_range_pair_value(value: object, path: str) -> Value:
                 "max": _decode_number(raw["max"], f"{path}.max"),
                 "min": _decode_number(raw["min"], f"{path}.min"),
             },
+        )
+    return _decode_binding(value, path)
+
+
+def _ordered_date_pair(lo: str, hi: str, path: str) -> Value:
+    """The DateRange ordered-pair rule (WIRE_FORMAT §3.6, 0.7.0).
+
+    A *literal* pair must satisfy ``from <= to``. Same-variant ISO-8601 strings
+    sort lexicographically in chronological order, so Python's ordinal string
+    compare (the `String.CompareOrdinal` twin) is total here — no date parsing,
+    no locale. Only a literal pair is checked; a bound pair's ordering is a
+    runtime concern."""
+    if lo > hi:
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"date-range start '{lo}' is after end '{hi}' — a DateRange pair is ordered (from <= to); "
+            "ISO-8601 strings of one variant compare lexicographically, so swap the two values",
+            'ordered ISO-8601 pair ({"from": <iso>, "to": <iso>} with from <= to)',
+        )
+    return Obj(None, {"from": lo, "to": hi})
+
+
+def _decode_date_range_pair_value(value: object, path: str) -> Value:
+    """A `FormFieldKind.DateRange` value: the canonical Static pair rides as the
+    BARE `{"from":…,"to":…}` object (no envelope — the `Range` posture); a
+    `[from,to]` two-element array and the enveloped `Static` form decode
+    leniently (§3.6); any other binding case passes through the normal binding
+    decode. A literal pair is ordered-checked; a bound one is not."""
+    raw: object = value
+    if isinstance(raw, dict) and raw.get("$type") == "Static" and "value" in raw:
+        raw = raw["value"]
+    if isinstance(raw, list):
+        if len(raw) != 2:
+            _fail(WRONG_TYPE, path, "a date-range value array must carry exactly [from, to]")
+        return _ordered_date_pair(
+            _expect_string(raw[0], f"{path}[0]"),
+            _expect_string(raw[1], f"{path}[1]"),
+            path,
+        )
+    if isinstance(raw, dict) and "$type" not in raw and "from" in raw and "to" in raw:
+        return _ordered_date_pair(
+            _expect_string(raw["from"], f"{path}.from"),
+            _expect_string(raw["to"], f"{path}.to"),
+            path,
         )
     return _decode_binding(value, path)
 
@@ -1577,6 +1635,19 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
                 )
             else:
                 fields["orientation"] = "Horizontal"
+    elif tag == "DateRange":
+        # 0.7.0 — the single-control date range: `Range`'s pair mechanics with
+        # `Date`'s value conventions. `min` / `max` (ISO strings) + `step`
+        # (seconds) are flat — they bound BOTH ends — with `Date`'s
+        # omit-when-absent discipline.
+        if "value" in obj:
+            decoded = _decode_date_range_pair_value(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, _AUTO_DATE_RANGE):
+                fields["value"] = decoded
+        fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+        bound("min", _decode_string)
+        bound("max", _decode_string)
+        bound("step", _decode_number)
     else:  # Range (0.2.0 — absorbed the retired FilterKind.RangeFilter)
         if "value" in obj:
             decoded = _decode_range_pair_value(obj["value"], f"{path}.value")

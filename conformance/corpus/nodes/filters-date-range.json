@@ -1,0 +1,1 @@
+{"id":"filters-date-range","kind":{"$type":"Filters","items":[{"kind":{"$type":"DateRange","variant":"Date"},"label":"Stay","name":"stay"}]}}

@@ -549,6 +549,22 @@
       "description": "pilot-5 n=3 gate — the Bound wrapper unwraps in bare-Binding slots (the TextSource.Bound convention transferred; one payload field, one-to-one); canonical stays the bare binding"
     },
     {
+      "id": "lenient-daterange-bare-array",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-daterange-bare-array.json",
+      "expectedFile": "lenient/lenient-daterange-bare-array.expected.json",
+      "description": "Phase 725 — a DateRange Static pair may ride the [from, to] two-element array (the §3.6 bare-array coercion, mirroring `Range`); it normalises to the canonical bare {from, to} object"
+    },
+    {
+      "id": "lenient-daterange-static-envelope",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-daterange-static-envelope.json",
+      "expectedFile": "lenient/lenient-daterange-static-envelope.expected.json",
+      "description": "Phase 725 — a DateRange Static pair wrapped in the explicit {\"$type\":\"Static\"} envelope stays decode-accepted (the `Range` read-compat posture); the bare {from, to} object is the canonical output"
+    },
+    {
       "id": "lenient-emphasis-cross-vocab",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -563,6 +579,38 @@
       "inputFile": "lenient/lenient-fact-explicit-defaults.json",
       "expectedFile": "lenient/lenient-fact-explicit-defaults.expected.json",
       "description": "Fact (the new labeled text-fact kind) — explicit-default `tone`/`emphasis` decode and canonicalise away (omitted-when-default on both boundaries from day one), and the bare-string TextSource shorthand applies to `label`/`value`. The canonical minimal Fact is exactly the two-field form models want to write."
+    },
+    {
+      "id": "lenient-filterable-static-dashboard-compact",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-filterable-static-dashboard-compact.json",
+      "expectedFile": "lenient/lenient-filterable-static-dashboard-compact.expected.json",
+      "description": "Phase 719 — the compact authoring twin of `filterable-static-dashboard`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
+    },
+    {
+      "id": "lenient-grid-field-named-compact",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-grid-field-named-compact.json",
+      "expectedFile": "lenient/lenient-grid-field-named-compact.expected.json",
+      "description": "Phase 719 — the compact authoring twin of `grid-field-named`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
+    },
+    {
+      "id": "lenient-grid-transform-param-compact",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-grid-transform-param-compact.json",
+      "expectedFile": "lenient/lenient-grid-transform-param-compact.expected.json",
+      "description": "Phase 719 — the compact authoring twin of `grid-transform-param`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
+    },
+    {
+      "id": "lenient-master-detail-preselected-compact",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-master-detail-preselected-compact.json",
+      "expectedFile": "lenient/lenient-master-detail-preselected-compact.expected.json",
+      "description": "Phase 719 — the compact authoring twin of `master-detail-preselected`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
     },
     {
       "id": "lenient-null-static-options",
@@ -603,6 +651,14 @@
       "inputFile": "lenient/lenient-opaque-static-values.json",
       "expectedFile": "lenient/lenient-opaque-static-values.expected.json",
       "description": "Pre-429 opaque multi-select values decode to the tagged placeholder list and re-encode typed"
+    },
+    {
+      "id": "lenient-scalar-transform-composition-compact",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-scalar-transform-composition-compact.json",
+      "expectedFile": "lenient/lenient-scalar-transform-composition-compact.expected.json",
+      "description": "Phase 719 — the compact authoring twin of `scalar-transform-composition`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
     },
     {
       "id": "lenient-shape-binding-scalar-fraction",
@@ -949,6 +1005,14 @@
       "description": "Input/Filters (text + choice)"
     },
     {
+      "id": "filters-date-range",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-date-range.json",
+      "expectedFile": "nodes/filters-date-range.json",
+      "description": "Input/Filters (Phase 725 — DateRange chip: one filter param carries the pair, value auto-bound)"
+    },
+    {
       "id": "filters-declarative",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -979,6 +1043,14 @@
       "inputFile": "nodes/form-date.json",
       "expectedFile": "nodes/form-date.json",
       "description": "Input/Form (Date — date/time/datetime variants + bounds)"
+    },
+    {
+      "id": "form-date-range",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-date-range.json",
+      "expectedFile": "nodes/form-date-range.json",
+      "description": "Input/Form (Phase 725 — DateRange: single-control date range, bare {from,to} pair + bounds)"
     },
     {
       "id": "form-declarative",
@@ -1394,7 +1466,7 @@
       "decoder": "node",
       "inputFile": "nodes/table-1.json",
       "expectedFile": "nodes/table-1.json",
-      "description": "Visualisation/Table"
+      "description": "Visualisation/Grid (static-table mode — staticRows; absorbed the retired Table kind)"
     },
     {
       "id": "tabs-1",
@@ -1603,6 +1675,15 @@
       "inputFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
       "expectedFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
       "description": "UpdateStyle (Phase 147 Role=Eyebrow + Voice=Structural)"
+    },
+    {
+      "id": "reject-daterange-unordered",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-daterange-unordered.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.value",
+      "description": "DateRange literal pair with start after end — the ordered-pair rule (Phase 725)"
     },
     {
       "id": "reject-emptynodeid",

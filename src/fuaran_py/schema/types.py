@@ -1270,6 +1270,40 @@ class DateField:
 
 
 @dataclass(frozen=True)
+class DateRangeField:
+    """``FormFieldKind.DateRange`` (0.7.0) — the single-control date range.
+
+    ``Range``'s pair mechanics with ``Date``'s value conventions: the bound value
+    is the ordered ``(from, to)`` pair, each end an ISO-8601 string in the
+    ``variant``'s shape. A literal pair rides the wire as the BARE
+    ``{"from":…,"to":…}`` object (no ``Static`` envelope — the ``Range``
+    posture) and must satisfy ``from <= to``; ``min`` / ``max`` (ISO strings) and
+    ``step`` (seconds) bound BOTH ends.
+    """
+
+    value: Binding | tuple[str, str]
+    variant: DateVariant = "Date"
+    min: str | None = None
+    max: str | None = None
+    step: float | None = None
+
+    def to_wire(self) -> Value:
+        pair = self.value
+        lowered: object = Obj(None, {"from": pair[0], "to": pair[1]}) if isinstance(pair, tuple) else _lower(pair)
+        return _obj(
+            "DateRange",
+            {
+                "max": self.max,
+                "min": self.min,
+                "onChange": CLOSURE,
+                "step": self.step,
+                "value": lowered,
+                "variant": self.variant,
+            },
+        )
+
+
+@dataclass(frozen=True)
 class ChoiceField:
     options: Binding
     value: Binding
@@ -1297,7 +1331,15 @@ class SegmentedChoice:
 
 
 FormFieldKind = (
-    TextField | NumberField | CheckboxField | TextAreaField | RangedNumber | DateField | ChoiceField | SegmentedChoice
+    TextField
+    | NumberField
+    | CheckboxField
+    | TextAreaField
+    | RangedNumber
+    | DateField
+    | DateRangeField
+    | ChoiceField
+    | SegmentedChoice
 )
 
 

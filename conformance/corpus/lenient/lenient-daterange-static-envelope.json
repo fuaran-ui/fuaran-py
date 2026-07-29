@@ -1,0 +1,1 @@
+{"id":"len-dr-env","kind":{"$type":"Form","fields":[{"id":"stay","kind":{"$type":"DateRange","value":{"$type":"Static","value":{"from":"2026-03-01","to":"2026-03-08"}},"variant":"Date"},"label":"Stay","required":false}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Book"}}

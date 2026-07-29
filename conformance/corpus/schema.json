@@ -1309,6 +1309,34 @@
             "$type",
             "variant"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "DateRange"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": true,
+            "variant": {
+              "$ref": "#/$defs/DateVariant"
+            },
+            "min": {
+              "type": "string"
+            },
+            "max": {
+              "type": "string"
+            },
+            "step": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "variant"
+          ]
         }
       ]
     },

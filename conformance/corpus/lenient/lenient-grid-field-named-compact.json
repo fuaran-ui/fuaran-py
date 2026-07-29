@@ -1,0 +1,1 @@
+{"id":"grid-field-named","kind":{"$type":"DataGrid","columns":[{"field":"dept","kind":{"$type":"Text"},"label":"Dept"},{"field":"amount","kind":{"$type":"Text"},"label":"Amount"}],"rowKeyField":"dept","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"amount":[100],"dept":["eng"]}}}}}

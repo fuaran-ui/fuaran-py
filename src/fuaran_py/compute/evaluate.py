@@ -11,6 +11,12 @@ Semantics pinned to the reference host:
 
 * **Parameter resolution.** Each ``parameters`` entry binds a ``Param`` name to a scalar
   source (``Filter`` / ``Selection`` / ``State`` / ``Static``) resolved against ``state``.
+* **Declared defaults seed the param.** An unwritten ``Selection`` (0.2.9) / ``Filter``
+  (0.2.0) / ``State`` binding falls back to its own ``defaultValue`` — so the param is
+  *bound* and its filter is evaluated, not pruned. This is the pre-selected-row /
+  pre-selected-filter mechanism: resolution-time defaulting, no store seeding. A
+  ``Selection`` reads ``nodeId`` (its identity key) and a declared ``field`` projects
+  that column off the written row.
 * **Lenient filter pruning.** A ``Filter`` step referencing an *unbound* param is dropped
   ("an unset filter is no constraint") — the one host-side leniency; the core evaluator
   stays strict, so a bound param substitutes to its literal and an unbound param that
@@ -96,25 +102,58 @@ def _scalar_to_cell(value: Value) -> Cell:
 type ComputeState = dict[str, object]
 
 
+def _declared_default(binding: Obj) -> Cell | None:
+    """The binding's declared ``defaultValue`` as a cell, or ``None`` when it
+    declares none. Resolution-time defaulting IS the pre-selection mechanism —
+    ``Selection`` (0.2.9), ``Filter`` (0.2.0), ``State`` — so a param sourced
+    from an unwritten-but-defaulted binding is **bound**, never pruned."""
+    if "defaultValue" not in binding.fields:
+        return None
+    return _scalar_to_cell(binding.fields["defaultValue"])
+
+
+def _project_selection(raw: object, field: Value) -> Cell:
+    """Project a written selection to its scalar. A declared ``field`` (0.2.10)
+    names the column to read off the stored ROW — a grid's row-click writes the
+    whole row, and a param slot is scalar. A field-less selection is already the
+    scalar value."""
+    if isinstance(field, str):
+        if isinstance(raw, Obj):
+            return _scalar_to_cell(raw.fields.get(field))
+        if isinstance(raw, dict):
+            return _scalar_to_cell(raw.get(field))  # type: ignore[arg-type]
+    return _scalar_to_cell(raw)  # type: ignore[arg-type]
+
+
 def resolve_param_binding(binding: Value, state: ComputeState) -> Cell | None:
     """Resolve a parameter's ``from`` binding against the host ``state`` store, or
-    ``None`` when it is unbound (the filter-pruning trigger)."""
+    ``None`` when it is unbound (the filter-pruning trigger).
+
+    Mirrors the reference hosts' ``resolve``: the written host value wins, and an
+    unwritten binding falls back to its own declared ``defaultValue`` before it is
+    called unbound. ``Selection`` keys on ``nodeId`` (the binding's identity key —
+    the accessor sentinel is off the wire since 0.2.0), ``Filter`` / ``Query`` on
+    ``name``, ``State`` on ``key``."""
     if not isinstance(binding, Obj):
         return None
     if binding.tag == "Static":
         return _scalar_to_cell(binding.fields.get("value"))
-    if binding.tag in ("Filter", "Selection"):
+    if binding.tag == "Filter":
         name = binding.fields.get("name")
         if isinstance(name, str) and name in state:
             return _scalar_to_cell(state[name])  # type: ignore[arg-type]
-        return None
+        return _declared_default(binding)
+    if binding.tag == "Selection":
+        node_id = binding.fields.get("nodeId")
+        if isinstance(node_id, str) and node_id in state:
+            return _project_selection(state[node_id], binding.fields.get("field"))
+        return _declared_default(binding)
     if binding.tag == "State":
         key = binding.fields.get("key")
         if isinstance(key, str):
             if key in state:
                 return _scalar_to_cell(state[key])  # type: ignore[arg-type]
-            default = binding.fields.get("defaultValue")
-            return _scalar_to_cell(default) if default is not None else None
+            return _declared_default(binding)
     return None
 
 

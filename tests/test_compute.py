@@ -23,7 +23,10 @@ from fuaran_py.canonical import encode_value
 from fuaran_py.compute import ComputeOk, evaluate_transform, evaluate_tree, rows_of
 from fuaran_py.dataframe import (
     NULL,
+    Binary,
+    Col,
     Column,
+    Embedded,
     Filter,
     Param,
     Ref,
@@ -90,6 +93,119 @@ def test_param_binds_from_state(dept: str, expected: list[dict[str, object]]) ->
     result = evaluate_transform(node.kind.fields["source"], {"dept": dept})
     assert isinstance(result, ComputeOk)
     assert result.rows == expected
+
+
+# ── declared param defaults (Selection 0.2.9 / Filter 0.2.0) ─────────────────
+#
+# A param whose `from` binding is unwritten but carries a `defaultValue` is
+# BOUND to that default, not unbound — so its filter step is evaluated, never
+# pruned. The two paths are observably different (a pruned filter yields every
+# row; a seeded one yields the selected subset), and the reference hosts seed.
+
+
+def _related_grid(tree: Node) -> Node:
+    """The `related-grid` child of `master-detail-preselected` — a DataGrid whose
+    Transform param is a `Selection` with a declared `defaultValue`."""
+    return next(c for c in tree.kind.fields["children"].items if c.id == "related-grid")
+
+
+@corpus_required
+def test_selection_param_seeds_declared_default() -> None:
+    """An unwritten `Selection` with a `defaultValue` SEEDS the param — the
+    preselected-row mechanism (0.2.9). Pruning instead would yield both rows."""
+    node = _related_grid(_decode("master-detail-preselected.json"))
+    result = evaluate_transform(node.kind.fields["source"], {})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"id": "TCK-2041", "priority": "high"}]
+
+
+@corpus_required
+def test_selection_param_default_is_not_first_row_coincidence() -> None:
+    """The load-bearing case the corpus cannot yet express: a default naming a
+    NON-FIRST row. Pruning yields both rows; seeding yields only TCK-2042 —
+    the two implementations are indistinguishable when the default is row 0."""
+    node = _related_grid(_decode("master-detail-preselected.json"))
+    source = node.kind.fields["source"]
+    param = source.fields["params"].items[0]
+    seeded = Obj(
+        "Transform",
+        {
+            **source.fields,
+            "params": Arr(
+                [
+                    Obj(
+                        None,
+                        {
+                            **param.fields,
+                            "from": Obj("Selection", {**param.fields["from"].fields, "defaultValue": "TCK-2042"}),
+                        },
+                    )
+                ]
+            ),
+        },
+    )
+    result = evaluate_transform(seeded, {})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"id": "TCK-2042", "priority": "low"}]
+
+
+@corpus_required
+def test_selection_param_projects_field_off_a_written_row() -> None:
+    """A written selection stores the whole row; a declared `field` projects the
+    scalar off it (0.2.10), and the live value wins over the default."""
+    node = _related_grid(_decode("master-detail-preselected.json"))
+    state = {"ticket-grid": {"id": "TCK-2042", "priority": "low"}}
+    result = evaluate_transform(node.kind.fields["source"], state)
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"id": "TCK-2042", "priority": "low"}]
+
+
+def _param_transform(from_binding: Obj) -> Obj:
+    """A one-column embedded source + `filter(name = param p)` over it."""
+    table = Table([("name", "string")], [Column("name", "string", [cell_str("a"), cell_str("b")])])
+    source = from_json(json.loads(encode_source(Embedded(table))))
+    pipeline = from_json(
+        json.loads(
+            encode_pipeline([Filter(Binary("eq", Col("name"), Param("p")))]),
+        )
+    )
+    return Obj(
+        "Transform",
+        {
+            "params": Arr([Obj(None, {"from": from_binding, "name": "p"})]),
+            "pipeline": pipeline,
+            "source": source,
+        },
+    )
+
+
+def test_filter_param_seeds_declared_default() -> None:
+    """`Binding.Filter.defaultValue` (0.2.0) seeds the same way — the value the
+    resolver yields before the filter is first written."""
+    result = evaluate_transform(_param_transform(Obj("Filter", {"defaultValue": "b", "name": "q"})), {})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"name": "b"}]
+
+
+def test_filter_param_written_value_wins_over_the_default() -> None:
+    result = evaluate_transform(_param_transform(Obj("Filter", {"defaultValue": "b", "name": "q"})), {"q": "a"})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"name": "a"}]
+
+
+def test_filter_param_without_a_default_still_prunes() -> None:
+    """The one host leniency is untouched: no written value AND no declared
+    default ⇒ unbound ⇒ the filter step is pruned ("an unset filter is no
+    constraint")."""
+    result = evaluate_transform(_param_transform(Obj("Filter", {"name": "q"})), {})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"name": "a"}, {"name": "b"}]
+
+
+def test_state_param_seeds_declared_default() -> None:
+    result = evaluate_transform(_param_transform(Obj("State", {"defaultValue": "b", "key": "k"})), {})
+    assert isinstance(result, ComputeOk)
+    assert result.rows == [{"name": "b"}]
 
 
 # ── the reactive runtime loop ─────────────────────────────────────────────────

@@ -56,7 +56,7 @@ fuaran-py/
 │   ├── op_stream/        # hash-chained provenance log: StreamEntry envelope + SHA-256 chain + in-memory sink + replay
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
 │   ├── ai_tools/         # AI-tools introspection: emittable-surface catalog + value-space + tool schemas + tree introspection + default-deny dispatch gate (Phase 237)
-│   ├── conformance/      # corpus round-trip smoke harness + certification bridge (Phase 236)
+│   ├── conformance/      # corpus round-trip smoke harness + certification bridge + the cross-host fuzz-sample exchange (Phase 236)
 │   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
 │   ├── style_observer/   # computed-style observer: pure flag tier + InMemory + Pyodide live read-back
 │   └── theme_manifest/   # DTCG-compatible theme contract (tokens + role bindings + invariants)
@@ -111,7 +111,34 @@ field-level validation is implemented for the common kinds;
 recognised-but-not-yet-typed kinds are accepted structurally (still
 byte-exact on round-trip). The formal certification harness (offline corpus
 snapshot + drift guard, schema validation, a language-agnostic certification
-bridge, a CI leg, and generative parity) is follow-up work.
+bridge, a CI leg, and generative parity) has since landed.
+
+### Within-host parity vs the cross-host exchange (do not conflate these)
+
+Two generative floors sit above the curated corpus, and each proves something the
+other cannot:
+
+- **Within-host** — `tests/test_generative_parity.py`, ≥1000 `hypothesis` trees,
+  `encode(decode(encode x)) == encode x`. This host's canonical form is a fixed
+  point. Self-consistency only: a misreading of the spec that this host applies
+  *consistently* passes it every time.
+- **Cross-host** — `fuaran_py.conformance.fuzz_exchange`, the fuzz-sample
+  exchange. Another host emits its canonical bytes for generated trees into
+  `<dir>/fsharp/`; this module decodes + re-encodes each through the Python codec,
+  asserts byte-identity, and writes **this** host's canonical output to
+  `<dir>/python/` so the sibling's `--check-fuzz-samples <dir> python` can check
+  the converse direction. One host's output, a different host's codec — the only
+  arrangement in which a shared misreading is visible.
+
+The exchange needs a sibling host's emitter and so is hand-driven (the module
+docstring carries the full command sequence); the within-host floor runs under a
+plain `pytest`. `tests/test_fuzz_exchange.py` pins the *runner* — that it detects
+a divergence, emits this host's set, and refuses a missing input set — using real
+corpus payloads, so it needs no other toolchain.
+
+The exchange's directory names (`fsharp` / `python`) are a cross-repo contract
+with the sibling's `--check-fuzz-samples <dir> <host>` argument; renaming either
+side silently un-wires it.
 
 ## Renderer (Phase 239)
 

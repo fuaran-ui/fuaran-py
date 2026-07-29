@@ -254,8 +254,33 @@ pytest
 ```
 
 A standalone offline corpus snapshot + drift guard, schema validation, a
-language-agnostic certification bridge, CI integration, and generative parity are
-follow-up work.
+language-agnostic certification bridge, and CI integration all ship.
+
+### Two generative layers, and neither replaces the other
+
+The curated corpus pins named traps. Beyond it there are two distinct floors,
+often conflated:
+
+- **Within-host** (`tests/test_generative_parity.py`) — over ≥1000 `hypothesis`
+  generated trees, `encode(decode(encode x)) == encode x`: this host's canonical
+  form is a fixed point. It proves `fuaran-py` is *self-consistent*, and it runs
+  under a plain `pytest` with no other toolchain.
+- **Cross-host** (`fuaran_py.conformance.fuzz_exchange`) — one host's canonical
+  bytes are checked by a *different* host's codec, in both directions. That is
+  the whole value of it: a shared misreading of the spec is invisible to any
+  within-host property and shows up here immediately.
+
+The cross-host exchange needs a sibling host's emitter, so it is driven by hand:
+
+```bash
+# emit the other host's canonical samples into <dir>/fsharp/, then:
+python -m fuaran_py.conformance.fuzz_exchange <dir>   # decode + re-encode + write <dir>/python/
+```
+
+Exit `0` all samples agree, `1` a divergence (named, with the first differing
+byte), `2` the input set is missing. The runner itself is pinned by
+`tests/test_fuzz_exchange.py`, which drives it over real corpus payloads and
+asserts a deliberately corrupted sample is rejected.
 
 ## License
 

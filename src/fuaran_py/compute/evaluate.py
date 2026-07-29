@@ -11,6 +11,11 @@ Semantics pinned to the reference host:
 
 * **Parameter resolution.** Each ``parameters`` entry binds a ``Param`` name to a scalar
   source (``Filter`` / ``Selection`` / ``State`` / ``Static``) resolved against ``state``.
+  Resolution is three-valued (:data:`ParamResolution`): a scalar cell, *unbound*, or a
+  **non-scalar** source — a structured value in a scalar slot, e.g. a whole row written
+  into a ``field``-less ``Selection``. The last is a named failure, matching the reference
+  hosts' ``Transform param '<name>' resolved to a non-scalar value``; boxing it to a NULL
+  cell would prune or match nothing and read as empty data rather than a broken binding.
 * **Declared defaults seed the param.** An unwritten ``Selection`` (0.2.9) / ``Filter``
   (0.2.0) / ``State`` binding falls back to its own ``defaultValue`` — so the param is
   *bound* and its filter is evaluated, not pruned. This is the pre-selected-row /
@@ -84,77 +89,128 @@ type ComputeResult = ComputeOk | ComputeErr
 
 
 # ── scalars + param resolution ───────────────────────────────────────────────
+#
+# Param resolution is THREE-valued, not two: the reference hosts split it into a
+# ``Resolution`` (Resolved / NotResolved) and a scalar projection
+# (``value_to_cell`` / ``objToCell``) whose failure is a loud error. Collapsing
+# the two — as a ``Cell | None`` return must — boxes a structured value to the
+# NULL cell, which then prunes or matches nothing and reads as *empty data*
+# rather than a *broken binding*. Hence the tagged union below.
 
 
-def _scalar_to_cell(value: Value) -> Cell:
+@dataclass(frozen=True)
+class ParamResolved:
+    """The param's source resolved to a scalar cell (JSON null included — the NULL cell)."""
+
+    cell: Cell
+    kind: Literal["resolved"] = "resolved"
+
+
+@dataclass(frozen=True)
+class ParamUnbound:
+    """The param's source is unwritten and declares no default — the filter-pruning trigger."""
+
+    kind: Literal["unbound"] = "unbound"
+
+
+@dataclass(frozen=True)
+class ParamNonScalar:
+    """The param's source resolved to a STRUCTURED value, which has no scalar form.
+
+    The loud twin of the reference hosts' ``value_to_cell`` / ``objToCell``
+    returning nothing — e.g. a row ``Obj`` written by a grid row-click into a
+    ``field``-less ``Selection`` slot. ``detail`` carries the cross-host message
+    verbatim."""
+
+    detail: str
+    kind: Literal["nonScalar"] = "nonScalar"
+
+
+type ParamResolution = ParamResolved | ParamUnbound | ParamNonScalar
+
+
+def _non_scalar(name: str) -> ParamNonScalar:
+    return ParamNonScalar(f"Transform param '{name}' resolved to a non-scalar value")
+
+
+def _scalar_to_cell(name: str, value: object) -> ParamResolution:
+    """A resolved param source as a cell. JSON null / an absent value IS a scalar
+    (the NULL cell, per the reference ``JVal::Null → Cell::Null``); a structured
+    ``Obj`` / ``Arr`` / host record has no scalar form and resolves loudly."""
+    if value is None:
+        return ParamResolved(NULL)
     if isinstance(value, bool):
-        return cell_bool(value)
+        return ParamResolved(cell_bool(value))
     if isinstance(value, int):
-        return cell_int(value)
+        return ParamResolved(cell_int(value))
     if isinstance(value, float):
-        return cell_float(value)
+        return ParamResolved(cell_float(value))
     if isinstance(value, str):
-        return cell_str(value)
-    return NULL
+        return ParamResolved(cell_str(value))
+    return _non_scalar(name)
 
 
 # A host state store: parameter name → its current scalar value.
 type ComputeState = dict[str, object]
 
 
-def _declared_default(binding: Obj) -> Cell | None:
-    """The binding's declared ``defaultValue`` as a cell, or ``None`` when it
-    declares none. Resolution-time defaulting IS the pre-selection mechanism —
-    ``Selection`` (0.2.9), ``Filter`` (0.2.0), ``State`` — so a param sourced
-    from an unwritten-but-defaulted binding is **bound**, never pruned."""
+def _declared_default(name: str, binding: Obj) -> ParamResolution:
+    """The binding's declared ``defaultValue`` as a cell, or :class:`ParamUnbound`
+    when it declares none. Resolution-time defaulting IS the pre-selection
+    mechanism — ``Selection`` (0.2.9), ``Filter`` (0.2.0), ``State`` — so a param
+    sourced from an unwritten-but-defaulted binding is **bound**, never pruned.
+    A declared default that is itself structured is a non-scalar error, exactly
+    as a written one would be."""
     if "defaultValue" not in binding.fields:
-        return None
-    return _scalar_to_cell(binding.fields["defaultValue"])
+        return ParamUnbound()
+    return _scalar_to_cell(name, binding.fields["defaultValue"])
 
 
-def _project_selection(raw: object, field: Value) -> Cell:
+def _project_selection(name: str, raw: object, field: Value) -> ParamResolution:
     """Project a written selection to its scalar. A declared ``field`` (0.2.10)
     names the column to read off the stored ROW — a grid's row-click writes the
     whole row, and a param slot is scalar. A field-less selection is already the
-    scalar value."""
+    scalar value; when it is NOT (the row itself landed in the slot) that is the
+    non-scalar error, not a silent NULL."""
     if isinstance(field, str):
         if isinstance(raw, Obj):
-            return _scalar_to_cell(raw.fields.get(field))
+            return _scalar_to_cell(name, raw.fields.get(field))
         if isinstance(raw, dict):
-            return _scalar_to_cell(raw.get(field))  # type: ignore[arg-type]
-    return _scalar_to_cell(raw)  # type: ignore[arg-type]
+            return _scalar_to_cell(name, raw.get(field))
+    return _scalar_to_cell(name, raw)
 
 
-def resolve_param_binding(binding: Value, state: ComputeState) -> Cell | None:
-    """Resolve a parameter's ``from`` binding against the host ``state`` store, or
-    ``None`` when it is unbound (the filter-pruning trigger).
+def resolve_param_binding(name: str, binding: Value, state: ComputeState) -> ParamResolution:
+    """Resolve parameter ``name``'s ``from`` binding against the host ``state`` store.
 
-    Mirrors the reference hosts' ``resolve``: the written host value wins, and an
-    unwritten binding falls back to its own declared ``defaultValue`` before it is
-    called unbound. ``Selection`` keys on ``nodeId`` (the binding's identity key —
-    the accessor sentinel is off the wire since 0.2.0), ``Filter`` / ``Query`` on
-    ``name``, ``State`` on ``key``."""
+    Mirrors the reference hosts' ``resolve`` + scalar projection: the written host
+    value wins, and an unwritten binding falls back to its own declared
+    ``defaultValue`` before it is called :class:`ParamUnbound` (the filter-pruning
+    trigger). ``Selection`` keys on ``nodeId`` (the binding's identity key — the
+    accessor sentinel is off the wire since 0.2.0), ``Filter`` / ``Query`` on
+    ``name``, ``State`` on ``key``. A source that resolves to a structured value
+    is :class:`ParamNonScalar`, never a silently-boxed NULL cell."""
     if not isinstance(binding, Obj):
-        return None
+        return ParamUnbound()
     if binding.tag == "Static":
-        return _scalar_to_cell(binding.fields.get("value"))
+        return _scalar_to_cell(name, binding.fields.get("value"))
     if binding.tag == "Filter":
-        name = binding.fields.get("name")
-        if isinstance(name, str) and name in state:
-            return _scalar_to_cell(state[name])  # type: ignore[arg-type]
-        return _declared_default(binding)
+        filter_name = binding.fields.get("name")
+        if isinstance(filter_name, str) and filter_name in state:
+            return _scalar_to_cell(name, state[filter_name])
+        return _declared_default(name, binding)
     if binding.tag == "Selection":
         node_id = binding.fields.get("nodeId")
         if isinstance(node_id, str) and node_id in state:
-            return _project_selection(state[node_id], binding.fields.get("field"))
-        return _declared_default(binding)
+            return _project_selection(name, state[node_id], binding.fields.get("field"))
+        return _declared_default(name, binding)
     if binding.tag == "State":
         key = binding.fields.get("key")
         if isinstance(key, str):
             if key in state:
-                return _scalar_to_cell(state[key])  # type: ignore[arg-type]
-            return _declared_default(binding)
-    return None
+                return _scalar_to_cell(name, state[key])
+            return _declared_default(name, binding)
+    return ParamUnbound()
 
 
 # ── param names / substitution / pruning ─────────────────────────────────────
@@ -263,9 +319,11 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
             if isinstance(entry, Obj):
                 name = entry.fields.get("name")
                 if isinstance(name, str):
-                    cell = resolve_param_binding(entry.fields.get("from"), state)
-                    if cell is not None:
-                        env[name] = cell
+                    resolution = resolve_param_binding(name, entry.fields.get("from"), state)
+                    if resolution.kind == "nonScalar":
+                        return ComputeErr(EvalError("TYPE_ERROR", resolution.detail))
+                    if resolution.kind == "resolved":
+                        env[name] = resolution.cell
 
     effective = _prune_and_substitute(pipe.value, env)
     result = eval_pipeline(effective, src.value.table)

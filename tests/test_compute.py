@@ -20,7 +20,16 @@ import pytest
 from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py import decode_node
 from fuaran_py.canonical import encode_value
-from fuaran_py.compute import ComputeOk, evaluate_transform, evaluate_tree, rows_of
+from fuaran_py.compute import (
+    ComputeOk,
+    ParamNonScalar,
+    ParamResolved,
+    ParamUnbound,
+    evaluate_transform,
+    evaluate_tree,
+    resolve_param_binding,
+    rows_of,
+)
 from fuaran_py.dataframe import (
     NULL,
     Binary,
@@ -206,6 +215,60 @@ def test_state_param_seeds_declared_default() -> None:
     result = evaluate_transform(_param_transform(Obj("State", {"defaultValue": "b", "key": "k"})), {})
     assert isinstance(result, ComputeOk)
     assert result.rows == [{"name": "b"}]
+
+
+# ── non-scalar param sources (the loud channel, rs/TS parity) ────────────────
+#
+# A param slot is scalar. A structured value reaching one — the classic case is a
+# grid row-click writing the WHOLE row into a `field`-less `Selection` — has no
+# scalar form. Boxing it to the NULL cell (this host's behaviour before the error
+# channel) prunes or matches nothing and reads as *empty data* rather than a
+# *broken binding*; the reference hosts fail loudly with a named message, and
+# these pin that parity. No corpus fixture exercises it — the fixtures are all
+# well-formed, and this is a HOST-side resolution defect, not a wire one.
+
+_NON_SCALAR_MESSAGE = "Transform param 'p' resolved to a non-scalar value"
+
+
+def test_field_less_selection_of_a_written_row_is_a_loud_error() -> None:
+    """The finding: a row `Obj` written into a `field`-less `Selection` slot."""
+    transform = _param_transform(Obj("Selection", {"nodeId": "grid"}))
+    result = evaluate_transform(transform, {"grid": Obj(None, {"name": "a", "amount": 1})})
+    assert not result.ok
+    assert result.error.code == "TYPE_ERROR"
+    assert result.error.detail == _NON_SCALAR_MESSAGE
+
+
+def test_field_less_selection_of_a_plain_dict_row_is_a_loud_error() -> None:
+    """The host store may hold a plain dict rather than a wire `Obj` — same verdict."""
+    transform = _param_transform(Obj("Selection", {"nodeId": "grid"}))
+    result = evaluate_transform(transform, {"grid": {"name": "a", "amount": 1}})
+    assert not result.ok
+    assert result.error.detail == _NON_SCALAR_MESSAGE
+
+
+def test_structured_declared_default_is_a_loud_error() -> None:
+    """A declared default is resolved the same way a written value is."""
+    transform = _param_transform(Obj("Filter", {"defaultValue": Arr([1, 2]), "name": "q"}))
+    result = evaluate_transform(transform, {})
+    assert not result.ok
+    assert result.error.detail == _NON_SCALAR_MESSAGE
+
+
+def test_resolve_param_binding_is_three_valued() -> None:
+    """Resolved / unbound / non-scalar are distinct outcomes — the whole point of
+    the error channel. A silent `Cell | None` cannot express the third."""
+    assert resolve_param_binding("p", Obj("Static", {"value": "a"}), {}) == ParamResolved(cell_str("a"))
+    assert resolve_param_binding("p", Obj("Filter", {"name": "q"}), {}) == ParamUnbound()
+    assert resolve_param_binding("p", Obj("Static", {"value": Arr([])}), {}) == ParamNonScalar(_NON_SCALAR_MESSAGE)
+
+
+def test_absent_and_null_sources_stay_scalar_nulls() -> None:
+    """The boundary the error channel must NOT swallow: JSON null (and a `Static`
+    carrying no value at all) IS a scalar — the NULL cell, per the reference
+    `JVal::Null -> Cell::Null`. Only Obj / Arr / host records are non-scalar."""
+    assert resolve_param_binding("p", Obj("Static", {}), {}) == ParamResolved(NULL)
+    assert resolve_param_binding("p", Obj("State", {"defaultValue": None, "key": "k"}), {}) == ParamResolved(NULL)
 
 
 # ── the reactive runtime loop ─────────────────────────────────────────────────

@@ -1269,6 +1269,14 @@
       "description": "Layout/Box (master-detail — grid + detail card State-bound with a pre-selected defaultValue)"
     },
     {
+      "id": "master-detail-preselected-second-row",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/master-detail-preselected-second-row.json",
+      "expectedFile": "nodes/master-detail-preselected-second-row.json",
+      "description": "Layout/Box (master-detail — Selection defaultValue naming a NON-FIRST row: prune-vs-seed is observable)"
+    },
+    {
       "id": "math-1",
       "kind": "node-round-trip",
       "decoder": "node",

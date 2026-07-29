@@ -43,6 +43,18 @@
     "Tabs",
     "Toast"
   ],
+  "formFieldKinds": [
+    "Checkbox",
+    "Choice",
+    "Date",
+    "DateRange",
+    "Number",
+    "Range",
+    "RangedNumber",
+    "SegmentedChoice",
+    "Text",
+    "TextArea"
+  ],
   "fixtures": [
     {
       "id": "elc-ans-accept-full",

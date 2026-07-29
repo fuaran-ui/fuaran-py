@@ -44,9 +44,9 @@ from fuaran_py import decode_node, encode_node, decode_op, encode_op
 
 result = decode_node('{"id":"a","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}}')
 if result.ok:
-    canonical = encode_node(result.value)   # byte-identical canonical wire form
+    canonical = encode_node(result.value)  # byte-identical canonical wire form
 else:
-    print(result.error.code, result.error.path)   # structured, recoverable
+    print(result.error.code, result.error.path)  # structured, recoverable
 ```
 
 Decoding never throws on malformed input — it returns `Ok(value)` or
@@ -71,7 +71,7 @@ tree = fuaran.dashboard(
         fuaran.markdown("note", "Updated hourly."),
     ],
 )
-wire = encode(tree)   # canonical JSON
+wire = encode(tree)  # canonical JSON
 ```
 
 This is the **human** authoring surface; the AI's emission surface is the wire
@@ -91,7 +91,7 @@ from fuaran_py.renderer import render_html, reference_css_path
 
 result = decode_node(wire_json)
 if result.ok:
-    body = render_html(result.value)            # body-fragment HTML string
+    body = render_html(result.value)  # body-fragment HTML string
     stylesheet = reference_css_path().read_text()  # the canonical reference CSS
 ```
 
@@ -126,7 +126,7 @@ re-render — reusing the renderer (markup + class vocabulary) and the apply eng
 ```python
 from fuaran_py.runtime import counter_runtime
 
-counter_runtime().mount("fuaran-root")   # clicking "+1" re-renders the count
+counter_runtime().mount("fuaran-root")  # clicking "+1" re-renders the count
 ```
 
 Browser-API access is behind an injectable `BrowserDeps` seam (default: the Pyodide
@@ -155,7 +155,7 @@ tree = decode_node(wire_json).value
 
 result = apply_and_persist(sink, ctx, Obj("RemoveNode", {"target": "leaf"}), tree)
 records = sink.replay("doc-1", 1, sink.latest_sequence("doc-1"))
-assert verify_chain(records) is None          # a clean, untampered chain
+assert verify_chain(records) is None  # a clean, untampered chain
 ```
 
 The chain is **byte-stable across hosts**: the pre-image envelope leads with
@@ -179,13 +179,13 @@ from fuaran_py.client import FuaranClient, FuaranSession, Produced
 
 client = FuaranClient(
     "https://<your-endpoint>/generate",
-    access_token=os.environ["FUARAN_ACCESS_TOKEN"],   # the paid credential
-    provider_key=os.environ["PROVIDER_API_KEY"],      # your BYOK LLM key
+    access_token=os.environ["FUARAN_ACCESS_TOKEN"],  # the paid credential
+    provider_key=os.environ["PROVIDER_API_KEY"],  # your BYOK LLM key
 )
 session = FuaranSession(client)
-result = session.next("a metric card showing revenue")   # fresh generation
+result = session.next("a metric card showing revenue")  # fresh generation
 if isinstance(result, Produced):
-    tree = result.decode_tree()                # typed Node via the wire codec
+    tree = result.decode_tree()  # typed Node via the wire codec
 result = session.next("rename the metric to ARR")  # a cheap repair diff
 ```
 

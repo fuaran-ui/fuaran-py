@@ -66,15 +66,16 @@ rendered markup as JSON:
 # views.py
 import json, os
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt   # or use Django's CSRF token client-side
+from django.views.decorators.csrf import csrf_exempt  # or use Django's CSRF token client-side
 from fuaran_py.client import FuaranClient, Produced, AccessDenied, TurnFailed
 from fuaran_py.renderer import render_html
 
 _client = FuaranClient(
     os.environ["FUARAN_ENDPOINT"],
-    access_token=os.environ.get("FUARAN_ACCESS_TOKEN"),   # server-side only
-    provider_key=os.environ.get("FUARAN_PROVIDER_KEY"),   # the BYOK key, server-side only
+    access_token=os.environ.get("FUARAN_ACCESS_TOKEN"),  # server-side only
+    provider_key=os.environ.get("FUARAN_PROVIDER_KEY"),  # the BYOK key, server-side only
 )
+
 
 @csrf_exempt
 def generate(request):
@@ -97,6 +98,7 @@ def generate(request):
 # urls.py
 from django.urls import path
 from . import views
+
 urlpatterns = [path("generate", views.generate)]
 ```
 

@@ -24,17 +24,17 @@ tree = fuaran.dashboard(
         fuaran.metric(
             "revenue",
             label="Revenue",
-            value=1234.5,                 # a bare number → Binding.Static
+            value=1234.5,  # a bare number → Binding.Static
             format=format.currency("GBP"),
             tone="Brand",
             trend=0.07,
             trend_format=format.percent(1),
         ),
-        fuaran.markdown("note", "Updated hourly."),   # a bare str → Literal text
+        fuaran.markdown("note", "Updated hourly."),  # a bare str → Literal text
     ],
 )
 
-wire = encode(tree)   # canonical JSON, byte-identical to every other host's output
+wire = encode(tree)  # canonical JSON, byte-identical to every other host's output
 ```
 
 `encode(tree)` is exactly `encode_node(tree.to_wire())` – the typed tree lowers to
@@ -73,9 +73,9 @@ Each constructor fills omitted fields with the per-kind default and injects the
 ARIA trait for that kind, exactly as the F#/TS smart constructors do:
 
 ```python
-fuaran.button("go", label="Go").accessibility        # Accessibility(role="button")
-fuaran.metric("m", label="X", value=1).accessibility # Accessibility(live_region="polite")
-fuaran.markdown("md", "body").accessibility          # None (decorative — no ARIA)
+fuaran.button("go", label="Go").accessibility  # Accessibility(role="button")
+fuaran.metric("m", label="X", value=1).accessibility  # Accessibility(live_region="polite")
+fuaran.markdown("md", "body").accessibility  # None (decorative — no ARIA)
 ```
 
 Decorative and structural kinds default to no ARIA; interactive (`Button`,
@@ -84,7 +84,7 @@ and/or live-region. To drop an injected trait – for example to match a fixture
 authored without one – wrap the node in `node.bare(...)`:
 
 ```python
-node.bare(fuaran.metric("m", label="Revenue", value=1234.5))   # no accessibility key on the wire
+node.bare(fuaran.metric("m", label="Revenue", value=1234.5))  # no accessibility key on the wire
 ```
 
 ## Postfix modifiers

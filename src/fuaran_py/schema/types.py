@@ -1426,10 +1426,40 @@ class ColumnKind:
 
 
 @dataclass(frozen=True)
+class TonedPillColumnKind:
+    """A value-conditional pill: the one cell kind holding no closure, which is exactly
+    why it survives the wire (Phase 750).
+
+    ``field`` names the row property that is both the pill's label and the map key;
+    ``map`` carries value → tone; ``default`` tones a value the map does not mention and
+    is omitted at ``Default`` (Phase 460). Every other cell kind's appearance rule is a
+    ``(row) -> …`` closure that erases to ``"<closure>"``, so it can be authored here but
+    never expressed on the wire — this one can.
+    """
+
+    field: str
+    map: dict[str, Tone]
+    default: Tone = "Default"
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "TonedPill",
+            {
+                "default": None if self.default == "Default" else self.default,
+                "field": self.field,
+                "map": dict(self.map),
+            },
+        )
+
+
+AnyColumnKind = ColumnKind | TonedPillColumnKind
+
+
+@dataclass(frozen=True)
 class Column:
     label: str
     format: CellFormat = field(default_factory=FormatNone)
-    kind: ColumnKind = field(default_factory=ColumnKind)
+    kind: AnyColumnKind = field(default_factory=ColumnKind)
     width: ColumnWidth = field(default_factory=ColumnWidth)
 
     def to_wire(self) -> Value:

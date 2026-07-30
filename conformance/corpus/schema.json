@@ -1500,6 +1500,31 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "TonedPill"
+            },
+            "default": {
+              "$ref": "#/$defs/ToneVariant"
+            },
+            "field": {
+              "type": "string"
+            },
+            "map": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/ToneVariant"
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "field",
+            "map"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Progress"
             },
             "fractionFn": {

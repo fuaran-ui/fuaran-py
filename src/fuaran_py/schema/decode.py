@@ -154,7 +154,12 @@ def _enum_aliased(value: object, path: str, allowed: frozenset[str], aliases: di
 
 # ── Bare-string enum vocabularies (WIRE_FORMAT.md §3.5) ─────────────────────
 
-TONE = frozenset({"Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info"})
+# The legal `ToneVariant` names in declaration order, extracted because two positions now
+# teach them — a `tone` field and (Phase 750) a `TonedPill` tone-map value. A second inline
+# copy is exactly how one of them comes to name six tones. `TONE` derives from it, so the
+# membership test and the taught vocabulary cannot drift.
+TONE_NAMES = ("Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info")
+TONE = frozenset(TONE_NAMES)
 WEIGHT = frozenset({"Compact", "Standard", "Spacious"})
 EMPHASIS = frozenset({"Quiet", "Normal", "Loud"})
 TEXT_ANCHOR = frozenset({"Start", "Middle", "End"})
@@ -1372,12 +1377,97 @@ def _title_to_heading(obj: dict) -> dict:
     return obj
 
 
+# ── TonedPill (WIRE_FORMAT §3.6 + §16, Phase 750) ───────────────────────────
+# The tone-map field names a `TonedPill` cell accepts (canonical first). `map` is the
+# shortest honest name for a value→tone dictionary and the least descriptive one.
+_TONE_MAP_KEYS = ("toneMap", "tones")
+
+
+def _decode_tone_map(value: object, path: str) -> Obj:
+    """A ``TonedPill``'s ``map``: a string-keyed object whose VALUES are ``ToneVariant``s.
+
+    Routed through the ordinary tone reader per entry, which buys two things deliberately
+    rather than by accident: the §3.6 tone aliases work inside the map exactly as they do
+    at a ``tone`` field, and an unrecognised value is refused rather than carried forward.
+    A second, private tone reader here is precisely how this position would come to accept
+    a vocabulary the ``tone`` field does not.
+
+    The refusal is RE-ISSUED rather than passed through: the shared reader reports
+    ``unrecognised tone '…'`` with the enum's own sorted hint, which does not say *which
+    map entry* is wrong — and "one of your tones is wrong" is not an actionable report
+    when the map has nine entries. The re-issue keeps the code, names the offending KEY
+    and value in the terms the author wrote them, and teaches the seven legal names.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for key, raw in obj.items():
+        entry_path = f"{path}.{key}"
+        try:
+            fields[key] = _enum_aliased(raw, entry_path, TONE, TONE_ALIASES, "tone")
+        except _Fail as f:
+            # A non-string value is a WRONG_TYPE and already reports at the right path.
+            if f.error.code != UNKNOWN_DU_CASE:
+                raise
+            got = raw if isinstance(raw, str) else ""
+            _fail(
+                UNKNOWN_DU_CASE,
+                entry_path,
+                f"tone-map value '{got}' for '{key}' is not a ToneVariant",
+                " | ".join(TONE_NAMES),
+            )
+    return Obj(None, fields)
+
+
+def _decode_toned_pill(obj: dict, path: str) -> Obj:
+    """The shared body of the canonical ``TonedPill`` case and the ``Pill``-tagged §16
+    shorthand below — one reader, so the two spellings cannot drift apart in what they
+    accept."""
+    fields: dict[str, Value] = {}
+    field_raw, field_present = _alias_get(obj, "field", ())
+    if not field_present:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.field",
+            "missing required field 'field'",
+            "TonedPill row-field name (drives the label and the map key)",
+        )
+    fields["field"] = _expect_string(field_raw, f"{path}.field")
+    map_raw, map_present = _alias_get(obj, "map", _TONE_MAP_KEYS)
+    if not map_present:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.map",
+            "missing required field 'map'",
+            "TonedPill value→ToneVariant map",
+        )
+    fields["map"] = _decode_tone_map(map_raw, f"{path}.map")
+    # `default` is omitted-when-`Default` (Phase 460); an absent key restores the
+    # identity, and an aliased `Neutral` normalises to `Default` and then omits.
+    if "default" in obj:
+        tone = _enum_aliased(obj["default"], f"{path}.default", TONE, TONE_ALIASES, "tone")
+        if tone != "Default":
+            fields["default"] = tone
+    return Obj("TonedPill", fields)
+
+
 def _decode_cell_kind(value: object, path: str) -> Value:
     """A DataGrid column's cell kind — a `$type`-discriminated case, preserved
-    structurally (the closure/handler payloads are host-side)."""
+    structurally (the closure/handler payloads are host-side) except for the one case
+    that carries no closure and so survives the wire: `TonedPill` (Phase 750)."""
     obj = _expect_object(value, path)
     if "$type" not in obj:
         _fail(MISSING_FIELD, f"{path}.$type", "missing $type discriminator")
+    tag = obj["$type"]
+    if tag == "TonedPill":
+        return _decode_toned_pill(obj, path)
+    # Lenient-ingest (WIRE_FORMAT §16, Phase 750): "pill" is the WORD for the thing, so a
+    # declarative tone rule arrives tagged `Pill` more often than tagged `TonedPill`.
+    # Before this phase the extra keys fell through the structural pass-through and the
+    # author's whole intent was carried as a closure pill's dead payload. Presence of a
+    # tone map is the unambiguous tell — a closure `Pill` carries only `labelFn`/`toneFn`
+    # and can never carry one.
+    if tag == "Pill" and any(k in obj for k in ("map", *_TONE_MAP_KEYS)):
+        return _decode_toned_pill(obj, path)
     return from_json(value)
 
 

@@ -729,6 +729,30 @@
       "description": "Static-envelope unwrap GENERALISED to every plain-scalar position (2026-07-18 — the 0.1.6 pilot found `emphasis` wrapped after `indeterminate` was fixed site-locally; the confusion is generic). A well-formed envelope at a plain-scalar position has exactly one reading; the encoder still emits bare scalars."
     },
     {
+      "id": "lenient-tonedpill-pill-tag",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-tonedpill-pill-tag.json",
+      "expectedFile": "lenient/lenient-tonedpill-pill-tag.expected.json",
+      "description": "Phase 750 — a `Pill` cell carrying `field` + `map` normalises to `TonedPill`; before this the declarative fields were silently DROPPED into a closure pill (the author's intent lost with no error)"
+    },
+    {
+      "id": "lenient-tonedpill-tone-aliases",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-tonedpill-tone-aliases.json",
+      "expectedFile": "lenient/lenient-tonedpill-tone-aliases.expected.json",
+      "description": "Phase 750 — the Phase 460 tone aliases apply inside a TonedPill `map` (Danger→Critical, Positive→Success) and in its `default` (Neutral→Default, which then omits)"
+    },
+    {
+      "id": "lenient-tonedpill-tonemap-alias",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-tonedpill-tonemap-alias.json",
+      "expectedFile": "lenient/lenient-tonedpill-tonemap-alias.expected.json",
+      "description": "Phase 750 — `toneMap` (and `tones`) alias the canonical `map` on a TonedPill cell, the `header`/`title`→`label` field-alias device"
+    },
+    {
       "id": "lenient-transform-bare-columns",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1199,6 +1223,14 @@
       "inputFile": "nodes/grid-field-named.json",
       "expectedFile": "nodes/grid-field-named.json",
       "description": "Visualisation/Grid (Phase 425 — field-named columns + RowKeyField, closure-free)"
+    },
+    {
+      "id": "grid-toned-pill",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-toned-pill.json",
+      "expectedFile": "nodes/grid-toned-pill.json",
+      "description": "Visualisation/Grid (Phase 750 — TonedPill: value-conditional cell tone declared as a value→tone map)"
     },
     {
       "id": "grid-transform",
@@ -1938,6 +1970,15 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.path",
       "description": "UpdateProp missing path"
+    },
+    {
+      "id": "reject-tonedpill-unknown-tone",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tonedpill-unknown-tone.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.columns[0].kind.map.Delayed",
+      "description": "TonedPill tone-map value outside ToneVariant — the message names the seven legal tones (Phase 750)"
     },
     {
       "id": "reject-unknown-binding",

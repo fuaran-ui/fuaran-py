@@ -1,1 +1,1 @@
-{"id":"table-1","kind":{"$type":"DataGrid","columns":[],"source":{"$type":"Static","value":"<opaque>"},"staticRows":{"headers":["Term","Definition"],"rows":[["MVU","Model-View-Update"],["DSL","Domain-specific language"]]}}}
+{"id":"table-1","kind":{"$type":"DataGrid","columns":[],"source":{"$type":"Static","value":[]},"staticRows":{"headers":["Term","Definition"],"rows":[["MVU","Model-View-Update"],["DSL","Domain-specific language"]]}}}

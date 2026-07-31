@@ -465,6 +465,14 @@
       "description": "Phase 596 — a form field's explicit auto-shape value (State(field id, placeholder)) normalises to the omitted-value canonical form"
     },
     {
+      "id": "lenient-665-rows-opaque-sentinel",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-665-rows-opaque-sentinel.json",
+      "expectedFile": "lenient/lenient-665-rows-opaque-sentinel.expected.json",
+      "description": "fuaran#665 read-compat: the legacy \"<opaque>\" rows sentinel decodes to the empty typed feed and re-encodes as []"
+    },
+    {
       "id": "lenient-alias-call-url",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -929,6 +937,14 @@
       "description": "Visualisation/Chart"
     },
     {
+      "id": "chart-state-rows",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-state-rows.json",
+      "expectedFile": "nodes/chart-state-rows.json",
+      "description": "Visualisation/Chart (Phase 663/665 — chart on the editable grid's state key)"
+    },
+    {
       "id": "code-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1215,6 +1231,14 @@
       "inputFile": "nodes/grid-1.json",
       "expectedFile": "nodes/grid-1.json",
       "description": "Visualisation/Grid"
+    },
+    {
+      "id": "grid-editable-state",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-editable-state.json",
+      "expectedFile": "nodes/grid-editable-state.json",
+      "description": "Visualisation/Grid (Phase 663/665 — editable State-sourced grid, typed rows on the wire)"
     },
     {
       "id": "grid-field-named",

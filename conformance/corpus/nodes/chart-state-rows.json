@@ -1,0 +1,1 @@
+{"id":"chart-state-rows","kind":{"$type":"Chart","kind":"Bar","source":{"$type":"State","defaultValue":[{"month":"Jan","revenue":980},{"month":"Feb","revenue":1105}],"key":"planRows"},"stacked":false,"xField":"month","yFields":["revenue"]}}

@@ -339,18 +339,21 @@ def test_every_op_fixture_applies_against_a_stack(name: str) -> None:
 # ── Nested paths (WIRE_FORMAT.md §3.4 — Phase-364 parity) ────────────────────
 
 
+# fuaran#665 — rows are a typed Static payload, so "a grid with no rows" is the
+# empty feed, not the `"<opaque>"` sentinel (which these decode-and-re-encode
+# round trips would normalise to `[]` anyway).
 def _channel_grid(*, first_label: str = "Channel") -> t.UiNode:
     return node.bare(
         fuaran.grid(
             "grid-1",
-            source=binding.opaque(),
+            source=binding.static([]),
             columns=[t.Column(first_label), t.Column("Spend")],
         )
     )
 
 
 def _mix_chart(*, y_fields: list[str]) -> t.UiNode:
-    return node.bare(fuaran.chart("chart-1", source=binding.opaque(), x_field="month", y_fields=y_fields))
+    return node.bare(fuaran.chart("chart-1", source=binding.static([]), x_field="month", y_fields=y_fields))
 
 
 def _signup_form(*, name_required: bool) -> t.UiNode:

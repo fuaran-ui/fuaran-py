@@ -1,1 +1,1 @@
-{"id":"chart-1","kind":{"$type":"Chart","kind":"Line","source":{"$type":"Static","value":"<opaque>"},"stacked":true,"title":"Channel mix","xField":"month","yFields":["revenue","cost"]}}
+{"id":"chart-1","kind":{"$type":"Chart","kind":"Line","source":{"$type":"Static","value":[{"cost":420,"month":"Jan","revenue":980},{"cost":390,"month":"Feb","revenue":1105}]},"stacked":true,"title":"Channel mix","xField":"month","yFields":["revenue","cost"]}}

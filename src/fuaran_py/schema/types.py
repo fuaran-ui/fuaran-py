@@ -522,13 +522,16 @@ class StateBehaviour:
 # ── Typed Static payloads (WIRE_FORMAT.md §"Typed Static payloads", Phase 429) ─
 #
 # The language enumerates a handful of ``Binding.Static`` payload shapes — a
-# Select/Filter/Choice options list, a Map marker list — that ride the wire as
-# their *typed* form rather than the ``"<opaque>"`` catch-all. Authoring a
-# ``Static`` of one of these lowers structurally (via ``_lower``): a
-# :class:`SelectOption` / :class:`MapMarker` carries a ``to_wire`` so a bare
-# ``Static([SelectOption(...)])`` serialises to the typed array the F#/TS tiers
-# emit. A ``Static`` of a genuinely host-typed value (grid/table rows, Mount
-# inputs, ``PropValue.Native``) still lowers to the residual ``"<opaque>"`` seam.
+# Select/Filter/Choice options list, a Map marker list, a grid/chart row feed —
+# that ride the wire as their *typed* form rather than the ``"<opaque>"``
+# catch-all. Authoring a ``Static`` of one of these lowers structurally (via
+# ``_lower``): a :class:`SelectOption` / :class:`MapMarker` carries a ``to_wire``
+# so a bare ``Static([SelectOption(...)])`` serialises to the typed array the F#/TS
+# tiers emit, and a row feed is a plain list of ``dict`` cells
+# (``Static([{"month": "Jan", "revenue": 980}])``). A ``Static`` of a genuinely
+# host-typed value (Mount inputs, ``PropValue.Native``) still lowers to the
+# residual ``"<opaque>"`` seam — which fuaran#665 narrowed, for rows, to the CELL:
+# a nested array/object cell is the sentinel, the row around it is not.
 
 
 @dataclass(frozen=True)
@@ -1154,9 +1157,9 @@ class Table:
     """Author-facing carrier for a static read-only table.
 
     Phase 393 — no longer a `VisKind` case of its own: `to_wire` lowers it into the
-    `staticRows` mode of `DataGrid` (one tabular kind). The opaque `Static` source
-    re-encodes to ``{"$type":"Static","value":"<opaque>"}`` — byte-identical to the
-    F#/TS static grid.
+    `staticRows` mode of `DataGrid` (one tabular kind). The empty `Static` source
+    re-encodes to ``{"$type":"Static","value":[]}`` under the fuaran#665 typed
+    row-source encoding — byte-identical to the F#/TS static grid.
     """
 
     headers: tuple[TextSource, ...]
@@ -1167,7 +1170,7 @@ class Table:
             "DataGrid",
             {
                 "columns": [],
-                "source": Static(OPAQUE),
+                "source": Static(Arr([])),
                 "staticRows": {
                     "headers": list(self.headers),
                     "rows": [list(r) for r in self.rows],

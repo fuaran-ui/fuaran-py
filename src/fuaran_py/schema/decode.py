@@ -337,9 +337,10 @@ def _decode_binding(value: object, path: str) -> Value:
 #
 # into the typed form the corpus now expects, so a round-trip is byte-stable AND
 # value-faithful. The normalisation is per-position (the ``lenient-opaque-static-*``
-# / ``lenient-null-static-*`` fixtures pin each). Positions whose payload is a
-# genuinely host-typed value (Chart/DataGrid rows, Mount inputs) keep the residual
-# ``"<opaque>"`` seam and use the plain ``_decode_binding`` above.
+# / ``lenient-null-static-*`` fixtures pin each). fuaran#665 added Chart/DataGrid
+# ROWS to this family (see :func:`_decode_grid_source`), leaving only genuinely
+# host-typed payloads (Mount inputs, ``PropValue.Native``) on the residual
+# ``"<opaque>"`` seam and the plain ``_decode_binding`` above.
 
 
 def _typed_static_binding(
@@ -348,6 +349,8 @@ def _typed_static_binding(
     on_typed: Callable[[object, str], Value],
     on_opaque: Value,
     on_null: Value,
+    *,
+    typed_default: bool = False,
 ) -> Value:
     """Decode a ``Binding`` whose ``Static`` payload is a typed position.
 
@@ -355,6 +358,12 @@ def _typed_static_binding(
     ``null``); a bare array/scalar coerces to ``Static`` (§3.6) and a ``Bound``
     wrapper unwraps (Phase 633); every other binding case passes through
     structurally (validated discriminator), exactly as :func:`_decode_binding`.
+
+    ``typed_default`` extends the same normalisation to the *other* value-carrying
+    binding arm — ``State``/``Selection``'s ``defaultValue`` — which the reference
+    hosts route through the slot's typed parser too. Opt-in per slot rather than
+    global: only the rows slot (fuaran#665) has a fixture pinning it, and flipping
+    the pre-429 typed slots onto it is a behaviour change of its own.
     """
     if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
         return Obj("Static", {"value": on_typed(value, path)})
@@ -376,7 +385,20 @@ def _typed_static_binding(
             normalised = on_typed(raw, f"{path}.value")
         return Obj("Static", {} if normalised is None else {"value": normalised})
     if tag == "Bound":
-        return _typed_static_binding(_require(obj, "binding", path), f"{path}.binding", on_typed, on_opaque, on_null)
+        return _typed_static_binding(
+            _require(obj, "binding", path),
+            f"{path}.binding",
+            on_typed,
+            on_opaque,
+            on_null,
+            typed_default=typed_default,
+        )
+    if typed_default:
+
+        def _default(raw: object, p: str) -> Value:
+            return on_opaque if raw == OPAQUE else on_typed(raw, p)
+
+        return _normalise_binding_obj(obj, path, on_default=_default)
     return _normalise_binding_obj(obj, path)
 
 
@@ -643,7 +665,12 @@ def _alias_get(obj: dict, canonical: str, aliases: tuple[str, ...]) -> tuple[obj
     return None, False
 
 
-def _normalise_binding_obj(obj: dict, path: str) -> Value:
+def _normalise_binding_obj(
+    obj: dict,
+    path: str,
+    *,
+    on_default: Callable[[object, str], Value] | None = None,
+) -> Value:
     """Normalise a non-``Static`` binding case to its 0.2.0 canonical shape.
 
     Query: ``dependsOn`` ← ``deps`` / ``dependencies`` (§3.6), omitted when
@@ -653,7 +680,12 @@ def _normalise_binding_obj(obj: dict, path: str) -> Value:
     Transform: ``params`` map form coerces to the canonical ``[{from,name}]``
     array (name-keyed set, §3.6), ``value`` aliases ``from`` at the element,
     and the embedded source + pipeline normalise through the columnar codec.
-    Everything else passes through structurally (validated discriminator)."""
+    Everything else passes through structurally (validated discriminator).
+
+    ``on_default`` decodes the ``defaultValue`` payload of the value-carrying arms
+    with a slot's typed parser instead of the structural :func:`from_json` — see
+    :func:`_typed_static_binding`'s ``typed_default``."""
+    decode_default = on_default if on_default is not None else (lambda raw, _p: from_json(raw))
     tag = obj.get("$type")
     if not isinstance(tag, str):
         return from_json(obj)
@@ -671,7 +703,7 @@ def _normalise_binding_obj(obj: dict, path: str) -> Value:
         node_id = _expect_string(_require(obj, "nodeId", path), f"{path}.nodeId")
         fields = {}
         if "defaultValue" in obj:
-            fields["defaultValue"] = from_json(obj["defaultValue"])
+            fields["defaultValue"] = decode_default(obj["defaultValue"], f"{path}.defaultValue")
         if "field" in obj:
             fields["field"] = _expect_string(obj["field"], f"{path}.field")
         fields["nodeId"] = node_id
@@ -682,7 +714,7 @@ def _normalise_binding_obj(obj: dict, path: str) -> Value:
         default_raw, default_present = _alias_get(obj, "defaultValue", ("initialValue", "default"))
         # Phase 677 — an explicit null default is absence, same as omitting it.
         if default_present and default_raw is not None:
-            fields["defaultValue"] = from_json(default_raw)
+            fields["defaultValue"] = decode_default(default_raw, f"{path}.defaultValue")
         fields["key"] = key
         return Obj("State", fields)
     if tag == "Transform":
@@ -1471,20 +1503,48 @@ def _decode_cell_kind(value: object, path: str) -> Value:
     return from_json(value)
 
 
-def _decode_grid_source(value: object, path: str) -> Value:
-    """A DataGrid/Chart data source. Its rows are the §5 host-typed opaque seam: a
-    ``Static`` payload erases to ``"<opaque>"`` (byte-stable + value-faithful) —
-    a bare JSON array coerces to that same erased ``Static`` (§3.6); every other
-    binding case (Transform/Query/…) normalises through the binding decoder."""
-    if isinstance(value, list):
-        return Obj("Static", {"value": OPAQUE})
-    if isinstance(value, dict) and value.get("$type") == "Static":
-        return Obj("Static", {"value": OPAQUE})
-    if isinstance(value, dict) and value.get("$type") == "Bound" and "binding" in value:
-        return _decode_grid_source(value["binding"], f"{path}.binding")
+def _decode_row_cell(value: object, path: str) -> Value:
+    """One cell of a typed row (fuaran#665) — the residual-opaque boundary, narrowed
+    from the whole rows payload to the cell seam.
+
+    The §2 rule-11 recognised scalars (string / bool / number) carry faithfully; a
+    nested array or object is display-opaque and normalises to the ``"<opaque>"``
+    sentinel, which is what the reference hosts *re-encode* such a cell as — so this
+    host's decode-time normalisation keeps the round-trip byte-stable in one pass
+    rather than two (the established ``_typed_static_binding`` idiom above).
+    """
+    del path  # every JSON value is representable here; nothing rejects
+    if isinstance(value, bool) or isinstance(value, (int, float, str)):
+        return value
+    return OPAQUE
+
+
+def _decode_row(value: object, path: str) -> Value:
+    """One row: an *open* name→value record of scalar cells. A ``null`` cell is
+    OMITTED (rule 4 — absence is structural, never ``"k":null``), matching what the
+    reference encoders emit. Built structurally rather than via :func:`from_json` so
+    a cell named ``$type`` stays a cell, never a discriminator."""
     obj = _expect_object(value, path)
-    _dispatch(obj, path, BINDING_CASES | {"Bound"})
-    return _normalise_binding_obj(obj, path)
+    return Obj(None, {k: _decode_row_cell(v, f"{path}.{k}") for k, v in obj.items() if v is not None})
+
+
+def _decode_row_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_row(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_grid_source(value: object, path: str) -> Value:
+    """A DataGrid/Chart data source. fuaran#665 moved its rows off the §5 host-typed
+    opaque seam: a ``Static``/``State`` payload is a typed array of row objects, and a
+    bare JSON array coerces to ``Static`` of the same (§3.6). Both legacy spellings —
+    the ``"<opaque>"`` sentinel a pre-typed host emitted, and an absent/``null``
+    payload — normalise to the empty feed ``[]`` (read-compat, indefinitely: that
+    *was* the whole value the sentinel carried). Every other binding case
+    (Transform/Query/…) normalises through the binding decoder."""
+    # `typed_default` — the editable-grid authoring shape is a `State`-sourced rows
+    # array (the write-back floor), so `defaultValue` carries rows just as `value`
+    # does and must take the same normalisation.
+    return _typed_static_binding(value, path, _decode_row_array, Arr([]), Arr([]), typed_default=True)
 
 
 def _decode_column(value: object, path: str) -> Value:

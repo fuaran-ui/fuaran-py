@@ -127,7 +127,14 @@ def _authored() -> dict[str, t.UiNode]:
         "chart-1": node.bare(
             fuaran.chart(
                 "chart-1",
-                source=binding.opaque(),
+                # fuaran#665 — a rows feed is a typed Static payload: a list of
+                # name→scalar cells, canonically key-sorted on the way out.
+                source=binding.static(
+                    [
+                        {"month": "Jan", "revenue": 980, "cost": 420},
+                        {"month": "Feb", "revenue": 1105, "cost": 390},
+                    ]
+                ),
                 x_field="month",
                 y_fields=["revenue", "cost"],
                 kind="Line",
@@ -189,7 +196,15 @@ def _authored() -> dict[str, t.UiNode]:
             component_id="TrendCard",
             content_hash=t.ContentHash("SHA256", "fedcba654321", "AdvisoryWarning"),
         ),
-        "grid-1": node.bare(fuaran.grid("grid-1", source=binding.opaque(), columns=[t.Column(label="Channel")])),
+        "grid-1": node.bare(
+            fuaran.grid(
+                "grid-1",
+                source=binding.static(
+                    [{"channel": "Direct", "revenue": 1200}, {"channel": "Referral", "revenue": 830}]
+                ),
+                columns=[t.Column(label="Channel")],
+            )
+        ),
         "filters-1": fuaran.filters(
             "filters-1",
             items=[

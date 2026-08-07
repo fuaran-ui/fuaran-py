@@ -38,6 +38,33 @@ def test_obfuscated_javascript_scheme_is_rejected() -> None:
     assert sanitize_url("JAVASCRIPT:alert(1)") is None
 
 
+def test_protocol_relative_urls_are_rejected() -> None:
+    # A protocol-relative URL carries no scheme, so the schemeless branch would
+    # admit it — but the browser resolves it against the current page's scheme
+    # and lands OFF-ORIGIN. `\` is WHATWG's lenient normalisation of `/` for
+    # special schemes, so all four two-separator forms resolve identically.
+    for url in ["//evil.example/x", "/\\evil.example/x", "\\\\evil.example/x", "\\/evil.example/x", "//"]:
+        assert sanitize_url(url) is None, url
+        assert sanitize_url_or_blank(url) == "about:blank", url
+
+
+def test_protocol_relative_rejection_survives_whitespace_trimming() -> None:
+    assert sanitize_url("  //evil.example/x") is None
+
+
+def test_single_slash_relative_paths_still_pass() -> None:
+    for url in ["/", "/a", "/foo//bar", "./rel", "page", "#frag"]:
+        assert sanitize_url(url) == url, url
+    # An absolute URL whose authority legitimately uses `//` is unaffected.
+    assert sanitize_url("https://ok.example/x") == "https://ok.example/x"
+
+
+def test_link_node_with_protocol_relative_href_resolves_to_about_blank() -> None:
+    html = render_link('{"$type":"Static","value":"//evil.example/x"}')
+    assert 'href="about:blank"' in html
+    assert "evil.example" not in html
+
+
 def test_link_node_with_javascript_href_resolves_to_about_blank() -> None:
     html = render_link('{"$type":"Static","value":"javascript:alert(1)"}')
     assert 'href="about:blank"' in html
@@ -106,6 +133,17 @@ def test_markdown_strips_genuine_handler_next_to_prose_on_words() -> None:
     assert "only one" in cleaned
     assert ">once<" in cleaned
     assert 'href="https://x"' in cleaned
+
+
+def test_markdown_element_sweep_is_index_aligned_under_case_folding() -> None:
+    # The dangerous-element sweep searches a case-folded COPY and splices the
+    # resulting indices into the ORIGINAL. `str.lower()` is not length-preserving
+    # ("İ".lower() is two code points), so a single such character before the tag
+    # used to shift the removal window and leave a fragment of it behind.
+    assert "İ".lower() != "i", "guard: this test is meaningless if the fold is length-preserving"
+    assert sanitize_markdown_html("İ<script>alert(1)</script>") == "İ"
+    assert sanitize_markdown_html("<p>İİ</p><SCRIPT>x</SCRIPT><p>b</p>") == "<p>İİ</p><p>b</p>"
+    assert sanitize_markdown_html("İ<iframe src='x'></iframe>b") == "İb"
 
 
 def test_markdown_node_renders_escaped_then_sanitised() -> None:

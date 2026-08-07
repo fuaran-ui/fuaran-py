@@ -25,6 +25,25 @@ labelled placeholder).
 from __future__ import annotations
 
 import re
+import string
+
+# ── Case folding ────────────────────────────────────────────────────────────
+
+_ASCII_FOLD = str.maketrans(string.ascii_uppercase, string.ascii_lowercase)
+
+
+def _ascii_lower(s: str) -> str:
+    """ASCII-only lowercase — length-preserving, which ``str.lower()`` is not.
+
+    ``"İ".lower()`` is two code points (U+0069 U+0307), so every place below
+    that searches a case-folded COPY and splices the resulting indices back
+    into the ORIGINAL string depends on a fold that cannot change length. A
+    locale-aware fold silently shifts the removal window and leaves a fragment
+    of the element it meant to remove. The tag / scheme / protocol vocabulary
+    this module matches is ASCII, so an ASCII-only fold loses no matches.
+    """
+    return s.translate(_ASCII_FOLD)
+
 
 # ── ExtraAttributes key/value sanitization ─────────────────────────────────
 
@@ -88,6 +107,21 @@ def _extract_scheme(url: str) -> str | None:
     return cleaned.strip().lower()
 
 
+def _is_protocol_relative(url: str) -> bool:
+    """A protocol-relative URL: ``//host/path`` and the forms browsers fold into it.
+
+    WHATWG URL parsing treats ``\\`` as ``/`` for special schemes, so ``\\\\host``,
+    ``/\\host`` and ``\\/host`` all resolve exactly as ``//host`` does.
+
+    These carry no scheme, so the schemeless branch below would otherwise admit
+    them — but the browser resolves them against the CURRENT page's scheme and
+    lands on an OFF-ORIGIN host, defeating the same-origin intent that makes a
+    schemeless URL safe. On an ``href`` that is off-origin navigation; on an
+    image ``src`` it is an off-origin request that leaks the Referer.
+    """
+    return len(url) >= 2 and url[0] in "/\\" and url[1] in "/\\"
+
+
 def sanitize_url(url: str) -> str | None:
     """Return the URL if its scheme is accepted, else ``None`` (default-deny)."""
     if url is None:
@@ -98,6 +132,9 @@ def sanitize_url(url: str) -> str | None:
         return trimmed
     scheme = _extract_scheme(trimmed)
     if scheme is None:
+        if _is_protocol_relative(trimmed):
+            # Off-origin despite carrying no scheme.
+            return None
         # No scheme → relative / fragment / same-origin. Allowed.
         return trimmed
     if scheme in _REJECTED_URL_SCHEMES:
@@ -153,10 +190,13 @@ def sanitize_markdown_html(html: str) -> str:
         open_tag = "<" + tag
         close_tag = "</" + tag + ">"
         while True:
-            i = result.lower().find(open_tag)
+            # ASCII-only fold: the indices below splice into `result`, so the
+            # searched copy must stay index-aligned with it (see `_ascii_lower`).
+            folded = _ascii_lower(result)
+            i = folded.find(open_tag)
             if i < 0:
                 break
-            j = result.lower().find(close_tag, i)
+            j = folded.find(close_tag, i)
             if j >= 0:
                 result = result[:i] + result[j + len(close_tag) :]
             else:

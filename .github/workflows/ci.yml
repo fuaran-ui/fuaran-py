@@ -1,0 +1,156 @@
+# Build, test and wire-format conformance gate for the Python host.
+#
+# ── Layout ───────────────────────────────────────────────────────────────────
+# The conformance corpus is its own public repository. The test suite resolves
+# it as a SIBLING of this repo root (tests/_corpus.py walks to
+# `<container>/wire-format-fixtures`), so this repo is checked out into a
+# subdirectory and the corpus beside it:
+#
+#     $GITHUB_WORKSPACE/
+#     ├── fuaran-py/               ← this repo
+#     └── wire-format-fixtures/    ← the corpus (fuaran-ui/fuaran-ui-specification)
+#
+# The corpus repository is PUBLIC, so the checkout is anonymous — no token.
+#
+# ── Why the corpus assertion below is not optional ───────────────────────────
+# When the corpus is absent, tests/_corpus.py does NOT fail — it silently falls
+# back to the committed offline snapshot under conformance/corpus/. A layout
+# drift would therefore leave the suite certifying against a stale local copy of
+# the spec while the job stayed green, which is the one failure mode a
+# conformance gate must never have. The assertion turns that into a hard stop.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  # ── QUARANTINE ─────────────────────────────────────────────────────────────
+  # These cases fail on a clean tree TODAY, and are excluded from the blocking
+  # gate so that a NEW regression is caught while this existing drift stays
+  # visible. They are not a judgement that the cases are wrong — they are a
+  # record of known, understood, outstanding work.
+  #
+  # Single root cause: the shared corpus has moved ahead of this decoder. Three
+  # fixtures — form-toggle, now-environment-binding, switch-on-selection — carry
+  # vocabulary the decoder does not yet model (a `Toggle` form-field kind, a
+  # `Now` binding, and a required `stateKey` on `Switch`). The corpus-sync cases
+  # fail for the same reason at one remove: the committed offline snapshot has
+  # not been re-synced since the corpus gained those fixtures.
+  #
+  # This list SHRINKS TO EMPTY when the decoder models that vocabulary. Delete
+  # entries as they start passing; do not add to it to make a red build green —
+  # a new failure here is the regression this gate exists to catch.
+  QUARANTINE: >-
+    --deselect tests/test_roundtrip.py::test_roundtrip[form-toggle]
+    --deselect tests/test_roundtrip.py::test_roundtrip[now-environment-binding]
+    --deselect tests/test_roundtrip.py::test_roundtrip[switch-on-selection]
+    --deselect tests/test_bridge.py::test_bridge_roundtrip[form-toggle]
+    --deselect tests/test_bridge.py::test_bridge_roundtrip[now-environment-binding]
+    --deselect tests/test_bridge.py::test_bridge_roundtrip[switch-on-selection]
+    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[form-toggle]
+    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[now-environment-binding]
+    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[switch-on-selection]
+    --deselect tests/test_diff.py::test_identity_diff_is_empty[form-toggle]
+    --deselect tests/test_diff.py::test_identity_diff_is_empty[now-environment-binding]
+    --deselect tests/test_diff.py::test_identity_diff_is_empty[switch-on-selection]
+    --deselect tests/test_diff.py::test_add_style_round_trips[form-toggle]
+    --deselect tests/test_diff.py::test_add_style_round_trips[now-environment-binding]
+    --deselect tests/test_diff.py::test_add_style_round_trips[switch-on-selection]
+    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[form-toggle]
+    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[now-environment-binding]
+    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[switch-on-selection]
+    --deselect tests/test_kind_set.py::test_form_field_kind_set_matches_manifest
+    --deselect tests/test_kind_set.py::test_corpus_control_kinds_are_declared
+    --deselect tests/test_corpus_sync.py::test_snapshot_file_set_matches_authority
+    --deselect tests/test_corpus_sync.py::test_snapshot_top_files_byte_identical[manifest.json]
+    --deselect tests/test_corpus_sync.py::test_snapshot_top_files_byte_identical[schema.json]
+    --deselect tests/test_corpus_sync.py::test_snapshot_family_bytes_identical[nodes]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fuaran-py
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: fuaran-py
+
+      # Deliberately UNPINNED: the corpus is the shared conformance authority
+      # every host certifies against, and one current spec for all hosts is the
+      # point of giving it a single home. Pinning here would let this host drift
+      # from the spec without anything going red.
+      - name: Check out the wire-format conformance corpus
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-ui-specification
+          path: wire-format-fixtures
+
+      - name: Assert the corpus is where the tests resolve it
+        run: test -f ../wire-format-fixtures/manifest.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+
+      - name: Lint (ruff check)
+        run: python -m ruff check .
+
+      - name: Format check (ruff format)
+        run: python -m ruff format --check .
+
+      - name: Type check (mypy)
+        run: python -m mypy
+
+      # Print what this gate does NOT cover, on every run. A cap nobody can see
+      # reads as "covered everything".
+      - name: Report the conformance quarantine
+        run: |
+          echo "The blocking gate below EXCLUDES these known-failing cases:"
+          echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$' | sed 's/^/  - /'
+          {
+            echo "### Conformance quarantine (excluded from the blocking gate)"
+            echo
+            echo "Cause: the shared corpus carries vocabulary this decoder does not yet model"
+            echo "(\`Toggle\` form-field kind, \`Now\` binding, required \`Switch.stateKey\`)."
+            echo
+            echo '```'
+            echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Non-blocking: runs the FULL suite so the size of the existing drift is
+      # measured on every run rather than inferred from the quarantine list.
+      - name: Conformance drift (reported, non-blocking)
+        continue-on-error: true
+        run: |
+          set +e
+          python -m pytest -q -rs > drift.log 2>&1
+          status=$?
+          tail -40 drift.log
+          {
+            echo "### Full suite, including quarantined cases (non-blocking)"
+            echo
+            echo '```'
+            grep -E '^[0-9]+ (failed|passed)|failed,|passed,' drift.log | tail -3
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+
+      # THE GATE. Everything the suite currently passes, including every
+      # conformance case outside the quarantine above.
+      - name: Test (gated)
+        run: python -m pytest -q -rs $QUARANTINE

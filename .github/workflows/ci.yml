@@ -121,6 +121,15 @@ jobs:
         run: |
           echo "The blocking gate below EXCLUDES these known-failing cases:"
           echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$' | sed 's/^/  - /'
+          echo
+          echo "ALSO NOT GATED HERE — inert rather than quarantined (see the skip"
+          echo "summary that -rs prints under each test run below):"
+          echo "  - the reference-renderer parity tests read the reference host's source"
+          echo "    from a sibling checkout this workflow does not make, so they skip."
+          echo "    Cross-host parity is covered by the scheduled cross-implementation"
+          echo "    run, not by this gate."
+          echo "  - the FastAPI sample-host tests skip because fastapi is a sample-only"
+          echo "    dependency and is not in the [dev] extra this job installs."
           {
             echo "### Conformance quarantine (excluded from the blocking gate)"
             echo

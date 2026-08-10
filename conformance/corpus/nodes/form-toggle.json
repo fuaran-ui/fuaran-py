@@ -1,0 +1,1 @@
+{"id":"form-toggle","kind":{"$type":"Form","fields":[{"id":"irrigation-running","kind":{"$type":"Toggle"},"label":"Irrigation","required":false},{"id":"accept-terms","kind":{"$type":"Checkbox"},"label":"I accept the terms","required":true}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

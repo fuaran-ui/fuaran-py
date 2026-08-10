@@ -1575,12 +1575,55 @@ def _decode_column(value: object, path: str) -> Value:
     return Obj(None, fields)
 
 
+_SORT_DIRECTIONS = frozenset({"asc", "desc"})
+
+
+def _validate_static_rows(raw: object, path: str) -> None:
+    """Phase 801 — check the two declarative sort-intent slots on ``staticRows``.
+
+    ``staticRows`` itself still passes through structurally (``from_json``), which is
+    what makes the round-trip byte-identical for free. What structure cannot do is
+    REFUSE: a direction outside the closed pair and a negative header index are both
+    well-formed JSON, so without this check they would decode silently and the corpus's
+    reject fixtures would pass as accepts. Validation only — nothing is rewritten, so
+    the passthrough encoding is untouched.
+    """
+    if not isinstance(raw, dict):
+        return
+    sortable = raw.get("sortable")
+    if sortable is not None and not isinstance(sortable, bool):
+        _fail(WRONG_TYPE, f"{path}.sortable", "sortable must be a boolean")
+    default_sort = raw.get("defaultSort")
+    if default_sort is None:
+        return
+    ds_path = f"{path}.defaultSort"
+    ds = _expect_object(default_sort, ds_path)
+    if "column" not in ds:
+        _fail(MISSING_FIELD, f"{ds_path}.column", "missing required field 'column'", "non-negative header index")
+    column = ds["column"]
+    # `bool` is a subclass of `int` in Python — exclude it explicitly, or `true` would
+    # decode as column 1.
+    if isinstance(column, bool) or not isinstance(column, int) or column < 0:
+        _fail(
+            WRONG_TYPE,
+            f"{ds_path}.column",
+            "column must be a non-negative integer header index",
+            "JSON number (non-negative integer header index)",
+        )
+    if "direction" not in ds:
+        _fail(MISSING_FIELD, f"{ds_path}.direction", "missing required field 'direction'", "asc | desc")
+    _enum(ds["direction"], f"{ds_path}.direction", _SORT_DIRECTIONS, "SortDirection")
+
+
 def _decode_datagrid(obj: dict, path: str) -> Obj:
     """DataGrid (GridSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` / ``rows`` (the
     rows are opaque-erased), typed ``columns``. Remaining fields (``editable`` /
     ``rowKey`` / ``rowKeyField`` / ``staticRows`` / ``onRowClick``) pass through
-    structurally, as the pre-typed decoder did."""
+    structurally, as the pre-typed decoder did — with the Phase 801 sort-intent slots
+    on ``staticRows`` validated in passing (see ``_validate_static_rows``)."""
     fields: dict[str, Value] = {}
+    if "staticRows" in obj:
+        _validate_static_rows(obj["staticRows"], f"{path}.staticRows")
     src_raw, src_present = _alias_get(obj, "source", ("data", "rows"))
     if src_present:
         fields["source"] = _decode_grid_source(src_raw, f"{path}.source")

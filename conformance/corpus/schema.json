@@ -354,6 +354,17 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Now"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "I18n"
             },
             "args": {
@@ -1175,6 +1186,23 @@
           "properties": {
             "$type": {
               "const": "Checkbox"
+            },
+            "onToggle": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Toggle"
             },
             "onToggle": {
               "const": "<closure>"
@@ -2957,6 +2985,26 @@
         "staticRows": {
           "type": "object",
           "properties": {
+            "defaultSort": {
+              "type": "object",
+              "properties": {
+                "column": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "asc",
+                    "desc"
+                  ]
+                }
+              },
+              "required": [
+                "column",
+                "direction"
+              ]
+            },
             "headers": {
               "type": "array",
               "items": {
@@ -2971,6 +3019,9 @@
                   "$ref": "#/$defs/TextSource"
                 }
               }
+            },
+            "sortable": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -4012,41 +4063,61 @@
           ]
         },
         {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "Switch"
-            },
-            "cases": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "child": {
-                    "$ref": "#/$defs/Node"
-                  },
-                  "match": {
-                    "type": "string"
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Switch"
+                },
+                "cases": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "child": {
+                        "$ref": "#/$defs/Node"
+                      },
+                      "match": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "child",
+                      "match"
+                    ]
                   }
                 },
-                "required": [
-                  "child",
-                  "match"
-                ]
-              }
+                "default": {
+                  "$ref": "#/$defs/Node"
+                },
+                "stateKey": {
+                  "type": "string"
+                },
+                "on": {
+                  "$ref": "#/$defs/Binding"
+                }
+              },
+              "required": [
+                "$type",
+                "cases",
+                "default"
+              ]
             },
-            "default": {
-              "$ref": "#/$defs/Node"
-            },
-            "stateKey": {
-              "type": "string"
+            {
+              "anyOf": [
+                {
+                  "required": [
+                    "stateKey"
+                  ]
+                },
+                {
+                  "required": [
+                    "on"
+                  ]
+                }
+              ]
             }
-          },
-          "required": [
-            "$type",
-            "cases",
-            "default",
-            "stateKey"
           ]
         },
         {

@@ -1,6 +1,7 @@
 {
   "version": 1,
   "schema": "schema.json",
+  "idl": "idl.json",
   "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
   "kinds": [
     "Badge",
@@ -53,7 +54,8 @@
     "RangedNumber",
     "SegmentedChoice",
     "Text",
-    "TextArea"
+    "TextArea",
+    "Toggle"
   ],
   "fixtures": [
     {
@@ -1033,6 +1035,14 @@
       "description": "Display/Drawing (degenerate — empty)"
     },
     {
+      "id": "empty-state-card",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/empty-state-card.json",
+      "expectedFile": "nodes/empty-state-card.json",
+      "description": "Layout/Box (Phase 767 — the canonical empty state with a CTA: one Card region, no nested Callout)"
+    },
+    {
       "id": "fact-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1151,6 +1161,14 @@
       "inputFile": "nodes/form-segmented.json",
       "expectedFile": "nodes/form-segmented.json",
       "description": "Input/Form (SegmentedChoice horizontal + vertical)"
+    },
+    {
+      "id": "form-toggle",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-toggle.json",
+      "expectedFile": "nodes/form-toggle.json",
+      "description": "Input/Form (Phase 766 — the Toggle switch affordance beside a Checkbox)"
     },
     {
       "id": "format-bindings",
@@ -1329,6 +1347,14 @@
       "description": "Display/Markdown"
     },
     {
+      "id": "master-detail-multi-field",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/master-detail-multi-field.json",
+      "expectedFile": "nodes/master-detail-multi-field.json",
+      "description": "Layout/Box (master-detail — ONE selection feeding N slots, each projecting a DIFFERENT field)"
+    },
+    {
       "id": "master-detail-preselected",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1431,6 +1457,14 @@
       "inputFile": "nodes/multiselect-1.json",
       "expectedFile": "nodes/multiselect-1.json",
       "description": "Input/Select (multi-select — list value)"
+    },
+    {
+      "id": "now-environment-binding",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/now-environment-binding.json",
+      "expectedFile": "nodes/now-environment-binding.json",
+      "description": "Binding/Now (Phase 765 — the host-furnished instant: a text slot + a Transform param feeding dateDiffDays)"
     },
     {
       "id": "progress-1",
@@ -1537,12 +1571,28 @@
       "description": "Switch (view state → details/summary cases + info default)"
     },
     {
+      "id": "switch-on-selection",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-on-selection.json",
+      "expectedFile": "nodes/switch-on-selection.json",
+      "description": "Meta/Switch (Phase 768 — the selector widened: `on` takes a Selection, the branch follows the clicked row)"
+    },
+    {
       "id": "table-1",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/table-1.json",
       "expectedFile": "nodes/table-1.json",
       "description": "Visualisation/Grid (static-table mode — staticRows; absorbed the retired Table kind)"
+    },
+    {
+      "id": "table-sortable-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/table-sortable-1.json",
+      "expectedFile": "nodes/table-sortable-1.json",
+      "description": "Visualisation/Grid (Phase 801 — static-table mode declaring sort intent: sortable + defaultSort)"
     },
     {
       "id": "tabs-1",
@@ -2041,6 +2091,15 @@
       "description": "Mount ChannelDirection value 'Sideways' (§4o)"
     },
     {
+      "id": "reject-unknown-static-sort-direction",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-static-sort-direction.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.staticRows.defaultSort.direction",
+      "description": "staticRows defaultSort direction 'sideways' — the closed asc|desc pair default-denies (Phase 801)"
+    },
+    {
       "id": "reject-unknown-textsource",
       "kind": "reject",
       "decoder": "node",
@@ -2120,6 +2179,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind",
       "description": "Node kind is a bare string not an object"
+    },
+    {
+      "id": "reject-wrongtype-static-sort-column",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-static-sort-column.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.defaultSort.column",
+      "description": "staticRows defaultSort column -1 — a header index is non-negative; the schema says the same with minimum:0 (Phase 801)"
     },
     {
       "id": "reject-wrongtype-style-tone",

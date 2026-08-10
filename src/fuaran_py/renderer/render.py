@@ -909,7 +909,23 @@ class Renderer:
                     body_rows += element("tr", [("class", "fuaran-table-row")], cells)
         thead = element("thead", [], element("tr", [], header_cells))
         tbody = element("tbody", [], body_rows)
-        return element("table", [("class", "fuaran-table")], thead + tbody)
+        # Phase 801 — the declared sort intent as data attributes, so a
+        # progressive-enhancement script honours it without re-parsing the wire.
+        # Emitted ONLY when declared (an undeclared table's bytes are unchanged),
+        # and in the same order as the F# / TS server renderers so the parity-locked
+        # markup stays parity-locked.
+        attrs: list[tuple[str, str]] = [("class", "fuaran-table")]
+        sortable = fields.get("sortable")
+        if isinstance(sortable, bool):
+            attrs.append(("data-fuaran-sortable", "true" if sortable else "false"))
+        default_sort = fields.get("defaultSort")
+        if isinstance(default_sort, Obj):
+            column = default_sort.fields.get("column")
+            direction = default_sort.fields.get("direction")
+            if isinstance(column, int) and isinstance(direction, str):
+                attrs.append(("data-fuaran-sort-column", str(column)))
+                attrs.append(("data-fuaran-sort-direction", direction))
+        return element("table", attrs, thead + tbody)
 
     def _make_vis_placeholder(self, css: str, name: str, count: int, text: str) -> str:
         return text_element(

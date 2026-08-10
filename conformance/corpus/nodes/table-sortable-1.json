@@ -1,0 +1,1 @@
+{"id":"table-sortable-1","kind":{"$type":"DataGrid","columns":[],"source":{"$type":"Static","value":[]},"staticRows":{"defaultSort":{"column":1,"direction":"desc"},"headers":["Region","Revenue"],"rows":[["North","1200"],["South","980"]],"sortable":true}}}

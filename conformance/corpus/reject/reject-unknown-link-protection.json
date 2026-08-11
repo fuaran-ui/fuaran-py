@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"mailto:a@example.com"},"label":{"$type":"Literal","text":"Email"},"protection":"rot13"},"state":{},"style":{"emphasis":"Normal","tone":"Default","weight":"Standard"}}

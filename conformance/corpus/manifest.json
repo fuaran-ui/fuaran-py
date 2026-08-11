@@ -1315,6 +1315,14 @@
       "description": "Display/Link"
     },
     {
+      "id": "link-protected-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/link-protected-1.json",
+      "expectedFile": "nodes/link-protected-1.json",
+      "description": "Display/Link (protected email — Phase 812 protection field)"
+    },
+    {
       "id": "list-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2080,6 +2088,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.shapes[0].$type",
       "description": "Drawing Shape $type 'Blob' — the closed-shape default-deny (Phase 524)"
+    },
+    {
+      "id": "reject-unknown-link-protection",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-link-protection.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.protection",
+      "description": "LinkProtection value 'rot13' — the closed protection DU default-denies (Phase 812)"
     },
     {
       "id": "reject-unknown-mount-direction",

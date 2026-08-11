@@ -1,0 +1,1 @@
+{"id":"link-protected-1","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"mailto:contact@example.com"},"label":"Email us","protection":"email"}}

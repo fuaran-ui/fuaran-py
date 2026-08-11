@@ -48,6 +48,12 @@
         "Lead"
       ]
     },
+    "LinkProtection": {
+      "type": "string",
+      "enum": [
+        "email"
+      ]
+    },
     "ImageVariant": {
       "type": "string",
       "enum": [
@@ -1686,6 +1692,9 @@
         },
         "target": {
           "type": "string"
+        },
+        "protection": {
+          "$ref": "#/$defs/LinkProtection"
         }
       },
       "required": [

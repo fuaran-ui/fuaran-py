@@ -175,6 +175,7 @@ MATH_DISPLAY = frozenset({"Inline", "Block"})
 BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
 BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Auto"})  # Phase 390
 BUTTON_VARIANT = frozenset({"Primary", "Secondary", "Tertiary", "Destructive"})
+LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render strategy
 
 # ── Lenient-ingest enum aliases (WIRE_FORMAT.md §3.6, decode-only) ──────────
 # The encoder never emits an alias; a re-encode normalises to the canonical DU
@@ -1167,6 +1168,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("download", True, _decode_bool),
         ("href", True, _decode_binding),
         ("label", True, _decode_text_source),
+        # Phase 812 — optional closed enumeration; unknown case rejects
+        # UNKNOWN_DU_CASE at $.kind.protection via the _enum default-deny.
+        ("protection", False, _enum_decoder(LINK_PROTECTION, "protection")),
         ("rel", False, _decode_string),
         ("target", False, _decode_string),
     ],

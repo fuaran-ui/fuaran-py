@@ -213,6 +213,7 @@ BINDING_CASES = frozenset(
         "Selection",
         "State",
         "Computed",
+        "Now",
         "I18n",
         "Local",
         "Format",
@@ -677,7 +678,8 @@ def _normalise_binding_obj(
     Query: ``dependsOn`` ← ``deps`` / ``dependencies`` (§3.6), omitted when
     empty; the retired ``accessor`` sentinel is dropped (0.2.0). Selection:
     ``accessor`` dropped; ``defaultValue`` (0.2.9) + ``field`` (Phase 632)
-    preserved. State: ``defaultValue`` ← ``initialValue`` / ``default``.
+    preserved. State: ``defaultValue`` ← ``initialValue`` / ``default``. Now:
+    tag-only (``{"$type":"Now"}`` — no fields survive re-encode).
     Transform: ``params`` map form coerces to the canonical ``[{from,name}]``
     array (name-keyed set, §3.6), ``value`` aliases ``from`` at the element,
     and the embedded source + pipeline normalise through the columnar codec.
@@ -718,6 +720,11 @@ def _normalise_binding_obj(
             fields["defaultValue"] = decode_default(default_raw, f"{path}.defaultValue")
         fields["key"] = key
         return Obj("State", fields)
+    if tag == "Now":
+        # The host-furnished current instant (ISO-8601 UTC). The wire form is
+        # `{"$type":"Now"}` — no fields: the clock lives in the HOST, resolved
+        # once per render pass, never on the wire.
+        return Obj("Now", {})
     if tag == "Transform":
         return _decode_transform_binding(obj, path)
     return from_json(obj)
@@ -1267,15 +1274,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("contentHash", False, _decode_json_value),
         ("exposedNodeIds", False, _decode_json_value),
     ],
-    # State-bound conditional child (Phase 392). `cases` is an array of
-    # `{child,match}` objects; `default` a Node; `stateKey` a string — all
-    # required (the reject fixtures pin MISSING_FIELD at each). Duplicate `match`
-    # values are NOT a decode error (first-match-wins; the validator flags them).
-    "Switch": [
-        ("cases", True, _decode_switch_cases),
-        ("default", True, _decode_single_node),
-        ("stateKey", True, _decode_string),
-    ],
+    # Switch (Phase 392, selector widened Phase 768) — decoded by a dedicated
+    # builder (`_decode_switch`), not a flat field schema, because the selector
+    # is one-of `stateKey` / `on` with the Phase 768 collapse rule.
     # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
     # capabilities + the onBubble closure sentinel are always present on the
     # canonical wire; inputs (a FragmentArg map, additive) passes through
@@ -1349,11 +1350,46 @@ def _decode_box(obj: dict, path: str) -> Obj:
     return Obj("Box", fields)
 
 
+def _decode_switch(obj: dict, path: str) -> Obj:
+    """Switch — the binding-selected conditional child (Phase 392; the selector
+    widened to any Binding by Phase 768).
+
+    ``cases`` is an array of ``{child,match}`` objects; ``default`` a Node —
+    both required. Duplicate ``match`` values are NOT a decode error
+    (first-match-wins keeps decode structural; the validator flags them,
+    FUARAN082). The selector is one of two spellings: ``on`` (any Binding —
+    wins when both are present) or the compact ``stateKey`` string, the
+    canonical spelling of the ``State(key)`` form. Both absent keeps the
+    ``stateKey`` MISSING_FIELD, so the reject fixture's error is unchanged.
+    The Phase 768 collapse rule: an ``on`` that decodes to a default-free
+    ``State`` normalises to ``stateKey``, so the canonical bytes carry ``on``
+    only for a selector the compact form cannot spell."""
+    fields: dict[str, Value] = {
+        "cases": _decode_switch_cases(_require(obj, "cases", path), f"{path}.cases"),
+        "default": _decode_single_node(_require(obj, "default", path), f"{path}.default"),
+    }
+    if "on" in obj:
+        selector = _decode_binding(obj["on"], f"{path}.on")
+        if isinstance(selector, Obj) and selector.tag == "State" and "defaultValue" not in selector.fields:
+            fields["stateKey"] = selector.fields["key"]
+        else:
+            fields["on"] = selector
+    else:
+        fields["stateKey"] = _decode_string(_require(obj, "stateKey", path), f"{path}.stateKey")
+    known = frozenset({"$type", "cases", "default", "on", "stateKey"})
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj("Switch", fields)
+
+
 def _decode_kind(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, KNOWN_KINDS, code_unknown=WRONG_NODE_KIND)
     if tag == "Box":
         return _decode_box(obj, path)
+    if tag == "Switch":
+        return _decode_switch(obj, path)
     if tag == "DataGrid":
         return _decode_datagrid(obj, path)
     if tag == "Form":
@@ -1673,6 +1709,7 @@ FORM_FIELD_KIND_CASES = frozenset(
         "Text",
         "Number",
         "Checkbox",
+        "Toggle",
         "Choice",
         "RangedNumber",
         "SegmentedChoice",
@@ -1784,7 +1821,7 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
     tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES)
     fields: dict[str, Value] = {}
 
-    handler_key = "onToggle" if tag == "Checkbox" else "onChange"
+    handler_key = "onToggle" if tag in ("Checkbox", "Toggle") else "onChange"
     if handler_key in obj:
         # A present handler (any spelling) decodes to the closure placeholder
         # and re-encodes as the sentinel; an absent one arms the write-back default.
@@ -1817,7 +1854,9 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
             bound("min", _decode_number)
             bound("max", _decode_number)
             bound("step", _decode_number)
-    elif tag == "Checkbox":
+    elif tag in ("Checkbox", "Toggle"):
+        # Toggle (Phase 766) — the switch-styled boolean control: Checkbox's
+        # bool mechanics under a distinct tag-only discriminator.
         value_slot(_decode_binding, _AUTO_CHECKBOX)
     elif tag in ("Choice", "SegmentedChoice"):
         fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")

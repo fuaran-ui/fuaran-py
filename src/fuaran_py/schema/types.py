@@ -154,6 +154,38 @@ class Filter:
         return Obj("Filter", {"name": self.name})
 
 
+@dataclass(frozen=True)
+class Selection:
+    """``Binding.Selection`` — the last-selected row on ``node_id``.
+
+    The row-typed ``accessor`` is a closure and rides off the wire (0.2.0);
+    ``field`` (Phase 632) is its wire-expressible twin, projecting the named
+    row property declaratively. ``default_value`` (0.2.9) yields until the
+    user first selects a row; ``None`` means absent (omitted, never null).
+    """
+
+    node_id: str
+    default_value: Value = None
+    field: str | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Selection", {"defaultValue": self.default_value, "field": self.field, "nodeId": self.node_id})
+
+
+@dataclass(frozen=True)
+class Now:
+    """``Binding.Now`` — the host-furnished current instant (ISO-8601 UTC).
+
+    Tag-only on the wire (``{"$type":"Now"}``): the clock lives in the HOST,
+    resolved once per render pass, never on the wire — which is what keeps a
+    tree a pure value and lets a replayed op-stream reproduce its original
+    render. The typed ``project`` accessor is a closure, off the wire.
+    """
+
+    def to_wire(self) -> Value:
+        return Obj("Now", {})
+
+
 # ── Locale-aware Format DU + LocaleSource (WIRE_FORMAT.md §3.3, Phase 102) ───
 # Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
 # ``Date`` carries ``dateStyle`` (a bare enum, not a format string).
@@ -279,7 +311,7 @@ class Local:
         )
 
 
-Binding = Static | State | Filter | FormatBinding | Local
+Binding = Static | State | Filter | Selection | Now | FormatBinding | Local
 
 NumberInput = float | int | Binding
 """A numeric ``Binding``, or a bare number coerced to :class:`Static`."""
@@ -1228,6 +1260,25 @@ class CheckboxField:
 
 
 @dataclass(frozen=True)
+class ToggleField:
+    """``FormFieldKind.Toggle`` (Phase 766) — the switch-styled boolean control:
+    ``Checkbox``'s bool mechanics under a distinct tag-only discriminator.
+
+    Mirrors the F# shape where BOTH slots are optional: an absent ``value``
+    auto-binds to the field's state key at run time (the canonical minimal
+    control is the bare ``{"$type":"Toggle"}``), and an absent handler arms the
+    write-back default. ``on_toggle=True`` marks a host handler as present — a
+    closure, emitted as the sentinel.
+    """
+
+    value: Binding | None = None
+    on_toggle: bool = False
+
+    def to_wire(self) -> Value:
+        return _obj("Toggle", {"onToggle": CLOSURE if self.on_toggle else None, "value": self.value})
+
+
+@dataclass(frozen=True)
 class TextAreaField:
     value: Binding
     rows: int
@@ -1337,6 +1388,7 @@ FormFieldKind = (
     TextField
     | NumberField
     | CheckboxField
+    | ToggleField
     | TextAreaField
     | RangedNumber
     | DateField
@@ -1556,25 +1608,42 @@ class SwitchCase:
 
 @dataclass(frozen=True)
 class Switch:
-    """State-bound conditional child (Phase 392) — render one of several child
-    subtrees based on a reactive state key. ``state_key`` selects the case (first
-    match on the value's string form wins); ``default`` renders when none match
-    (and is the SSR / first-paint surface). Wire: ``{"$type":"Switch","cases":[…],
-    "default":<Node>,"stateKey":<str>}``."""
+    """Binding-selected conditional child (Phase 392; the selector widened to any
+    ``Binding`` by Phase 768) — render one of several child subtrees. The selector
+    picks the case (first match on the value's string form wins); ``default``
+    renders when none match (and is the SSR / first-paint surface).
 
-    state_key: str
+    Exactly one selector spelling is given: ``state_key`` (the compact Phase 392
+    form, canonical for a default-free ``State``) or ``on`` (any ``Binding`` —
+    e.g. a :class:`Selection`, so the branch follows the clicked row with no
+    writer). Mirroring the F#/TS encoders, an ``on`` that is a default-free
+    ``State`` collapses to the ``stateKey`` wire spelling, so canonical bytes
+    carry ``on`` only for a selector the compact form cannot spell. Wire:
+    ``{"$type":"Switch","cases":[…],"default":<Node>,"stateKey":<str>|"on":<Binding>}``."""
+
+    state_key: str | None
     cases: tuple[SwitchCase, ...]
     default: UiNode
+    on: Binding | None = None
+
+    def __post_init__(self) -> None:
+        if (self.state_key is None) == (self.on is None):
+            raise ValueError("Switch takes exactly one selector: state_key or on")
 
     def to_wire(self) -> Obj:
-        return _obj(
-            "Switch",
-            {
-                "cases": list(self.cases),
-                "default": self.default,
-                "stateKey": self.state_key,
-            },
-        )
+        fields: dict[str, object] = {
+            "cases": list(self.cases),
+            "default": self.default,
+        }
+        selector = self.on
+        if selector is None:
+            fields["stateKey"] = self.state_key
+        elif isinstance(selector, State) and selector.default_value is None:
+            # Phase 768 collapse rule — State(key) keeps the compact spelling.
+            fields["stateKey"] = selector.key
+        else:
+            fields["on"] = selector
+        return _obj("Switch", fields)
 
 
 # Fragment parameterisation (holes / effect / args) — WIRE_FORMAT.md §3.2 -----

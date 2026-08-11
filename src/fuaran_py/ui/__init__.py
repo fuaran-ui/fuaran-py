@@ -99,6 +99,18 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         return t.Filter(name)
 
     @staticmethod
+    def selection(node_id: str, *, field: str | None = None, default_value: t.Value = None) -> Binding:
+        """``Binding.Selection`` — the last-selected row on ``node_id``; ``field``
+        (Phase 632) projects a row property declaratively, ``default_value``
+        (0.2.9) yields until the first selection."""
+        return t.Selection(node_id, default_value, field)
+
+    @staticmethod
+    def now() -> Binding:
+        """``Binding.Now`` — the host-furnished current instant (tag-only on the wire)."""
+        return t.Now()
+
+    @staticmethod
     def opaque() -> Binding:
         """A ``Static`` whose value the encoder cannot decompose (``"<opaque>"``)."""
         return t.Static(t.OPAQUE)
@@ -719,14 +731,17 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     def switch(  # noqa: A003
         id: str,  # noqa: A002
         *,
-        state_key: str,
         cases: list[tuple[str, UiNode]],
         default: UiNode,
+        state_key: str | None = None,
+        on: Binding | None = None,
     ) -> UiNode:
-        """State-bound conditional child (Phase 392). ``cases`` is a list of
-        ``(match_value, child)`` pairs; ``default`` renders when none match."""
+        """Binding-selected conditional child (Phase 392 / 768). ``cases`` is a
+        list of ``(match_value, child)`` pairs; ``default`` renders when none
+        match. Give exactly one selector: the compact ``state_key``, or ``on``
+        (any ``Binding`` — e.g. ``binding.selection`` to follow the clicked row)."""
         switch_cases = tuple(t.SwitchCase(match=m, child=child) for m, child in cases)
-        return _node(id, t.Switch(state_key, switch_cases, default), accessibility.none)
+        return _node(id, t.Switch(state_key, switch_cases, default, on), accessibility.none)
 
     @staticmethod
     def fragment_decl(

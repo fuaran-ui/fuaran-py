@@ -1,0 +1,1 @@
+{"id":"button-setstate-valuefrom","kind":{"$type":"Button","label":"Track this order","onClick":{"$type":"SetState","key":"chosen-id","valueFrom":{"$type":"Selection","field":"id","nodeId":"orders-grid"}},"variant":"Secondary"}}

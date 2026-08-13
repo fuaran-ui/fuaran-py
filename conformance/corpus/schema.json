@@ -685,24 +685,44 @@
           ]
         },
         {
-          "type": "object",
-          "properties": {
-            "$type": {
-              "const": "SetState"
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "SetState"
+                },
+                "key": {
+                  "type": "string"
+                },
+                "value": {
+                  "not": {
+                    "type": "null"
+                  }
+                },
+                "valueFrom": {
+                  "$ref": "#/$defs/Binding"
+                }
+              },
+              "required": [
+                "$type",
+                "key"
+              ]
             },
-            "key": {
-              "type": "string"
-            },
-            "value": {
-              "not": {
-                "type": "null"
-              }
+            {
+              "oneOf": [
+                {
+                  "required": [
+                    "value"
+                  ]
+                },
+                {
+                  "required": [
+                    "valueFrom"
+                  ]
+                }
+              ]
             }
-          },
-          "required": [
-            "$type",
-            "key",
-            "value"
           ]
         },
         {
@@ -3098,6 +3118,9 @@
           "const": "<closure>"
         },
         "rowKeyField": {
+          "type": "string"
+        },
+        "sortStateKey": {
           "type": "string"
         },
         "source": {

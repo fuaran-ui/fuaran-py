@@ -841,7 +841,7 @@
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-source-state-rows.json",
       "expectedFile": "lenient/lenient-transform-source-state-rows.expected.json",
-      "description": "fuaran#815 — the Tier-D pilot shape: a State binding WRAPPER around row-major data in the Transform source slot unwraps to its defaultValue (initial-snapshot semantics), then transposes to canonical columnar"
+      "description": "fuaran#815/fuaran#818 — the Tier-D pilot shape: a State binding as the Transform source is preserved as a LIVE source (subscription semantics; the carried defaultValue is the initial snapshot) and round-trips byte-for-byte — the canonical spelling, not a shorthand"
     },
     {
       "id": "lenient-transform-step-aliases",
@@ -874,6 +874,14 @@
       "inputFile": "nodes/badge-1.json",
       "expectedFile": "nodes/badge-1.json",
       "description": "Display/Badge"
+    },
+    {
+      "id": "badge-transform-live",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/badge-transform-live.json",
+      "expectedFile": "nodes/badge-transform-live.json",
+      "description": "Display/Badge (Phase 818 — LIVE State-sourced Transform: the Tier-D count badge, preserved source + initial snapshot)"
     },
     {
       "id": "boundary-1",
@@ -922,6 +930,14 @@
       "inputFile": "nodes/btn-read-workbook.json",
       "expectedFile": "nodes/btn-read-workbook.json",
       "description": "Input/Button (Action.ReadFileBody base64)"
+    },
+    {
+      "id": "button-setstate-valuefrom",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/button-setstate-valuefrom.json",
+      "expectedFile": "nodes/button-setstate-valuefrom.json",
+      "description": "Input/Button (Phase 818 — SetState.valueFrom: a derived state write from the selected row's field)"
     },
     {
       "id": "call-into",
@@ -1282,6 +1298,14 @@
       "inputFile": "nodes/grid-field-named.json",
       "expectedFile": "nodes/grid-field-named.json",
       "description": "Visualisation/Grid (Phase 425 — field-named columns + RowKeyField, closure-free)"
+    },
+    {
+      "id": "grid-sort-state-key",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-sort-state-key.json",
+      "expectedFile": "nodes/grid-sort-state-key.json",
+      "description": "Visualisation/Grid (Phase 818 — sortStateKey: the data-bound grid-sort header affordance)"
     },
     {
       "id": "grid-toned-pill",
@@ -2085,6 +2109,15 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.path",
       "description": "UpdateProp missing path"
+    },
+    {
+      "id": "reject-setstate-value-and-valuefrom",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-setstate-value-and-valuefrom.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.valueFrom",
+      "description": "SetState carrying BOTH 'value' and 'valueFrom' — exactly one is allowed; the didactic names both fields and how each is used (Phase 818)"
     },
     {
       "id": "reject-tonedpill-unknown-tone",

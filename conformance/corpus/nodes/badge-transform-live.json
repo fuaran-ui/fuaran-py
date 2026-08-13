@@ -1,0 +1,1 @@
+{"id":"badge-transform-live","kind":{"$type":"Badge","label":{"$type":"Bound","binding":{"$type":"Transform","pipeline":[{"$type":"groupBy","aggs":[{"fn":"count","name":"n","of":"medication"}],"keys":[]}],"source":{"$type":"State","defaultValue":[{"medication":"Amoxicillin","quantity":20},{"medication":"Ibuprofen","quantity":50}],"key":"request-log"}}},"variant":"Info"}}

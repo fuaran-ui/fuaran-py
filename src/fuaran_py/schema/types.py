@@ -391,10 +391,17 @@ class Navigate:
 
 @dataclass(frozen=True)
 class SetState:
+    """``Action.SetState`` — fuaran#818: ``value`` (a literal, written verbatim)
+    XOR ``value_from`` (a Binding evaluated at dispatch time; ``valueFrom`` on
+    the wire). A set ``value_from`` wins — the wire carries exactly one."""
+
     key: str
-    value: Value
+    value: Value = None
+    value_from: Value | None = None
 
     def to_wire(self) -> Value:
+        if self.value_from is not None:
+            return Obj("SetState", {"key": self.key, "valueFrom": _lower(self.value_from)})
         return Obj("SetState", {"key": self.key, "value": _lower(self.value)})
 
 

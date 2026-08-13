@@ -790,10 +790,47 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     normalise through the columnar codec (`fuaran_py.dataframe`), which owns the
     lenient columnar/expression ingest; `params` carries the §3.6 map coercion +
     the `value` ← `from` element alias. The `source` value first rounds through
-    the fuaran#815 wrapper/row-major normalisation (`_normalise_transform_source`)."""
-    source_raw = _normalise_transform_source(_require(obj, "source", path))
+    the fuaran#815 wrapper/row-major normalisation (`_normalise_transform_source`).
+
+    fuaran#818 — a binding-shaped source (State / Selection / Query ``$type``) is
+    PRESERVED as the live source: the decoded binding sits in the ``source`` slot
+    verbatim (canonical re-encode is byte-for-byte — one wire dialect) and the
+    compute evaluator re-derives against the current store, falling back to the
+    initial snapshot from the binding's carried default data. A State wrapper
+    carrying NO data still errors didactically through the columnar codec (the
+    815 posture), and a State wrapper's carried data is snapshot-VALIDATED here
+    so the ragged-rows didactic stays byte-identical to the snapshot era."""
+    source_raw_orig = _require(obj, "source", path)
     pipeline_raw = _require(obj, "pipeline", path)
-    source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
+    live_tag = source_raw_orig.get("$type") if isinstance(source_raw_orig, dict) else None
+    preserved = live_tag in ("State", "Selection", "Query")
+    has_carried = isinstance(source_raw_orig, dict) and "defaultValue" in source_raw_orig
+    if preserved and live_tag == "State" and not has_carried:
+        # No carried data — the 815 path (unwrap a legacy `value` payload, or
+        # surface the columnar codec's own missing-field didactic).
+        preserved = False
+    if preserved:
+        assert isinstance(source_raw_orig, dict)
+        source = _decode_binding(source_raw_orig, f"{path}.source")
+        if live_tag == "State":
+            # Validate the carried data as the initial snapshot (didactics
+            # byte-identical to the 815 snapshot decode); the preserved binding
+            # stays the stored source.
+            from ..dataframe.codec import decode_source_json
+
+            snapshot = decode_source_json(_normalise_transform_source(source_raw_orig))
+            if not snapshot.ok:
+                _fail(WRONG_TYPE, f"{path}.source", f"{snapshot.error.code}: {snapshot.error.detail}")
+        from ..dataframe.codec import decode_pipeline_json, encode_transform_value
+
+        pipe_result = decode_pipeline_json(pipeline_raw)
+        if not pipe_result.ok:
+            _fail(WRONG_TYPE, f"{path}.pipeline", f"{pipe_result.error.code}: {pipe_result.error.detail}")
+            raise AssertionError("unreachable")
+        pipeline: Value = Arr([encode_transform_value(t) for t in pipe_result.value])
+    else:
+        source_raw = _normalise_transform_source(source_raw_orig)
+        source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
     fields: dict[str, Value] = {}
     if "params" in obj:
         raw_params = obj["params"]
@@ -924,6 +961,34 @@ def _decode_action(value: object, path: str) -> Value:
         decoded_ops = Arr([_decode_action(o, f"{path}.ops[{i}]") for i, o in enumerate(ops_arr)])
         rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "ops")}
         return Obj("Chain", {"ops": decoded_ops, **rest})
+    elif tag == "SetState":
+        # fuaran#818 — `value` (a literal JSON value, written verbatim) XOR
+        # `valueFrom` (a Binding evaluated at dispatch time inside the existing
+        # gate). Exactly one must be present; both / neither error didactically
+        # naming both fields. A present `valueFrom` decodes through the binding
+        # decoder (the typed default-deny surface); the literal `value` keeps
+        # the structural null-strict pass-through below.
+        has_value = "value" in obj
+        has_from = "valueFrom" in obj
+        if has_value and has_from:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.valueFrom",
+                "SetState carries both 'value' and 'valueFrom' — exactly one is allowed: "
+                "'value' is a literal JSON value written verbatim; 'valueFrom' derives the "
+                "written value from a Binding at dispatch time; remove one",
+            )
+        if not has_value and not has_from:
+            _fail(
+                MISSING_FIELD,
+                f"{path}.value",
+                "missing required field 'value' — provide 'value' (a literal JSON value) "
+                "or 'valueFrom' (a Binding evaluated at dispatch time)",
+            )
+        if has_from:
+            value_from = _decode_binding(obj["valueFrom"], f"{path}.valueFrom")
+            rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "valueFrom")}
+            return Obj("SetState", {**rest, "valueFrom": value_from})
     # Structural (validated discriminator) but NULL-STRICT: the action payload
     # positions (SetState.value / Notify.payload / AiTool.args) are structured
     # JVal positions per rule 12, and no action case carries a §5 opaque seam —
@@ -1738,7 +1803,12 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     # 0.2.0 — `editable` omitted-when-false on both boundaries.
     if "editable" in obj and _expect_bool(obj["editable"], f"{path}.editable"):
         fields["editable"] = True
-    _grid_known = frozenset({"$type", "source", "data", "rows", "columns", "editable"})
+    # fuaran#818 — the grid-sort header affordance: `sortStateKey` names the
+    # State key carrying the `{column, direction}` sort descriptor a data-bound
+    # grid's runtime sorts by. Typed as a string; encode-omitted when absent.
+    if "sortStateKey" in obj:
+        fields["sortStateKey"] = _expect_string(obj["sortStateKey"], f"{path}.sortStateKey")
+    _grid_known = frozenset({"$type", "source", "data", "rows", "columns", "editable", "sortStateKey"})
     for key, raw in obj.items():
         if key not in _grid_known:
             fields[key] = from_json(raw)

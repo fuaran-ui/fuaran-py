@@ -149,6 +149,14 @@ class action:  # noqa: N801 — namespace object
         return t.SetState(key, value)
 
     @staticmethod
+    def set_state_from(key: str, value_from: t.Value) -> Action:
+        """fuaran#818 — write a DERIVED value to the State channel: ``value_from``
+        is a Binding (wire-shaped, e.g. a Selection field projection) evaluated
+        at dispatch time inside the existing gate (value XOR valueFrom on the
+        wire). Closes "set state from what the user clicked" without closures."""
+        return t.SetState(key, value_from=value_from)
+
+    @staticmethod
     def notify(channel: str, payload: t.Value) -> Action:
         return t.Notify(channel, payload)
 

@@ -34,6 +34,7 @@ Semantics pinned to the reference host:
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Literal
 
@@ -295,6 +296,40 @@ def rows_of(table: Table) -> list[dict[str, object]]:
 # ── the resolver ──────────────────────────────────────────────────────────────
 
 
+# fuaran#818 — the preserved LIVE Transform-source tags, each with its store
+# identity key. A live source resolves against the flat state store first
+# (subscription semantics' evaluation-time analogue), then falls back to the
+# binding's carried defaultValue (the decode-time initial snapshot), then the
+# empty table (a Selection / Query with nothing yet — zero rows).
+_LIVE_SOURCE_KEYS = {"State": "key", "Selection": "nodeId", "Query": "name"}
+
+
+def _transpose_row_major(data: object) -> object:
+    """Row-major rows (a list of row dicts) transpose to the canonical columnar
+    ``{"columns": …}`` shape — FIRST-row key set (sorted ordinal), absent cells
+    ``None`` — the same fuaran#815 normalisation the decode-time snapshot used.
+    Anything else passes through untouched."""
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        rows = data
+        columns = {k: [row.get(k) if isinstance(row, dict) else None for row in rows] for k in sorted(data[0])}
+        return {"columns": columns}
+    return data
+
+
+def _live_source(source_value: Obj, state: ComputeState) -> object:
+    """Materialise a live source's current data as raw columnar JSON: the
+    host-seeded store value when present, else the carried defaultValue, else
+    the empty table."""
+    key = source_value.fields.get(_LIVE_SOURCE_KEYS[source_value.tag or ""])
+    raw: object | None = state.get(key) if isinstance(key, str) else None
+    if raw is None:
+        dv = source_value.fields.get("defaultValue")
+        raw = json.loads(encode_value(dv)) if dv is not None else None
+    if raw is None:
+        return {"columns": {}}
+    return _transpose_row_major(raw)
+
+
 def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
     """Evaluate one decoded ``Binding.Transform`` against the host ``state`` store."""
     source_value = transform.fields.get("source")
@@ -302,7 +337,14 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
     if source_value is None or pipeline_value is None:
         return ComputeErr(EvalError("TYPE_ERROR", "Transform binding missing 'source' or 'pipeline'"))
 
-    src = decode_source(encode_value(source_value))
+    if isinstance(source_value, Obj) and source_value.tag in _LIVE_SOURCE_KEYS:
+        # fuaran#818 — a preserved LIVE source: evaluate over the CURRENT data
+        # (host-seeded store value, else the initial snapshot). A non-tabular
+        # live value surfaces the columnar codec's own didactic — loud, never a
+        # silent wrong value.
+        src = decode_source(json.dumps(_live_source(source_value, state), separators=(",", ":")))
+    else:
+        src = decode_source(encode_value(source_value))
     if not src.ok:
         return ComputeErr(EvalError(src.error.code, src.error.detail))
     if not isinstance(src.value, Embedded):

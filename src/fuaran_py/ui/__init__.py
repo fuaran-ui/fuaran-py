@@ -192,6 +192,16 @@ class format:  # noqa: N801, A001 — namespace object, mirrors the cross-tier `
     def date(fmt: str) -> CellFormat:
         return t.DateFormat(fmt)
 
+    @staticmethod
+    def duration(unit: t.DurationUnit, style: t.DurationStyle) -> CellFormat:
+        """Phase 819 — trendable duration cells (the raw float counts ``unit``s)."""
+        return t.DurationFormat(unit, style)
+
+    @staticmethod
+    def relative_time(unit: t.RelativeTimeUnit) -> CellFormat:
+        """Phase 819 — the English relative form ("3 minutes ago" / "in 2 hours")."""
+        return t.RelativeTimeFormat(unit)
+
 
 # ── Per-kind ARIA defaults (the ``accessibility`` namespace) ─────────────────
 #
@@ -588,6 +598,20 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     @staticmethod
     def skeleton(id: str, rows: int) -> UiNode:  # noqa: A002
         return _node(id, t.Skeleton(rows), accessibility.none)
+
+    @staticmethod
+    def icon(
+        id: str,  # noqa: A002
+        name: str,
+        *,
+        size: t.IconSize = "Medium",
+        tone: t.Tone = "Default",
+        label: str | None = None,
+    ) -> UiNode:
+        """Phase 821 — the standalone icon-only display kind. No ``label`` is
+        decorative (``aria-hidden``); a ``label`` makes it meaningful
+        (``role="img"`` + ``aria-label``)."""
+        return _node(id, t.Icon(name, size, tone, label), accessibility.none)
 
     # ── Input ────────────────────────────────────────────────────────────────
     @staticmethod

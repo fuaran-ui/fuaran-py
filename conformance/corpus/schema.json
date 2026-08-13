@@ -179,6 +179,30 @@
         "Year"
       ]
     },
+    "DurationUnit": {
+      "type": "string",
+      "enum": [
+        "Seconds",
+        "Minutes",
+        "Hours"
+      ]
+    },
+    "DurationStyle": {
+      "type": "string",
+      "enum": [
+        "Compact",
+        "Clock",
+        "Long"
+      ]
+    },
+    "IconSize": {
+      "type": "string",
+      "enum": [
+        "Small",
+        "Medium",
+        "Large"
+      ]
+    },
     "FileReadEncoding": {
       "type": "string",
       "enum": [
@@ -887,6 +911,40 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Duration"
+            },
+            "style": {
+              "$ref": "#/$defs/DurationStyle"
+            },
+            "unit": {
+              "$ref": "#/$defs/DurationUnit"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "unit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RelativeTime"
+            },
+            "unit": {
+              "$ref": "#/$defs/RelativeTimeUnit"
+            }
+          },
+          "required": [
+            "$type",
+            "unit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Custom"
             },
             "fn": {
@@ -1092,6 +1150,25 @@
           },
           "required": [
             "$type",
+            "unit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Duration"
+            },
+            "style": {
+              "$ref": "#/$defs/DurationStyle"
+            },
+            "unit": {
+              "$ref": "#/$defs/DurationUnit"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
             "unit"
           ]
         }
@@ -1828,6 +1905,26 @@
         "rows"
       ]
     },
+    "IconSpec": {
+      "type": "object",
+      "properties": {
+        "icon": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "size": {
+          "$ref": "#/$defs/IconSize"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        }
+      },
+      "required": [
+        "icon"
+      ]
+    },
     "CalloutSpec": {
       "type": "object",
       "properties": {
@@ -2503,6 +2600,24 @@
             },
             {
               "$ref": "#/$defs/SkeletonSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Icon"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/IconSpec"
             }
           ]
         },

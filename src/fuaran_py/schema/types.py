@@ -47,6 +47,7 @@ ImageVariant = Literal["Default", "Avatar", "Rounded"]
 ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
 DateVariant = Literal["Date", "Time", "DateTime"]
 MathDisplay = Literal["Inline", "Block"]
+IconSize = Literal["Small", "Medium", "Large"]  # Phase 821 — the Icon display kind
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -192,6 +193,11 @@ class Now:
 
 DateStyle = Literal["Short", "Medium", "Long", "Full"]
 RelativeTimeUnit = Literal["Second", "Minute", "Hour", "Day", "Week", "Month", "Year"]
+# Phase 819 — the numeric source counts this unit (Seconds = 1, Minutes = 60,
+# Hours = 3600); presentation is `Compact` "1h 20m", `Clock` "1:20:00",
+# `Long` "1 hour 20 minutes".
+DurationUnit = Literal["Seconds", "Minutes", "Hours"]
+DurationStyle = Literal["Compact", "Clock", "Long"]
 
 
 @dataclass(frozen=True)
@@ -234,7 +240,18 @@ class FmtRelativeTime:
         return Obj("RelativeTime", {"unit": self.unit})
 
 
-Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime
+@dataclass(frozen=True)
+class FmtDuration:
+    """``Format.Duration`` (Phase 819) — locale-independent duration formatting."""
+
+    unit: DurationUnit
+    style: DurationStyle
+
+    def to_wire(self) -> Value:
+        return Obj("Duration", {"style": self.style, "unit": self.unit})
+
+
+Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime | FmtDuration
 
 
 @dataclass(frozen=True)
@@ -464,7 +481,39 @@ class DateFormat:
         return Obj("Date", {"format": self.format})
 
 
-CellFormat = FormatNone | Currency | NumberFormat | PercentFormat | SignificantDigits | DateFormat
+@dataclass(frozen=True)
+class DurationFormat:
+    """``CellFormat.Duration`` (Phase 819) — trendable duration cells: the raw
+    float counts ``unit``s, rendered per ``style``."""
+
+    unit: DurationUnit
+    style: DurationStyle
+
+    def to_wire(self) -> Value:
+        return Obj("Duration", {"style": self.style, "unit": self.unit})
+
+
+@dataclass(frozen=True)
+class RelativeTimeFormat:
+    """``CellFormat.RelativeTime`` (Phase 819) — cell-vocabulary parity with
+    ``Format.RelativeTime`` (the English form is the canonical cell rendering)."""
+
+    unit: RelativeTimeUnit
+
+    def to_wire(self) -> Value:
+        return Obj("RelativeTime", {"unit": self.unit})
+
+
+CellFormat = (
+    FormatNone
+    | Currency
+    | NumberFormat
+    | PercentFormat
+    | SignificantDigits
+    | DateFormat
+    | DurationFormat
+    | RelativeTimeFormat
+)
 
 
 # ── Accessibility / SemanticStyle / StateBehaviour (WIRE_FORMAT.md §3.1) ────
@@ -968,6 +1017,32 @@ class Skeleton:
 
     def to_wire(self) -> Obj:
         return _obj("Skeleton", {"rows": self.rows})
+
+
+@dataclass(frozen=True)
+class Icon:
+    """Phase 821 — the standalone icon-only display kind: a decorative or
+    labelled glyph with no Button / Image envelope. ``icon`` names a glyph from
+    the existing icon vocabulary (the ``data-icon`` hook); ``label`` absent is
+    decorative (``aria-hidden``), present is meaningful (``role="img"``)."""
+
+    icon: str
+    size: IconSize = "Medium"
+    tone: Tone = "Default"
+    label: str | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Icon",
+            {
+                "icon": self.icon,
+                "label": self.label,
+                # `size` omitted-when-`Medium`, `tone` omitted-when-`Default`
+                # (the Phase 460 discipline).
+                "size": None if self.size == "Medium" else self.size,
+                "tone": None if self.tone == "Default" else self.tone,
+            },
+        )
 
 
 @dataclass(frozen=True)

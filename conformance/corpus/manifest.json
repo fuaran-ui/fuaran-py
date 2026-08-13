@@ -22,6 +22,7 @@
     "FragmentDecl",
     "FragmentRef",
     "Heading",
+    "Icon",
     "Image",
     "LabelValueRow",
     "Link",
@@ -827,6 +828,22 @@
       "description": "fuaran-core#88 — an embedded Transform source may omit schema; column types infer from the cells (int/float/bool/string only)"
     },
     {
+      "id": "lenient-transform-source-rowmajor",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-source-rowmajor.json",
+      "expectedFile": "lenient/lenient-transform-source-rowmajor.expected.json",
+      "description": "fuaran#815 — ROW-MAJOR Transform source (an array of row objects) transposes to canonical columnar: first-row key set, absent cells null"
+    },
+    {
+      "id": "lenient-transform-source-state-rows",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-source-state-rows.json",
+      "expectedFile": "lenient/lenient-transform-source-state-rows.expected.json",
+      "description": "fuaran#815 — the Tier-D pilot shape: a State binding WRAPPER around row-major data in the Transform source slot unwraps to its defaultValue (initial-snapshot semantics), then transposes to canonical columnar"
+    },
+    {
       "id": "lenient-transform-step-aliases",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1299,6 +1316,14 @@
       "description": "Display/Heading"
     },
     {
+      "id": "icon-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/icon-1.json",
+      "expectedFile": "nodes/icon-1.json",
+      "description": "Display/Icon (Phase 821 — decorative, no label, Large)"
+    },
+    {
       "id": "image-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1393,6 +1418,14 @@
       "inputFile": "nodes/metric-1.json",
       "expectedFile": "nodes/metric-1.json",
       "description": "Display/Metric"
+    },
+    {
+      "id": "metric-duration-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-duration-1.json",
+      "expectedFile": "nodes/metric-duration-1.json",
+      "description": "Display/Metric (Phase 819 — CellFormat.Duration value + cell RelativeTime trend)"
     },
     {
       "id": "metric-float-17sig",
@@ -2061,6 +2094,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.columns[0].kind.map.Delayed",
       "description": "TonedPill tone-map value outside ToneVariant — the message names the seven legal tones (Phase 750)"
+    },
+    {
+      "id": "reject-transform-source-empty-wrapper",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-source-empty-wrapper.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "fuaran#815 — a State wrapper carrying only a key (no defaultValue/value) is NOT unwrappable: the Transform source stays a binding object and the columnar decode refuses it"
     },
     {
       "id": "reject-unknown-binding",

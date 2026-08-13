@@ -1,0 +1,1 @@
+{"id":"len-tf-state-rows","kind":{"$type":"Badge","label":{"$type":"Bound","binding":{"$type":"Transform","pipeline":[],"source":{"columns":{"dept":{"validity":[true,true],"values":["ops","eng"]},"waitMins":{"validity":[true,true],"values":[12,31]}},"schema":[{"name":"dept","type":"string"},{"name":"waitMins","type":"int"}]}}},"variant":"Neutral"}}

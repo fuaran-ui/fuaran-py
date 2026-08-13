@@ -239,6 +239,59 @@ def _plain_number(value: float) -> str:
     return repr(value)
 
 
+# ── Duration / relative-time rendering (Phase 819) ──────────────────────────
+#
+# Mirrors the F# ``Formatting.formatDuration`` / ``formatRelativeEnglish``
+# exactly (shared hand-rolled implementations — a duration is deliberately
+# LOCALE-INDEPENDENT, and the cell vocabulary has no locale dimension, so the
+# English relative form IS the canonical cell rendering). Rounding is
+# half-to-even — CPython's built-in ``round`` matches .NET ``round``.
+
+_DURATION_UNIT_SECONDS = {"Seconds": 1.0, "Minutes": 60.0, "Hours": 3600.0}
+
+
+def format_duration(unit: str, style: str, value: float) -> str:
+    """Render ``value`` (a signed count of ``unit``s) per the bounded ``DurationStyle``."""
+    total_seconds = value * _DURATION_UNIT_SECONDS.get(unit, 1.0)
+    total = int(round(abs(total_seconds)))  # half-to-even, matching .NET `round`
+    sign = "-" if total_seconds < 0.0 and total > 0 else ""
+    hours = total // 3600
+    minutes = (total % 3600) // 60
+    seconds = total % 60
+    if style == "Clock":
+        # "h:mm:ss" from one hour up, "m:ss" below it.
+        body = f"{hours}:{minutes:02d}:{seconds:02d}" if hours >= 1 else f"{minutes}:{seconds:02d}"
+    elif style == "Long":
+        # English words, singular/plural, zero components omitted; zero -> "0 minutes".
+        def part(n: int, word: str) -> str | None:
+            return None if n == 0 else (f"1 {word}" if n == 1 else f"{n} {word}s")
+
+        parts = [p for p in (part(hours, "hour"), part(minutes, "minute"), part(seconds, "second")) if p is not None]
+        body = " ".join(parts) if parts else "0 minutes"
+    else:  # Compact
+        # Largest two grains, zero tails omitted: "1h 20m" / "2h" / "5m 30s" /
+        # "42s"; zero -> "0s".
+        if hours >= 1:
+            body = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+        elif minutes >= 1:
+            body = f"{minutes}m {seconds}s" if seconds > 0 else f"{minutes}m"
+        else:
+            body = f"{seconds}s"
+    return sign + body
+
+
+def format_relative_english(unit: str, value: float) -> str:
+    """English relative-time rendering over a signed count of ``unit`` — "in 2
+    hours" / "3 minutes ago" / "this minute" (Phase 819)."""
+    n = int(round(value))  # half-to-even, matching .NET `round`
+    unit_word = unit.lower()
+    if n == 0:
+        return f"this {unit_word}"
+    magnitude = abs(n)
+    plural = unit_word if magnitude == 1 else f"{unit_word}s"
+    return f"{magnitude} {plural} ago" if n < 0 else f"in {magnitude} {plural}"
+
+
 def format_number(fmt: Value, value: object) -> str:
     """Format a numeric value through a decoded ``CellFormat`` (mirrors F# ``formatNumber``)."""
     try:
@@ -268,5 +321,11 @@ def format_number(fmt: Value, value: object) -> str:
     if tag == "SignificantDigits":
         digits = fields.get("digits")
         return f"{num:.{digits}g}" if isinstance(digits, int) else _plain_number(num)
+    if tag == "Duration":
+        # Phase 819 — locale-independent by design (see format_duration above).
+        return format_duration(str(fields.get("unit")), str(fields.get("style")), num)
+    if tag == "RelativeTime":
+        # Phase 819 — the English form IS the canonical cell rendering.
+        return format_relative_english(str(fields.get("unit")), num)
     # Date / Custom: structural — fall back to the plain numeric form.
     return _plain_number(num)

@@ -536,6 +536,27 @@ class Renderer:
         body = "".join(element("div", [("class", "fuaran-skeleton-row")], "") for _ in range(rows))
         return element("div", [("class", "fuaran-skeleton")], body)
 
+    def _icon(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 821 — the standalone icon-only display kind. The glyph NAME
+        # rides `data-icon` (the uniform icon-hook contract — no text content,
+        # hosts map it to glyphs); size + tone are modifier classes. A11y:
+        # decorative (no label) emits `aria-hidden="true"`; labelled emits
+        # `role="img"` + `aria-label`. Mirrors the F# SSR renderer byte-for-byte.
+        size = str(fields.get("size", "Medium")).lower()
+        tone = str(fields.get("tone", "Default")).lower()
+        icon = fields.get("icon")
+        attrs: list[tuple[str, str]] = [
+            ("class", f"fuaran-icon fuaran-icon--{size} fuaran-icon-{tone}"),
+            ("data-icon", icon if isinstance(icon, str) else ""),
+        ]
+        label = fields.get("label")
+        if isinstance(label, str):
+            attrs.append(("role", "img"))
+            attrs.append(("aria-label", label))
+        else:
+            attrs.append(("aria-hidden", "true"))
+        return element("span", attrs, "")
+
     def _sparkline(self, node: Node, fields: dict[str, Value]) -> str:
         return text_element("div", [("class", "fuaran-sparkline fuaran-sparkline-empty")], _EM_DASH)
 
@@ -1126,6 +1147,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Callout": Renderer._callout,
     "Progress": Renderer._progress,
     "Skeleton": Renderer._skeleton,
+    "Icon": Renderer._icon,
     "Sparkline": Renderer._sparkline,
     "LabelValueRow": Renderer._label_value_row,
     "Fact": Renderer._fact,

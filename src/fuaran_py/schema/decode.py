@@ -176,6 +176,12 @@ BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
 BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Auto"})  # Phase 390
 BUTTON_VARIANT = frozenset({"Primary", "Secondary", "Tertiary", "Destructive"})
 LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render strategy
+# Phase 819 — the Duration / RelativeTime format enums (shared by CellFormat
+# and the Binding.Format vocabulary).
+DURATION_UNIT = frozenset({"Seconds", "Minutes", "Hours"})
+DURATION_STYLE = frozenset({"Compact", "Clock", "Long"})
+RELATIVE_TIME_UNIT = frozenset({"Second", "Minute", "Hour", "Day", "Week", "Month", "Year"})
+ICON_SIZE = frozenset({"Small", "Medium", "Large"})  # Phase 821 — the Icon display kind
 
 # ── Lenient-ingest enum aliases (WIRE_FORMAT.md §3.6, decode-only) ──────────
 # The encoder never emits an alias; a re-encode normalises to the canonical DU
@@ -222,7 +228,9 @@ BINDING_CASES = frozenset(
         "Invoke",
     }
 )
-CELL_FORMAT_CASES = frozenset({"None", "Number", "Currency", "Percent", "SignificantDigits", "Date", "Custom"})
+CELL_FORMAT_CASES = frozenset(
+    {"None", "Number", "Currency", "Percent", "SignificantDigits", "Date", "Duration", "RelativeTime", "Custom"}
+)
 
 # Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2). A kind not in
 # this set is WRONG_NODE_KIND; a kind in this set but absent from KIND_SCHEMAS is
@@ -248,6 +256,7 @@ KNOWN_KINDS = frozenset(
         "Callout",
         "Progress",
         "Skeleton",
+        "Icon",  # Phase 821 — the standalone icon-only display kind
         "LabelValueRow",
         "Link",
         "Image",
@@ -473,7 +482,18 @@ def _decode_binding_marker_seq(value: object, path: str) -> Value:
 
 def _decode_cell_format(value: object, path: str) -> Value:
     obj = _expect_object(value, path)
-    _dispatch(obj, path, CELL_FORMAT_CASES)
+    tag = _dispatch(obj, path, CELL_FORMAT_CASES)
+    if tag == "Duration":
+        # Phase 819 — trendable duration cells: raw float counts `unit`s,
+        # rendered per `style`. Both fields required, typed against the closed
+        # enums (the canonical encoder emits alphabetical: style before unit).
+        unit = _enum(_require(obj, "unit", path), f"{path}.unit", DURATION_UNIT, "DurationUnit")
+        style = _enum(_require(obj, "style", path), f"{path}.style", DURATION_STYLE, "DurationStyle")
+        return Obj("Duration", {"style": style, "unit": unit})
+    if tag == "RelativeTime":
+        # Phase 819 — cell-vocabulary parity with `Format.RelativeTime`.
+        unit = _enum(_require(obj, "unit", path), f"{path}.unit", RELATIVE_TIME_UNIT, "RelativeTimeUnit")
+        return Obj("RelativeTime", {"unit": unit})
     return from_json(value)
 
 
@@ -730,12 +750,48 @@ def _normalise_binding_obj(
     return from_json(obj)
 
 
+def _normalise_transform_source(raw: object) -> object:
+    """fuaran#815 — organic-demand leniencies for the Transform ``source`` slot,
+    both observed cross-family (the Tier-D pilot, 2026-08-13): models bind a
+    derived value to a Transform whose source is
+    ``{"$type":"State","defaultValue":[{row},…]}``. Two universal priors,
+    accommodated as typed data at THIS host bridge, before the columnar codec
+    sees the value (the Phase 633 ``Bound``-unwrap precedent — no wire-spec
+    change, no new key). Mirror of the F# ``normaliseTransformSource``:
+
+    1. a ``State``/``Static``/``Bound`` binding WRAPPER around the data unwraps
+       to its ``defaultValue``/``value`` (initial-snapshot semantics — a LIVE
+       state-sourced Transform is deliberately not this). A wrapper carrying
+       neither passes through UNCHANGED and fails in the columnar decode (the
+       ``reject-transform-source-empty-wrapper`` fixture pins it);
+    2. ROW-MAJOR data (an array of row objects) transposes to the canonical
+       columnar ``{"columns": …}`` shape — FIRST-row key set (sorted ordinal
+       ascending, the F# Map ordering), absent cells (and non-object rows)
+       filled with JSON null. Canonical columnar and ``ref`` sources pass
+       through untouched, so existing fixtures stay byte-identical.
+
+    Ragged / mixed-type rows may still fail downstream — deliberately not
+    special-cased."""
+    unwrapped = raw
+    if isinstance(raw, dict) and raw.get("$type") in ("State", "Static", "Bound"):
+        if "defaultValue" in raw:
+            unwrapped = raw["defaultValue"]
+        elif "value" in raw:
+            unwrapped = raw["value"]
+    if isinstance(unwrapped, list) and unwrapped and isinstance(unwrapped[0], dict):
+        rows = unwrapped
+        columns = {k: [row.get(k) if isinstance(row, dict) else None for row in rows] for k in sorted(rows[0])}
+        return {"columns": columns}
+    return unwrapped
+
+
 def _decode_transform_binding(obj: dict, path: str) -> Value:
     """The `Binding.Transform` case (Phase 282/424): `source` + `pipeline`
     normalise through the columnar codec (`fuaran_py.dataframe`), which owns the
     lenient columnar/expression ingest; `params` carries the §3.6 map coercion +
-    the `value` ← `from` element alias."""
-    source_raw = _require(obj, "source", path)
+    the `value` ← `from` element alias. The `source` value first rounds through
+    the fuaran#815 wrapper/row-major normalisation (`_normalise_transform_source`)."""
+    source_raw = _normalise_transform_source(_require(obj, "source", path))
     pipeline_raw = _require(obj, "pipeline", path)
     source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
     fields: dict[str, Value] = {}
@@ -1150,6 +1206,15 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "Skeleton": [
         ("rows", True, _decode_int),
+    ],
+    # Phase 821 — the standalone icon-only display kind: `size` omitted-when-
+    # `Medium`, `tone` omitted-when-`Default` (the Phase 460 discipline),
+    # `label` omitted-when-decorative.
+    "Icon": [
+        ("icon", True, _decode_string),
+        ("label", False, _decode_string),
+        ("size", False, _omit_default_enum(ICON_SIZE, {}, "Medium", "IconSize")),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
     ],
     "Sparkline": [
         # Phase 429 — `source` is a typed Static float-series position; `data` alias (§3.6).

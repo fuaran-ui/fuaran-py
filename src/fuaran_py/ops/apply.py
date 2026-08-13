@@ -34,6 +34,7 @@ from ..schema.decode import (
     CELL_FORMAT_CASES,
     EMPHASIS,
     HEADING_VARIANT,
+    ICON_SIZE,
     ORIENTATION,
     TEXT_SOURCE_CASES,
     TONE,
@@ -320,6 +321,16 @@ def _coerce_string(v: Value) -> _Coerced:
     return _Coerced(True, v)
 
 
+def _coerce_string_option(v: Value) -> _Coerced:
+    """An optional string field (Phase 821 — `Icon.Label`, the F#
+    ``tryStringOption`` twin): a string sets it, ``null`` clears it. A cleared
+    field is REMOVED from the model (absence is structural, never ``"k":null``)
+    — `_update_field` drops the key on an ok ``None``."""
+    if v is None or isinstance(v, str):
+        return _Coerced(True, v)
+    return _Coerced(False, detail="expected a string or null")
+
+
 _Coercer = Callable[[Value], _Coerced]
 _NOT_SUPPORTED = "__not_supported__"
 
@@ -352,6 +363,14 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Variant": ("variant", _coerce_enum(BADGE_VARIANT)),
     },
     "Skeleton": {"Rows": ("rows", _coerce_int)},
+    # Phase 821 — the standalone Icon display kind's field surface (mirrors the
+    # F# `updateIcon`).
+    "Icon": {
+        "Icon": ("icon", _coerce_string),
+        "Size": ("size", _coerce_enum(ICON_SIZE)),
+        "Tone": ("tone", _coerce_enum(TONE)),
+        "Label": ("label", _coerce_string_option),
+    },
     "Callout": {
         "Tone": ("tone", _coerce_enum(TONE)),
         "Body": ("body", _coerce_text_source),
@@ -491,7 +510,12 @@ def _update_field(field: str, value: Value, kind: Obj) -> _Outcome:
     if not result.ok:
         return _Outcome("typeMismatch", detail=result.detail)
     fields = dict(kind.fields)
-    fields[camel] = result.value
+    if result.value is None:
+        # An optional field cleared (only `_coerce_string_option` yields an ok
+        # `None`) — absence is structural, so the key is dropped, never nulled.
+        fields.pop(camel, None)
+    else:
+        fields[camel] = result.value
     return _Outcome("updated", Obj(kind.tag, fields))
 
 

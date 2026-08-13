@@ -63,6 +63,7 @@ KIND_CLASS: dict[str, str] = {
     "Callout": "fuaran-kind-callout",
     "Progress": "fuaran-kind-progress",
     "Skeleton": "fuaran-kind-skeleton",
+    "Icon": "fuaran-kind-icon",
     # Input
     "Form": "fuaran-kind-form",
     "Filters": "fuaran-kind-filters",

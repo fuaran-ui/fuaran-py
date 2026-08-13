@@ -1,0 +1,1 @@
+{"id":"metric-duration-1","kind":{"$type":"Metric","format":{"$type":"Duration","style":"Compact","unit":"Minutes"},"label":"Avg wait","trend":{"$type":"Static","value":-3},"trendFormat":{"$type":"RelativeTime","unit":"Minute"},"value":{"$type":"Static","value":80}}}

@@ -31,47 +31,22 @@ permissions:
   contents: read
 
 env:
-  # ── QUARANTINE ─────────────────────────────────────────────────────────────
-  # These cases fail on a clean tree TODAY, and are excluded from the blocking
-  # gate so that a NEW regression is caught while this existing drift stays
-  # visible. They are not a judgement that the cases are wrong — they are a
-  # record of known, understood, outstanding work.
+  # ── QUARANTINE ──────────────────────────────────────────────────────────────────────────
+  # Cases that fail on a clean tree are excluded from the blocking gate here, so
+  # that a NEW regression is caught while known drift stays visible. An entry is
+  # not a judgement that a case is wrong — it is a record of known, understood,
+  # outstanding work, and the list SHRINKS TO EMPTY as the decoder catches up.
+  # Delete entries as they start passing; do not add to it to make a red build
+  # green without a root-cause note — a new failure here is the regression this
+  # gate exists to catch.
   #
-  # Single root cause: the shared corpus has moved ahead of this decoder. Three
-  # fixtures — form-toggle, now-environment-binding, switch-on-selection — carry
-  # vocabulary the decoder does not yet model (a `Toggle` form-field kind, a
-  # `Now` binding, and a required `stateKey` on `Switch`). The corpus-sync cases
-  # fail for the same reason at one remove: the committed offline snapshot has
-  # not been re-synced since the corpus gained those fixtures.
-  #
-  # This list SHRINKS TO EMPTY when the decoder models that vocabulary. Delete
-  # entries as they start passing; do not add to it to make a red build green —
-  # a new failure here is the regression this gate exists to catch.
-  QUARANTINE: >-
-    --deselect tests/test_roundtrip.py::test_roundtrip[form-toggle]
-    --deselect tests/test_roundtrip.py::test_roundtrip[now-environment-binding]
-    --deselect tests/test_roundtrip.py::test_roundtrip[switch-on-selection]
-    --deselect tests/test_bridge.py::test_bridge_roundtrip[form-toggle]
-    --deselect tests/test_bridge.py::test_bridge_roundtrip[now-environment-binding]
-    --deselect tests/test_bridge.py::test_bridge_roundtrip[switch-on-selection]
-    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[form-toggle]
-    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[now-environment-binding]
-    --deselect tests/test_schema_conformance.py::test_reencoded_output_is_schema_valid[switch-on-selection]
-    --deselect tests/test_diff.py::test_identity_diff_is_empty[form-toggle]
-    --deselect tests/test_diff.py::test_identity_diff_is_empty[now-environment-binding]
-    --deselect tests/test_diff.py::test_identity_diff_is_empty[switch-on-selection]
-    --deselect tests/test_diff.py::test_add_style_round_trips[form-toggle]
-    --deselect tests/test_diff.py::test_add_style_round_trips[now-environment-binding]
-    --deselect tests/test_diff.py::test_add_style_round_trips[switch-on-selection]
-    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[form-toggle]
-    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[now-environment-binding]
-    --deselect tests/test_diff.py::test_kind_swap_floors_to_editnode[switch-on-selection]
-    --deselect tests/test_kind_set.py::test_form_field_kind_set_matches_manifest
-    --deselect tests/test_kind_set.py::test_corpus_control_kinds_are_declared
-    --deselect tests/test_corpus_sync.py::test_snapshot_file_set_matches_authority
-    --deselect tests/test_corpus_sync.py::test_snapshot_top_files_byte_identical[manifest.json]
-    --deselect tests/test_corpus_sync.py::test_snapshot_top_files_byte_identical[schema.json]
-    --deselect tests/test_corpus_sync.py::test_snapshot_family_bytes_identical[nodes]
+  # EMPTY as of 2026-08-13: the Toggle/Now/Switch vocabulary landed
+  # (3ac3c87/8e9fac3), the offline corpus snapshot was re-synced (392abd6), and
+  # every formerly quarantined case passes against the current corpus —
+  # verified by the full suite at 1627 passed with zero deselections AND each
+  # former entry re-run by node ID (24 passed). The machinery stays armed; a
+  # future corpus advance repopulates the list the same way.
+  QUARANTINE: ""
 
 jobs:
   build:
@@ -119,8 +94,12 @@ jobs:
       # reads as "covered everything".
       - name: Report the conformance quarantine
         run: |
-          echo "The blocking gate below EXCLUDES these known-failing cases:"
-          echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$' | sed 's/^/  - /'
+          if [ -n "$QUARANTINE" ]; then
+            echo "The blocking gate below EXCLUDES these known-failing cases:"
+            echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$' | sed 's/^/  - /'
+          else
+            echo "Quarantine EMPTY — the blocking gate covers the full conformance suite."
+          fi
           echo
           echo "ALSO NOT GATED HERE — inert rather than quarantined (see the skip"
           echo "summary that -rs prints under each test run below):"
@@ -133,12 +112,13 @@ jobs:
           {
             echo "### Conformance quarantine (excluded from the blocking gate)"
             echo
-            echo "Cause: the shared corpus carries vocabulary this decoder does not yet model"
-            echo "(\`Toggle\` form-field kind, \`Now\` binding, required \`Switch.stateKey\`)."
-            echo
-            echo '```'
-            echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$'
-            echo '```'
+            if [ -n "$QUARANTINE" ]; then
+              echo '```'
+              echo "$QUARANTINE" | tr ' ' '\n' | grep -v '^--deselect$'
+              echo '```'
+            else
+              echo "Empty — the blocking gate covers the full conformance suite."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Non-blocking: runs the FULL suite so the size of the existing drift is

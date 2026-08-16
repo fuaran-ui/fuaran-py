@@ -37,6 +37,11 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # Phase 878 — `xTitle` / `yTitle` / `subtitle` are WIRE fields carried as
     # plain strings (the canonical `TextSource.Literal` form), omitted when the
     # author declared none. Absent on every pre-878 case.
+    #
+    # Phase 880 — `legendPosition` is a WIRE field carried as the bare enum name
+    # (`Top | Right | Bottom | None`). ABSENT means the host default (`Right`),
+    # never "no legend", so it is omitted on every pre-880 case even though the
+    # picture many of them lower to moved when the default did.
     spec = ChartSpec(
         kind=inp["kind"],
         x_field=inp["xField"],
@@ -48,6 +53,7 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         x_title=inp.get("xTitle"),
         y_title=inp.get("yTitle"),
         subtitle=inp.get("subtitle"),
+        legend_position=inp.get("legendPosition"),
     )
     return spec, list(inp["data"])
 

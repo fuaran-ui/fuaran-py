@@ -119,10 +119,56 @@ _Y_AXIS_TITLE_OFFSET_X = 18.0
 # negative angle reads BOTTOM-UP — the conventional treatment, and the same sign
 # convention `_VERTICAL_TILT_DEGREES` already uses.
 _Y_AXIS_TITLE_DEGREES = 90.0
-# Legend geometry. The pitch is PER ENTRY since Phase 879 (swatch offset + the
-# entry's own measured name width + this gap), never a fixed stride.
+# Legend geometry (Phase 880 — ONE legend, four placements).
+#
+# Both shapes live here because both are reachable from any arm: a horizontal
+# BAND (the ``Top`` / ``Bottom`` arms — Phase 879's per-entry pitch) and a
+# vertical COLUMN (``Right``, the default — one row per entry, the plot
+# shrinking by the column's width). The pie arm draws through exactly these
+# constants too since Phase 880; its own pie-legend literals are retired into
+# them at their own values, so no pie geometry was restyled by the unification.
 _LEGEND_LABEL_OFFSET_X = 15.0
+# BAND arms only. Horizontal padding after an entry's label, before the next
+# entry's swatch. The pitch is PER ENTRY since Phase 879 (swatch offset + the
+# entry's own measured name width + this gap), never a fixed stride.
 _LEGEND_ENTRY_GAP = 24.0
+# BAND arms only. Top y of a legend swatch in the TOP band, measured from the
+# canvas top; the ``Bottom`` band mirrors from the canvas bottom via
+# ``_LEGEND_LABEL_BASELINE_DY``, so it needs no second constant.
+_LEGEND_SWATCH_Y = 34.0
+_LEGEND_SWATCH_SIZE = 10.0
+_LEGEND_SWATCH_CORNER_RADIUS = 2.0
+# BAND arms only. Baseline y of a legend label in the TOP band.
+_LEGEND_LABEL_BASELINE_Y = 43.0
+# COLUMN arms only. Vertical pitch between legend rows.
+_LEGEND_ROW_PITCH_Y = 20.0
+# COLUMN arms (and the ``Bottom`` band). Baseline nudge from a legend row's TOP
+# to its label's baseline — the relation that lets a row be placed by its top
+# edge and still read as one line.
+_LEGEND_LABEL_BASELINE_DY = 9.0
+# COLUMN arms only. Gap between the plot's edge and the legend column's
+# swatches. The column's own trailing clearance to the canvas edge is
+# ``_MARGIN_RIGHT``, which is what it always was.
+_LEGEND_COLUMN_GAP = 16.0
+# Ceiling on the legend column's width, as a share of the canvas width. Same
+# posture as the margin autosizes: a pathological series name is truncated with
+# the deterministic ellipsis rather than allowed to eat the plot.
+_LEGEND_COLUMN_MAX_SHARE = 0.3
+
+LEGEND_POSITIONS = ("Top", "Right", "Bottom", "None")
+"""Which edge the legend occupies — or ``None``, which suppresses it. A WIRE
+vocabulary (``ChartSpec.legend_position``); the geometry that realises it is the
+host's, above."""
+
+_LEGEND_POSITION_DEFAULT = "Right"
+"""The host default an absent ``ChartSpec.legend_position`` resolves to (Phase
+880). A VERTICAL COLUMN, and that is a structural choice rather than a taste:
+a band's width is the SUM of its entries, so it runs off a 640 px canvas once
+the names are long enough or numerous enough — silently, with no refusal and no
+ellipsis. A column's width is the MAX of its entries, bounded by
+``_LEGEND_COLUMN_MAX_SHARE`` and truncated at it, and its height is one
+``_LEGEND_ROW_PITCH_Y`` per entry into 400 px of canvas. Neither term grows
+without limit, so the eight-slot palette legends itself by construction."""
 
 
 # ── Deterministic numeric helpers ────────────────────────────────────────────
@@ -627,6 +673,16 @@ class ChartSpec:
     x_title: str | None = None
     y_title: str | None = None
     subtitle: str | None = None
+    # Phase 880 — WHERE the legend sits, and whether it sits anywhere at all.
+    # A WIRE field for the same reason the titles above are (D8): the edge an
+    # author wants the legend on is their meaning; the column widths and pitches
+    # that realise it are the host's, above.
+    #
+    # Absent means "the host default" (``_LEGEND_POSITION_DEFAULT``, which is
+    # ``Right``) — NOT "no legend"; suppression is the explicit ``"None"``. So
+    # absence stays the ordinary shape and is omitted on the wire, and an author
+    # who wants no legend has to say so.
+    legend_position: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -790,6 +846,84 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             acc = max(acc, _text_width(tick_size, t))
         return acc
 
+    # ── Legend placement (Phase 880) ─────────────────────────────────────────
+    #
+    # ONE legend with four placements, resolved HERE — above the margins,
+    # because a ``Right`` legend's column width is an INPUT to the plot
+    # rectangle and a ``Bottom`` legend's band is an input to the bottom margin.
+    # The same acyclicity discipline the text metrics established: everything
+    # the layout reads is computed before the layout that reads it.
+    #
+    # The pie arm's shares are resolved here for the same reason: its legend
+    # labels carry them ("name (NN%)"), so they are layout input, not output.
+    is_pie = spec.kind == "Pie"
+    pie_values = series[0] if is_pie and m == 1 else []
+    pie_total = sum(pie_values)
+    # The Phase-638 bounded-v1 guard, unchanged and merely lifted: exactly one
+    # series, no negative value, a positive total. A refused pie draws no
+    # geometry AND no legend — a legend for a picture that was refused would be
+    # a claim about data the drawing declined to show.
+    pie_refused = is_pie and (m != 1 or any(v < 0.0 for v in pie_values) or pie_total <= 0.0)
+    pie_fractions = [v / pie_total for v in pie_values] if is_pie and not pie_refused else []
+
+    # The legend's rows in draw order — ``(colour, label)``. TWO sources, ONE
+    # shape, which is what Phase 880 unified: the cartesian arms legend their
+    # SERIES and only when there is more than one (with a single series the
+    # title already names it — the pre-880 rule, preserved exactly), while the
+    # pie arm legends its CATEGORIES, which is why a single-series pie legends
+    # and a single-series bar does not. Before this phase these were two
+    # separate emitters with two separate constant sets, and only one of them
+    # could honour a position.
+    legend_entries: list[tuple[str, str]] = []
+    if is_pie:
+        # Routed through the canonical formatter (Phase 876) — one rounding +
+        # rendering rule for every number this module prints. A share is a whole
+        # percent, so the shipped ``NN%`` shape is unchanged.
+        legend_entries = [
+            (_colour_for(i), f"{categories[i]} ({_format_value(None, 1.0, False, 1.0, f * 100.0)}%)")
+            for i, f in enumerate(pie_fractions)
+        ]
+    elif m > 1:
+        legend_entries = [(_colour_for(j), spec.y_fields[j]) for j in range(m)]
+
+    # The placement actually used: the author's explicit spec value where there
+    # is one, else the host default. With no entries at all the answer is
+    # ``None`` whatever either of them said — so an explicit position on a
+    # single-series chart still draws nothing and, more to the point, reserves
+    # no space.
+    if not legend_entries:
+        legend_pos = "None"
+    elif spec.legend_position is not None:
+        legend_pos = spec.legend_position
+    else:
+        legend_pos = _LEGEND_POSITION_DEFAULT
+
+    # COLUMN arms: the widest label decides the column, bounded by
+    # ``_LEGEND_COLUMN_MAX_SHARE`` of the canvas and truncated beyond it — the
+    # margin autosizes' posture, adopted for the same reason. A name with no
+    # bound is a data problem the layout should report by truncating, not absorb
+    # by shrinking the picture.
+    legend_name_budget = max(0.0, _LEGEND_COLUMN_MAX_SHARE * _W - _LEGEND_LABEL_OFFSET_X - _LEGEND_COLUMN_GAP)
+
+    # The band arms pack at each entry's natural width and still run off the
+    # right edge past enough entries. Truncating there would not fix it (the
+    # overflow is in the SUM, not in one name), so the band is left as Phase 879
+    # shipped it and the default moved instead.
+    legend_texts = [
+        _truncate_to_width(tick_size, legend_name_budget, t) if legend_pos == "Right" else t for _, t in legend_entries
+    ]
+
+    legend_column_w = (
+        _r2(_LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X + widest_of(legend_texts)) if legend_pos == "Right" else 0.0
+    )
+
+    # The ``Bottom`` band's height — one line plus its padding, reserved BELOW
+    # everything the bottom margin's autosize already accounts for (the x-axis
+    # title's line included), so the two computations never contend for the same
+    # pixels. The exact mirror of ``subtitle_band`` at the top: one term that
+    # shifts the whole band, present only when the arm is.
+    legend_band_h = _r2(line_height + _AXIS_LABEL_PADDING) if legend_pos == "Bottom" else 0.0
+
     # ── Axis names + subtitle (Phase 878) ────────────────────────────────────
     #
     # Resolved HERE, before any margin, because both margins have to reserve a
@@ -858,7 +992,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     margin_left = _r2(max(_MARGIN_LEFT, min(left_ceiling, required_left)))
 
     plot_x0 = margin_left
-    plot_x1 = _W - _MARGIN_RIGHT
+    # Phase 880 — a ``Right`` legend takes its column off the PLOT, not off the
+    # right margin: the margin stays the clearance between the legend's widest
+    # label and the canvas edge, exactly as it was the clearance to the plot
+    # before. Every other placement leaves ``legend_column_w = 0``, so the
+    # pre-880 rectangle is recovered term-for-term.
+    plot_x1 = _W - _MARGIN_RIGHT - legend_column_w
     plot_w = plot_x1 - plot_x0
 
     band_w = plot_w / float(n) if n > 0 else plot_w
@@ -911,7 +1050,11 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         + line_height
         + _AXIS_TITLE_BOTTOM_OFFSET
     )
-    margin_bottom = _r2(max(_MARGIN_BOTTOM, min(bottom_ceiling, required_bottom)))
+    # Phase 880 — the ``Bottom`` legend's band is ADDED to the autosized margin
+    # rather than competing inside its ceiling: the ceiling exists to stop
+    # LABELS eating the plot, and the legend is not a label. So the picture
+    # shrinks by the band, and the tilt escalation still sees the budget it had.
+    margin_bottom = _r2(legend_band_h + max(_MARGIN_BOTTOM, min(bottom_ceiling, required_bottom)))
 
     plot_y0 = margin_top
     plot_y1 = _H - margin_bottom
@@ -1062,7 +1205,11 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         axis_titles.append(
             _label(
                 _r2((plot_x0 + plot_x1) / 2.0),
-                _r2(_H - _AXIS_TITLE_BOTTOM_OFFSET),
+                # Phase 880 — the x title rides ABOVE a ``Bottom`` legend band,
+                # keeping its own inset from whatever is beneath it.
+                # ``legend_band_h`` is 0 on every other arm, so the pre-880
+                # baseline is unchanged.
+                _r2(_H - legend_band_h - _AXIS_TITLE_BOTTOM_OFFSET),
                 _literal(bound_text(tick_size, plot_w, x_title)),
                 _text_style(None, "Middle", tick_size, "Normal"),
             )
@@ -1185,37 +1332,89 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                     )
                 )
 
-    # ── Legend (only when >1 series) — a swatch + series name per series ──
+    # ── Legend (Phase 880) — one entry list, four placements ──
     #
-    # The pitch is PER ENTRY since Phase 879: an entry occupies its
-    # swatch-to-label offset, its own measured name width, and the inter-entry
-    # gap, so entries lay out cumulatively rather than on a fixed stride. A long
-    # series name now pushes its neighbour along instead of being overwritten by
-    # it. Legend POSITION and OVERFLOW are deliberately unchanged — they are one
-    # problem and land together in a later phase.
+    # COLUMN (``Right``, the shipped default): one row per entry, each a swatch
+    # and its label, the plot already shrunk by the column above. Rows are
+    # TOP-ALIGNED with the plot rather than vertically centred, deliberately:
+    # centring makes row j's y a function of the entry COUNT, so adding a series
+    # moves every row that was already there — chrome sliding under a data
+    # refresh is precisely what this module's mark-identity rule exists to
+    # avoid, and there is no reason to reintroduce it for the legend. Reading
+    # order is also series order, which is the order the rows are in.
+    #
+    # This is what structurally retires the overflow. A BAND's width is the SUM
+    # of its entries, so it runs off the canvas once the names are long enough
+    # or numerous enough, silently and with no ellipsis. A COLUMN's width is the
+    # MAX of its entries — bounded by ``_LEGEND_COLUMN_MAX_SHARE`` and truncated
+    # at it — and its height is one pitch per entry into 400 px of canvas.
+    #
+    # BAND (``Top`` / ``Bottom``): Phase 879's horizontal row, entries laid out
+    # cumulatively from the plot's left edge at each entry's own natural width —
+    # unchanged for ``Top``, which is the pre-880 shape every pre-880 golden
+    # pins. It still runs off the right edge past enough entries; that survives
+    # only on the arms an author asks for explicitly.
+    #
+    # The label styling is one expression for all four: chrome ink at the label
+    # opacity, ``Start``-anchored, tick-sized.
+    legend_label_style = _text_style(_LABEL_OPACITY, "Start", tick_size, "Normal")
+
+    def legend_row(swatch_x: float, row_top: float, j: int) -> list[Value]:
+        return [
+            _rectangle(
+                _r2(swatch_x),
+                _r2(row_top),
+                _LEGEND_SWATCH_SIZE,
+                _LEGEND_SWATCH_SIZE,
+                _LEGEND_SWATCH_CORNER_RADIUS,
+                _style_fill(legend_entries[j][0]),
+            ),
+            _label(
+                _r2(swatch_x + _LEGEND_LABEL_OFFSET_X),
+                _r2(row_top + _LEGEND_LABEL_BASELINE_DY),
+                _literal(legend_texts[j]),
+                legend_label_style,
+            ),
+        ]
+
     legend: list[Value] = []
-    if m > 1:
+    if legend_pos == "Right":
+        column_swatch_x = plot_x1 + _LEGEND_COLUMN_GAP
+        for j in range(len(legend_entries)):
+            legend.extend(legend_row(column_swatch_x, plot_y0 + _LEGEND_ROW_PITCH_Y * float(j), j))
+    elif legend_pos != "None":
+        # Phase 878 — the TOP band sits BELOW the subtitle, so it moves down by
+        # the line the subtitle took; ``subtitle_band`` is 0 without one,
+        # leaving the pre-878 constants exactly where they were. The BOTTOM band
+        # mirrors from the canvas bottom off the band the margin already
+        # reserved, so it needs no constants of its own.
+        if legend_pos == "Bottom":
+            band_row_top = _H - legend_band_h
+            swatch_y = band_row_top
+            baseline_y = band_row_top + _LEGEND_LABEL_BASELINE_DY
+        else:
+            swatch_y = _LEGEND_SWATCH_Y + subtitle_band
+            baseline_y = _LEGEND_LABEL_BASELINE_Y + subtitle_band
         lx_acc = plot_x0
-        for j in range(m):
-            colour = _colour_for(j)
-            name = spec.y_fields[j]
+        for j in range(len(legend_entries)):
             # The label offsets from the ROUNDED swatch x, exactly as the
             # reference does — rounding the sum instead can differ in the last
             # 2 dp.
             sx = _r2(lx_acc)
-            # Phase 878 — the legend row sits BELOW the subtitle, so it moves
-            # down by the line the subtitle took. ``subtitle_band`` is 0 without
-            # one, leaving the pre-878 constants exactly where they were.
-            legend.append(_rectangle(sx, _r2(34.0 + subtitle_band), 10.0, 10.0, 2.0, _style_fill(colour)))
             legend.append(
-                _label(
-                    _r2(sx + _LEGEND_LABEL_OFFSET_X),
-                    _r2(43.0 + subtitle_band),
-                    _literal(name),
-                    _text_style(_LABEL_OPACITY, "Start", tick_size, "Normal"),
+                _rectangle(
+                    sx,
+                    _r2(swatch_y),
+                    _LEGEND_SWATCH_SIZE,
+                    _LEGEND_SWATCH_SIZE,
+                    _LEGEND_SWATCH_CORNER_RADIUS,
+                    _style_fill(legend_entries[j][0]),
                 )
             )
-            lx_acc += _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, name) + _LEGEND_ENTRY_GAP
+            legend.append(
+                _label(_r2(sx + _LEGEND_LABEL_OFFSET_X), _r2(baseline_y), _literal(legend_texts[j]), legend_label_style)
+            )
+            lx_acc += _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, legend_texts[j]) + _LEGEND_ENTRY_GAP
 
     # ── Visible title (a Label — bigger + emphasised) ──
     title_x = _r2(plot_x0)
@@ -1244,10 +1443,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # Pie is polar — no axes/gridlines/tick chrome; every other arm assembles
     # the shared cartesian chrome in painter's order: gridlines (h then v),
     # the zero baseline, axes, tick marks, y-tick + x labels, axis titles,
-    # series, legend, chart title.
+    # series, legend, chart title. Since Phase 880 BOTH arms take the same
+    # ``legend`` in the same slot — geometry, then legend, then titles.
     if spec.kind == "Pie":
         shapes: list[Value] = (
-            _pie_shapes(spec, series, categories, n, m, plot_x0, plot_x1, plot_y0, plot_y1)
+            _pie_shapes(spec, categories, n, pie_refused, pie_fractions, plot_x0, plot_x1, plot_y0, plot_y1)
+            + legend
             + title_shapes
             + subtitle_shapes
         )
@@ -1279,10 +1480,10 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
 def _pie_shapes(  # noqa: PLR0914
     spec: ChartSpec,
-    series: list[list[float]],
     categories: list[str],
     n: int,
-    m: int,
+    refused: bool,
+    fractions: list[float],
     plot_x0: float,
     plot_x1: float,
     plot_y0: float,
@@ -1297,12 +1498,15 @@ def _pie_shapes(  # noqa: PLR0914
     clockwise; arcs are the standard <=90-degree-segment cubic-Bezier
     approximation (the closed `CurveCommand` vocabulary has no arc case,
     deliberately). A lone 100% category degenerates to a `Circle`. Category
-    share reads in the legend ("name (NN%)")."""
-    tick_size = _TICK_FONT_SIZE
-    values = series[0] if m == 1 else []
-    refused = m != 1 or any(v < 0.0 for v in values)
-    total = sum(values)
-    if refused or total <= 0.0:
+    share reads in the legend ("name (NN%)").
+
+    Phase 880 — this emits WEDGES ONLY. The pie's legend was the vertical
+    right-hand column the cartesian arms have now converged on, so it is emitted
+    by the shared legend in :func:`lower` (from the shared entry list, which
+    carries the shares) and honours ``legend_position`` like any other arm. The
+    refusal guard and the shares themselves are computed by the caller, above
+    the margins, because the legend's width is layout input."""
+    if refused:
         return []
 
     cx = _r2((plot_x0 + plot_x1) / 2.0)
@@ -1328,7 +1532,6 @@ def _pie_shapes(  # noqa: PLR0914
             out.append(Obj("CubicTo", {"control1": c1, "control2": c2, "to": pt(t1)}))
         return out
 
-    fractions = [v / total for v in values]
     starts = [0.0]
     acc = 0.0
     for f in fractions:
@@ -1368,26 +1571,7 @@ def _pie_shapes(  # noqa: PLR0914
                     ]
                     segs.append(_curve(cmds, mark_style))
 
-    # Vertical category legend on the right — categories take the palette
-    # roles a cartesian chart gives its series.
-    pie_legend: list[Value] = []
-    for i in range(n):
-        ly = 70.0 + 20.0 * float(i)
-        pie_legend.append(_rectangle(_r2(_W - 168.0), _r2(ly), 10.0, 10.0, 2.0, _style_fill(_colour_for(i))))
-        # Routed through the canonical formatter (Phase 876) — one rounding +
-        # rendering rule for every number this module prints. A share is a whole
-        # percent here, so the shipped ``NN%`` shape is unchanged.
-        pct = _format_value(None, 1.0, False, 1.0, fractions[i] * 100.0)
-        pie_legend.append(
-            _label(
-                _r2(_W - 153.0),
-                _r2(ly + 9.0),
-                _literal(f"{categories[i]} ({pct}%)"),
-                _text_style(_LABEL_OPACITY, "Start", tick_size, "Normal"),
-            )
-        )
-
-    return segs + pie_legend
+    return segs
 
 
 def lower_node(node_id: str, spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Node:

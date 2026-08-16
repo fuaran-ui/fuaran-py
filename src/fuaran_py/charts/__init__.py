@@ -101,6 +101,24 @@ _AXIS_TITLE_BOTTOM_OFFSET = 12.0  # canvas bottom → x-axis title BASELINE
 # which packs one label per line height at any category count.
 _LABEL_TILT_DEGREES = 30.0
 _VERTICAL_TILT_DEGREES = 90.0
+# Phase 878 — the subtitle + the rotated y-axis title.
+# The subtitle sits deliberately BELOW the 18.0 title size: it is a qualifier on
+# the title, and a qualifier set at the same size competes with what it
+# qualifies. Its baseline sits directly under the title's, sharing its x + anchor
+# so the pair reads as one block.
+_SUBTITLE_FONT_SIZE = 13.0
+_SUBTITLE_BASELINE_Y = 38.0
+# x of the ROTATED y-axis title's baseline, measured from the canvas LEFT EDGE —
+# not from the autosized margin, so the title does not slide about as tick widths
+# change. A rotated-by `-_Y_AXIS_TITLE_DEGREES` label's ascenders extend LEFT of
+# its baseline, which is why this sits near the outer edge of the reserved band
+# rather than at it.
+_Y_AXIS_TITLE_OFFSET_X = 18.0
+# The MAGNITUDE of the y-axis title's rotation. Emitted as `rotation =
+# -_Y_AXIS_TITLE_DEGREES`: `rotation` is clockwise (SVG's convention), so the
+# negative angle reads BOTTOM-UP — the conventional treatment, and the same sign
+# convention `_VERTICAL_TILT_DEGREES` already uses.
+_Y_AXIS_TITLE_DEGREES = 90.0
 # Legend geometry. The pitch is PER ENTRY since Phase 879 (swatch offset + the
 # entry's own measured name width + this gap), never a fixed stride.
 _LEGEND_LABEL_OFFSET_X = 15.0
@@ -601,6 +619,14 @@ class ChartSpec:
     y_fields: tuple[str, ...]
     title: str | None = None
     stacked: bool = field(default=False)
+    # Phase 878 — the axis names + the subtitle. WIRE fields, on the same side
+    # of the D8 line as ``title``: what an axis is CALLED is the author's
+    # meaning, where and how it is drawn stays the host's. All three are
+    # optional, and the axis titles are DEFAULT-ON — an absent one falls back to
+    # the capitalised field name, so an axis is never nameless.
+    x_title: str | None = None
+    y_title: str | None = None
+    subtitle: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -746,6 +772,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
     tick_size = _TICK_FONT_SIZE
     title_size = 18.0
+    subtitle_size = _SUBTITLE_FONT_SIZE
 
     # ── Text-metric layout (Phase 879) ───────────────────────────────────────
     #
@@ -763,16 +790,71 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             acc = max(acc, _text_width(tick_size, t))
         return acc
 
+    # ── Axis names + subtitle (Phase 878) ────────────────────────────────────
+    #
+    # Resolved HERE, before any margin, because both margins have to reserve a
+    # line for text whose presence is decided by these three fields — the left
+    # margin for the rotated y-axis title, the top margin for the subtitle. The
+    # same dependency Phase 879 established when the bottom margin started
+    # reserving the x-axis title's line.
+
+    def axis_title_of(declared: str | None, fallback_field: str) -> str | None:
+        """An axis title: the author's own text when declared, else the
+        capitalised field name — which is exactly what the x axis has always
+        drawn, now stated once and applied to both axes. ``None`` only where
+        there is no honest fallback: an empty field name, or a y axis carrying
+        no series at all."""
+        if declared is not None:
+            return declared
+        if fallback_field == "":
+            return None
+        return _capitalise(fallback_field)
+
+    x_title = axis_title_of(spec.x_title, spec.x_field)
+
+    # The y fallback is the capitalised FIRST y-field. It is the honest answer
+    # to "what is on this axis", where the retired "Value" literal named neither
+    # the measure nor its unit — and it makes ONE rule cover both axes rather
+    # than a rule for x and a constant for y. The multi-series chart is the case
+    # it serves least well; there the legend already names every series, and an
+    # author plotting genuinely different measures should declare ``y_title``,
+    # which is precisely why the field exists.
+    y_title = axis_title_of(spec.y_title, spec.y_fields[0] if spec.y_fields else "")
+
+    # ── Top margin ──
+    # A subtitle takes one line under the visible title, and EVERYTHING below it
+    # in the top band moves down by exactly that line: the legend row, the
+    # display-unit slot, and the plot itself (so on the Pie arm the wedge centre
+    # moves too). Reserved only when a subtitle is present, so a chart without
+    # one keeps the pre-878 layout byte-for-byte.
+    subtitle_band = _text_line_height(subtitle_size, _TEXT_LINE_HEIGHT_FACTOR) if spec.subtitle is not None else 0.0
+    margin_top = _r2(_MARGIN_TOP + subtitle_band)
+
+    def bound_text(font_size: float, extent: float, t: str) -> str:
+        """Bound a title to the extent it runs along."""
+        return _truncate_to_width(font_size, extent, t)
+
     # ── Left margin ──
     # The truncation budget is derived from the CEILING — a constant — so the
     # truncation that feeds the margin never depends on the margin it decides.
     left_ceiling = _MARGIN_LEFT_MAX_SHARE * _W
-    tick_text_budget = max(0.0, left_ceiling - _TICK_LABEL_GAP - _AXIS_LABEL_PADDING)
+
+    # Phase 878 — the rotated y-axis title occupies one LINE of the left margin,
+    # outboard of the tick column. Only its line height (plus the padding beside
+    # it) is reserved here: the title is rotated, so its LENGTH runs vertically
+    # and is bounded against the plot height further down. That is what keeps
+    # this acyclic — exactly the shape Phase 879 gave the x-axis title's line in
+    # the bottom margin.
+    y_title_band = line_height + _AXIS_LABEL_PADDING if y_title is not None else 0.0
+
+    tick_text_budget = max(0.0, left_ceiling - _TICK_LABEL_GAP - _AXIS_LABEL_PADDING - y_title_band)
 
     def y_tick_label_text(v: float) -> str:
         return _truncate_to_width(tick_size, tick_text_budget, y_tick_text(v))
 
-    required_left = _TICK_LABEL_GAP + widest_of([y_tick_label_text(t) for t in ticks]) + _AXIS_LABEL_PADDING
+    required_left = (
+        _TICK_LABEL_GAP + widest_of([y_tick_label_text(t) for t in ticks]) + _AXIS_LABEL_PADDING + y_title_band
+    )
     margin_left = _r2(max(_MARGIN_LEFT, min(left_ceiling, required_left)))
 
     plot_x0 = margin_left
@@ -831,7 +913,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     )
     margin_bottom = _r2(max(_MARGIN_BOTTOM, min(bottom_ceiling, required_bottom)))
 
-    plot_y0 = _MARGIN_TOP
+    plot_y0 = margin_top
     plot_y1 = _H - margin_bottom
     plot_h = plot_y1 - plot_y0
 
@@ -938,23 +1020,75 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             for i, c in enumerate(category_texts)
         ]
 
-    # ── Axis titles (a name on both axes) ──
-    axis_titles: list[Value] = [
-        _label(
-            _r2((plot_x0 + plot_x1) / 2.0),
-            _r2(_H - _AXIS_TITLE_BOTTOM_OFFSET),
-            _literal(_capitalise(spec.x_field)),
-            _text_style(None, "Middle", tick_size, "Normal"),
-        ),
-        _label(
-            _r2(8.0),
-            _r2(plot_y0 - 12.0),
-            # The top-left slot states the value axis's DISPLAY UNIT once when
-            # scaling applies, and otherwise keeps the horizontal "Value" hint.
-            _literal("Value" if y_unit_label == "" else y_unit_label),
-            _text_style(None, "Start", tick_size, "Normal"),
-        ),
-    ]
+    # ── Axis titles + the display-unit slot (Phase 878) ──
+    #
+    # Three rules, and together they retire the hardcoded "Value":
+    #
+    #   1. NAMES. The x title stays centred under the tick band (where it has
+    #      always been); the y title is ROTATED by `-_Y_AXIS_TITLE_DEGREES` in
+    #      the left margin, centred on the plot, reading BOTTOM-UP — the
+    #      conventional treatment, and the same sign convention the vertical
+    #      category labels already use. Each falls back to its capitalised field
+    #      name, so an axis is never nameless.
+    #
+    #   2. UNITS KEEP THEIR OWN SLOT. The top-left label states the Phase-876
+    #      display unit and NOTHING else: with no scaling in play it is not
+    #      drawn at all, where it previously fell back to the literal "Value" —
+    #      a word naming neither the measure nor its unit, printed on every
+    #      chart in the corpus. Composing the unit INTO the rotated title
+    #      ("Revenue (Millions of £)") was the alternative and was rejected:
+    #      that concatenation is only expressible when the title is a literal,
+    #      so a bound or i18n title would silently fall back to a different
+    #      layout — and a layout rule with a shape that depends on which text
+    #      source an author reached for is not a rule. Two slots, always the
+    #      same two, is what stays total.
+    #
+    #   3. DEDUPE. An explicit subtitle SUPPRESSES the unit slot. The subtitle
+    #      is the author's own place to say "£m", and the machine restating it
+    #      two lines away is exactly the clutter this rule exists to prevent —
+    #      so the author's sentence wins. PRESENCE is the whole test: no string
+    #      comparison, which is what keeps the rule total over every text-source
+    #      arm and identical on every host.
+    #
+    # A SELF-EVIDENT DATE AXIS SUPPRESSES ITS DEFAULT TITLE — an axis reading
+    # "Jan Feb Mar" does not need the word "Month" beneath it. The rule is
+    # recorded here and is WIRED when the temporal axis lands: nothing in the
+    # lowering can currently tell a date column from a string one, and inferring
+    # it from the label text would be a guess dressed as a rule. It will apply
+    # to the FALLBACK only — an explicit x title is the author overriding the
+    # default, and always draws.
+    axis_titles: list[Value] = []
+    if x_title is not None:
+        axis_titles.append(
+            _label(
+                _r2((plot_x0 + plot_x1) / 2.0),
+                _r2(_H - _AXIS_TITLE_BOTTOM_OFFSET),
+                _literal(bound_text(tick_size, plot_w, x_title)),
+                _text_style(None, "Middle", tick_size, "Normal"),
+            )
+        )
+    if y_title is not None:
+        # Middle-anchored at the plot's vertical centre: the anchor is the
+        # pivot, so the rotated text stays centred on the axis it names,
+        # whatever its length. The x is measured from the CANVAS edge, not the
+        # autosized margin, so the title does not slide as tick widths change.
+        axis_titles.append(
+            _label(
+                _r2(_Y_AXIS_TITLE_OFFSET_X),
+                _r2((plot_y0 + plot_y1) / 2.0),
+                _literal(bound_text(tick_size, plot_h, y_title)),
+                _text_style(None, "Middle", tick_size, "Normal", _r2(-_Y_AXIS_TITLE_DEGREES)),
+            )
+        )
+    if y_unit_label != "" and spec.subtitle is None:
+        axis_titles.append(
+            _label(
+                _r2(8.0),
+                _r2(plot_y0 - 12.0),
+                _literal(y_unit_label),
+                _text_style(None, "Start", tick_size, "Normal"),
+            )
+        )
 
     # ── Series geometry ──
     series_shapes: list[Value] = []
@@ -1069,11 +1203,14 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             # reference does — rounding the sum instead can differ in the last
             # 2 dp.
             sx = _r2(lx_acc)
-            legend.append(_rectangle(sx, 34.0, 10.0, 10.0, 2.0, _style_fill(colour)))
+            # Phase 878 — the legend row sits BELOW the subtitle, so it moves
+            # down by the line the subtitle took. ``subtitle_band`` is 0 without
+            # one, leaving the pre-878 constants exactly where they were.
+            legend.append(_rectangle(sx, _r2(34.0 + subtitle_band), 10.0, 10.0, 2.0, _style_fill(colour)))
             legend.append(
                 _label(
                     _r2(sx + _LEGEND_LABEL_OFFSET_X),
-                    43.0,
+                    _r2(43.0 + subtitle_band),
                     _literal(name),
                     _text_style(_LABEL_OPACITY, "Start", tick_size, "Normal"),
                 )
@@ -1081,10 +1218,27 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             lx_acc += _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, name) + _LEGEND_ENTRY_GAP
 
     # ── Visible title (a Label — bigger + emphasised) ──
+    title_x = _r2(plot_x0)
     title_shapes: list[Value] = []
     if spec.title is not None:
-        title_shapes.append(
-            _label(_r2(plot_x0), 22.0, _literal(spec.title), _text_style(None, "Start", title_size, "Loud"))
+        title_shapes.append(_label(title_x, 22.0, _literal(spec.title), _text_style(None, "Start", title_size, "Loud")))
+
+    # ── Subtitle (Phase 878) — the muted line under the title ──
+    #
+    # MUTED (label-role opacity, not full-strength ink) and SMALLER than the
+    # title, sharing its x and its anchor, so the pair reads as one block and the
+    # subtitle is unmistakably subordinate. It draws independently of the title:
+    # an author who sets one and not the other gets what they asked for, and the
+    # top margin has already reserved the line either way.
+    subtitle_shapes: list[Value] = []
+    if spec.subtitle is not None:
+        subtitle_shapes.append(
+            _label(
+                title_x,
+                _SUBTITLE_BASELINE_Y,
+                _literal(bound_text(subtitle_size, plot_w, spec.subtitle)),
+                _text_style(_LABEL_OPACITY, "Start", subtitle_size, "Normal"),
+            )
         )
 
     # Pie is polar — no axes/gridlines/tick chrome; every other arm assembles
@@ -1093,7 +1247,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # series, legend, chart title.
     if spec.kind == "Pie":
         shapes: list[Value] = (
-            _pie_shapes(spec, series, categories, n, m, plot_x0, plot_x1, plot_y0, plot_y1) + title_shapes
+            _pie_shapes(spec, series, categories, n, m, plot_x0, plot_x1, plot_y0, plot_y1)
+            + title_shapes
+            + subtitle_shapes
         )
     else:
         shapes = (
@@ -1108,6 +1264,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             + series_shapes
             + legend
             + title_shapes
+            + subtitle_shapes
         )
 
     kind_fields: dict[str, Value] = {

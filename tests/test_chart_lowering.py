@@ -33,6 +33,10 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # JSON; `axisUnitMode` is a harness-only STYLE selector (the chart style is
     # a lowering parameter, never wire), present so the corpus can pin every
     # mode. Both absent on the pre-876 cases.
+    #
+    # Phase 878 — `xTitle` / `yTitle` / `subtitle` are WIRE fields carried as
+    # plain strings (the canonical `TextSource.Literal` form), omitted when the
+    # author declared none. Absent on every pre-878 case.
     spec = ChartSpec(
         kind=inp["kind"],
         x_field=inp["xField"],
@@ -41,6 +45,9 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         stacked=bool(inp.get("stacked", False)),
         value_format=inp.get("valueFormat"),
         axis_unit_mode=inp.get("axisUnitMode", "Words"),
+        x_title=inp.get("xTitle"),
+        y_title=inp.get("yTitle"),
+        subtitle=inp.get("subtitle"),
     )
     return spec, list(inp["data"])
 

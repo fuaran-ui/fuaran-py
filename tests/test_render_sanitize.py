@@ -59,6 +59,57 @@ def test_single_slash_relative_paths_still_pass() -> None:
     assert sanitize_url("https://ok.example/x") == "https://ok.example/x"
 
 
+def test_url_floor_normalises_as_the_url_parser_does() -> None:
+    """§19 rule 1 — the WHATWG basic URL parser's own pre-parse normalisation (Phase 795).
+
+    Control characters are written as escapes throughout: a raw C0 byte in source is
+    invisible in review and does not survive a copy-paste, which is the wrong property
+    for the payloads a security pin is made of.
+    """
+    # V1 — an interior TAB / LF / CR BETWEEN the two slash-ish characters. Before rule 1
+    # normalised, `/<TAB>/host/x` had first two characters `/` and `<TAB>`, so the
+    # protocol-relative test read an ordinary relative reference and accepted, while the
+    # browser removed the tab by the URL Standard's step 2 and resolved `//host/x`
+    # OFF-ORIGIN. Verified against the WHATWG parser: all twelve spellings resolve to
+    # `https://evil.example/x`.
+    for c in ("\t", "\n", "\r"):
+        for a in ("/", "\\"):
+            for b in ("/", "\\"):
+                url = f"{a}{c}{b}evil.example/x"
+                assert sanitize_url(url) is None, repr(url)
+    assert sanitize_url("/\t\r/\nevil.example/x") is None
+
+    # V2 — a LEADING C0 control that is not whitespace. No native trim removes U+0001 or
+    # NUL, so the two slashes sat at positions 1 and 2 and the protocol-relative test
+    # never saw them; the parser removes them by step 1 and resolves off-origin.
+    for c in ("\x01", "\x00", "\x1f"):
+        assert sanitize_url(f"{c}//evil.example/x") is None, repr(c)
+
+    # Step 1 is the whole C0-or-space range, at both ends.
+    assert sanitize_url("https://good.example/x\x01") == "https://good.example/x"
+
+    # Rule 1's output is the EMITTED value.
+    assert sanitize_url("https://good.ex\tample/x") == "https://good.example/x"
+
+    # U+000B and U+000C are removed at the EDGES by step 1 and KEPT in the interior — the
+    # parser treats `/<VT>/host/x` as a same-origin path, and so must the floor. Pinned
+    # because widening step 2 to "all C0" would silently over-reject here.
+    for c in ("\x0b", "\x0c"):
+        assert sanitize_url(f"/{c}/evil.example/x") == f"/{c}/evil.example/x", repr(c)
+
+    # ASCII-exact LOOSENS these, correctly: the parser keeps them and resolves an ordinary
+    # same-origin path, where `str.strip` removed them and the floor then saw `//` and
+    # rejected. U+001C–U+001F is where Python diverged from the other four hosts, and
+    # U+0085 is where JS diverged from Python; ASCII-exact ends both.
+    for c in ("\xa0", "\x85"):
+        assert sanitize_url(f"{c}//evil.example/x") == f"{c}//evil.example/x", repr(c)
+
+    # Rule 2 is UNCHANGED and still stricter than the browser, which is why V1 and V2 are
+    # off-origin navigation rather than script execution.
+    assert sanitize_url("java\tscript:alert(1)") is None
+    assert sanitize_url("java\x0bscript:alert(1)") is None
+
+
 def test_link_node_with_protocol_relative_href_resolves_to_about_blank() -> None:
     html = render_link('{"$type":"Static","value":"//evil.example/x"}')
     assert 'href="about:blank"' in html

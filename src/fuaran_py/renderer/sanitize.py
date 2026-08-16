@@ -122,11 +122,49 @@ def _is_protocol_relative(url: str) -> bool:
     return len(url) >= 2 and url[0] in "/\\" and url[1] in "/\\"
 
 
+_TAB_LF_CR = ("\t", "\n", "\r")
+
+
+def _normalize_url_for_floor(url: str) -> str:
+    """§19 rule 1 — normalise exactly as the WHATWG URL Standard's basic URL parser does.
+
+    Two ordered, ASCII-exact steps applied before the parser parses anything:
+
+    1. remove leading and trailing **C0 control or space** — all of U+0000–U+0020,
+       not merely the whitespace subset;
+    2. remove every U+0009 / U+000A / U+000D from anywhere in what remains.
+
+    Deliberately **not** :meth:`str.strip`. A native trim answers a different
+    question in every language — ``str.strip`` also removes U+001C–U+001F where
+    .NET, JS, Go and Rust do not; JS alone keeps U+0085 NEL where the other four
+    drop it — and all of them remove non-ASCII whitespace (U+00A0, U+2028, …) that
+    the parser keeps. The floor's whole purpose is that a tree vetted on one host
+    is safe on another, so the normalisation is defined by the parser that will
+    actually consume the string, not by the host's standard library.
+
+    Step 2 is those three code points **only**: the parser removes U+000B and
+    U+000C at the edges (step 1) and *keeps* them in the interior, so
+    ``/<VT>/host/x`` is an ordinary same-origin path and must stay one.
+    """
+    lo, hi = 0, len(url)
+    while lo < hi and url[lo] <= " ":
+        lo += 1
+    while hi > lo and url[hi - 1] <= " ":
+        hi -= 1
+    return "".join(ch for ch in url[lo:hi] if ch not in _TAB_LF_CR)
+
+
 def sanitize_url(url: str) -> str | None:
-    """Return the URL if its scheme is accepted, else ``None`` (default-deny)."""
+    """Return the URL if its scheme is accepted, else ``None`` (default-deny).
+
+    The input is first normalised per §19 rule 1 (see :func:`_normalize_url_for_floor`),
+    and that normalised form is also what is **emitted** on acceptance — so an
+    accepted URL carrying an interior tab loses it, which is what the browser would
+    have parsed anyway.
+    """
     if url is None:
         return None
-    trimmed = url.strip()
+    trimmed = _normalize_url_for_floor(url)
     if trimmed == "":
         # Empty href/src — pass through (a same-page link, documented HTML behaviour).
         return trimmed

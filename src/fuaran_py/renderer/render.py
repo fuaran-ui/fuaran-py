@@ -753,6 +753,25 @@ class Renderer:
             out += f' data-fuaran-mark="{_draw_escape(str(fields["markId"]))}"'
         return out
 
+    def _draw_stroke_join_attrs(self, style: Value) -> str:
+        """Round line joins + caps on a STROKED path shape (``Polyline`` /
+        ``Polygon`` / ``Curve``). A RENDERER default, not a wire field: no
+        fixture changes shape, and every host emits the same two attributes
+        from its own builder. SVG's initial ``stroke-linejoin`` is ``miter``,
+        which spikes at the acute vertices a data polyline routinely has — a
+        visible artefact that carries no data.
+
+        Emitted only when the shape actually strokes, so a fill-only polygon
+        (an area band) keeps its minimal attribute set. ``Line`` is
+        deliberately excluded: a round cap on the axis and gridline rules
+        would overhang each end by half the stroke width, lengthening chrome
+        that is positioned exactly.
+        """
+        fields = style.fields if isinstance(style, Obj) else {}
+        if "stroke" in fields and resolve_binding(fields["stroke"], self.sources) is not None:
+            return ' stroke-linejoin="round" stroke-linecap="round"'
+        return ""
+
     def _draw_shape(self, sh: Value) -> str:
         if not isinstance(sh, Obj):
             return ""
@@ -780,17 +799,17 @@ class Renderer:
         if tag == "Polyline":
             return (
                 f'<polyline class="fuaran-drawing-polyline" points="{_draw_points(f.get("points"))}"'
-                f"{self._draw_style_attrs(style, True)}/>"
+                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}/>"
             )
         if tag == "Polygon":
             return (
                 f'<polygon class="fuaran-drawing-polygon" points="{_draw_points(f.get("points"))}"'
-                f"{self._draw_style_attrs(style, False)}/>"
+                f"{self._draw_style_attrs(style, False)}{self._draw_stroke_join_attrs(style)}/>"
             )
         if tag == "Curve":
             return (
                 f'<path class="fuaran-drawing-curve" d="{_draw_path_d(f.get("commands"))}"'
-                f"{self._draw_style_attrs(style, True)}/>"
+                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}/>"
             )
         if tag == "Circle":
             return (

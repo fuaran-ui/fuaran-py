@@ -99,4 +99,4 @@ def test_headless_chart_renders_real_inline_svg() -> None:
     assert "fuaran-drawing" in html
     assert "ssr-placeholder" not in html
     # A bar rectangle from the series geometry made it into the SVG.
-    assert "#3366cc" in html
+    assert "#1a86ac" in html

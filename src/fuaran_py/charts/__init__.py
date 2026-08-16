@@ -49,7 +49,26 @@ _PLOT_W = _PLOT_X1 - _PLOT_X0
 _PLOT_H = _PLOT_Y1 - _PLOT_Y0
 
 # A fixed, deterministic categorical palette (series index → colour).
-_PALETTE = ("#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6")
+#
+# Palette v2 (default chart style v2) — 8 slots, fixed assignment order.
+# Validated on BOTH surfaces (light #fcfcfb, dark #1a1a19) against the OKLab
+# gate set: lightness band, chroma floor, adjacent-pair CVD ΔE (protan +
+# deutan, Machado 2009 at severity 1.0), adjacent-pair normal-vision ΔE. Every
+# slot sits in the INTERSECTION of the two lightness bands (OKLCH L
+# 0.48-0.67), which is what lets one hex set serve both themes. The
+# ASSIGNMENT ORDER is load-bearing — the gates are measured over ADJACENT
+# pairs, so re-ordering the tuple can drop a passing set below the floor. Do
+# not cycle or sort it. Mirrors the F# `ChartStyle.defaults.Palette`.
+_PALETTE = (
+    "#1a86ac",  # loch blue
+    "#bf831c",  # ochre
+    "#a51574",  # magenta
+    "#21a766",  # green
+    "#6454e5",  # violet
+    "#af153d",  # crimson
+    "#21a2b2",  # teal
+    "#d3241b",  # vermilion
+)
 
 
 def _colour_for(i: int) -> str:
@@ -150,8 +169,19 @@ def _style_stroke(stroke: str, width: float) -> Obj:
 
 # A translucent categorical fill (Phase 637 — area bands). The gridlines stay
 # legible through the band; the series' full-strength Polyline edge on top
-# carries the categorical colour at full contrast.
-_AREA_FILL_OPACITY = 0.35
+# carries the categorical colour at full contrast. Dropped to a wash (default
+# chart style v2): at 0.35 two overlaid bands read as a third colour and the
+# chrome beneath them disappears.
+_AREA_FILL_OPACITY = 0.12
+
+# Mark-geometry constants (default chart style v2).
+_BAR_MAX_THICKNESS = 28.0  # hard pixel ceiling on a single bar's thickness
+_STACK_SEGMENT_GAP = 2.0  # geometric gap between consecutive stacked-bar segments
+_WEDGE_GAP_DEGREES = 0.75  # geometric angular padding between pie wedges
+
+# Length of the small OUTSIDE tick marks on both axes: y-axis marks run left
+# from the spine, x-axis marks run down from it, so neither eats plot area.
+_TICK_MARK_LENGTH = 5.0
 
 
 def _style_fill_opacity(fill: str, opacity: float) -> Obj:
@@ -372,22 +402,63 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         return _r2(_PLOT_X0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * _PLOT_W)
 
     tick_size = 13.0
-    title_size = 16.0
+    title_size = 18.0
 
     # ── Cartesian chrome (painter's order pieces) ──
-    gridlines: list[Value] = [
-        _line(_r2(_PLOT_X0), y_scale(t), _r2(_PLOT_X1), y_scale(t), _style_stroke_ink(_GRID_OPACITY, 1.0))
-        for t in ticks
-    ]
+    grid_style = _style_stroke_ink(_GRID_OPACITY, 1.0)
+    axis_stroke_style = _style_stroke_ink(_AXIS_OPACITY, 1.0)
+    gridlines: list[Value] = [_line(_r2(_PLOT_X0), y_scale(t), _r2(_PLOT_X1), y_scale(t), grid_style) for t in ticks]
+
+    # Vertical gridlines — the Scatter arm only. A linear x-scale has readable
+    # x positions, so a reader traces a point back to an x value the same way
+    # the horizontal grid lets them trace a y value. A BAND x-axis has no such
+    # positions to trace (a category is a label, not a magnitude), so a
+    # vertical rule there would be decoration.
+    x_gridlines: list[Value] = (
+        [_line(x_scale(t), _r2(_PLOT_Y0), x_scale(t), _r2(_PLOT_Y1), grid_style) for t in x_ticks] if is_scatter else []
+    )
+
+    # Zero baseline — only when the domain CROSSES zero, where the sign of a
+    # value is a reading of the chart and the zero line is what the reader
+    # measures against. Drawn at axis strength, over the ordinary gridline it
+    # shares a y with; when the domain does not cross zero the axis spine
+    # already IS the baseline and a second rule at the same strength would be
+    # noise.
+    zero_line: list[Value] = (
+        [_line(_r2(_PLOT_X0), y_scale(0.0), _r2(_PLOT_X1), y_scale(0.0), axis_stroke_style)]
+        if nice_lo < 0.0 < nice_hi
+        else []
+    )
+
     axes: list[Value] = [
-        _line(_r2(_PLOT_X0), _r2(_PLOT_Y0), _r2(_PLOT_X0), _r2(_PLOT_Y1), _style_stroke_ink(_AXIS_OPACITY, 1.0)),
-        _line(_r2(_PLOT_X0), _r2(_PLOT_Y1), _r2(_PLOT_X1), _r2(_PLOT_Y1), _style_stroke_ink(_AXIS_OPACITY, 1.0)),
+        _line(_r2(_PLOT_X0), _r2(_PLOT_Y0), _r2(_PLOT_X0), _r2(_PLOT_Y1), axis_stroke_style),
+        _line(_r2(_PLOT_X0), _r2(_PLOT_Y1), _r2(_PLOT_X1), _r2(_PLOT_Y1), axis_stroke_style),
     ]
+
+    # Outside tick marks — outside the plot on both axes, so the plot area
+    # stays ink-free and the marks tie each label to its position. y marks
+    # come first, then x marks. Suppressed entirely when `_TICK_MARK_LENGTH`
+    # is not positive.
+    if _TICK_MARK_LENGTH <= 0.0:
+        tick_marks: list[Value] = []
+    else:
+        y_marks: list[Value] = [
+            _line(_r2(_PLOT_X0 - _TICK_MARK_LENGTH), y_scale(t), _r2(_PLOT_X0), y_scale(t), axis_stroke_style)
+            for t in ticks
+        ]
+
+        def _x_mark(x: float) -> Value:
+            return _line(x, _r2(_PLOT_Y1), x, _r2(_PLOT_Y1 + _TICK_MARK_LENGTH), axis_stroke_style)
+
+        x_marks: list[Value] = (
+            [_x_mark(x_scale(t)) for t in x_ticks] if is_scatter else [_x_mark(centre_x(i)) for i in range(n)]
+        )
+        tick_marks = y_marks + x_marks
 
     # y-axis tick labels — right-anchored (End) in the left margin.
     y_tick_labels: list[Value] = [
         _label(
-            _r2(_PLOT_X0 - 8.0),
+            _r2(_PLOT_X0 - 12.0),
             _r2(y_scale(t) + 4.0),
             _literal(_tick_label(t)),
             _text_style(_LABEL_OPACITY, "End", tick_size, "Normal"),
@@ -437,31 +508,42 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # ── Series geometry ──
     series_shapes: list[Value] = []
     if spec.kind in ("Bar", "Column") and stacked:
-        # One full group-width bar per category; series stack as segments
-        # between consecutive cumulative sums (Phase 637).
+        # One capped bar per category, centred in its band; series stack as
+        # segments between consecutive cumulative sums (Phase 637), each
+        # shortened by `_STACK_SEGMENT_GAP` on the side facing the next
+        # segment so the boundaries read as gaps rather than colour changes.
         group_w = band_w * 0.7
+        bw = _r2(min(group_w * 0.9, _BAR_MAX_THICKNESS))
         for i in range(n):
-            bx = _r2(_PLOT_X0 + band_w * float(i) + (band_w - group_w) / 2.0)
-            bw = _r2(group_w * 0.9)
+            bx = _r2(_PLOT_X0 + band_w * float(i) + (band_w - bw) / 2.0)
             cums = cums_for(i)
             for j in range(m):
                 y0 = y_scale(cums[j])
                 y1 = y_scale(cums[j + 1])
-                top = min(y0, y1)
-                hgt = _r2(abs(y1 - y0))
+                # The gap comes off the far side from the baseline, and only
+                # where another segment follows — so the stack's outer tip
+                # keeps its full height and the total stays honest. `max 0`
+                # covers a segment thinner than the gap.
+                gap = _STACK_SEGMENT_GAP if j < m - 1 else 0.0
+                top = _r2(min(y0, y1) + (gap if y1 < y0 else 0.0))
+                hgt = _r2(max(0.0, abs(y1 - y0) - gap))
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
                 series_shapes.append(_rectangle(bx, top, bw, hgt, None, _with_mark(_style_fill(_colour_for(j)), mark)))
     elif spec.kind in ("Bar", "Column"):
         group_w = band_w * 0.7
         sub_w = group_w / float(m) if m > 0 else group_w
+        bw = _r2(min(sub_w * 0.9, _BAR_MAX_THICKNESS))
         base_y = y_scale(0.0)
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             for i in range(n):
                 v = values[i]
-                bx = _r2(_PLOT_X0 + band_w * float(i) + (band_w - group_w) / 2.0 + float(j) * sub_w)
-                bw = _r2(sub_w * 0.9)
+                # Centre the (possibly capped) bar in its own sub-slot, so a
+                # cap takes air off BOTH sides and the group stays symmetric
+                # about the band centre.
+                slot_x = _PLOT_X0 + band_w * float(i) + (band_w - group_w) / 2.0 + float(j) * sub_w
+                bx = _r2(slot_x + (sub_w - bw) / 2.0)
                 vy = y_scale(v)
                 top = min(vy, base_y)
                 hgt = _r2(abs(vy - base_y))
@@ -542,12 +624,25 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         )
 
     # Pie is polar — no axes/gridlines/tick chrome; every other arm assembles
-    # the shared cartesian chrome in painter's order: gridlines, axes, y-tick +
-    # x labels, axis titles, series, legend, chart title.
+    # the shared cartesian chrome in painter's order: gridlines (h then v),
+    # the zero baseline, axes, tick marks, y-tick + x labels, axis titles,
+    # series, legend, chart title.
     if spec.kind == "Pie":
         shapes: list[Value] = _pie_shapes(spec, series, categories, n, m) + title_shapes
     else:
-        shapes = gridlines + axes + y_tick_labels + x_labels + axis_titles + series_shapes + legend + title_shapes
+        shapes = (
+            gridlines
+            + x_gridlines
+            + zero_line
+            + axes
+            + tick_marks
+            + y_tick_labels
+            + x_labels
+            + axis_titles
+            + series_shapes
+            + legend
+            + title_shapes
+        )
 
     kind_fields: dict[str, Value] = {
         "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _W, "height": _H}),
@@ -610,6 +705,11 @@ def _pie_shapes(  # noqa: PLR0914
         starts.append(acc)
     top = -math.pi / 2.0
 
+    # Half the angular padding comes off each end of every wedge, so the
+    # separation is a sliver of absent ink — no surface colour is needed and
+    # the result is theme-invariant, which a stroked wedge border could not be.
+    half_gap = _WEDGE_GAP_DEGREES * math.pi / 360.0
+
     yf = spec.y_fields[0]
     segs: list[Value] = []
     for i in range(n):
@@ -618,17 +718,24 @@ def _pie_shapes(  # noqa: PLR0914
             colour = _colour_for(i)
             mark_style = _with_mark(_style_fill(colour), f"{yf}|{categories[i]}")
             if f >= 1.0 - 1e-9:
+                # A lone 100% category is a circle — there is no neighbour to
+                # separate from, so no padding.
                 segs.append(_circle(cx, cy, radius, mark_style))
             else:
-                a0 = top + 2.0 * math.pi * starts[i]
-                a1 = top + 2.0 * math.pi * starts[i + 1]
-                cmds = [
-                    Obj("MoveTo", {"to": _pt(cx, cy)}),
-                    Obj("LineTo", {"to": pt(a0)}),
-                    *arc_cubics(a0, a1),
-                    Obj("Close", {}),
-                ]
-                segs.append(_curve(cmds, mark_style))
+                a0 = top + 2.0 * math.pi * starts[i] + half_gap
+                a1 = top + 2.0 * math.pi * starts[i + 1] - half_gap
+                # A wedge narrower than the padding is DROPPED rather than
+                # drawn inverted — the alternative is a sliver sweeping the
+                # wrong way round the circle, which is a wrong picture, not a
+                # small one.
+                if a1 > a0:
+                    cmds = [
+                        Obj("MoveTo", {"to": _pt(cx, cy)}),
+                        Obj("LineTo", {"to": pt(a0)}),
+                        *arc_cubics(a0, a1),
+                        Obj("Close", {}),
+                    ]
+                    segs.append(_curve(cmds, mark_style))
 
     # Vertical category legend on the right — categories take the palette
     # roles a cartesian chart gives its series.

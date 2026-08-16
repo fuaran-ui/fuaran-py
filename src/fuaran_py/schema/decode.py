@@ -1063,6 +1063,12 @@ def _decode_draw_style(value: object, path: str) -> Value:
     # Phase 642 — keyed mark identity (`data-fuaran-mark` at render time); optional.
     if "markId" in obj:
         fields["markId"] = _expect_string(obj["markId"], f"{path}.markId")
+    # Phase 877 — Label text rotation in degrees, clockwise; optional with no
+    # default (absent = upright). Keys off PRESENCE in the object: an explicit
+    # 0 is a distinct present value, so a truthiness test here would drop it and
+    # re-encode to different bytes.
+    if "rotation" in obj:
+        fields["rotation"] = _decode_number(obj["rotation"], f"{path}.rotation")
     return Obj(None, fields)
 
 

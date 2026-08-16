@@ -93,3 +93,53 @@ def test_reference_vocabulary_is_non_trivial() -> None:
     assert len(exact) > 50
     assert "fuaran-node" in exact
     assert "fuaran-custom-" in prefixes
+
+
+def test_drawing_label_rotation_anchors_at_the_label_position() -> None:
+    """Phase 877 — the rotation transform pivots on the label's OWN (x, y).
+
+    That anchoring is what makes rotation compose with ``textAnchor`` rather
+    than fight it: the text turns about the point it is aligned to, so a
+    ``Middle``-anchored tilted category label stays centred under its band.
+    The strings below are byte-for-byte what the F# reference emitter produces
+    for the same shapes — the corpus is the oracle for the codec, and this is
+    the emission half it does not cover.
+    """
+    decoded = decode_node(
+        '{"id":"d","kind":{"$type":"Drawing","shapes":['
+        '{"$type":"Label","style":{"rotation":-30},"text":"Q1","x":30,"y":100},'
+        '{"$type":"Label","style":{"rotation":12.34},"text":"F","x":110,"y":100},'
+        '{"$type":"Label","style":{"rotation":0},"text":"Z","x":150,"y":100},'
+        '{"$type":"Label","style":{},"text":"U","x":100,"y":20}'
+        '],"style":{},"viewBox":{"height":120,"minX":0,"minY":0,"width":200}}}'
+    )
+    assert decoded.ok, f"decode failed: {getattr(decoded, 'error', decoded)}"
+    html = render_html(decoded.value)
+
+    assert '<text class="fuaran-drawing-label" x="30" y="100" transform="rotate(-30 30 100)"' in html
+    assert 'transform="rotate(12.34 110 100)"' in html
+    # An explicit 0 is a PRESENT value and must still emit: absent and zero are
+    # different wire shapes, and a renderer that conflates them re-introduces
+    # downstream the distinction the codec is careful to preserve.
+    assert 'transform="rotate(0 150 100)"' in html
+    # The unrotated label carries no transform at all — the byte-unchanged
+    # guarantee for every pre-877 drawing.
+    assert '<text class="fuaran-drawing-label" x="100" y="20">U</text>' in html
+    assert html.count('transform="rotate(') == 3
+
+
+def test_drawing_rotation_is_inert_off_label() -> None:
+    """Rotation is ignored on non-text shapes — load-bearing, not cosmetic.
+
+    Unlike the other text-only ``DrawStyle`` fields, an SVG ``transform`` on a
+    ``<rect>`` would MOVE GEOMETRY rather than be ignored, so a renderer that
+    emitted it uniformly would silently distort drawings.
+    """
+    decoded = decode_node(
+        '{"id":"d","kind":{"$type":"Drawing","shapes":['
+        '{"$type":"Rectangle","height":10,"style":{"rotation":45},"width":10,"x":0,"y":0},'
+        '{"$type":"Circle","cx":5,"cy":5,"r":2,"style":{"rotation":45}}'
+        '],"style":{},"viewBox":{"height":100,"minX":0,"minY":0,"width":100}}}'
+    )
+    assert decoded.ok, f"decode failed: {getattr(decoded, 'error', decoded)}"
+    assert "transform=" not in render_html(decoded.value)

@@ -1076,6 +1076,14 @@
       "description": "Display/Drawing (degenerate — empty)"
     },
     {
+      "id": "drawing-rotated-labels",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/drawing-rotated-labels.json",
+      "expectedFile": "nodes/drawing-rotated-labels.json",
+      "description": "Display/Drawing (Phase 877 — rotated Labels, incl. explicit 0 and 2-dp fraction)"
+    },
+    {
       "id": "empty-state-card",
       "kind": "node-round-trip",
       "decoder": "node",

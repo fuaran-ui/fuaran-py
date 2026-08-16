@@ -805,9 +805,25 @@ class Renderer:
                 f' ry="{_draw_num(f.get("ry", 0))}"{self._draw_style_attrs(style, False)}/>'
             )
         if tag == "Label":
+            # Phase 877 — the rotation transform is built HERE rather than in
+            # `_draw_style_attrs` because the pivot is the label's own anchor
+            # point, which the style record does not carry; `_draw_style_attrs`
+            # is shared by every shape and stays position-free. Anchoring at
+            # (x, y) is what makes the rotation compose with `textAnchor` — the
+            # text turns about the point it is aligned to. Degrees, clockwise
+            # (SVG's own convention), so no sign conversion is needed.
+            #
+            # Deliberately never emitted off `Label`: an SVG transform on a
+            # <rect> would MOVE GEOMETRY rather than be inert as the other
+            # text-only fields are.
+            x, y = f.get("x", 0), f.get("y", 0)
+            style_fields = style.fields if isinstance(style, Obj) else {}
+            rot = ""
+            if "rotation" in style_fields:
+                rot = f' transform="rotate({_draw_num(style_fields["rotation"])} {_draw_num(x)} {_draw_num(y)})"'
             return (
-                f'<text class="fuaran-drawing-label" x="{_draw_num(f.get("x", 0))}"'
-                f' y="{_draw_num(f.get("y", 0))}"{self._draw_style_attrs(style, False)}>'
+                f'<text class="fuaran-drawing-label" x="{_draw_num(x)}"'
+                f' y="{_draw_num(y)}"{rot}{self._draw_style_attrs(style, False)}>'
                 f"{_draw_escape(self._text(f.get('text')))}</text>"
             )
         return ""

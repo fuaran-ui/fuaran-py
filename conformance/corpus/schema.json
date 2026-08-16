@@ -2117,6 +2117,9 @@
         },
         "markId": {
           "type": "string"
+        },
+        "rotation": {
+          "type": "number"
         }
       }
     },

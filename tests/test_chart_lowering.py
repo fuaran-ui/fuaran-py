@@ -29,12 +29,18 @@ def _cases() -> list[str]:
 
 
 def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
+    # Phase 876 — `valueFormat` is a WIRE field carried in canonical `Format`
+    # JSON; `axisUnitMode` is a harness-only STYLE selector (the chart style is
+    # a lowering parameter, never wire), present so the corpus can pin every
+    # mode. Both absent on the pre-876 cases.
     spec = ChartSpec(
         kind=inp["kind"],
         x_field=inp["xField"],
         y_fields=tuple(inp["yFields"]),
         title=inp.get("title"),
         stacked=bool(inp.get("stacked", False)),
+        value_format=inp.get("valueFormat"),
+        axis_unit_mode=inp.get("axisUnitMode", "Words"),
     )
     return spec, list(inp["data"])
 

@@ -1,0 +1,1 @@
+{"id":"chart-value-format","kind":{"$type":"Chart","kind":"Bar","source":{"$type":"Static","value":[{"month":"Jan","revenue":12500000},{"month":"Feb","revenue":15200000}]},"stacked":false,"title":"Revenue","valueFormat":{"$type":"Currency","isoCode":"GBP"},"xField":"month","yFields":["revenue"]}}

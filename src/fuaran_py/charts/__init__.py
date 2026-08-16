@@ -120,8 +120,12 @@ def _nice_num(x: float, round_it: bool) -> float:
     return nf * (10.0**exp)
 
 
-def _nice_domain(lo: float, hi: float) -> tuple[float, float, list[float]]:
-    """A nice value domain + its tick values for ``[lo, hi]``, targeting ~5 ticks."""
+def _nice_domain(lo: float, hi: float) -> tuple[float, float, float, list[float]]:
+    """A nice value domain + its TICK STEP + its tick values for ``[lo, hi]``.
+
+    The step is returned because the axis's decimal precision derives from it
+    (Phase 876) — precision follows the axis, not the data.
+    """
     if hi == lo:
         hi = lo + 1.0
     target_ticks = 5.0
@@ -132,7 +136,7 @@ def _nice_domain(lo: float, hi: float) -> tuple[float, float, list[float]]:
     # Enumerate ticks by integer count (float accumulation would drift).
     count = int(round((nice_hi - nice_lo) / step))
     ticks = [_r2(nice_lo + float(i) * step) for i in range(count + 1)]
-    return nice_lo, nice_hi, ticks
+    return nice_lo, nice_hi, step, ticks
 
 
 def _format_num(n: float) -> str:
@@ -148,8 +152,194 @@ def _format_num(n: float) -> str:
     return format_finite_double(n)
 
 
-def _tick_label(v: float) -> str:
-    return _format_num(_r2(v))
+# ── The canonical invariant number formatter (Phase 876) ─────────────────────
+#
+# A byte-for-byte port of the F# reference spec. The chart lowering does NOT
+# inherit the locale-aware rendering other surfaces give ``Format``: a chart's
+# ticks are part of a drawing whose bytes must be identical on every host, so
+# the rendering here is locale-INVARIANT by definition — period decimal
+# separator, comma thousands separator, no locale data anywhere.
+#
+#   1. Decimals come from the TICK STEP, never the data (``_dps_of_step``).
+#   2. The base render is round-half-up on the magnitude at that precision,
+#      grouped in threes, zero-padded to exactly d places, a leading ``-`` only
+#      when the rounded magnitude is non-zero.
+#   3. The ``Format`` arms layer meaning over that base; ``Date`` /
+#      ``RelativeTime`` / ``Duration`` are not value-axis formats and fall
+#      through to the base render.
+#   4. Display-unit scaling divides BOTH the value and the step by 10**n.
+
+
+def _dps_of_step(step: float) -> int:
+    """Decimal places implied by a tick step: the smallest ``d <= 6`` for which
+    ``step * 10**d`` is (within relative float tolerance) an integer."""
+    s = abs(step)
+    if not (s > 0.0) or math.isnan(s) or math.isinf(s):
+        return 0
+    scaled = s
+    for d in range(6):
+        if abs(scaled - math.floor(scaled + 0.5)) <= 1e-9 * max(1.0, scaled):
+            return d
+        scaled *= 10.0
+    return 6
+
+
+def _group_thousands(digits: str) -> str:
+    """Group an integral digit string in threes from the right with ``,``."""
+    n = len(digits)
+    if n <= 3:
+        return digits
+    head = n % 3
+    parts: list[str] = []
+    if head > 0:
+        parts.append(digits[:head])
+    for i in range(head, n - 2, 3):
+        parts.append(digits[i : i + 3])
+    return ",".join(parts)
+
+
+def _render_fixed(dps: int, v: float) -> str:
+    """Render ``v`` with EXACTLY ``dps`` decimals — round-half-up on the
+    magnitude, comma thousands separators, period decimal point, invariant."""
+    if math.isnan(v) or math.isinf(v):
+        return "0"
+    d = 0 if dps < 0 else (6 if dps > 6 else dps)
+    scale = 10.0**d
+    units = math.floor(abs(v) * scale + 0.5)
+    int_part = math.floor(units / scale)
+    frac_part = units - int_part * scale
+    int_str = _group_thousands(_format_num(float(int_part)))
+    body = int_str
+    if d > 0:
+        raw = _format_num(float(frac_part))
+        body = int_str + "." + "0" * max(0, d - len(raw)) + raw
+    return "-" + body if v < 0.0 and units > 0 else body
+
+
+# ISO-4217 code -> symbol, the invariant table. An unlisted code renders as the
+# code itself — deterministic, and never a wrong symbol.
+_CURRENCY_SYMBOLS: dict[str, str] = {
+    "EUR": "€",
+    "USD": "$",
+    "GBP": "£",
+    "JPY": "¥",
+    "CNY": "¥",
+    "CHF": "CHF",
+    "AUD": "$",
+    "CAD": "$",
+    "NZD": "$",
+    "HKD": "$",
+    "SGD": "$",
+    "INR": "₹",
+    "KRW": "₩",
+    "BRL": "R$",
+    "RUB": "₽",
+    "ZAR": "R",
+    "SEK": "kr",
+    "NOK": "kr",
+    "DKK": "kr",
+    "PLN": "zł",
+    "CZK": "Kč",
+    "HUF": "Ft",
+    "TRY": "₺",
+    "MXN": "$",
+    "THB": "฿",
+    "ILS": "₪",
+}
+
+
+def _currency_symbol(iso: str) -> str:
+    return _CURRENCY_SYMBOLS.get(iso, iso)
+
+
+def _format_unit_symbol(fmt: Mapping[str, object] | None) -> str:
+    """The unit symbol a ``Format`` contributes to an axis-unit label."""
+    if fmt is not None and fmt.get("$type") == "Currency":
+        return _currency_symbol(str(fmt.get("isoCode", "")))
+    return ""
+
+
+def _format_value_scale(fmt: Mapping[str, object] | None) -> float:
+    """The x100 a ``Format.Percent`` applies to BOTH the value and the step."""
+    return 100.0 if fmt is not None and fmt.get("$type") == "Percent" else 1.0
+
+
+def _format_value(
+    fmt: Mapping[str, object] | None,
+    divisor: float,
+    drop_symbol: bool,
+    step: float,
+    v: float,
+) -> str:
+    """Render one value-axis number. ``divisor`` is the display unit (1.0 when
+    no scaling applies); ``drop_symbol`` suppresses a currency symbol on the
+    ticks because the axis-unit label already states it once."""
+    pct = _format_value_scale(fmt)
+    dv = v * pct / divisor
+    ds = step * pct / divisor
+    kind = None if fmt is None else fmt.get("$type")
+    pinned = fmt.get("decimals") if fmt is not None and kind in ("Number", "Percent") else None
+    dps = int(pinned) if isinstance(pinned, (int, float)) else _dps_of_step(ds)
+    body = _render_fixed(dps, dv)
+    if kind == "Percent":
+        return body + "%"
+    if kind == "Currency" and not drop_symbol:
+        sym = _currency_symbol(str(fmt.get("isoCode", "")))  # type: ignore[union-attr]
+        return "-" + sym + body[1:] if body.startswith("-") else sym + body
+    return body
+
+
+# ── Display units (Phase 876) ────────────────────────────────────────────────
+#
+# The operator's prefix table: thresholds sit at 1 + 3k and the selected
+# threshold ``t`` for a magnitude of exponent ``e`` satisfies
+# ``e - 1 <= t < e + 2``, giving the unit exponent ``n = t - 1``. Each unit
+# covers three exponents — Thousands for e in {3,4,5}, Millions for {6,7,8} —
+# which is why a 12-million axis and a 900-million axis both read in millions.
+
+AXIS_UNIT_MODES = ("Words", "WordsWithSymbol", "SIAbbreviation", "CompactPerTick", "Off")
+"""How a value axis states its display unit once scaling applies."""
+
+DISPLAY_UNIT_MIN_EXPONENT = 6
+"""The smallest unit exponent that triggers scaling at the shipped default — the
+operator's ``unit > 3`` gate, so scaling begins at MILLIONS and a
+thousands-range axis still reads ``12,500`` in full."""
+
+_UNIT_WORDS = {3: "Thousands", 6: "Millions", 9: "Billions", 12: "Trillions", 15: "Quadrillions"}
+_UNIT_SI = {3: "k", 6: "M", 9: "G", 12: "T", 15: "P"}
+_UNIT_COMPACT = {3: "K", 6: "M", 9: "B", 12: "T", 15: "Q"}
+
+
+def _unit_exponent_of(max_abs: float) -> int:
+    if not (max_abs > 0.0) or math.isnan(max_abs) or math.isinf(max_abs):
+        return 0
+    e = int(math.floor(math.log10(max_abs) + 0.5))
+    n = 3 * int(math.ceil((e - 2) / 3.0))
+    return -15 if n < -15 else (15 if n > 15 else n)
+
+
+def _resolve_display_unit(
+    mode: str,
+    min_exponent: int,
+    fmt: Mapping[str, object] | None,
+    max_abs: float,
+) -> tuple[float, str, bool, str]:
+    """(divisor, tick suffix, drop-symbol, axis unit label) for a value axis
+    whose PRINTED magnitudes peak at ``max_abs`` (already through any x100)."""
+    n = _unit_exponent_of(max_abs)
+    threshold = 3 if mode == "CompactPerTick" else min_exponent
+    words = _UNIT_WORDS.get(n, "")
+    if mode == "Off" or n < 3 or n < threshold or words == "":
+        return 1.0, "", False, ""
+    symbol = _format_unit_symbol(fmt)
+    divisor = 10.0**n
+    if mode == "WordsWithSymbol":
+        return divisor, "", symbol != "", (words if symbol == "" else words + " of " + symbol)
+    if mode == "SIAbbreviation":
+        return divisor, "", symbol != "", _UNIT_SI.get(n, "") + symbol
+    if mode == "CompactPerTick":
+        return divisor, _UNIT_COMPACT.get(n, ""), False, ""
+    return divisor, "", False, words
 
 
 # ── DrawStyle builders (untagged style objects; only Some fields emitted) ─────
@@ -279,6 +469,15 @@ class ChartSpec:
     y_fields: tuple[str, ...]
     title: str | None = None
     stacked: bool = field(default=False)
+    # Phase 876 — the VALUE axis's number format, reusing the existing
+    # ``Format`` vocabulary, carried as its canonical wire mapping
+    # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
+    # declaration, not an appearance.
+    value_format: Mapping[str, object] | None = None
+    # Phase 876 — the axis-unit mode + gate. NOT wire fields: the chart style is
+    # a lowering parameter, so a display-unit convention is the host's choice.
+    axis_unit_mode: str = "Words"
+    display_unit_min_exponent: int = DISPLAY_UNIT_MIN_EXPONENT
 
 
 LOWERED_KINDS = frozenset({"Bar", "Line", "Area", "Scatter", "Pie"})
@@ -373,7 +572,23 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # Bars + lines share a zero-anchored domain — deterministic + honest for
     # bars. Stacked domains come from the cumulative partial sums, so the axis
     # covers the stack totals, never a single series' range.
-    nice_lo, nice_hi, ticks = _nice_domain(min(0.0, data_min), max(0.0, data_max))
+    nice_lo, nice_hi, y_step, ticks = _nice_domain(min(0.0, data_min), max(0.0, data_max))
+
+    # ── Value-axis number formatting (Phase 876) ──
+    # The declared meaning (``spec.value_format``) chooses the arms; the style
+    # chooses whether a large magnitude is stated once as a display unit; the
+    # tick STEP chooses the precision. The unit is resolved from the PRINTED
+    # magnitude, so a Percent axis is measured after its x100.
+    value_format = spec.value_format
+    y_divisor, y_tick_suffix, y_drop_symbol, y_unit_label = _resolve_display_unit(
+        spec.axis_unit_mode,
+        spec.display_unit_min_exponent,
+        value_format,
+        max(abs(nice_lo), abs(nice_hi)) * _format_value_scale(value_format),
+    )
+
+    def y_tick_text(v: float) -> str:
+        return _format_value(value_format, y_divisor, y_drop_symbol, y_step, v) + y_tick_suffix
 
     def y_scale(v: float) -> float:
         return _r2(_PLOT_Y1 - (v - nice_lo) / (nice_hi - nice_lo) * _PLOT_H)
@@ -392,11 +607,18 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     x_values = [_numeric_of(r, spec.x_field) for r in rows] if is_scatter else []
     if is_scatter:
         if x_values:
-            x_nice_lo, x_nice_hi, x_ticks = _nice_domain(min(x_values), max(x_values))
+            x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(min(x_values), max(x_values))
         else:
-            x_nice_lo, x_nice_hi, x_ticks = _nice_domain(0.0, 1.0)
+            x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(0.0, 1.0)
     else:
-        x_nice_lo, x_nice_hi, x_ticks = 0.0, 1.0, []
+        x_nice_lo, x_nice_hi, x_step, x_ticks = 0.0, 1.0, 1.0, []
+
+    # The Scatter arm's x IS a value axis, so its ticks take the same canonical
+    # formatter (Phase 876). ``value_format`` is deliberately NOT applied to it:
+    # one declared meaning cannot be true of two different measures, and there
+    # is no second axis-unit slot to state an x display unit in.
+    def x_tick_text(v: float) -> str:
+        return _format_value(None, 1.0, False, x_step, v)
 
     def x_scale(v: float) -> float:
         return _r2(_PLOT_X0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * _PLOT_W)
@@ -460,7 +682,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         _label(
             _r2(_PLOT_X0 - 12.0),
             _r2(y_scale(t) + 4.0),
-            _literal(_tick_label(t)),
+            _literal(y_tick_text(t)),
             _text_style(_LABEL_OPACITY, "End", tick_size, "Normal"),
         )
         for t in ticks
@@ -473,7 +695,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             _label(
                 x_scale(t),
                 _r2(_PLOT_Y1 + 20.0),
-                _literal(_tick_label(t)),
+                _literal(x_tick_text(t)),
                 _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal"),
             )
             for t in x_ticks
@@ -500,7 +722,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         _label(
             _r2(8.0),
             _r2(_PLOT_Y0 - 12.0),
-            _literal("Value"),
+            # The top-left slot states the value axis's DISPLAY UNIT once when
+            # scaling applies, and otherwise keeps the horizontal "Value" hint.
+            _literal("Value" if y_unit_label == "" else y_unit_label),
             _text_style(None, "Start", tick_size, "Normal"),
         ),
     ]
@@ -743,7 +967,10 @@ def _pie_shapes(  # noqa: PLR0914
     for i in range(n):
         ly = 70.0 + 20.0 * float(i)
         pie_legend.append(_rectangle(_r2(_W - 168.0), _r2(ly), 10.0, 10.0, 2.0, _style_fill(_colour_for(i))))
-        pct = _format_num(math.floor(fractions[i] * 100.0 + 0.5))
+        # Routed through the canonical formatter (Phase 876) — one rounding +
+        # rendering rule for every number this module prints. A share is a whole
+        # percent here, so the shipped ``NN%`` shape is unchanged.
+        pct = _format_value(None, 1.0, False, 1.0, fractions[i] * 100.0)
         pie_legend.append(
             _label(
                 _r2(_W - 153.0),

@@ -980,6 +980,14 @@
       "description": "Visualisation/Chart (Phase 663/665 — chart on the editable grid's state key)"
     },
     {
+      "id": "chart-value-format",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-value-format.json",
+      "expectedFile": "nodes/chart-value-format.json",
+      "description": "Visualisation/Chart (Phase 876 — valueFormat: the value axis's declared number format)"
+    },
+    {
       "id": "code-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1300,6 +1308,14 @@
       "description": "Visualisation/Grid"
     },
     {
+      "id": "grid-bound-sort",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-bound-sort.json",
+      "expectedFile": "nodes/grid-bound-sort.json",
+      "description": "Visualisation/Grid (Phase 861 — bound-path sort: per-column sortable narrowing + a declared initial order)"
+    },
+    {
       "id": "grid-editable-state",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1314,6 +1330,22 @@
       "inputFile": "nodes/grid-field-named.json",
       "expectedFile": "nodes/grid-field-named.json",
       "description": "Visualisation/Grid (Phase 425 — field-named columns + RowKeyField, closure-free)"
+    },
+    {
+      "id": "grid-paged",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-paged.json",
+      "expectedFile": "nodes/grid-paged.json",
+      "description": "Visualisation/Grid (Phase 862 — pageStateKey + pageSize: declarative pagination, renderer-owned pager)"
+    },
+    {
+      "id": "grid-paged-sorted",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-paged-sorted.json",
+      "expectedFile": "nodes/grid-paged-sorted.json",
+      "description": "Visualisation/Grid (Phase 862 — paging and sorting composed: two behaviours, two state keys, one rule)"
     },
     {
       "id": "grid-sort-state-key",
@@ -2260,6 +2292,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.text.$type",
       "description": "Discriminator under Style is number"
+    },
+    {
+      "id": "reject-wrongtype-grid-default-sort-column",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-default-sort-column.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.defaultSort.column",
+      "description": "bound-grid defaultSort column -1 — the same non-negative bound the staticRows spelling carries, same record, same message (Phase 861)"
+    },
+    {
+      "id": "reject-wrongtype-grid-page-size-zero",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-page-size-zero.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.pageSize",
+      "description": "grid pageSize 0 — a page of no rows names no page; the schema says the same with minimum:1 (Phase 862)"
     },
     {
       "id": "reject-wrongtype-heading-level",

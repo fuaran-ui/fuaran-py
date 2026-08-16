@@ -41,6 +41,9 @@ def _authored() -> dict[str, t.UiNode]:
         )
     )
     markdown_1 = fuaran.markdown("markdown-1", "Updated hourly.")
+    # WIRE_FORMAT.md §8.1 — NodeIds are unique within a tree, so a sample child
+    # placed twice in one document needs a distinct id at each site.
+    markdown_2 = fuaran.markdown("markdown-2", "Updated hourly.")
     spark_1 = fuaran.sparkline("spark-1", source=binding.static([1.0, 2.0, 3.0, 2.0, 4.0]))
     lvr_1 = fuaran.label_value_row(
         "lvr-1", label="Total", value=42, format=format.number(2), emphasis=True, help="Last 30 days"
@@ -73,7 +76,7 @@ def _authored() -> dict[str, t.UiNode]:
         "glayout-1": fuaran.grid_layout("glayout-1", children=[metric_1], cols=12),
         "split-1": fuaran.split_panel("split-1", children=[metric_1, markdown_1], weight=0.6),
         "card-1": node.bare(fuaran.card("card-1", children=[metric_1], heading="Insights")),
-        "step-1": node.bare(fuaran.stepper("step-1", children=[markdown_1, markdown_1], active_step=1)),
+        "step-1": node.bare(fuaran.stepper("step-1", children=[markdown_1, markdown_2], active_step=1)),
         "summary-1": node.bare(fuaran.summary_list("summary-1", children=[lvr_1], heading="Stats")),
         "discl-1": node.bare(
             fuaran.disclosure(

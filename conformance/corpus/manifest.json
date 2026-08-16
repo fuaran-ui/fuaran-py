@@ -996,6 +996,14 @@
       "description": "Composite (Dashboard ⊃ Card ⊃ Metric + Stack)"
     },
     {
+      "id": "composite-tabs-panels",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/composite-tabs-panels.json",
+      "expectedFile": "nodes/composite-tabs-panels.json",
+      "description": "Layout/Tabs (composite — containers inside a wrapper, grid panel, pre-filled controls)"
+    },
+    {
       "id": "controls-closure",
       "kind": "node-round-trip",
       "decoder": "node",

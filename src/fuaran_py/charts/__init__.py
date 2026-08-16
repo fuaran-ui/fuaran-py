@@ -38,15 +38,20 @@ _W = 640.0
 _H = 400.0
 _MARGIN_TOP = 64.0  # title + legend band
 _MARGIN_RIGHT = 28.0
+# Phase 879 — both of these are now the FLOOR of an autosized margin, not the
+# margin itself: the left one is derived from the widest FORMATTED y tick, the
+# bottom one from the drop a tilted (or vertical) category label needs. The
+# plot rectangle is therefore NOT a module constant — it depends on the text
+# the chart is going to print, so it is computed per lowering.
 _MARGIN_BOTTOM = 56.0  # x-axis category labels + x-axis title
 _MARGIN_LEFT = 64.0  # right-aligned y-axis tick labels
 
-_PLOT_X0 = _MARGIN_LEFT
-_PLOT_X1 = _W - _MARGIN_RIGHT
-_PLOT_Y0 = _MARGIN_TOP
-_PLOT_Y1 = _H - _MARGIN_BOTTOM
-_PLOT_W = _PLOT_X1 - _PLOT_X0
-_PLOT_H = _PLOT_Y1 - _PLOT_Y0
+# Ceilings on the autosized margins, as a share of the canvas.
+_MARGIN_LEFT_MAX_SHARE = 0.3
+_MARGIN_BOTTOM_MAX_SHARE = 0.35
+# Breathing room between an autosized margin's content and the canvas edge —
+# also absorbs the few percent by which a real font differs from the table.
+_AXIS_LABEL_PADDING = 6.0
 
 # A fixed, deterministic categorical palette (series index → colour).
 #
@@ -85,6 +90,22 @@ _LABEL_OPACITY = 0.66
 # self-contained + legible on every host without host CSS.
 _CHART_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 
+# Typography + label geometry (Phase 879 reads these).
+_TICK_LABEL_GAP = 12.0  # y-axis spine → right edge of a tick label
+_TICK_FONT_SIZE = 13.0  # tick / category / axis-title / legend text
+_TEXT_LINE_HEIGHT_FACTOR = 1.2  # a line's height as a multiple of its font size
+_CATEGORY_LABEL_OFFSET_Y = 20.0  # x-axis spine → category-label baseline
+_AXIS_TITLE_BOTTOM_OFFSET = 12.0  # canvas bottom → x-axis title BASELINE
+# The MAGNITUDE of the category-label tilt. Tilt is the DEFAULT state — it is
+# for LEGIBILITY, not a crowding fallback — and escalates to the vertical arm,
+# which packs one label per line height at any category count.
+_LABEL_TILT_DEGREES = 30.0
+_VERTICAL_TILT_DEGREES = 90.0
+# Legend geometry. The pitch is PER ENTRY since Phase 879 (swatch offset + the
+# entry's own measured name width + this gap), never a fixed stride.
+_LEGEND_LABEL_OFFSET_X = 15.0
+_LEGEND_ENTRY_GAP = 24.0
+
 
 # ── Deterministic numeric helpers ────────────────────────────────────────────
 
@@ -92,6 +113,111 @@ _CHART_FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
 def _r2(x: float) -> float:
     """Round-half-up to 2 dp — the single deterministic rule every host reproduces."""
     return math.floor(x * 100.0 + 0.5) / 100.0
+
+
+# ── Deterministic text metrics (Phase 879) ───────────────────────────────────
+#
+# A byte-for-byte MIRROR of the F# reference table
+# (``Fuaran.UI.Charts.TextMetrics``) — mirrored, never re-derived, because the
+# margins, the legend pitch and the label rotations it decides are all pinned
+# by the shared ``chart-lowering/*`` corpus.
+#
+# THE APPROXIMATION IS THE SPEC. No host measures text: this one has no font
+# engine at all, and a browser's measurement depends on which member of the
+# font stack actually resolved — either would make the lowering's output a
+# function of the host, destroying the byte-identical cross-host property the
+# corpus rests on. So the widths come from a FIXED table of per-character
+# advance widths as a fraction of the font size (em), approximating a typical
+# sans-serif. A real font differs by a few percent; ``_AXIS_LABEL_PADDING``
+# absorbs it.
+#
+#   1. Five width classes; an unlisted character (including every non-ASCII
+#      one) takes the DEFAULT, which is what makes the table total.
+#   2. Width = font_size × Σ advance_em(ch), summed LEFT TO RIGHT (float
+#      addition is not associative — the order is part of the spec), rounded
+#      once at the end.
+#   3. Line height = font_size × _TEXT_LINE_HEIGHT_FACTOR.
+#   4. Truncation keeps the longest prefix that still fits with the ellipsis;
+#      when nothing fits the result is a bare "…", never the empty string.
+
+_THIN_EM = 0.28
+_NARROW_EM = 0.33
+_DEFAULT_EM = 0.55
+_WIDE_EM = 0.7
+_EXTRA_WIDE_EM = 0.9
+_ELLIPSIS = "…"
+
+_THIN_CHARS = " !',.:;Iijl|"
+_NARROW_CHARS = '"()*-/\\[]{}frt'
+_EXTRA_WIDE_CHARS = "%@MWm"
+
+
+def _advance_em(ch: str) -> float:
+    """One character's advance width as a fraction of the font size.
+
+    Total: an unlisted character takes ``_DEFAULT_EM``, so no host enumerates
+    Unicode."""
+    if ch in _THIN_CHARS:
+        return _THIN_EM
+    if ch in _NARROW_CHARS:
+        return _NARROW_EM
+    if ch in _EXTRA_WIDE_CHARS:
+        return _EXTRA_WIDE_EM
+    if ch in ("J", "L"):
+        return _DEFAULT_EM
+    if "A" <= ch <= "Z":
+        return _WIDE_EM
+    if ch == "w":
+        return _WIDE_EM
+    return _DEFAULT_EM
+
+
+def _advance_em_of(text: str) -> float:
+    """A string's advance width in em — summed LEFT TO RIGHT (rule 2)."""
+    acc = 0.0
+    for ch in text:
+        acc += _advance_em(ch)
+    return acc
+
+
+def _text_width(font_size: float, text: str) -> float:
+    """The estimated rendered width of ``text`` at ``font_size``, rounded once."""
+    return _r2(font_size * _advance_em_of(text))
+
+
+def _text_line_height(font_size: float, line_height_factor: float) -> float:
+    """The estimated line height at ``font_size`` (rule 3)."""
+    return _r2(font_size * line_height_factor)
+
+
+def text_fits_box(font_size: float, line_height_factor: float, max_width: float, max_height: float, text: str) -> bool:
+    """Does ``text`` fit a box ``max_width`` × ``max_height`` at ``font_size``?
+
+    The single predicate a data-label gate answers inside/outside/suppress
+    with, so a label can never disagree with the margin that made room for
+    it."""
+    return _text_width(font_size, text) <= max_width and _text_line_height(font_size, line_height_factor) <= max_height
+
+
+def _truncate_to_width(font_size: float, max_width: float, text: str) -> str:
+    """Deterministic ellipsis truncation to ``max_width`` (rule 4).
+
+    A string that already fits comes back unchanged, so a host that never hits
+    a bound never sees a "…"."""
+    if _text_width(font_size, text) <= max_width:
+        return text
+    budget = max_width - _text_width(font_size, _ELLIPSIS)
+    if budget < 0.0:
+        return _ELLIPSIS
+    acc = 0.0
+    take = 0
+    for i, ch in enumerate(text):
+        nxt = acc + _advance_em(ch)
+        if _r2(font_size * nxt) > budget:
+            break
+        acc = nxt
+        take = i + 1
+    return text[:take] + _ELLIPSIS
 
 
 def _nice_num(x: float, round_it: bool) -> float:
@@ -391,8 +517,12 @@ def _style_stroke_ink(opacity: float, width: float) -> Obj:
     return Obj(None, {"stroke": _static(_INK), "strokeWidth": _static(width), "opacity": _static(opacity)})
 
 
-def _text_style(opacity: float | None, anchor: str, size: float, emphasis: str) -> Obj:
-    """Surface-relative text-label style: ``currentColor`` + optional per-role opacity."""
+def _text_style(opacity: float | None, anchor: str, size: float, emphasis: str, rotation: float | None = None) -> Obj:
+    """Surface-relative text-label style: ``currentColor`` + optional per-role opacity.
+
+    ``rotation`` (Phase 879) is the clockwise rotation in degrees about the
+    label's own anchor point; omitted when ``None``, so an unrotated drawing is
+    byte-unchanged."""
     fields: dict[str, Value] = {
         "fill": _static(_INK),
         "textAnchor": anchor,
@@ -402,6 +532,8 @@ def _text_style(opacity: float | None, anchor: str, size: float, emphasis: str) 
     }
     if opacity is not None:
         fields["opacity"] = _static(opacity)
+    if rotation is not None:
+        fields["rotation"] = rotation
     return Obj(None, fields)
 
 
@@ -590,14 +722,6 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     def y_tick_text(v: float) -> str:
         return _format_value(value_format, y_divisor, y_drop_symbol, y_step, v) + y_tick_suffix
 
-    def y_scale(v: float) -> float:
-        return _r2(_PLOT_Y1 - (v - nice_lo) / (nice_hi - nice_lo) * _PLOT_H)
-
-    band_w = _PLOT_W / float(n) if n > 0 else _PLOT_W
-
-    def centre_x(i: int) -> float:
-        return _r2(_PLOT_X0 + band_w * (float(i) + 0.5))
-
     # ── Linear x-scale (Phase 636 — the Scatter arm's numeric x axis) ──
     # Scatter reads the x-field NUMERICALLY and plots on a linear x-domain (the
     # first non-band x-scale arm). The domain is NOT zero-anchored — a scatter's
@@ -620,16 +744,107 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     def x_tick_text(v: float) -> str:
         return _format_value(None, 1.0, False, x_step, v)
 
-    def x_scale(v: float) -> float:
-        return _r2(_PLOT_X0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * _PLOT_W)
-
-    tick_size = 13.0
+    tick_size = _TICK_FONT_SIZE
     title_size = 18.0
+
+    # ── Text-metric layout (Phase 879) ───────────────────────────────────────
+    #
+    # ORDER IS LOAD-BEARING. The plot rectangle used to be four module
+    # constants; it is now DERIVED from the text the chart prints — the widest
+    # formatted y tick decides the left margin, and the category labels' tilt
+    # decides the bottom one. So: the left margin, the band pitch that follows
+    # from it, the tilt, and the bottom margin the tilt needs, in that order.
+
+    line_height = _text_line_height(tick_size, _TEXT_LINE_HEIGHT_FACTOR)
+
+    def widest_of(texts: Sequence[str]) -> float:
+        acc = 0.0
+        for t in texts:
+            acc = max(acc, _text_width(tick_size, t))
+        return acc
+
+    # ── Left margin ──
+    # The truncation budget is derived from the CEILING — a constant — so the
+    # truncation that feeds the margin never depends on the margin it decides.
+    left_ceiling = _MARGIN_LEFT_MAX_SHARE * _W
+    tick_text_budget = max(0.0, left_ceiling - _TICK_LABEL_GAP - _AXIS_LABEL_PADDING)
+
+    def y_tick_label_text(v: float) -> str:
+        return _truncate_to_width(tick_size, tick_text_budget, y_tick_text(v))
+
+    required_left = _TICK_LABEL_GAP + widest_of([y_tick_label_text(t) for t in ticks]) + _AXIS_LABEL_PADDING
+    margin_left = _r2(max(_MARGIN_LEFT, min(left_ceiling, required_left)))
+
+    plot_x0 = margin_left
+    plot_x1 = _W - _MARGIN_RIGHT
+    plot_w = plot_x1 - plot_x0
+
+    band_w = plot_w / float(n) if n > 0 else plot_w
+
+    def centre_x(i: int) -> float:
+        return _r2(plot_x0 + band_w * (float(i) + 0.5))
+
+    # ── Category-label tilt + its vertical escalation ──
+    # Only the BAND arms label categories: Scatter labels numeric x ticks (short
+    # by construction, left horizontal) and Pie has no x axis. Both must
+    # therefore contribute NO drop, or their bottom margin — and with it the
+    # pie's centre — would move for a decision they never take.
+    draws_category_labels = not is_scatter and spec.kind != "Pie"
+
+    # A rotated label's footprint ALONG the axis is w·cos θ + h·sin θ. Escalate
+    # when the widest label's footprint at the tilt no longer fits the band
+    # pitch. At 90° the width term vanishes, so the vertical arm packs one label
+    # per line height at any count — which is why it is terminal.
+    def along_axis_footprint(deg: float, w: float) -> float:
+        return w * math.cos(math.radians(deg)) + line_height * math.sin(math.radians(deg))
+
+    if not draws_category_labels or n == 0 or _LABEL_TILT_DEGREES <= 0.0:
+        # A zero tilt is a host opting out; honour it literally rather than
+        # escalating it to vertical.
+        tilt_degrees = 0.0
+    elif along_axis_footprint(_LABEL_TILT_DEGREES, widest_of(categories)) > band_w:
+        tilt_degrees = _VERTICAL_TILT_DEGREES
+    else:
+        tilt_degrees = _LABEL_TILT_DEGREES
+
+    # ── Bottom margin ──
+    # Below the plot, top to bottom: the label offset, the tilted label's drop
+    # (w·sin θ), the padding, the x-axis title's own LINE (its offset measures
+    # to its BASELINE, so the glyphs above it need reserving separately), and
+    # that offset. Same ceiling-then-truncate posture as the left margin.
+    sin_tilt = math.sin(math.radians(tilt_degrees))
+    bottom_ceiling = _MARGIN_BOTTOM_MAX_SHARE * _H
+    drop_ceiling = max(
+        0.0,
+        bottom_ceiling - _CATEGORY_LABEL_OFFSET_Y - _AXIS_LABEL_PADDING - line_height - _AXIS_TITLE_BOTTOM_OFFSET,
+    )
+    category_text_budget = drop_ceiling / sin_tilt if sin_tilt > 0.0 else math.inf
+    category_texts = (
+        [_truncate_to_width(tick_size, category_text_budget, c) for c in categories] if draws_category_labels else []
+    )
+    required_bottom = (
+        _CATEGORY_LABEL_OFFSET_Y
+        + sin_tilt * widest_of(category_texts)
+        + _AXIS_LABEL_PADDING
+        + line_height
+        + _AXIS_TITLE_BOTTOM_OFFSET
+    )
+    margin_bottom = _r2(max(_MARGIN_BOTTOM, min(bottom_ceiling, required_bottom)))
+
+    plot_y0 = _MARGIN_TOP
+    plot_y1 = _H - margin_bottom
+    plot_h = plot_y1 - plot_y0
+
+    def y_scale(v: float) -> float:
+        return _r2(plot_y1 - (v - nice_lo) / (nice_hi - nice_lo) * plot_h)
+
+    def x_scale(v: float) -> float:
+        return _r2(plot_x0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * plot_w)
 
     # ── Cartesian chrome (painter's order pieces) ──
     grid_style = _style_stroke_ink(_GRID_OPACITY, 1.0)
     axis_stroke_style = _style_stroke_ink(_AXIS_OPACITY, 1.0)
-    gridlines: list[Value] = [_line(_r2(_PLOT_X0), y_scale(t), _r2(_PLOT_X1), y_scale(t), grid_style) for t in ticks]
+    gridlines: list[Value] = [_line(_r2(plot_x0), y_scale(t), _r2(plot_x1), y_scale(t), grid_style) for t in ticks]
 
     # Vertical gridlines — the Scatter arm only. A linear x-scale has readable
     # x positions, so a reader traces a point back to an x value the same way
@@ -637,7 +852,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # positions to trace (a category is a label, not a magnitude), so a
     # vertical rule there would be decoration.
     x_gridlines: list[Value] = (
-        [_line(x_scale(t), _r2(_PLOT_Y0), x_scale(t), _r2(_PLOT_Y1), grid_style) for t in x_ticks] if is_scatter else []
+        [_line(x_scale(t), _r2(plot_y0), x_scale(t), _r2(plot_y1), grid_style) for t in x_ticks] if is_scatter else []
     )
 
     # Zero baseline — only when the domain CROSSES zero, where the sign of a
@@ -647,14 +862,14 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # already IS the baseline and a second rule at the same strength would be
     # noise.
     zero_line: list[Value] = (
-        [_line(_r2(_PLOT_X0), y_scale(0.0), _r2(_PLOT_X1), y_scale(0.0), axis_stroke_style)]
+        [_line(_r2(plot_x0), y_scale(0.0), _r2(plot_x1), y_scale(0.0), axis_stroke_style)]
         if nice_lo < 0.0 < nice_hi
         else []
     )
 
     axes: list[Value] = [
-        _line(_r2(_PLOT_X0), _r2(_PLOT_Y0), _r2(_PLOT_X0), _r2(_PLOT_Y1), axis_stroke_style),
-        _line(_r2(_PLOT_X0), _r2(_PLOT_Y1), _r2(_PLOT_X1), _r2(_PLOT_Y1), axis_stroke_style),
+        _line(_r2(plot_x0), _r2(plot_y0), _r2(plot_x0), _r2(plot_y1), axis_stroke_style),
+        _line(_r2(plot_x0), _r2(plot_y1), _r2(plot_x1), _r2(plot_y1), axis_stroke_style),
     ]
 
     # Outside tick marks — outside the plot on both axes, so the plot area
@@ -665,24 +880,26 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         tick_marks: list[Value] = []
     else:
         y_marks: list[Value] = [
-            _line(_r2(_PLOT_X0 - _TICK_MARK_LENGTH), y_scale(t), _r2(_PLOT_X0), y_scale(t), axis_stroke_style)
+            _line(_r2(plot_x0 - _TICK_MARK_LENGTH), y_scale(t), _r2(plot_x0), y_scale(t), axis_stroke_style)
             for t in ticks
         ]
 
         def _x_mark(x: float) -> Value:
-            return _line(x, _r2(_PLOT_Y1), x, _r2(_PLOT_Y1 + _TICK_MARK_LENGTH), axis_stroke_style)
+            return _line(x, _r2(plot_y1), x, _r2(plot_y1 + _TICK_MARK_LENGTH), axis_stroke_style)
 
         x_marks: list[Value] = (
             [_x_mark(x_scale(t)) for t in x_ticks] if is_scatter else [_x_mark(centre_x(i)) for i in range(n)]
         )
         tick_marks = y_marks + x_marks
 
-    # y-axis tick labels — right-anchored (End) in the left margin.
+    # y-axis tick labels — right-anchored (End) in the left margin. The text is
+    # the margin-bounded one (Phase 879): whatever the margin was sized for is
+    # exactly what gets drawn.
     y_tick_labels: list[Value] = [
         _label(
-            _r2(_PLOT_X0 - 12.0),
+            _r2(plot_x0 - _TICK_LABEL_GAP),
             _r2(y_scale(t) + 4.0),
-            _literal(y_tick_text(t)),
+            _literal(y_tick_label_text(t)),
             _text_style(_LABEL_OPACITY, "End", tick_size, "Normal"),
         )
         for t in ticks
@@ -690,11 +907,19 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
     # x-axis labels — band arms label each category under its band centre;
     # Scatter labels its numeric x-ticks along the linear axis (Phase 636).
+    #
+    # A tilted category label is End-anchored at the band centre and rotated
+    # NEGATIVELY (counter-clockwise, against ``rotation``'s clockwise
+    # convention): the anchor is the pivot, so the text ENDS under the band's
+    # tick and runs back down-and-left, reading up-to-the-right into it. The
+    # opposite sign would swing the same text up into the plot area. At 90° this
+    # degenerates to reading bottom-up. Scatter's numeric ticks stay horizontal
+    # + Middle — short by construction, and centred on their value.
     if is_scatter:
         x_labels: list[Value] = [
             _label(
                 x_scale(t),
-                _r2(_PLOT_Y1 + 20.0),
+                _r2(plot_y1 + _CATEGORY_LABEL_OFFSET_Y),
                 _literal(x_tick_text(t)),
                 _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal"),
             )
@@ -704,24 +929,26 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         x_labels = [
             _label(
                 centre_x(i),
-                _r2(_PLOT_Y1 + 20.0),
+                _r2(plot_y1 + _CATEGORY_LABEL_OFFSET_Y),
                 _literal(c),
-                _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal"),
+                _text_style(_LABEL_OPACITY, "End", tick_size, "Normal", _r2(-tilt_degrees))
+                if tilt_degrees > 0.0
+                else _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal"),
             )
-            for i, c in enumerate(categories)
+            for i, c in enumerate(category_texts)
         ]
 
     # ── Axis titles (a name on both axes) ──
     axis_titles: list[Value] = [
         _label(
-            _r2((_PLOT_X0 + _PLOT_X1) / 2.0),
-            _r2(_H - 12.0),
+            _r2((plot_x0 + plot_x1) / 2.0),
+            _r2(_H - _AXIS_TITLE_BOTTOM_OFFSET),
             _literal(_capitalise(spec.x_field)),
             _text_style(None, "Middle", tick_size, "Normal"),
         ),
         _label(
             _r2(8.0),
-            _r2(_PLOT_Y0 - 12.0),
+            _r2(plot_y0 - 12.0),
             # The top-left slot states the value axis's DISPLAY UNIT once when
             # scaling applies, and otherwise keeps the horizontal "Value" hint.
             _literal("Value" if y_unit_label == "" else y_unit_label),
@@ -739,7 +966,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         group_w = band_w * 0.7
         bw = _r2(min(group_w * 0.9, _BAR_MAX_THICKNESS))
         for i in range(n):
-            bx = _r2(_PLOT_X0 + band_w * float(i) + (band_w - bw) / 2.0)
+            bx = _r2(plot_x0 + band_w * float(i) + (band_w - bw) / 2.0)
             cums = cums_for(i)
             for j in range(m):
                 y0 = y_scale(cums[j])
@@ -766,7 +993,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 # Centre the (possibly capped) bar in its own sub-slot, so a
                 # cap takes air off BOTH sides and the group stays symmetric
                 # about the band centre.
-                slot_x = _PLOT_X0 + band_w * float(i) + (band_w - group_w) / 2.0 + float(j) * sub_w
+                slot_x = plot_x0 + band_w * float(i) + (band_w - group_w) / 2.0 + float(j) * sub_w
                 bx = _r2(slot_x + (sub_w - bw) / 2.0)
                 vy = y_scale(v)
                 top = min(vy, base_y)
@@ -825,26 +1052,39 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 )
 
     # ── Legend (only when >1 series) — a swatch + series name per series ──
+    #
+    # The pitch is PER ENTRY since Phase 879: an entry occupies its
+    # swatch-to-label offset, its own measured name width, and the inter-entry
+    # gap, so entries lay out cumulatively rather than on a fixed stride. A long
+    # series name now pushes its neighbour along instead of being overwritten by
+    # it. Legend POSITION and OVERFLOW are deliberately unchanged — they are one
+    # problem and land together in a later phase.
     legend: list[Value] = []
     if m > 1:
+        lx_acc = plot_x0
         for j in range(m):
             colour = _colour_for(j)
-            lx = _r2(_PLOT_X0 + float(j) * 100.0)
-            legend.append(_rectangle(lx, 34.0, 10.0, 10.0, 2.0, _style_fill(colour)))
+            name = spec.y_fields[j]
+            # The label offsets from the ROUNDED swatch x, exactly as the
+            # reference does — rounding the sum instead can differ in the last
+            # 2 dp.
+            sx = _r2(lx_acc)
+            legend.append(_rectangle(sx, 34.0, 10.0, 10.0, 2.0, _style_fill(colour)))
             legend.append(
                 _label(
-                    _r2(lx + 15.0),
+                    _r2(sx + _LEGEND_LABEL_OFFSET_X),
                     43.0,
-                    _literal(spec.y_fields[j]),
+                    _literal(name),
                     _text_style(_LABEL_OPACITY, "Start", tick_size, "Normal"),
                 )
             )
+            lx_acc += _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, name) + _LEGEND_ENTRY_GAP
 
     # ── Visible title (a Label — bigger + emphasised) ──
     title_shapes: list[Value] = []
     if spec.title is not None:
         title_shapes.append(
-            _label(_r2(_PLOT_X0), 22.0, _literal(spec.title), _text_style(None, "Start", title_size, "Loud"))
+            _label(_r2(plot_x0), 22.0, _literal(spec.title), _text_style(None, "Start", title_size, "Loud"))
         )
 
     # Pie is polar — no axes/gridlines/tick chrome; every other arm assembles
@@ -852,7 +1092,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # the zero baseline, axes, tick marks, y-tick + x labels, axis titles,
     # series, legend, chart title.
     if spec.kind == "Pie":
-        shapes: list[Value] = _pie_shapes(spec, series, categories, n, m) + title_shapes
+        shapes: list[Value] = (
+            _pie_shapes(spec, series, categories, n, m, plot_x0, plot_x1, plot_y0, plot_y1) + title_shapes
+        )
     else:
         shapes = (
             gridlines
@@ -879,7 +1121,15 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
 
 def _pie_shapes(  # noqa: PLR0914
-    spec: ChartSpec, series: list[list[float]], categories: list[str], n: int, m: int
+    spec: ChartSpec,
+    series: list[list[float]],
+    categories: list[str],
+    n: int,
+    m: int,
+    plot_x0: float,
+    plot_x1: float,
+    plot_y0: float,
+    plot_y1: float,
 ) -> list[Value]:
     """The Pie arm (Phase 638) — polar, cubic-approximated wedges.
 
@@ -891,15 +1141,15 @@ def _pie_shapes(  # noqa: PLR0914
     approximation (the closed `CurveCommand` vocabulary has no arc case,
     deliberately). A lone 100% category degenerates to a `Circle`. Category
     share reads in the legend ("name (NN%)")."""
-    tick_size = 13.0
+    tick_size = _TICK_FONT_SIZE
     values = series[0] if m == 1 else []
     refused = m != 1 or any(v < 0.0 for v in values)
     total = sum(values)
     if refused or total <= 0.0:
         return []
 
-    cx = _r2((_PLOT_X0 + _PLOT_X1) / 2.0)
-    cy = _r2((_PLOT_Y0 + _PLOT_Y1) / 2.0)
+    cx = _r2((plot_x0 + plot_x1) / 2.0)
+    cy = _r2((plot_y0 + plot_y1) / 2.0)
     radius = 130.0
 
     def pt(a: float) -> Obj:

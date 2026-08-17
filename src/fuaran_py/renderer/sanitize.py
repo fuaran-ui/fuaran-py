@@ -50,8 +50,40 @@ def _ascii_lower(s: str) -> str:
 _CONTROL_OR_ANGLE = re.compile(r"[\x00-\x08\x0a-\x1f<>]")
 
 
+_SAFE_ATTRIBUTE_NAME_CHARS = frozenset(string.ascii_letters + string.digits + "-")
+
+
+def is_safe_attribute_name(name: str) -> bool:
+    """Positive character allowlist for an HTML attribute NAME: ``[A-Za-z0-9-]``.
+
+    Everything else — ``=``, quotes, backtick, ``<``, ``>``, ``/``, space, tab,
+    newline, C0 controls, any non-ASCII byte — is rejected.
+
+    This is a **rejection** gate, not an escape, because HTML has no escape for an
+    illegal character in an attribute name: a space inside a name simply starts a
+    NEW attribute and an ``=`` starts its value. So
+    ``data-x=1 onmouseover=alert(1) z`` is not a mangled attribute name — it is
+    three attributes, one of them a live event handler. Renderers escape attribute
+    *values*, never *names*, so dropping the entry is the only sound response.
+
+    Exported so an emission site can re-check it as defence in depth rather than
+    trusting upstream validation alone.
+    """
+    if not name:
+        return False
+    return all(ch in _SAFE_ATTRIBUTE_NAME_CHARS for ch in name)
+
+
 def is_allowed_extra_attribute_key(key: str) -> bool:
-    """The ``data-*`` / ``aria-*`` allowlist, with an explicit ``on*`` / ``style`` reject."""
+    """The ``data-*`` / ``aria-*`` allowlist, with an explicit ``on*`` / ``style`` reject.
+
+    Plus :func:`is_safe_attribute_name` over the whole trimmed key — without it a
+    key like ``data-x=1 onmouseover=alert(1) z`` satisfies the ``data-`` prefix and
+    smuggles a live event handler into rendered HTML.
+
+    The predicate judges the **trimmed** form, so a caller using it directly must
+    trim before emission too.
+    """
     if key is None:
         return False
     trimmed = key.strip()
@@ -62,6 +94,10 @@ def is_allowed_extra_attribute_key(key: str) -> bool:
         return False
     if trimmed.lower() == "style":
         # CSS-injection vector (`expression()`, `url(javascript:…)`).
+        return False
+    if not is_safe_attribute_name(trimmed):
+        # Attribute-NAME injection: any character that could terminate the name
+        # and open a second attribute at the emission site.
         return False
     return trimmed.startswith("data-") or trimmed.startswith("aria-")
 
@@ -74,8 +110,14 @@ def is_safe_extra_attribute_value(value: str) -> bool:
 
 
 def sanitize_extra_attributes(attrs: dict[str, str]) -> dict[str, str]:
-    """Filter a candidate attribute map down to entries that pass both predicates."""
-    return {k: v for k, v in attrs.items() if is_allowed_extra_attribute_key(k) and is_safe_extra_attribute_value(v)}
+    """Filter a candidate attribute map down to entries that pass both predicates.
+
+    The re-key is load-bearing: the predicate judges ``key.strip()``, so emitting
+    the untrimmed key would emit something the gate never inspected.
+    """
+    return {
+        k.strip(): v for k, v in attrs.items() if is_allowed_extra_attribute_key(k) and is_safe_extra_attribute_value(v)
+    }
 
 
 # ── URL-scheme sanitization ─────────────────────────────────────────────────

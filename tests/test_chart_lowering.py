@@ -256,3 +256,52 @@ def test_ssr_bridge_passes_legend_position() -> None:
     html = render_wire(none_wire)
     assert ">alpha_series<" not in html
     assert ">beta_series<" not in html
+
+
+def test_ssr_bridge_passes_data_labels() -> None:
+    # Phase 881. The discriminator is a POSITIVE CONTROL first: the same wire
+    # with the declaration stripped must NOT carry the value as a text node, so
+    # the assertion cannot pass vacuously on a substring that was there anyway.
+    # `120` and `150` are the bar values, and they appear as text ONLY as data
+    # labels — the axis ticks of this chart are 0/50/100/150, so `>150<` alone
+    # would be ambiguous and `>120<` is the one that is not.
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    def render_wire(wire: str) -> str:
+        result = decode_node(wire)
+        assert result.ok, getattr(result, "error", result)
+        html = render_html(result.value)
+        assert "<svg" in html and "ssr-placeholder" not in html
+        return html
+
+    ends_wire = json.dumps(
+        {
+            "id": "chart-ends",
+            "kind": {
+                "$type": "Chart",
+                "kind": "Bar",
+                "xField": "quarter",
+                "yFields": ["revenue"],
+                "stacked": False,
+                "dataLabels": "Ends",
+                "source": {
+                    "$type": "Static",
+                    "value": [
+                        {"quarter": "Q1", "revenue": 120},
+                        {"quarter": "Q2", "revenue": 150},
+                    ],
+                },
+            },
+        }
+    )
+    stripped = json.loads(ends_wire)
+    del stripped["kind"]["dataLabels"]
+    off_html = render_wire(json.dumps(stripped))
+    assert ">120<" not in off_html  # negative control: Off writes no values
+
+    html = render_wire(ends_wire)
+    assert ">120<" in html  # the cap label the bridge now carries
+    # …and it is set at the data-label size, which no chrome label uses.
+    assert 'font-size="12px"' in html
+    assert 'font-size="12px"' not in off_html

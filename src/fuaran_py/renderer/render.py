@@ -1061,6 +1061,12 @@ class Renderer:
         legend_position_src = fields.get("legendPosition")
         legend_position = legend_position_src if isinstance(legend_position_src, str) else None
 
+        # Phase 881 — whether the values are written onto the picture (bare enum
+        # name; absent means "Off", which is also the default, so a headless
+        # render of a pre-881 tree is byte-unchanged).
+        data_labels_src = fields.get("dataLabels")
+        data_labels = data_labels_src if isinstance(data_labels_src, str) else None
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -1073,6 +1079,7 @@ class Renderer:
             y_title=literal_text(fields.get("yTitle")),
             subtitle=literal_text(fields.get("subtitle")),
             legend_position=legend_position,
+            data_labels=data_labels,
         )
         drawing_node = lower_node(node.id, spec, rows)
         assert isinstance(drawing_node.kind, Obj)

@@ -96,9 +96,13 @@ _TICK_FONT_SIZE = 13.0  # tick / category / axis-title / legend text
 _TEXT_LINE_HEIGHT_FACTOR = 1.2  # a line's height as a multiple of its font size
 _CATEGORY_LABEL_OFFSET_Y = 20.0  # x-axis spine → category-label baseline
 _AXIS_TITLE_BOTTOM_OFFSET = 12.0  # canvas bottom → x-axis title BASELINE
-# The MAGNITUDE of the category-label tilt. Tilt is the DEFAULT state — it is
-# for LEGIBILITY, not a crowding fallback — and escalates to the vertical arm,
-# which packs one label per line height at any category count.
+# The MAGNITUDE of the MIDDLE RUNG of the category-label angle ladder. The ladder
+# is fit-driven and UNIFORM per axis: flat while every label fits its band, all at
+# this angle when any does not, all vertical when this angle no longer packs
+# either. (Phase 879 read the tilt as the resting state; Phase 903's correction
+# makes it the middle rung.) A zero angle opts out of rotation entirely — flat at
+# every label length, never escalated instead. The vertical rung takes one line
+# height per label whatever its length, so it packs at any category count.
 _LABEL_TILT_DEGREES = 30.0
 _VERTICAL_TILT_DEGREES = 90.0
 # Phase 878 — the subtitle + the rotated y-axis title.
@@ -1052,28 +1056,55 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     def centre_x(i: int) -> float:
         return _r2(plot_x0 + band_w * (float(i) + 0.5))
 
-    # ── Category-label tilt + its vertical escalation ──
+    def boundary_x(i: int) -> float:
+        """The ``i``th BAND BOUNDARY.
+
+        ``n`` bands have ``n+1`` of them, boundary ``0`` on the y-axis spine and
+        boundary ``n`` on the plot's right edge. Phase 903's category tick marks
+        land here, where a label lands at ``centre_x``.
+        """
+        return _r2(plot_x0 + band_w * float(i))
+
+    # ── The category-label ANGLE LADDER (Phase 903, correcting Phase 879) ──
     # Only the BAND arms label categories: Scatter labels numeric x ticks (short
     # by construction, left horizontal) and Pie has no x axis. Both must
     # therefore contribute NO drop, or their bottom margin — and with it the
     # pie's centre — would move for a decision they never take.
     draws_category_labels = not is_scatter and spec.kind != "Pie"
 
-    # A rotated label's footprint ALONG the axis is w·cos θ + h·sin θ. Escalate
-    # when the widest label's footprint at the tilt no longer fits the band
-    # pitch. At 90° the width term vanishes, so the vertical arm packs one label
-    # per line height at any count — which is why it is terminal.
+    # A rotated label's footprint ALONG the axis is w·cos θ + h·sin θ. At 0° that
+    # is the bare width (cos 0 = 1, sin 0 = 0, both exact on every IEEE-754 host,
+    # so the flat rung needs no special case); at 90° the width term vanishes, so
+    # the vertical rung takes one line height per label at any count — which is
+    # why it is terminal.
     def along_axis_footprint(deg: float, w: float) -> float:
         return w * math.cos(math.radians(deg)) + line_height * math.sin(math.radians(deg))
 
+    # THREE RUNGS, ONE PREDICATE, applied to the WIDEST label and therefore
+    # UNIFORMLY to the axis: flat while every label fits its band, 30° when it
+    # does not, vertical when 30° no longer packs either. Deciding on the widest
+    # label rather than per-label is what keeps an axis from mixing angles.
+    #
+    # Decided on the labels AS AUTHORED (``categories``, not ``category_texts``):
+    # the truncation budget below is a function of the angle, so reading truncated
+    # text here would be circular as well as wrong.
+    widest_category = widest_of(categories)
+
+    def packs_at(deg: float) -> bool:
+        return along_axis_footprint(deg, widest_category) <= band_w
+
     if not draws_category_labels or n == 0 or _LABEL_TILT_DEGREES <= 0.0:
-        # A zero tilt is a host opting out; honour it literally rather than
-        # escalating it to vertical.
+        # A zero angle is FLAT-ALWAYS, not "the ladder with a flat rung": a host
+        # that zeroed it named the one rotation the ladder may use, so escalating
+        # past it to vertical would override an explicit choice with a computed
+        # one.
         tilt_degrees = 0.0
-    elif along_axis_footprint(_LABEL_TILT_DEGREES, widest_of(categories)) > band_w:
-        tilt_degrees = _VERTICAL_TILT_DEGREES
-    else:
+    elif packs_at(0.0):
+        tilt_degrees = 0.0
+    elif packs_at(_LABEL_TILT_DEGREES):
         tilt_degrees = _LABEL_TILT_DEGREES
+    else:
+        tilt_degrees = _VERTICAL_TILT_DEGREES
 
     # ── Bottom margin ──
     # Below the plot, top to bottom: the label offset, the tilted label's drop
@@ -1148,6 +1179,14 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # stays ink-free and the marks tie each label to its position. y marks
     # come first, then x marks. Suppressed entirely when `_TICK_MARK_LENGTH`
     # is not positive.
+    #
+    # BAND vs CONTINUOUS (Phase 903). Where the axis is CONTINUOUS a tick marks a
+    # VALUE and sits at it: the y axis, and Scatter's numeric x. Where it is a
+    # BAND axis a tick DELIMITS a group, so the n+1 marks land on the band
+    # BOUNDARIES and the label stays centred between two of them — the
+    # category-axis convention, and the honest one: a category has an extent, not
+    # a position, so a mark under its centre claims a coordinate the axis does
+    # not have.
     if _TICK_MARK_LENGTH <= 0.0:
         tick_marks: list[Value] = []
     else:
@@ -1159,9 +1198,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         def _x_mark(x: float) -> Value:
             return _line(x, _r2(plot_y1), x, _r2(plot_y1 + _TICK_MARK_LENGTH), axis_stroke_style)
 
-        x_marks: list[Value] = (
-            [_x_mark(x_scale(t)) for t in x_ticks] if is_scatter else [_x_mark(centre_x(i)) for i in range(n)]
-        )
+        if is_scatter:
+            x_marks: list[Value] = [_x_mark(x_scale(t)) for t in x_ticks]
+        elif n == 0:
+            x_marks = []
+        else:
+            x_marks = [_x_mark(boundary_x(i)) for i in range(n + 1)]
         tick_marks = y_marks + x_marks
 
     # y-axis tick labels — right-anchored (End) in the left margin. The text is
@@ -1180,10 +1222,16 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # x-axis labels — band arms label each category under its band centre;
     # Scatter labels its numeric x-ticks along the linear axis (Phase 636).
     #
-    # A tilted category label is End-anchored at the band centre and rotated
+    # Every category label sits at its band CENTRE — including since Phase 903,
+    # when the tick marks moved to the boundaries: the label names the band, the
+    # marks delimit it.
+    #
+    # The ANCHOR follows the ladder's rung. At the FLAT rung a label is
+    # Middle-anchored on the band centre (the pre-879 convention, restored). At
+    # either ROTATED rung it is End-anchored at the same point and rotated
     # NEGATIVELY (counter-clockwise, against ``rotation``'s clockwise
-    # convention): the anchor is the pivot, so the text ENDS under the band's
-    # tick and runs back down-and-left, reading up-to-the-right into it. The
+    # convention): the anchor is the pivot, so the text ENDS under the band
+    # centre and runs back down-and-left, reading up-to-the-right into it. The
     # opposite sign would swing the same text up into the plot area. At 90° this
     # degenerates to reading bottom-up. Scatter's numeric ticks stay horizontal
     # + Middle — short by construction, and centred on their value.

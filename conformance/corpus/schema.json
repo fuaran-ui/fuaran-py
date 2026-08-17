@@ -158,6 +158,13 @@
         "Ends"
       ]
     },
+    "ChartXScale": {
+      "type": "string",
+      "enum": [
+        "Category",
+        "Temporal"
+      ]
+    },
     "LiveRegionKind": {
       "type": "string",
       "enum": [
@@ -3278,6 +3285,9 @@
         },
         "dataLabels": {
           "$ref": "#/$defs/ChartDataLabels"
+        },
+        "xScale": {
+          "$ref": "#/$defs/ChartXScale"
         },
         "onPointClick": {
           "const": "<closure>"

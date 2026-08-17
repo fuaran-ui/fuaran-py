@@ -1,0 +1,1 @@
+{"id":"chart-temporal-x","kind":{"$type":"Chart","kind":"Line","source":{"$type":"Static","value":[{"day":"2026-01-05","sessions":1200},{"day":"2026-01-12","sessions":1450},{"day":"2026-01-19","sessions":1310},{"day":"2026-01-26","sessions":1580}]},"stacked":false,"title":"Sessions by week","xField":"day","xScale":"Temporal","yFields":["sessions"]}}

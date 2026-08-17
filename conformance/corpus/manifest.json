@@ -1004,6 +1004,14 @@
       "description": "Visualisation/Chart (Phase 663/665 — chart on the editable grid's state key)"
     },
     {
+      "id": "chart-temporal-x",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-temporal-x.json",
+      "expectedFile": "nodes/chart-temporal-x.json",
+      "description": "Visualisation/Chart (Phase 882 — xScale: a temporal x-axis over ISO-8601 date cells)"
+    },
+    {
       "id": "chart-value-format",
       "kind": "node-round-trip",
       "decoder": "node",

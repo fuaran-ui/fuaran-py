@@ -1067,6 +1067,12 @@ class Renderer:
         data_labels_src = fields.get("dataLabels")
         data_labels = data_labels_src if isinstance(data_labels_src, str) else None
 
+        # Phase 882 — what the x column MEANS (bare enum name; absent means
+        # "Category", which is also the default, so a headless render of a
+        # pre-882 tree is byte-unchanged).
+        x_scale_src = fields.get("xScale")
+        x_scale = x_scale_src if isinstance(x_scale_src, str) else None
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -1080,6 +1086,7 @@ class Renderer:
             subtitle=literal_text(fields.get("subtitle")),
             legend_position=legend_position,
             data_labels=data_labels,
+            x_scale=x_scale,
         )
         drawing_node = lower_node(node.id, spec, rows)
         assert isinstance(drawing_node.kind, Obj)

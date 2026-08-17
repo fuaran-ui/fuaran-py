@@ -212,6 +212,23 @@ _DATA_LABEL_END_OFFSET_X = 6.0
 # the text off the line it belongs to.
 _DATA_LABEL_END_NUDGE_Y = 5.0
 
+X_SCALES = ("Category", "Temporal")
+"""What a chart's x column MEANS (Phase 882) — discrete ``Category`` bands or
+``Temporal`` dates on a continuous day-scale. A WIRE vocabulary
+(``ChartSpec.x_scale``) that is DECLARED, never inferred, so the pre-emit
+validator can ground it against the column type (FUARAN097) instead of the
+lowering guessing from cell strings."""
+
+_X_SCALE_DEFAULT = "Category"
+"""What an absent ``ChartSpec.x_scale`` resolves to — and the shipped default, so
+every pre-882 chart lowers byte-for-byte unchanged."""
+
+_TARGET_TICK_COUNT = 5.0
+"""The value axis's tick target (``_nice_domain``). The temporal ladder's ceiling
+is this PLUS ONE (rule 3 below): a continuous step can be tuned to hit a target,
+a calendar rung jumps by 2–3× and cannot, so rounding a rung down loses roughly
+half the ticks."""
+
 
 # ── Deterministic numeric helpers ────────────────────────────────────────────
 
@@ -360,7 +377,7 @@ def _nice_domain(lo: float, hi: float) -> tuple[float, float, float, list[float]
     """
     if hi == lo:
         hi = lo + 1.0
-    target_ticks = 5.0
+    target_ticks = _TARGET_TICK_COUNT
     rng = _nice_num(hi - lo, False)
     step = _nice_num(rng / (target_ticks - 1.0), True)
     nice_lo = math.floor(lo / step) * step
@@ -574,6 +591,359 @@ def _resolve_display_unit(
     return divisor, "", False, words
 
 
+# ─── The temporal x-axis (Phase 882) ─────────────────────────────────────────
+#
+# NORMATIVE CROSS-HOST SPEC (R2), the same standing as the text metrics and the
+# number formatter above: every conformant host reproduces this section exactly,
+# and ``docs/CHARTS-DRAWING-PRIMITIVE-DESIGN.md`` §4h carries it as the
+# language-neutral statement. The ``chart-lowering/*`` goldens pin it.
+#
+# FIVE RULES, and each one exists to remove a way two hosts could disagree.
+#
+#   1. THE UNIT IS THE DAY, and a date is an INTEGER: days since 1970-01-01 in
+#      the PROLEPTIC GREGORIAN calendar. Nothing here reads a host date type, a
+#      locale, a time zone, or a clock — the conversions are the fixed integer
+#      algorithms below (Howard Hinnant's ``days_from_civil`` /
+#      ``civil_from_days``, public domain), which are exact for every date they
+#      admit and need no leap-year table. A timestamp cell's TIME-OF-DAY IS
+#      DISCARDED: the value is its UTC date. That is the whole of the axis's
+#      time-zone policy, and it is stated rather than inherited, because
+#      inheriting it from a host would make the picture depend on where it was
+#      drawn.
+#
+#      Integer division must TRUNCATE TOWARD ZERO (F#, Rust, Go and C all do;
+#      JavaScript needs ``Math.trunc(a / b)``). PYTHON'S ``//`` FLOORS, which is
+#      a DIFFERENT answer for the two negative-bias branches (``y - 399`` and
+#      ``z - 146096``) — so every division in the two algorithms goes through
+#      ``_trunc_div``. The algorithms bias their operands into the non-negative
+#      range precisely so that truncation is the only convention they need.
+#
+#   2. THE DOMAIN IS THE DATA'S OWN EXTENT, UNEXPANDED — ``[min, max]``, so the
+#      first and last points sit on the plot's edges. It is NOT snapped outward
+#      to a tick boundary (the value axis's ``_nice_domain`` posture), because a
+#      calendar boundary is a coarse thing to round to: nicing a 30-day domain
+#      to whole months would add a month of empty plot at each end to make room
+#      for ticks nobody asked for. The ticks come to the domain instead. A
+#      degenerate domain (every row the same date, or no rows) becomes
+#      ``[lo, lo+1]``, the same guard ``_nice_domain`` applies for the same
+#      reason.
+#
+#   3. THE TICKS ARE CALENDAR-ALIGNED INSTANTS INSIDE THE DOMAIN, at a step
+#      drawn from a FIXED LADDER — the ``{1,2,5}·10ⁿ`` rule's analogue for units
+#      that are not decimal:
+#
+#        1, 2, 5, 10 DAYS · 1, 2, 3, 6 MONTHS · {1,2,5}·10ⁿ YEARS (n ≤ 6)
+#
+#      The chosen rung is the FIRST whose in-domain tick count fits the
+#      ceiling; the coarsest rung is the fallback nothing else fits. Day rungs
+#      step from the DOMAIN'S OWN START (a "nice" 2-day or 5-day boundary does
+#      not exist — days are uniform, so the honest anchor is the first datum);
+#      month rungs land on month starts where ``(month-1) % k == 0``, which
+#      makes ``k = 3`` the calendar quarters and ``k = 6`` January and July;
+#      year rungs land on the January 1 of years where ``year % k == 0``.
+#
+#      The ceiling is ``_TARGET_TICK_COUNT + 1`` (6 at the shipped default)
+#      rather than the target itself — see that constant. Counts are computed
+#      WITHOUT generating the ticks, so the ladder can be walked from its
+#      densest rung on a millennium-wide domain without unbounded work.
+#
+#   4. THE FORMAT FOLLOWS THE STEP'S NOMINAL LENGTH, at the operator's
+#      thresholds: ``> 365`` days ⇒ ``yyyy``, ``> 27`` ⇒ ``mmm yy``, else
+#      ``dd mmm yy``. Nominal, not measured: a month is
+#      ``365.2425 / 12 = 30.436875`` days and a year ``365.2425``, so the rung
+#      decides the format and the DATA cannot. Measuring the actual tick gaps
+#      instead would put the year rung's average at exactly 365.0 across a run
+#      of non-leap years (1900–1903, say) and flip a decade chart from ``yyyy``
+#      to ``mmm yy`` on a property of the calendar nobody was asking about. The
+#      thresholds are calibrated for this: the 1-month rung clears 27 and the
+#      6-month rung does not clear 365, so each threshold separates two
+#      ADJACENT rungs.
+#
+#   5. THE MONTH NAMES ARE PART OF THE SPEC. English three-letter
+#      abbreviations, invariant, never a locale lookup — an i18n date axis is a
+#      different feature with its own vocabulary, and a chart whose golden bytes
+#      changed with the host's culture would not be certifiable at all.
+
+_MONTH_NAMES = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+"""The English three-letter month abbreviations, in calendar order. INVARIANT —
+part of the wire-visible spec (rule 5), never a locale lookup."""
+
+TEMPORAL_UNITS = ("Days", "Months", "Years")
+"""The calendar unit a tick step counts in."""
+
+
+def _trunc_div(a: int, b: int) -> int:
+    """Integer division TRUNCATING TOWARD ZERO — the convention rule 1 requires.
+
+    Python's ``//`` floors, so ``-399 // 400`` is ``-1`` where the calendar
+    algorithms need ``0``. Every division inside them goes through here, which is
+    what makes this host's day numbers identical to the other four.
+    """
+    q = abs(a) // abs(b)
+    return -q if (a < 0) != (b < 0) else q
+
+
+def _trunc_mod(a: int, b: int) -> int:
+    """The remainder that pairs with :func:`_trunc_div` — i.e. the sign of ``a``.
+
+    Python's ``%`` takes the sign of the DIVISOR (``-1 % 12 == 11``) where the
+    reference hosts' ``%`` takes the sign of the dividend (``-1``). Only the two
+    call sites where the operand can be negative (a pre-epoch month index, a
+    two-digit year) use this; a divisibility test (``x % k == 0``) is unaffected
+    by the convention and is left as the plain operator.
+    """
+    return a - _trunc_div(a, b) * b
+
+
+@dataclass(frozen=True)
+class _TemporalStep:
+    """One rung of the ladder: ``count`` of ``unit`` (rule 3)."""
+
+    unit: str
+    count: int
+
+
+def _is_leap_year(y: int) -> bool:
+    """Gregorian leap year (proleptic — the rule applies to every year the parser
+    admits, with no historical exception)."""
+    return (y % 4 == 0 and y % 100 != 0) or y % 400 == 0
+
+
+def _days_in_month(y: int, m: int) -> int:
+    """Days in a month — the one place the calendar's irregularity is written
+    down, used by the PARSER only (the conversions below need no table)."""
+    if m == 2:
+        return 29 if _is_leap_year(y) else 28
+    if m in (4, 6, 9, 11):
+        return 30
+    return 31
+
+
+def _days_from_civil(year: int, month: int, day: int) -> int:
+    """``(y, m, d)`` → days since 1970-01-01. Hinnant's ``days_from_civil``: exact
+    for every proleptic-Gregorian date, no leap table, integer-only. Division
+    truncates toward zero — the operands are biased so that is the only
+    convention needed (rule 1)."""
+    y = year - 1 if month <= 2 else year
+    era = _trunc_div(y if y >= 0 else y - 399, 400)
+    yoe = y - era * 400  # [0, 399]
+    mp = month - 3 if month > 2 else month + 9  # March-based month
+    doy = _trunc_div(153 * mp + 2, 5) + day - 1  # [0, 365]
+    doe = yoe * 365 + _trunc_div(yoe, 4) - _trunc_div(yoe, 100) + doy  # [0, 146096]
+    return era * 146097 + doe - 719468
+
+
+def _civil_from_days(days: int) -> tuple[int, int, int]:
+    """Days since 1970-01-01 → ``(y, m, d)``. Hinnant's ``civil_from_days``, the
+    exact inverse of :func:`_days_from_civil`."""
+    z = days + 719468
+    era = _trunc_div(z if z >= 0 else z - 146096, 146097)
+    doe = z - era * 146097  # [0, 146096]
+    yoe = _trunc_div(doe - _trunc_div(doe, 1460) + _trunc_div(doe, 36524) - _trunc_div(doe, 146096), 365)  # [0, 399]
+    y = yoe + era * 400
+    doy = doe - (365 * yoe + _trunc_div(yoe, 4) - _trunc_div(yoe, 100))  # [0, 365]
+    mp = _trunc_div(5 * doy + 2, 153)  # [0, 11], March-based
+    d = doy - _trunc_div(153 * mp + 2, 5) + 1  # [1, 31]
+    m = mp + 3 if mp < 10 else mp - 9  # [1, 12]
+    return (y + 1 if m <= 2 else y), m, d
+
+
+def _try_parse_day(text: str) -> int | None:
+    """Parse a canonical ISO-8601 date to days since epoch — ``YYYY-MM-DD``,
+    optionally followed by ``T…``, whose time-of-day is DISCARDED (rule 1).
+
+    STRICT by shape and by calendar: four digits, two, two, both hyphens, a month
+    in 1–12 and a day the month actually has. ``None`` for everything else,
+    including a locale spelling ("15/01/2026") and a bare year — admitting either
+    would be the string-sniffing this axis exists to avoid.
+    """
+
+    def digits(start: int, length: int) -> int | None:
+        if start + length > len(text):
+            return None
+        acc = 0
+        for k in range(start, start + length):
+            c = text[k]
+            if not ("0" <= c <= "9"):
+                return None
+            acc = acc * 10 + (ord(c) - ord("0"))
+        return acc
+
+    if len(text) < 10:
+        return None
+    if text[4] != "-" or text[7] != "-":
+        return None
+    if len(text) > 10 and text[10] != "T":
+        return None
+    y = digits(0, 4)
+    m = digits(5, 2)
+    d = digits(8, 2)
+    if y is None or m is None or d is None:
+        return None
+    if not (1 <= m <= 12) or not (1 <= d <= _days_in_month(y, m)):
+        return None
+    return _days_from_civil(y, m, d)
+
+
+def _day_of(text: str) -> int:
+    """The day number a row's x cell carries, with an UNPARSEABLE cell reading as
+    the epoch. That mirrors ``_numeric_of``'s posture for a non-numeric value-axis
+    cell — the lowering stays total, and the grounding rule (FUARAN097) is what
+    makes a non-date column loud, upstream, before any picture is drawn. Silence
+    here is not the design; refusing here would be."""
+    d = _try_parse_day(text)
+    return 0 if d is None else d
+
+
+def _nominal_days(step: _TemporalStep) -> float:
+    """The step's NOMINAL length in days (rule 4) — a mean Gregorian month and
+    year, so the FORMAT is a property of the rung rather than of the data."""
+    if step.unit == "Days":
+        return float(step.count)
+    if step.unit == "Months":
+        return float(step.count) * 30.436875  # 365.2425 / 12
+    return float(step.count) * 365.2425
+
+
+_TEMPORAL_LADDER: tuple[_TemporalStep, ...] = (
+    _TemporalStep("Days", 1),
+    _TemporalStep("Days", 2),
+    _TemporalStep("Days", 5),
+    _TemporalStep("Days", 10),
+    _TemporalStep("Months", 1),
+    _TemporalStep("Months", 2),
+    _TemporalStep("Months", 3),
+    _TemporalStep("Months", 6),
+    _TemporalStep("Years", 1),
+    _TemporalStep("Years", 2),
+    _TemporalStep("Years", 5),
+    _TemporalStep("Years", 10),
+    _TemporalStep("Years", 20),
+    _TemporalStep("Years", 50),
+    _TemporalStep("Years", 100),
+    _TemporalStep("Years", 200),
+    _TemporalStep("Years", 500),
+    _TemporalStep("Years", 1000),
+    _TemporalStep("Years", 2000),
+    _TemporalStep("Years", 5000),
+    _TemporalStep("Years", 10000),
+    _TemporalStep("Years", 20000),
+    _TemporalStep("Years", 50000),
+    _TemporalStep("Years", 100000),
+    _TemporalStep("Years", 200000),
+    _TemporalStep("Years", 500000),
+    _TemporalStep("Years", 1000000),
+    _TemporalStep("Years", 2000000),
+    _TemporalStep("Years", 5000000),
+)
+"""The ladder, ascending (rule 3). Written out rather than generated: it is a
+pinned vocabulary five hosts mirror, and an explicit list cannot drift on a
+difference of opinion about exponentiation."""
+
+
+def _ceil_to(k: int, i: int) -> int:
+    """Round an index UP to the next multiple of ``k`` (both non-negative)."""
+    return _trunc_div(i + k - 1, k) * k
+
+
+def _month_window(k: int, lo: int, hi: int) -> tuple[int, int]:
+    """The aligned window a month rung covers: ``(first aligned month index,
+    count)`` over ``[lo, hi]``, in month-index space (``year·12 + month - 1``).
+    Closed-form, so a count never generates a tick."""
+    y0, m0, d0 = _civil_from_days(lo)
+    # A `lo` past the 1st means `lo`'s own month start is outside the domain.
+    first_idx = (y0 * 12 + m0 - 1) + (1 if d0 > 1 else 0)
+    first = _ceil_to(k, first_idx)
+    y1, m1, _ = _civil_from_days(hi)
+    # `hi`'s own month start is always inside the domain (its day >= 1).
+    last = _trunc_div(y1 * 12 + m1 - 1, k) * k
+    if last < first:
+        return first, 0
+    return first, _trunc_div(last - first, k) + 1
+
+
+def _year_window(k: int, lo: int, hi: int) -> tuple[int, int]:
+    """The year rung's twin of :func:`_month_window`, in year space."""
+    y0, m0, d0 = _civil_from_days(lo)
+    first_year = y0 + (0 if (m0 == 1 and d0 == 1) else 1)
+    first = _ceil_to(k, first_year)
+    y1, _, _ = _civil_from_days(hi)
+    last = _trunc_div(y1, k) * k
+    if last < first:
+        return first, 0
+    return first, _trunc_div(last - first, k) + 1
+
+
+def _tick_count(step: _TemporalStep, lo: int, hi: int) -> int:
+    """How many ``step``-aligned ticks fall in ``[lo, hi]`` — closed-form, never by
+    generation (rule 3), so walking the ladder is O(rungs) whatever the span."""
+    if hi < lo:
+        return 0
+    if step.unit == "Days":
+        return _trunc_div(hi - lo, step.count) + 1
+    if step.unit == "Months":
+        return _month_window(step.count, lo, hi)[1]
+    return _year_window(step.count, lo, hi)[1]
+
+
+def _temporal_ticks(step: _TemporalStep, lo: int, hi: int) -> list[int]:
+    """The ``step``-aligned ticks in ``[lo, hi]``, ascending."""
+    if hi < lo:
+        return []
+    if step.unit == "Days":
+        return [lo + i * step.count for i in range(_trunc_div(hi - lo, step.count) + 1)]
+    if step.unit == "Months":
+        first, count = _month_window(step.count, lo, hi)
+        out = []
+        for i in range(count):
+            idx = first + i * step.count
+            out.append(_days_from_civil(_trunc_div(idx, 12), _trunc_mod(idx, 12) + 1, 1))
+        return out
+    first, count = _year_window(step.count, lo, hi)
+    return [_days_from_civil(first + i * step.count, 1, 1) for i in range(count)]
+
+
+def _choose_temporal_step(max_ticks: int, lo: int, hi: int) -> _TemporalStep:
+    """The chosen rung: the FIRST whose in-domain tick count fits ``max_ticks``,
+    else the coarsest (rule 3). Total — the ladder is never empty."""
+    for s in _TEMPORAL_LADDER:
+        if _tick_count(s, lo, hi) <= max_ticks:
+            return s
+    return _TEMPORAL_LADDER[-1]
+
+
+def _temporal_domain(days: Sequence[int]) -> tuple[int, int]:
+    """The domain: the data's own extent, unexpanded, with the degenerate guard
+    (rule 2). No rows ⇒ ``[0, 1]`` — the epoch day and the one after it, which
+    draws an axis rather than dividing by zero."""
+    if not days:
+        return 0, 1
+    lo = min(days)
+    hi = max(days)
+    return (lo, lo + 1) if hi == lo else (lo, hi)
+
+
+def _pad(width: int, v: int) -> str:
+    s = str(v)
+    if len(s) >= width:
+        return s
+    return "0" * (width - len(s)) + s
+
+
+def _temporal_label(step: _TemporalStep, day: int) -> str:
+    """The tick label for ``day`` under ``step`` — the granularity-adaptive format
+    (rule 4). ``yyyy`` past a year, ``mmm yy`` past 27 days, else ``dd mmm yy``."""
+    y, m, d = _civil_from_days(day)
+    nominal = _nominal_days(step)
+    if nominal > 365.0:
+        return _pad(4, y)
+    yy = _pad(2, _trunc_mod(y, 100))
+    mmm = _MONTH_NAMES[m - 1]
+    if nominal > 27.0:
+        return mmm + " " + yy
+    return _pad(2, d) + " " + mmm + " " + yy
+
+
 # ── DrawStyle builders (untagged style objects; only Some fields emitted) ─────
 
 
@@ -734,6 +1104,17 @@ class ChartSpec:
     # lowers to the pre-881 picture byte-for-byte. ``"Ends"`` is the only other
     # value there is.
     data_labels: str | None = None
+    # Phase 882 — what the x column MEANS: discrete ``Category`` bands or
+    # ``Temporal`` dates on a continuous day-scale. A WIRE field, and a DECLARED
+    # one: what a column is is the author's meaning, and inferring it (from the
+    # column type, or worse from the cell strings) would make one wire tree draw
+    # a band axis or a temporal one depending on where its rows came from.
+    #
+    # Absent means ``"Category"``, which is also the default, so an absent field
+    # lowers to the pre-882 picture byte-for-byte. ``"Temporal"`` is the only
+    # other value there is, and the pre-emit validator grounds it against the
+    # column type where the schema is statically known (FUARAN097).
+    x_scale: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -861,8 +1242,63 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # x range carries no baseline semantics (the y domain stays zero-anchored
     # with the other arms, deliberately: one shared y-domain rule).
     is_scatter = spec.kind == "Scatter"
-    x_values = [_numeric_of(r, spec.x_field) for r in rows] if is_scatter else []
-    if is_scatter:
+
+    # ── Temporal x-scale (Phase 882 — the SECOND non-band x-scale) ──
+    #
+    # DECLARED, never inferred. ``x_scale == "Temporal"`` is the author saying
+    # "this column is dates"; the language then GROUNDS that claim against the
+    # statically-known column type (FUARAN097) wherever it can. Inference was the
+    # alternative and is wrong twice over: the schema is statically known only
+    # for an embedded table with an EMPTY pipeline (FUARAN086's window), so an
+    # inferred axis would make the same tree draw a band axis or a temporal one
+    # depending on where its rows came from — a picture that depends on data
+    # PROVENANCE — and sniffing the cell strings for an ISO-8601 shape is the
+    # guess-dressed-as-a-rule §4e refused. Absent is ``"Category"``, which is
+    # every pre-882 chart, byte-for-byte.
+    #
+    # Pie is excluded because it HAS no x axis: a temporal declaration there is
+    # dead intent the polar arm cannot honour, and neutralising it here keeps the
+    # pie geometry free of a scale it never reads.
+    is_temporal = (spec.x_scale or _X_SCALE_DEFAULT) == "Temporal" and spec.kind != "Pie"
+
+    # Each row's x as a DAY NUMBER, read off the same string projection the band
+    # arms label with — which is exactly the canonical ISO-8601 form a date /
+    # timestamp cell carries through the row bridge. So the mark identity keeps
+    # the day number while the geometry uses the same integer, and neither has to
+    # be derived from the other.
+    day_values = [_day_of(c) for c in categories] if is_temporal else []
+
+    # The x axis is CONTINUOUS (Phase 903's split) on exactly two arms: the
+    # Scatter arm's numeric x and a temporal x. Everything keyed off this — tick
+    # marks AT the value, vertical gridlines, marks placed by value rather than
+    # by band index — follows from that one property rather than from a list of
+    # kinds.
+    is_continuous_x = is_scatter or is_temporal
+
+    if is_temporal:
+        x_values = [float(d) for d in day_values]
+    elif is_scatter:
+        x_values = [_numeric_of(r, spec.x_field) for r in rows]
+    else:
+        x_values = []
+
+    # The chosen calendar rung, on a temporal axis only. ONE value decides both
+    # the tick positions and the label format, so the two cannot disagree about
+    # the axis's granularity.
+    temporal_step: _TemporalStep | None = None
+    if is_temporal:
+        temporal_lo, temporal_hi = _temporal_domain(day_values)
+        temporal_step = _choose_temporal_step(int(_TARGET_TICK_COUNT) + 1, temporal_lo, temporal_hi)
+
+    if temporal_step is not None:
+        # The domain is the data's own extent (rule 2) — deliberately NOT nice-d
+        # outward — and the ticks are the calendar-aligned instants inside it.
+        # ``x_step`` carries the rung's NOMINAL length, which is what the label
+        # format reads.
+        x_nice_lo, x_nice_hi = float(temporal_lo), float(temporal_hi)
+        x_step = _nominal_days(temporal_step)
+        x_ticks = [float(t) for t in _temporal_ticks(temporal_step, temporal_lo, temporal_hi)]
+    elif is_scatter:
         if x_values:
             x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(min(x_values), max(x_values))
         else:
@@ -874,7 +1310,13 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # formatter (Phase 876). ``value_format`` is deliberately NOT applied to it:
     # one declared meaning cannot be true of two different measures, and there
     # is no second axis-unit slot to state an x display unit in.
+    #
+    # A TEMPORAL tick takes the calendar label instead (Phase 882) — the same
+    # one-formatter-per-axis discipline over a different vocabulary: the number
+    # formatter has nothing true to say about a date.
     def x_tick_text(v: float) -> str:
+        if temporal_step is not None:
+            return _temporal_label(temporal_step, int(v))
         return _format_value(None, 1.0, False, x_step, v)
 
     tick_size = _TICK_FONT_SIZE
@@ -995,7 +1437,15 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             return None
         return _capitalise(fallback_field)
 
-    x_title = axis_title_of(spec.x_title, spec.x_field)
+    # Phase 882 wires §4e's date-axis rule: a SELF-EVIDENT DATE AXIS SUPPRESSES
+    # ITS DEFAULT TITLE — an axis reading "Jan Feb Mar" does not need the word
+    # "Date" beneath it. Two boundaries, both stated when the rule was written
+    # down and both kept: it applies to the FALLBACK only (an explicit ``x_title``
+    # is the author overriding the default and always draws), and it suppresses
+    # the TITLE, never the axis. The declaration is what made it wirable —
+    # nothing before 882 could tell a date column from a string one, which is why
+    # 878 recorded the rule instead of shipping it.
+    x_title = None if (is_temporal and spec.x_title is None) else axis_title_of(spec.x_title, spec.x_field)
 
     # The y fallback is the capitalised FIRST y-field. It is the honest answer
     # to "what is on this axis", where the retired "Value" literal named neither
@@ -1065,12 +1515,46 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         """
         return _r2(plot_x0 + band_w * float(i))
 
-    # ── The category-label ANGLE LADDER (Phase 903, correcting Phase 879) ──
-    # Only the BAND arms label categories: Scatter labels numeric x ticks (short
-    # by construction, left horizontal) and Pie has no x axis. Both must
-    # therefore contribute NO drop, or their bottom margin — and with it the
-    # pie's centre — would move for a decision they never take.
-    draws_category_labels = not is_scatter and spec.kind != "Pie"
+    # ── The x-axis-label ANGLE LADDER (Phase 903, correcting Phase 879) ──
+    # The BAND arms label categories; Pie has no x axis at all and Scatter labels
+    # numeric x ticks (short by construction, left horizontal). Both of those must
+    # contribute NO drop, or their bottom margin — and with it the pie's centre —
+    # would move for a decision they never take.
+    draws_category_labels = not is_scatter and not is_temporal and spec.kind != "Pie"
+
+    # Phase 882 — a TEMPORAL axis labels its TICKS, and the ladder applies to
+    # them: same three rungs, same footprint formula, measured against the TICK
+    # PITCH instead of the band pitch. A date label is not short by construction
+    # the way a numeric tick is ("15 Jan 26" against "150"), so leaving it
+    # always-flat would recreate exactly the overlap the ladder exists to resolve
+    # — and reusing the ladder rather than adding a second rule is what keeps one
+    # angle policy for the whole x axis.
+    temporal_tick_texts = [x_tick_text(t) for t in x_ticks] if is_temporal else []
+
+    # Whether the x axis draws labels the ladder governs at all — the band arms'
+    # categories or a temporal axis's ticks. Scatter and Pie: no.
+    draws_x_axis_labels = draws_category_labels or is_temporal
+
+    # The pitch the ladder measures a label against: a band's width, or — on a
+    # temporal axis — the SMALLEST pixel gap between consecutive ticks, since
+    # calendar gaps are not uniform (28 to 31 days a month) and the tightest pair
+    # is the one that has to fit. Computable here because it needs ``plot_w``
+    # only, which the left margin has already fixed: the acyclicity Phase 879
+    # established survives intact, with nothing reading the bottom margin the
+    # ladder is about to decide.
+    if not is_temporal:
+        x_label_pitch = band_w
+    elif len(x_ticks) < 2:
+        x_label_pitch = plot_w
+    else:
+        span = x_nice_hi - x_nice_lo
+        min_gap = span
+        for a, b in zip(x_ticks[:-1], x_ticks[1:], strict=True):
+            min_gap = min(min_gap, b - a)
+        x_label_pitch = plot_w * min_gap / span
+
+    # The labels the ladder decides on, AS AUTHORED (see below).
+    x_labels_as_authored = temporal_tick_texts if is_temporal else categories
 
     # A rotated label's footprint ALONG the axis is w·cos θ + h·sin θ. At 0° that
     # is the bare width (cos 0 = 1, sin 0 = 0, both exact on every IEEE-754 host,
@@ -1085,15 +1569,16 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # does not, vertical when 30° no longer packs either. Deciding on the widest
     # label rather than per-label is what keeps an axis from mixing angles.
     #
-    # Decided on the labels AS AUTHORED (``categories``, not ``category_texts``):
-    # the truncation budget below is a function of the angle, so reading truncated
-    # text here would be circular as well as wrong.
-    widest_category = widest_of(categories)
+    # Decided on the labels AS AUTHORED (``x_labels_as_authored``, not the
+    # truncated ``x_label_texts``): the truncation budget below is a function of
+    # the angle, so reading truncated text here would be circular as well as
+    # wrong.
+    widest_x_label = widest_of(x_labels_as_authored)
 
     def packs_at(deg: float) -> bool:
-        return along_axis_footprint(deg, widest_category) <= band_w
+        return along_axis_footprint(deg, widest_x_label) <= x_label_pitch
 
-    if not draws_category_labels or n == 0 or _LABEL_TILT_DEGREES <= 0.0:
+    if not draws_x_axis_labels or n == 0 or _LABEL_TILT_DEGREES <= 0.0:
         # A zero angle is FLAT-ALWAYS, not "the ladder with a flat rung": a host
         # that zeroed it named the one rotation the ladder may use, so escalating
         # past it to vertical would override an explicit choice with a computed
@@ -1118,12 +1603,17 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         bottom_ceiling - _CATEGORY_LABEL_OFFSET_Y - _AXIS_LABEL_PADDING - line_height - _AXIS_TITLE_BOTTOM_OFFSET,
     )
     category_text_budget = drop_ceiling / sin_tilt if sin_tilt > 0.0 else math.inf
-    category_texts = (
-        [_truncate_to_width(tick_size, category_text_budget, c) for c in categories] if draws_category_labels else []
+    # The x labels as DRAWN — the ladder's own labels, bounded by the drop
+    # ceiling. Empty on the arms that draw none, so their bottom margin is unmoved
+    # (Scatter's short numeric ticks are emitted separately, flat).
+    x_label_texts = (
+        [_truncate_to_width(tick_size, category_text_budget, c) for c in x_labels_as_authored]
+        if draws_x_axis_labels
+        else []
     )
     required_bottom = (
         _CATEGORY_LABEL_OFFSET_Y
-        + sin_tilt * widest_of(category_texts)
+        + sin_tilt * widest_of(x_label_texts)
         + _AXIS_LABEL_PADDING
         + line_height
         + _AXIS_TITLE_BOTTOM_OFFSET
@@ -1141,21 +1631,34 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     def y_scale(v: float) -> float:
         return _r2(plot_y1 - (v - nice_lo) / (nice_hi - nice_lo) * plot_h)
 
+    def x_scale_raw(v: float) -> float:
+        """The x-scale before rounding. Split out by Phase 882 so the bar arms can
+        derive an UNROUNDED slot origin from it: rounding a centre and then
+        subtracting half a width would round twice, and the band arms' goldens pin
+        the single-rounding form."""
+        return plot_x0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * plot_w
+
     def x_scale(v: float) -> float:
-        return _r2(plot_x0 + (v - x_nice_lo) / (x_nice_hi - x_nice_lo) * plot_w)
+        return _r2(x_scale_raw(v))
 
     # ── Cartesian chrome (painter's order pieces) ──
     grid_style = _style_stroke_ink(_GRID_OPACITY, 1.0)
     axis_stroke_style = _style_stroke_ink(_AXIS_OPACITY, 1.0)
     gridlines: list[Value] = [_line(_r2(plot_x0), y_scale(t), _r2(plot_x1), y_scale(t), grid_style) for t in ticks]
 
-    # Vertical gridlines — the Scatter arm only. A linear x-scale has readable
-    # x positions, so a reader traces a point back to an x value the same way
-    # the horizontal grid lets them trace a y value. A BAND x-axis has no such
-    # positions to trace (a category is a label, not a magnitude), so a
-    # vertical rule there would be decoration.
+    # Vertical gridlines — wherever the x axis is CONTINUOUS (Phase 875 for
+    # Scatter, extended to the temporal axis by Phase 882). A continuous scale has
+    # readable x positions, so a reader traces a point back to an x value the same
+    # way the horizontal grid lets them trace a y value. A BAND x-axis has no such
+    # positions to trace (a category is a label, not a magnitude), so a vertical
+    # rule there would be decoration. Stating it as "continuous" rather than
+    # "Scatter" is what let the temporal axis inherit the behaviour instead of
+    # re-deciding it — including on a temporal BAR chart, where the rules read as
+    # date guides through the bars rather than as chrome.
     x_gridlines: list[Value] = (
-        [_line(x_scale(t), _r2(plot_y0), x_scale(t), _r2(plot_y1), grid_style) for t in x_ticks] if is_scatter else []
+        [_line(x_scale(t), _r2(plot_y0), x_scale(t), _r2(plot_y1), grid_style) for t in x_ticks]
+        if is_continuous_x
+        else []
     )
 
     # Zero baseline — only when the domain CROSSES zero, where the sign of a
@@ -1198,7 +1701,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         def _x_mark(x: float) -> Value:
             return _line(x, _r2(plot_y1), x, _r2(plot_y1 + _TICK_MARK_LENGTH), axis_stroke_style)
 
-        if is_scatter:
+        if is_continuous_x:
             x_marks: list[Value] = [_x_mark(x_scale(t)) for t in x_ticks]
         elif n == 0:
             x_marks = []
@@ -1235,6 +1738,18 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # opposite sign would swing the same text up into the plot area. At 90° this
     # degenerates to reading bottom-up. Scatter's numeric ticks stay horizontal
     # + Middle — short by construction, and centred on their value.
+    #
+    # Phase 882 — a TEMPORAL axis's labels sit at their TICKS (not at a band
+    # centre, because there are no bands) and take the ladder's rung and anchor
+    # exactly as the band arms do. So one expression covers "centred at the
+    # position the label names" on both, and the only thing that differs is which
+    # positions those are.
+    x_label_style = (
+        _text_style(_LABEL_OPACITY, "End", tick_size, "Normal", _r2(-tilt_degrees))
+        if tilt_degrees > 0.0
+        else _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal")
+    )
+
     if is_scatter:
         x_labels: list[Value] = [
             _label(
@@ -1245,17 +1760,20 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             )
             for t in x_ticks
         ]
-    else:
+    elif is_temporal:
         x_labels = [
             _label(
-                centre_x(i),
+                x_scale(t),
                 _r2(plot_y1 + _CATEGORY_LABEL_OFFSET_Y),
-                _literal(c),
-                _text_style(_LABEL_OPACITY, "End", tick_size, "Normal", _r2(-tilt_degrees))
-                if tilt_degrees > 0.0
-                else _text_style(_LABEL_OPACITY, "Middle", tick_size, "Normal"),
+                _literal(text),
+                x_label_style,
             )
-            for i, c in enumerate(category_texts)
+            for t, text in zip(x_ticks, x_label_texts, strict=True)
+        ]
+    else:
+        x_labels = [
+            _label(centre_x(i), _r2(plot_y1 + _CATEGORY_LABEL_OFFSET_Y), _literal(c), x_label_style)
+            for i, c in enumerate(x_label_texts)
         ]
 
     # ── Axis titles + the display-unit slot (Phase 878) ──
@@ -1332,6 +1850,34 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             )
         )
 
+    # ── Where a datum sits along x (Phase 882) ───────────────────────────────
+    #
+    # ONE pair of expressions the series geometry reads, and the band-vs-value
+    # difference lives here and nowhere else. On a band axis a datum sits at its
+    # band's INDEX; on a temporal axis it sits at its DATE — the same datum, a
+    # different question asked of the axis.
+    #
+    # The temporal slot keeps ``band_w`` as its PITCH — ``plot_w / n``, the average
+    # spacing — so a bar's thickness is decided by the same expression on both
+    # axes and a monthly bar chart looks like a bar chart rather than like a
+    # sequence of hairlines. With irregular dates two slots can overlap; that is
+    # honest, because the bars are at their true positions and the overlap is the
+    # data's, not the layout's. ``_BAR_MAX_THICKNESS`` already bounds the other
+    # direction.
+
+    def x_centre(i: int) -> float:
+        """The x a datum's mark centres on."""
+        return x_scale(x_values[i]) if is_temporal else centre_x(i)
+
+    def slot_origin_x(i: int) -> float:
+        """The UNROUNDED left edge of the slot a datum's bar geometry lays out in.
+        Unrounded because the bar arms round once, at the end — the band form is
+        ``plot_x0 + band_w·i`` character-for-character, so every band golden is
+        unmoved."""
+        if is_temporal:
+            return x_scale_raw(x_values[i]) - band_w / 2.0
+        return plot_x0 + band_w * float(i)
+
     # ── Bar geometry ──
     #
     # Hoisted out of the two Bar arms (Phase 881) because the cap labels have to
@@ -1345,12 +1891,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     grouped_bar_w = _r2(min(grouped_sub_w * 0.9, _BAR_MAX_THICKNESS))
 
     def stacked_bar_x(i: int) -> float:
-        return _r2(plot_x0 + band_w * float(i) + (band_w - stacked_bar_w) / 2.0)
+        return _r2(slot_origin_x(i) + (band_w - stacked_bar_w) / 2.0)
 
     def grouped_bar_x(i: int, j: int) -> float:
         # Centre the (possibly capped) bar in its own sub-slot, so a cap takes
         # air off BOTH sides and the group stays symmetric about the band centre.
-        slot_x = plot_x0 + band_w * float(i) + (band_w - bar_group_w) / 2.0 + float(j) * grouped_sub_w
+        slot_x = slot_origin_x(i) + (band_w - bar_group_w) / 2.0 + float(j) * grouped_sub_w
         return _r2(slot_x + (grouped_sub_w - grouped_bar_w) / 2.0)
 
     # ── Series geometry ──
@@ -1398,8 +1944,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         for j in range(m):
             colour = _colour_for(j)
             yf = spec.y_fields[j]
-            upper = [(centre_x(i), y_scale(cum_rows[i][j + 1])) for i in range(n)]
-            lower_pts = [(centre_x(i), y_scale(cum_rows[i][j])) for i in range(n - 1, -1, -1)]
+            upper = [(x_centre(i), y_scale(cum_rows[i][j + 1])) for i in range(n)]
+            lower_pts = [(x_centre(i), y_scale(cum_rows[i][j])) for i in range(n - 1, -1, -1)]
             series_shapes.append(
                 _polygon(upper + lower_pts, _with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf))
             )
@@ -1413,15 +1959,15 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             colour = _colour_for(j)
             values = series[j]
             yf = spec.y_fields[j]
-            points = [(centre_x(i), y_scale(values[i])) for i in range(n)]
-            band = [(centre_x(0), base_y), *points, (centre_x(n - 1), base_y)]
+            points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
+            band = [(x_centre(0), base_y), *points, (x_centre(n - 1), base_y)]
             series_shapes.append(_polygon(band, _with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf)))
             series_shapes.append(_polyline(points, _with_mark(_style_stroke(colour, 2.0), yf)))
     elif spec.kind == "Line":
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
-            points = [(centre_x(i), y_scale(values[i])) for i in range(n)]
+            points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
             series_shapes.append(_polyline(points, _with_mark(_style_stroke(colour, 2.0), spec.y_fields[j])))
     elif spec.kind == "Scatter":
         # Fixed-radius point marks per datum (Phase 636). A non-numeric x/y
@@ -1522,7 +2068,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         decides who yields, which makes the outcome deterministic."""
         if n == 0:
             return
-        label_x = centre_x(n - 1) + _DATA_LABEL_END_OFFSET_X
+        label_x = x_centre(n - 1) + _DATA_LABEL_END_OFFSET_X
         # The budget runs to the PLOT's right edge, not the canvas's: beyond it
         # lies the legend column, and running into it is the collision the gate
         # refuses.

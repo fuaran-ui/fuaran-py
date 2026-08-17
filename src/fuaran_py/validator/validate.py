@@ -87,9 +87,15 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
 
 _NUMERIC_COLUMN_TYPES = frozenset({"int", "float", "bool"})  # bool coerces 1/0 at lowering
 
+_DATED_COLUMN_TYPES = frozenset({"date", "timestamp"})
+"""The column types a temporal x-axis can read (FUARAN097, Phase 882). Both are
+honoured: a timestamp's time-of-day is DISCARDED by the lowering, which is a
+documented narrowing, not a mismatch."""
+
 
 def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
-    """Schema-grounded ChartSpec validation (Phase 640, FUARAN086-089).
+    """Schema-grounded ChartSpec validation (Phase 640, FUARAN086-089; Phase 882,
+    FUARAN097).
 
     An ungrounded field reference is the LANGUAGE's defect to catch before
     lowering — a wrong field name otherwise lowers to a silently flat/empty
@@ -164,9 +170,38 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
                 )
             )
 
+    # FUARAN097 (Phase 882) — a temporal x-axis is a DECLARATION, and this is
+    # where the language grounds it. A non-date column cannot parse as a date, so
+    # every row's x would read as the epoch and the chart would draw every point
+    # stacked on one date. Refused, never coerced; and refused only where the
+    # schema is statically known (the window above), so an unknowable source
+    # passes ungrounded — refuse only what is PROVABLY wrong.
+    #
+    # Pie is NOT excluded here even though the lowering neutralises the
+    # declaration: a dead declaration on a pie is still a claim about the column,
+    # and the reference raises it wherever the x field is grounded.
+    temporal_x = kind.fields.get("xScale") == "Temporal"
+
     x_field = kind.fields.get("xField")
     if isinstance(x_field, str):
-        ground(x_field, require_numeric=chart_kind == "Scatter")
+        x_type = col_types.get(x_field)
+        if temporal_x and x_type is not None and x_type not in _DATED_COLUMN_TYPES:
+            findings.append(
+                Finding(
+                    "CHART_TEMPORAL_X_NOT_DATE",
+                    path,
+                    f"chart declares a temporal x-axis over field '{x_field}' of type '{x_type}' — a date axis "
+                    "needs a date column, and every row's x would read as 1970-01-01; give the column type "
+                    "'date' (canonical ISO-8601 YYYY-MM-DD cells), or drop xScale to plot the values as "
+                    "categories (FUARAN097)",
+                )
+            )
+        # FUARAN087's x arm is NARROWED by a temporal declaration: a temporal
+        # Scatter reads its x as dates, so a date column there is correct rather
+        # than "not numeric", and FUARAN097 above is the rule that governs it.
+        # Without the narrowing a correctly-authored time-series scatter would
+        # raise a mismatch about the very column it declared.
+        ground(x_field, require_numeric=chart_kind == "Scatter" and not temporal_x)
     for yf in y_fields:
         ground(yf, require_numeric=True)
 

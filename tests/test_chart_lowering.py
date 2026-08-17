@@ -16,7 +16,28 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_available
-from fuaran_py.charts import ChartSpec, lower_node
+
+# The Phase-882 calendar is a NORMATIVE cross-host spec (§4h), so its properties
+# are asserted directly rather than inferred from pixel positions — which means
+# reaching for the module-private helpers that implement it.
+from fuaran_py.charts import (
+    ChartSpec,
+    _choose_temporal_step,
+    _civil_from_days,
+    _day_of,
+    _days_from_civil,
+    _is_leap_year,
+    _nominal_days,
+    _temporal_domain,
+    _temporal_label,
+    _temporal_ticks,
+    _TemporalStep,
+    _trunc_div,
+    _try_parse_day,
+    lower,
+    lower_node,
+)
+from fuaran_py.model import Arr, Obj
 from fuaran_py.schema.encode import encode_node
 
 _CHART_LOWERING_DIR = CORPUS_ROOT / "chart-lowering"
@@ -46,6 +67,11 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # Phase 881 — `dataLabels` is a WIRE field carried as the bare enum name
     # (`Off | Ends`). ABSENT means `Off`, which is also the default, so it is
     # omitted on every pre-881 case AND every pre-881 golden is unchanged.
+    #
+    # Phase 882 — `xScale` is a WIRE field carried as the bare enum name
+    # (`Category | Temporal`). ABSENT means `Category`, which is also the
+    # default, so it is omitted on every pre-882 case AND every pre-882 golden
+    # is unchanged — not one `.expected.json` was rewritten by the phase.
     spec = ChartSpec(
         kind=inp["kind"],
         x_field=inp["xField"],
@@ -59,6 +85,7 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         subtitle=inp.get("subtitle"),
         legend_position=inp.get("legendPosition"),
         data_labels=inp.get("dataLabels"),
+        x_scale=inp.get("xScale"),
     )
     return spec, list(inp["data"])
 
@@ -305,3 +332,375 @@ def test_ssr_bridge_passes_data_labels() -> None:
     # …and it is set at the data-label size, which no chrome label uses.
     assert 'font-size="12px"' in html
     assert 'font-size="12px"' not in off_html
+
+
+# ── Phase 882 — the temporal x-axis ──────────────────────────────────────────
+#
+# The calendar arithmetic is tested DIRECTLY (it is a normative spec five hosts
+# mirror, so its properties are worth asserting rather than inferring from pixel
+# positions); the lowering behaviour is read back off the drawing.
+
+
+def test_calendar_conversions_are_exact_inverses_across_four_centuries() -> None:
+    # The property that matters: the two conversions round-trip for EVERY day,
+    # including the negative side of the epoch and the century leap rules. A
+    # coprime stride samples all residues rather than a lattice. The range runs
+    # well past -719468 so the `z - 146096` negative-bias branch is exercised too
+    # — the one Python's floor division gets wrong.
+    failures = [d for d in range(-900000, 900000, 977) if _days_from_civil(*_civil_from_days(d)) != d]
+    assert failures == [], f"{len(failures)} sampled days did not round-trip"
+
+    # The anchors, stated so a port has fixed points to check.
+    assert _civil_from_days(0) == (1970, 1, 1)
+    assert _days_from_civil(1970, 1, 1) == 0
+    assert _days_from_civil(1969, 12, 31) == -1
+
+    # 2000 is a leap year (÷400), 1900 is not (÷100, not ÷400) — the pair a naive
+    # four-year rule gets wrong.
+    assert _is_leap_year(2000)
+    assert not _is_leap_year(1900)
+    assert _days_from_civil(2000, 3, 1) - _days_from_civil(2000, 2, 1) == 29
+    assert _days_from_civil(1900, 3, 1) - _days_from_civil(1900, 2, 1) == 28
+
+    # THE PYTHON-SPECIFIC HAZARD, pinned with its counterfactual so the guard
+    # cannot be silently removed: `//` FLOORS, and the algorithms' two
+    # negative-bias branches need TRUNCATION toward zero. A floor-divided
+    # `days_from_civil` is off by one for a pre-year-0 date, which would put this
+    # host's day numbers a day away from every other host's.
+    def floored_days_from_civil(year: int, month: int, day: int) -> int:
+        y = year - 1 if month <= 2 else year
+        era = (y if y >= 0 else y - 399) // 400
+        yoe = y - era * 400
+        mp = month - 3 if month > 2 else month + 9
+        doy = (153 * mp + 2) // 5 + day - 1
+        doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+        return era * 146097 + doe - 719468
+
+    assert _trunc_div(-399, 400) == 0, "truncation toward zero, not the floor's -1"
+    assert floored_days_from_civil(-220, 3, 15) != _days_from_civil(-220, 3, 15)
+    assert floored_days_from_civil(2026, 1, 15) == _days_from_civil(2026, 1, 15), "identical where non-negative"
+
+
+def test_iso_date_parser_is_strict_and_a_timestamp_keeps_only_its_date() -> None:
+    assert _try_parse_day("2026-01-15") is not None  # the canonical form
+    assert _try_parse_day("2000-02-29") is not None  # a real leap day
+
+    # A timestamp's TIME-OF-DAY is discarded — the axis's unit is the day, so
+    # 00:01 and 23:59 are the same value. That is the whole of the time-zone
+    # policy, and it is why no host needs one.
+    assert _try_parse_day("2026-01-15T10:30:00Z") == _try_parse_day("2026-01-15")
+
+    # Refused: an impossible calendar date, a month out of range, a day the month
+    # lacks, a locale spelling, a bare year, and the empty cell. Admitting any of
+    # them would be the string-sniffing this axis exists to avoid.
+    for bad in ("1900-02-29", "2026-13-01", "2026-00-10", "2026-01-32", "15/01/2026", "2026", ""):
+        assert _try_parse_day(bad) is None, f"{bad!r} is not a canonical ISO date"
+
+    # And an unparseable cell reads as the EPOCH rather than raising — the
+    # lowering stays total; FUARAN097 is the loud part, upstream.
+    assert _day_of("not a date") == 0
+
+
+def test_tick_ladder_picks_a_calendar_nice_step_and_formats_to_the_granularity() -> None:
+    if not _cases():
+        pytest.skip("chart-lowering fixtures not found")
+
+    def step_and_first(name: str) -> tuple[_TemporalStep, int]:
+        inp = json.loads((_CHART_LOWERING_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+        days = [_day_of(str(r[inp["xField"]])) for r in inp["data"]]
+        lo, hi = _temporal_domain(days)
+        return _choose_temporal_step(6, lo, hi), days[0]
+
+    def expect(name: str, unit: str, count: int, sample: str) -> None:
+        step, first = step_and_first(name)
+        assert (step.unit, step.count) == (unit, count), f"{name}: rung"
+        assert _temporal_label(step, first) == sample, f"{name}: label shape"
+
+    # The three granularity regimes, read off the CHOSEN RUNG rather than off the
+    # picture: one rung decides both the positions and the format.
+    expect("line-temporal-daily", "Days", 5, "05 Jan 26")
+    expect("bar-temporal-monthly", "Months", 6, "Jan 26")
+    expect("line-temporal-yearly", "Years", 2, "2017")
+
+    # The FORMAT BOUNDARIES: the adjacent rungs the two thresholds separate. 10
+    # days is the last nominal under 27; one month (30.436875) the first over. Six
+    # months (182.6) is the last under 365; one year (365.2425) the first over.
+    expect("line-temporal-format-day-boundary", "Days", 10, "02 Mar 26")
+    expect("line-temporal-format-month-boundary", "Months", 1, "Jan 26")
+    expect("line-temporal-format-halfyear-boundary", "Months", 6, "Jan 24")
+    expect("line-temporal-format-year-boundary", "Years", 1, "2021")
+
+    # The thresholds themselves, on the nominals, so the arithmetic is checkable
+    # without a fixture.
+    assert _nominal_days(_TemporalStep("Days", 10)) <= 27.0
+    assert _nominal_days(_TemporalStep("Months", 1)) > 27.0  # 30.436875
+    assert _nominal_days(_TemporalStep("Months", 6)) <= 365.0
+    assert _nominal_days(_TemporalStep("Years", 1)) > 365.0  # 365.2425
+
+    # The ladder is total: a millennium-wide domain still resolves, and it does so
+    # without generating a tick per day on the way.
+    wide = _choose_temporal_step(6, _days_from_civil(1000, 1, 1), _days_from_civil(2000, 1, 1))
+    assert wide.unit == "Years"
+    assert wide.count >= 200
+
+
+def test_month_and_year_rungs_land_on_calendar_boundaries_not_data_offsets() -> None:
+    # The quarters fall out of the alignment rule rather than being a case of
+    # their own: `(month-1) % 3 == 0` IS Jan/Apr/Jul/Oct.
+    quarters = [
+        _civil_from_days(d)
+        for d in _temporal_ticks(
+            _TemporalStep("Months", 3), _days_from_civil(2026, 1, 15), _days_from_civil(2027, 12, 20)
+        )
+    ]
+    assert all(d == 1 and (m - 1) % 3 == 0 for _, m, d in quarters)
+    assert quarters[0] == (2026, 4, 1), "the first is INSIDE the domain, not at its start"
+
+    # A year rung anchors on the January 1 of years divisible by the step — so a
+    # decade chart ticks 2020, 2030, never 2021, 2031.
+    decades = [
+        _civil_from_days(d)[0]
+        for d in _temporal_ticks(_TemporalStep("Years", 10), _days_from_civil(2013, 6, 1), _days_from_civil(2044, 6, 1))
+    ]
+    assert decades == [2020, 2030, 2040]
+
+    # A DAY rung steps from the domain's own start, because a "nice" 5-day
+    # boundary does not exist.
+    assert _temporal_ticks(_TemporalStep("Days", 5), 100, 118) == [100, 105, 110, 115]
+
+
+def _shapes_of(spec: ChartSpec, rows: list[dict]) -> list[Obj]:
+    shapes = lower(spec, rows).fields["shapes"]
+    assert isinstance(shapes, Arr)
+    return [s for s in shapes.items if isinstance(s, Obj)]
+
+
+def _fixture_spec(name: str) -> tuple[ChartSpec, list[dict]]:
+    inp = json.loads((_CHART_LOWERING_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    return _spec_and_rows(inp)
+
+
+@_cases_available
+def test_temporal_axis_is_continuous_marks_at_the_dates_labels_centred_on_them() -> None:
+    # The x tick marks are the short segments hanging below the spine — the same
+    # reader the band/continuous split uses.
+    spec, rows = _fixture_spec("line-temporal-daily")
+    shapes = _shapes_of(spec, rows)
+
+    def is_line(s: Obj) -> bool:
+        return s.tag == "Line"
+
+    spine_y = max(s.fields["y1"] for s in shapes if is_line(s) and s.fields["y1"] == s.fields["y2"])
+    mark_xs = sorted(
+        s.fields["x1"]
+        for s in shapes
+        if is_line(s) and s.fields["x1"] == s.fields["x2"] and s.fields["y1"] == spine_y and s.fields["y2"] > spine_y
+    )
+    # SIX ticks from thirty rows: the count follows the tick rule, not the row
+    # count — which is the whole difference from a band axis, where it would be
+    # thirty-one boundaries.
+    assert len(mark_xs) == 6
+
+    labelled = sorted(
+        (s.fields["x"], s.fields["text"])
+        for s in shapes
+        if s.tag == "Label"
+        and s.fields["y"] > spine_y
+        and isinstance(s.fields.get("style"), Obj)
+        and "opacity" in s.fields["style"].fields
+        # `Middle`-anchored excludes the y axis's lowest tick label, which also
+        # sits below the spine but is `End`-anchored in the left margin.
+        and s.fields["style"].fields.get("textAnchor") == "Middle"
+        and "rotation" not in s.fields["style"].fields
+    )
+    assert [x for x, _ in labelled] == mark_xs, "a continuous label sits AT its mark, not beside it"
+    assert [t for _, t in labelled] == [
+        "05 Jan 26",
+        "10 Jan 26",
+        "15 Jan 26",
+        "20 Jan 26",
+        "25 Jan 26",
+        "30 Jan 26",
+    ], "and reads at the data's own granularity"
+
+
+@_cases_available
+def test_vertical_gridlines_follow_from_the_axis_being_continuous() -> None:
+    # A temporal BAR chart has them too — the rule is a property, not a kind
+    # list. The GRID opacity (0.12) is the discriminator: the axis spines and the
+    # tick marks carry the axis opacity.
+    def vertical_rules(name: str) -> int:
+        spec, rows = _fixture_spec(name)
+        count = 0
+        for s in _shapes_of(spec, rows):
+            if s.tag != "Line" or s.fields["x1"] != s.fields["x2"] or s.fields["y2"] <= s.fields["y1"]:
+                continue
+            style = s.fields.get("style")
+            if not isinstance(style, Obj):
+                continue
+            opacity = style.fields.get("opacity")
+            if isinstance(opacity, Obj) and opacity.fields.get("value") == 0.12:
+                count += 1
+        return count
+
+    assert vertical_rules("bar-temporal-monthly") == 4, "a temporal bar axis rules its dates"
+    assert vertical_rules("bar-single") == 0, "a band axis has no positions to rule"
+
+
+def test_a_dates_position_is_its_value_so_an_irregular_run_is_not_evenly_spaced() -> None:
+    # The point of a temporal axis over a band one: 1 Jan, 2 Jan and 1 Feb are not
+    # three equal steps. A band axis would draw them evenly and silently misstate
+    # the data.
+    rows = [
+        {"day": "2026-01-01", "v": 1.0},
+        {"day": "2026-01-02", "v": 2.0},
+        {"day": "2026-02-01", "v": 3.0},
+    ]
+    base = ChartSpec(kind="Line", x_field="day", y_fields=("v",))
+
+    def polyline_xs(spec: ChartSpec) -> list[float]:
+        for s in _shapes_of(spec, rows):
+            if s.tag == "Polyline":
+                pts = s.fields["points"]
+                assert isinstance(pts, Arr)
+                return [p.fields["x"] for p in pts.items if isinstance(p, Obj)]
+        raise AssertionError("no polyline")
+
+    a, b, c = polyline_xs(ChartSpec(**{**base.__dict__, "x_scale": "Temporal"}))
+    # One day out of thirty-one: the second point sits hard against the first,
+    # and the third at the far edge.
+    assert b - a < (c - b) / 10.0
+
+    p, q, r = polyline_xs(base)
+    assert round(q - p, 2) == round(r - q, 2), "a band axis spaces them evenly"
+
+
+@_cases_available
+def test_a_temporal_axis_suppresses_its_default_x_title_never_an_explicit_one() -> None:
+    # §4e's rule, recorded by Phase 878 and wired here. The x-axis title is the
+    # unrotated, opacity-free label on the canvas's bottom inset.
+    def x_axis_title(spec: ChartSpec, rows: list[dict]) -> str:
+        for s in _shapes_of(spec, rows):
+            if s.tag != "Label" or s.fields["y"] != 388.0:
+                continue
+            style = s.fields.get("style")
+            if isinstance(style, Obj) and "opacity" not in style.fields and "rotation" not in style.fields:
+                text = s.fields["text"]
+                assert isinstance(text, str)
+                return text
+        return ""
+
+    spec, rows = _fixture_spec("line-temporal-daily")
+    assert x_axis_title(spec, rows) == "", "no fallback title on a date axis"
+
+    # The band twin of the same chart DOES title itself, so the suppression is
+    # attributable to the scale and to nothing else.
+    banded = ChartSpec(**{**spec.__dict__, "x_scale": None})
+    assert x_axis_title(banded, rows) == "Day", "a category axis still falls back to the field name"
+
+    # And an explicit title always draws — the author overriding the default,
+    # which the rule never touches.
+    titled_spec, titled_rows = _fixture_spec("bar-temporal-x-title")
+    assert x_axis_title(titled_spec, titled_rows) == "Reporting month"
+
+
+@_cases_available
+def test_the_label_ladder_governs_a_temporal_axiss_tick_labels_too() -> None:
+    # Every ordinary temporal fixture rests FLAT — six short date labels in a
+    # comfortable pitch — and the crowded one escalates, uniformly. Keyed on the
+    # x-label baseline exactly, because the y axis's lowest tick label also sits
+    # below the plot bottom and a looser reader picks it up.
+    def rotations(name: str) -> set[float | None]:
+        spec, rows = _fixture_spec(name)
+        shapes = _shapes_of(spec, rows)
+        spine_y = max(
+            s.fields["y1"]
+            for s in shapes
+            if s.tag == "Line" and s.fields["y1"] == s.fields["y2"] and s.fields["x1"] < s.fields["x2"]
+        )
+        baseline = round(spine_y + 20.0, 2)
+        out: set[float | None] = set()
+        for s in shapes:
+            if s.tag != "Label" or s.fields["y"] != baseline:
+                continue
+            style = s.fields.get("style")
+            if isinstance(style, Obj) and "opacity" in style.fields:
+                rot = style.fields.get("rotation")
+                out.add(rot if isinstance(rot, float) else None)
+        return out
+
+    assert rotations("line-temporal-daily") == {None}, "a roomy date axis reads flat"
+    assert rotations("line-temporal-vertical-labels") == {-90.0}, "a crowded one goes vertical — never a mix"
+
+
+@_cases_available
+def test_an_absent_x_scale_is_byte_identical_to_an_explicit_category() -> None:
+    # The stronger form the corpus cannot state: the default is not merely
+    # similar to absence, it is the same bytes. Which is why every pre-882 golden
+    # is unmoved.
+    for name in _cases():
+        inp = json.loads((_CHART_LOWERING_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+        if inp.get("xScale") is not None:
+            continue
+        spec, rows = _spec_and_rows(inp)
+        explicit = ChartSpec(**{**spec.__dict__, "x_scale": "Category"})
+        assert encode_node(lower_node("c", explicit, rows)) == encode_node(lower_node("c", spec, rows)), (
+            f"{name}: Category must be indistinguishable from absent"
+        )
+
+
+@_cases_available
+def test_a_temporal_declaration_on_a_pie_is_inert() -> None:
+    # Dead intent the lowering cannot honour, neutralised rather than
+    # half-applied: a pie's picture must not depend on a scale it never reads.
+    spec, rows = _fixture_spec("pie-quarters")
+    temporal = ChartSpec(**{**spec.__dict__, "x_scale": "Temporal"})
+    assert encode_node(lower_node("c", temporal, rows)) == encode_node(lower_node("c", spec, rows))
+
+
+def test_ssr_bridge_passes_x_scale() -> None:
+    # The bridge half. Positive control first: with the declaration stripped the
+    # axis is a band one and falls back to the capitalised field name as its x
+    # title; declared, the title is suppressed and the labels read as dates.
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    def render_wire(wire: str) -> str:
+        result = decode_node(wire)
+        assert result.ok, getattr(result, "error", result)
+        html = render_html(result.value)
+        assert "<svg" in html and "ssr-placeholder" not in html
+        return html
+
+    temporal_wire = json.dumps(
+        {
+            "id": "chart-temporal",
+            "kind": {
+                "$type": "Chart",
+                "kind": "Line",
+                "xField": "day",
+                "yFields": ["sessions"],
+                "stacked": False,
+                "xScale": "Temporal",
+                "source": {
+                    "$type": "Static",
+                    "value": [
+                        {"day": "2026-01-05", "sessions": 1200},
+                        {"day": "2026-01-12", "sessions": 1450},
+                        {"day": "2026-01-19", "sessions": 1310},
+                        {"day": "2026-01-26", "sessions": 1580},
+                    ],
+                },
+            },
+        }
+    )
+    stripped = json.loads(temporal_wire)
+    del stripped["kind"]["xScale"]
+    band_html = render_wire(json.dumps(stripped))
+    assert ">Day<" in band_html, "negative control: a band axis titles itself from the field"
+    assert ">2026-01-05<" in band_html, "and labels the raw cell strings"
+
+    html = render_wire(temporal_wire)
+    assert ">Day<" not in html, "the declared date axis suppresses its fallback title"
+    assert ">2026-01-05<" not in html, "and labels calendar ticks, not the cells"
+    assert ">05 Jan 26<" in html

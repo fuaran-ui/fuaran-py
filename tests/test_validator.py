@@ -55,6 +55,7 @@ def _chart_node(
     stacked: bool = False,
     schema: list[tuple[str, str]] | None = None,
     pipeline_items: list[Obj] | None = None,
+    x_scale: str | None = None,
 ) -> Node:
     entries = schema or [("quarter", "string"), ("revenue", "float")]
     schema_arr = Arr([Obj(None, {"name": n, "type": t}) for n, t in entries])
@@ -73,6 +74,8 @@ def _chart_node(
     }
     if stacked:
         fields["stacked"] = True
+    if x_scale is not None:
+        fields["xScale"] = x_scale
     return Node("cht", Obj("Chart", fields))  # type: ignore[arg-type]
 
 
@@ -93,6 +96,57 @@ def test_chart_non_numeric_y_field_is_flagged() -> None:
 def test_scatter_x_field_must_be_numeric() -> None:
     findings = validate_node(_chart_node(kind="Scatter", x_field="quarter"))
     assert "CHART_FIELD_TYPE_MISMATCH" in [f.code for f in findings]
+
+
+def test_temporal_x_over_a_non_date_column_is_refused() -> None:
+    # FUARAN097 (Phase 882). The declaration is grounded against the column type:
+    # a string column cannot parse as a date, so every row's x would read as the
+    # epoch and the chart would draw every point stacked on one date.
+    findings = validate_node(_chart_node(x_scale="Temporal"))  # `quarter` is a string column
+    assert [f.code for f in findings] == ["CHART_TEMPORAL_X_NOT_DATE"]
+
+    # A date column is what the declaration claims, so it passes; and so does a
+    # timestamp, whose time-of-day the lowering discards (a documented narrowing,
+    # not a mismatch).
+    for ty in ("date", "timestamp"):
+        assert (
+            validate_node(_chart_node(x_field="day", x_scale="Temporal", schema=[("day", ty), ("revenue", "float")]))
+            == []
+        )
+
+    # Without the declaration the same string column is an ordinary category axis
+    # — the rule fires on the DECLARATION, not on the column.
+    assert validate_node(_chart_node()) == []
+
+    # An unknowable source passes ungrounded (refuse only what is PROVABLY wrong).
+    static_source = Node(
+        "cht",
+        Obj(
+            "Chart",
+            {
+                "kind": "Line",
+                "source": Obj("Static", {"value": Arr([])}),
+                "xField": "quarter",
+                "yFields": Arr(["revenue"]),
+                "xScale": "Temporal",
+            },
+        ),  # type: ignore[arg-type]
+    )
+    assert validate_node(static_source) == []
+
+
+def test_temporal_narrows_the_scatter_x_numeric_arm() -> None:
+    # FUARAN087's x arm is NARROWED by a temporal declaration: a temporal scatter
+    # reads its x as dates, so a date column there is correct rather than "not
+    # numeric". Without the narrowing a correctly-authored time-series scatter
+    # would be refused for the very column it declared.
+    dated = [("day", "date"), ("revenue", "float")]
+    assert validate_node(_chart_node(kind="Scatter", x_field="day", schema=dated, x_scale="Temporal")) == []
+    # The negative control: the same scatter WITHOUT the declaration still wants a
+    # numeric x, and a date column is not one.
+    assert [f.code for f in validate_node(_chart_node(kind="Scatter", x_field="day", schema=dated))] == [
+        "CHART_FIELD_TYPE_MISMATCH"
+    ]
 
 
 def test_pie_needs_exactly_one_series() -> None:

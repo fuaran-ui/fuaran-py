@@ -119,3 +119,77 @@ def test_headless_chart_renders_real_inline_svg() -> None:
     assert "ssr-placeholder" not in html
     # A bar rectangle from the series geometry made it into the SVG.
     assert "#1a86ac" in html
+
+
+# ── SSR bridge coverage (the wire-node → ChartSpec seam) ─────────────────────
+# The parametrized goldens above exercise the LOWERING with a hand-built
+# ChartSpec; these pin the other half — that the renderer's `_lower_chart`
+# bridge actually carries the declared wire fields (`valueFormat`, `xTitle`,
+# `yTitle`, `subtitle`) into the spec, so a dropped field cannot silently
+# regress to the lowering's defaults again (the Phase 876/878 SSR gap).
+
+_SSR_NODE_FIXTURES: dict[str, tuple[str, ...]] = {
+    # Phase 876 — Currency GBP: ticks carry the symbol only when the declared
+    # format crossed the bridge (unformatted ticks are bare numbers).
+    "chart-value-format": ("£",),
+    # Phase 878 — the subtitle draws only when declared (it has no fallback).
+    "chart-axis-titles": ("Millions of £",),
+}
+
+
+@pytest.mark.parametrize("name", sorted(_SSR_NODE_FIXTURES))
+def test_ssr_bridge_carries_declared_wire_fields(name: str) -> None:
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    path = CORPUS_ROOT / "nodes" / f"{name}.json"
+    if not path.is_file():
+        pytest.skip(f"corpus fixture nodes/{name}.json not found under {CORPUS_ROOT}")
+    result = decode_node(path.read_text(encoding="utf-8"))
+    assert result.ok, getattr(result, "error", result)
+    html = render_html(result.value)
+    assert "<svg" in html and "ssr-placeholder" not in html
+    for needle in _SSR_NODE_FIXTURES[name]:
+        assert needle in html, f"{name}: declared wire field did not reach the SVG ({needle!r})"
+
+
+def test_ssr_bridge_passes_all_declared_chart_fields() -> None:
+    # Discriminating values: the axis titles DIFFER from the capitalised
+    # field-name fallbacks and the format is Percent, so each assertion fails
+    # individually if its field is dropped by the bridge (a corpus fixture
+    # whose declared titles coincide with the fallbacks cannot catch that).
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    wire = json.dumps(
+        {
+            "id": "chart-bridge",
+            "kind": {
+                "$type": "Chart",
+                "kind": "Bar",
+                "xField": "quarter",
+                "yFields": ["share"],
+                "stacked": False,
+                "title": "Market share",
+                "subtitle": "Share of segment",
+                "xTitle": "Fiscal quarter",
+                "yTitle": "Segment share",
+                "valueFormat": {"$type": "Percent"},
+                "source": {
+                    "$type": "Static",
+                    "value": [
+                        {"quarter": "Q1", "share": 0.42},
+                        {"quarter": "Q2", "share": 0.55},
+                    ],
+                },
+            },
+        }
+    )
+    result = decode_node(wire)
+    assert result.ok, getattr(result, "error", result)
+    html = render_html(result.value)
+    assert "<svg" in html and "ssr-placeholder" not in html
+    assert "Fiscal quarter" in html  # x_title (fallback would be "Quarter")
+    assert "Segment share" in html  # y_title (fallback would be "Share")
+    assert "Share of segment" in html  # subtitle (absent without the bridge)
+    assert ">0%<" in html  # value_format Percent (a bare "0" tick without it)

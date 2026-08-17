@@ -1036,17 +1036,38 @@ class Renderer:
         y_fields = tuple(y for y in y_fields_raw.items if isinstance(y, str))
 
         # 0.2.0 — the canonical Literal is the bare string (the envelope stays
-        # decode-accepted, so both spellings resolve here).
-        title_src = fields.get("title")
-        title: str | None = None
-        if isinstance(title_src, str):
-            title = title_src
-        elif isinstance(title_src, Obj) and title_src.tag == "Literal":
-            text = title_src.fields.get("text")
-            title = text if isinstance(text, str) else None
+        # decode-accepted, so both spellings resolve here). Shared by every
+        # TextSource-typed chart field (title, xTitle, yTitle, subtitle).
+        def literal_text(src: Value) -> str | None:
+            if isinstance(src, str):
+                return src
+            if isinstance(src, Obj) and src.tag == "Literal":
+                text = src.fields.get("text")
+                return text if isinstance(text, str) else None
+            return None
 
         stacked = fields.get("stacked") is True
-        spec = ChartSpec(kind=kind, x_field=x_field, y_fields=y_fields, title=title, stacked=stacked)
+
+        # Phase 876 — the declared value-axis number format crosses the bridge
+        # as its canonical wire mapping (the shape the lowering reads).
+        # `axisUnitMode` is a STYLE selector, not a wire field — never read here.
+        value_format_src = fields.get("valueFormat")
+        value_format: dict[str, object] | None = None
+        if isinstance(value_format_src, Obj) and isinstance(value_format_src.tag, str):
+            value_format = {"$type": value_format_src.tag, **value_format_src.fields}
+
+        spec = ChartSpec(
+            kind=kind,
+            x_field=x_field,
+            y_fields=y_fields,
+            title=literal_text(fields.get("title")),
+            stacked=stacked,
+            value_format=value_format,
+            # Phase 878 — the axis names + the muted subtitle.
+            x_title=literal_text(fields.get("xTitle")),
+            y_title=literal_text(fields.get("yTitle")),
+            subtitle=literal_text(fields.get("subtitle")),
+        )
         drawing_node = lower_node(node.id, spec, rows)
         assert isinstance(drawing_node.kind, Obj)
         return self._drawing(drawing_node, drawing_node.kind.fields)

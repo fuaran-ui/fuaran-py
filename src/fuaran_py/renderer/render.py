@@ -1056,6 +1056,11 @@ class Renderer:
         if isinstance(value_format_src, Obj) and isinstance(value_format_src.tag, str):
             value_format = {"$type": value_format_src.tag, **value_format_src.fields}
 
+        # Phase 880 — the legend edge (bare enum name; absent means the host
+        # default, the explicit "None" suppresses the legend).
+        legend_position_src = fields.get("legendPosition")
+        legend_position = legend_position_src if isinstance(legend_position_src, str) else None
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -1067,6 +1072,7 @@ class Renderer:
             x_title=literal_text(fields.get("xTitle")),
             y_title=literal_text(fields.get("yTitle")),
             subtitle=literal_text(fields.get("subtitle")),
+            legend_position=legend_position,
         )
         drawing_node = lower_node(node.id, spec, rows)
         assert isinstance(drawing_node.kind, Obj)

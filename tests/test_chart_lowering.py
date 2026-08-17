@@ -193,3 +193,61 @@ def test_ssr_bridge_passes_all_declared_chart_fields() -> None:
     assert "Segment share" in html  # y_title (fallback would be "Share")
     assert "Share of segment" in html  # subtitle (absent without the bridge)
     assert ">0%<" in html  # value_format Percent (a bare "0" tick without it)
+
+
+def test_ssr_bridge_passes_legend_position() -> None:
+    # Phase 880. Two halves, each discriminating against the default (`Right`):
+    # the corpus fixture declares `Bottom`, so its render must DIFFER from the
+    # same node with the declaration stripped; and an explicit `"None"`
+    # suppresses the legend, so the series labels a two-series default legend
+    # would draw must be absent.
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    def render_wire(wire: str) -> str:
+        result = decode_node(wire)
+        assert result.ok, getattr(result, "error", result)
+        html = render_html(result.value)
+        assert "<svg" in html and "ssr-placeholder" not in html
+        return html
+
+    fixture = CORPUS_ROOT / "nodes" / "chart-legend-position.json"
+    if fixture.is_file():
+        declared = json.loads(fixture.read_text(encoding="utf-8"))
+        assert declared["kind"].pop("legendPosition") == "Bottom"
+        stripped_html = render_wire(json.dumps(declared))
+        declared_html = render_wire(fixture.read_text(encoding="utf-8"))
+        assert declared_html != stripped_html, "declared legendPosition did not move the legend"
+
+    none_wire = json.dumps(
+        {
+            "id": "chart-legend-none",
+            "kind": {
+                "$type": "Chart",
+                "kind": "Bar",
+                "xField": "region",
+                "yFields": ["alpha_series", "beta_series"],
+                "stacked": False,
+                "legendPosition": "None",
+                "source": {
+                    "$type": "Static",
+                    "value": [
+                        {"region": "North", "alpha_series": 80, "beta_series": 100},
+                        {"region": "South", "alpha_series": 130, "beta_series": 110},
+                    ],
+                },
+            },
+        }
+    )
+    # The legend's labels are the raw series names AS TEXT CONTENT (`>name<`);
+    # the series geometry also carries them in `data-fuaran-mark` attributes,
+    # so the text-node form is the discriminator. Positive control first: the
+    # default legend draws them, so their disappearance is the suppression —
+    # not a vacuously-true substring.
+    stripped = json.loads(none_wire)
+    del stripped["kind"]["legendPosition"]
+    default_html = render_wire(json.dumps(stripped))
+    assert ">alpha_series<" in default_html and ">beta_series<" in default_html
+    html = render_wire(none_wire)
+    assert ">alpha_series<" not in html
+    assert ">beta_series<" not in html

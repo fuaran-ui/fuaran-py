@@ -1,0 +1,1 @@
+{"id":"chart-legend-position","kind":{"$type":"Chart","kind":"Bar","legendPosition":"Bottom","source":{"$type":"Static","value":[{"region":"North","sales":80,"target":100},{"region":"South","sales":130,"target":110}]},"stacked":false,"title":"Sales vs target","xField":"region","yFields":["sales","target"]}}

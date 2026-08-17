@@ -972,6 +972,30 @@
       "description": "Visualisation/Chart"
     },
     {
+      "id": "chart-axis-titles",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-axis-titles.json",
+      "expectedFile": "nodes/chart-axis-titles.json",
+      "description": "Visualisation/Chart (Phase 878 — xTitle/yTitle/subtitle: the axis names + the muted subtitle)"
+    },
+    {
+      "id": "chart-data-labels",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-data-labels.json",
+      "expectedFile": "nodes/chart-data-labels.json",
+      "description": "Visualisation/Chart (Phase 881 — dataLabels: values written onto the picture)"
+    },
+    {
+      "id": "chart-legend-position",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/chart-legend-position.json",
+      "expectedFile": "nodes/chart-legend-position.json",
+      "description": "Visualisation/Chart (Phase 880 — legendPosition: the legend's declared edge)"
+    },
+    {
       "id": "chart-state-rows",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1314,6 +1338,14 @@
       "inputFile": "nodes/grid-bound-sort.json",
       "expectedFile": "nodes/grid-bound-sort.json",
       "description": "Visualisation/Grid (Phase 861 — bound-path sort: per-column sortable narrowing + a declared initial order)"
+    },
+    {
+      "id": "grid-declared-edit",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-declared-edit.json",
+      "expectedFile": "nodes/grid-declared-edit.json",
+      "description": "Visualisation/Grid (Phase 863 — declared edit destination + per-column read-only narrowing)"
     },
     {
       "id": "grid-editable-state",

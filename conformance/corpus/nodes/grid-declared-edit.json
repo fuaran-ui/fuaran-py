@@ -1,0 +1,1 @@
+{"id":"grid-declared-edit","kind":{"$type":"DataGrid","columns":[{"field":"month","kind":{"$type":"Text"},"label":"Month"},{"field":"revenue","kind":{"$type":"Text"},"label":"Revenue"},{"editable":false,"field":"note","kind":{"$type":"Text"},"label":"Note"}],"editStateKey":"stock-adjustments","editable":true,"rowKeyField":"month","source":{"$type":"Query","name":"stock"}}}

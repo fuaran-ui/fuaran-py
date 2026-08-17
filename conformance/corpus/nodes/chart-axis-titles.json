@@ -1,0 +1,1 @@
+{"id":"chart-axis-titles","kind":{"$type":"Chart","kind":"Bar","source":{"$type":"Static","value":[{"quarter":"Q1","revenue":12500000},{"quarter":"Q2","revenue":15200000}]},"stacked":false,"subtitle":"Millions of £","title":"Revenue by quarter","valueFormat":{"$type":"Currency","isoCode":"GBP"},"xField":"quarter","xTitle":"Quarter","yFields":["revenue"],"yTitle":"Revenue"}}

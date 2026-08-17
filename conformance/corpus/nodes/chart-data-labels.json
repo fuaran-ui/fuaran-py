@@ -1,0 +1,1 @@
+{"id":"chart-data-labels","kind":{"$type":"Chart","dataLabels":"Ends","kind":"Bar","source":{"$type":"Static","value":[{"quarter":"Q1","revenue":120},{"quarter":"Q2","revenue":150}]},"stacked":false,"title":"Revenue by quarter","xField":"quarter","yFields":["revenue"]}}

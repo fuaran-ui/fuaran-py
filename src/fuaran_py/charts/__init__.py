@@ -26,7 +26,7 @@ spec wire field; series (categorical data) colours stay hex. See
 from __future__ import annotations
 
 import math
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 
 from ..canonical import format_finite_double
@@ -169,6 +169,44 @@ ellipsis. A column's width is the MAX of its entries, bounded by
 ``_LEGEND_COLUMN_MAX_SHARE`` and truncated at it, and its height is one
 ``_LEGEND_ROW_PITCH_Y`` per entry into 400 px of canvas. Neither term grows
 without limit, so the eight-slot palette legends itself by construction."""
+
+DATA_LABEL_MODES = ("Off", "Ends")
+"""Whether a chart writes its values onto the picture, and where (Phase 881). A
+WIRE vocabulary (``ChartSpec.data_labels``); the type size, the offsets and the
+fit rule that realise it are the host's, below.
+
+THE SET IS TWO, AND THAT IS THE POINT. There is deliberately no all-points
+value: a number on every interior point is the clutter this vocabulary exists to
+avoid, so no shape of the API can request one. ``"Ends"`` names the selective
+placements that read — a bar's cap, a line's last point — and the set is closed
+there."""
+
+_DATA_LABEL_MODE_DEFAULT = "Off"
+"""What an absent ``ChartSpec.data_labels`` resolves to — and the shipped
+default. The one place this differs from ``legend_position``, deliberately: a
+legend is chrome an author opts OUT of, where a data label is ink an author opts
+IN to. So an absent field lowers to the pre-881 picture byte-for-byte."""
+
+# Phase 881 — the data-label geometry. NONE of these feeds a margin: a data
+# label never makes the plot smaller, it either fits the room the picture
+# already has or it is suppressed. That is what keeps ``Off`` byte-identical to
+# the pre-881 layout rather than merely visually similar.
+#
+# The font size is one point BELOW the tick size, and a constant of its own: a
+# tick sits OUTSIDE the plot in a column, where a data label sits INSIDE it
+# competing with the mark it describes.
+_DATA_LABEL_FONT_SIZE = 12.0
+# Clearance between a bar's cap and the nearest ink of its label, in BOTH
+# directions — one constant used twice, so the two placements are mirrors.
+_DATA_LABEL_OFFSET_Y = 5.0
+# Clearance a label keeps from the plot edge, and half the clearance it keeps
+# from its neighbour's. Feeds the fit gate only.
+_DATA_LABEL_PADDING = 2.0
+# Gap from a line/area endpoint to the left edge of its label.
+_DATA_LABEL_END_OFFSET_X = 6.0
+# Rise from a line/area endpoint to its label's baseline — the nudge that takes
+# the text off the line it belongs to.
+_DATA_LABEL_END_NUDGE_Y = 5.0
 
 
 # ── Deterministic numeric helpers ────────────────────────────────────────────
@@ -683,6 +721,15 @@ class ChartSpec:
     # absence stays the ordinary shape and is omitted on the wire, and an author
     # who wants no legend has to say so.
     legend_position: str | None = None
+    # Phase 881 — whether the values are written onto the picture. A WIRE field
+    # in the same way: whether a reader is meant to read the NUMBERS or the
+    # shape is the author's meaning; the type size, the offsets and the fit rule
+    # that decide whether a given label draws are the host's, above.
+    #
+    # Absent means ``"Off"``, which is also the default, so an absent field
+    # lowers to the pre-881 picture byte-for-byte. ``"Ends"`` is the only other
+    # value there is.
+    data_labels: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -1237,6 +1284,27 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             )
         )
 
+    # ── Bar geometry ──
+    #
+    # Hoisted out of the two Bar arms (Phase 881) because the cap labels have to
+    # land on the SAME caps the rectangles draw: one expression per quantity, so
+    # a label and its bar cannot disagree about where the bar is. The arithmetic
+    # is character-for-character what the arms computed inline before, which is
+    # why every golden is unmoved.
+    bar_group_w = band_w * 0.7
+    stacked_bar_w = _r2(min(bar_group_w * 0.9, _BAR_MAX_THICKNESS))
+    grouped_sub_w = bar_group_w / float(m) if m > 0 else bar_group_w
+    grouped_bar_w = _r2(min(grouped_sub_w * 0.9, _BAR_MAX_THICKNESS))
+
+    def stacked_bar_x(i: int) -> float:
+        return _r2(plot_x0 + band_w * float(i) + (band_w - stacked_bar_w) / 2.0)
+
+    def grouped_bar_x(i: int, j: int) -> float:
+        # Centre the (possibly capped) bar in its own sub-slot, so a cap takes
+        # air off BOTH sides and the group stays symmetric about the band centre.
+        slot_x = plot_x0 + band_w * float(i) + (band_w - bar_group_w) / 2.0 + float(j) * grouped_sub_w
+        return _r2(slot_x + (grouped_sub_w - grouped_bar_w) / 2.0)
+
     # ── Series geometry ──
     series_shapes: list[Value] = []
     if spec.kind in ("Bar", "Column") and stacked:
@@ -1244,10 +1312,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         # segments between consecutive cumulative sums (Phase 637), each
         # shortened by `_STACK_SEGMENT_GAP` on the side facing the next
         # segment so the boundaries read as gaps rather than colour changes.
-        group_w = band_w * 0.7
-        bw = _r2(min(group_w * 0.9, _BAR_MAX_THICKNESS))
+        bw = stacked_bar_w
         for i in range(n):
-            bx = _r2(plot_x0 + band_w * float(i) + (band_w - bw) / 2.0)
+            bx = stacked_bar_x(i)
             cums = cums_for(i)
             for j in range(m):
                 y0 = y_scale(cums[j])
@@ -1262,20 +1329,14 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
                 series_shapes.append(_rectangle(bx, top, bw, hgt, None, _with_mark(_style_fill(_colour_for(j)), mark)))
     elif spec.kind in ("Bar", "Column"):
-        group_w = band_w * 0.7
-        sub_w = group_w / float(m) if m > 0 else group_w
-        bw = _r2(min(sub_w * 0.9, _BAR_MAX_THICKNESS))
+        bw = grouped_bar_w
         base_y = y_scale(0.0)
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             for i in range(n):
                 v = values[i]
-                # Centre the (possibly capped) bar in its own sub-slot, so a
-                # cap takes air off BOTH sides and the group stays symmetric
-                # about the band centre.
-                slot_x = plot_x0 + band_w * float(i) + (band_w - group_w) / 2.0 + float(j) * sub_w
-                bx = _r2(slot_x + (sub_w - bw) / 2.0)
+                bx = grouped_bar_x(i, j)
                 vy = y_scale(v)
                 top = min(vy, base_y)
                 hgt = _r2(abs(vy - base_y))
@@ -1331,6 +1392,126 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                         _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}"),
                     )
                 )
+
+    # ── Data labels (Phase 881) — the values, written selectively ────────────
+    #
+    # Two states and no third: ``Off`` (the default, and what an absent field
+    # means) and ``Ends``. There is deliberately NO all-points mode — a number
+    # on every interior point is the clutter this vocabulary exists to prevent,
+    # so the API cannot express it. ``Ends`` names the placements that read on
+    # their own:
+    #
+    #   * BARS label the CAP — above a positive cap, below a negative one, the
+    #     two exact mirrors about the cap.
+    #   * A GROUPED bar labels every bar. A STACKED bar labels the TOTAL at the
+    #     stack cap and nothing else: an interior segment's value is unreadable
+    #     against the segment above it, and the legend plus the hover readout
+    #     already serve it.
+    #   * LINES and AREA EDGES label the LAST point of each series, right of the
+    #     endpoint and nudged up off the line.
+    #   * SCATTER gets nothing in v1 (recorded decision): a scatter's x IS a
+    #     value axis, so its last ROW carries no meaning its first does not, and
+    #     labelling by row order would present an accident of the feed as a
+    #     reading of the chart.
+    #   * PIE is unchanged — its legend already carries ``name (NN%)``.
+    #
+    # Every value goes through ``y_tick_text``, so a label and a tick agree by
+    # construction. NO LABEL EVER MOVES A MARGIN: the plot rectangle is decided
+    # long before this point, so a label either fits the room the picture
+    # already has or it is SUPPRESSED — never clipped, never overlapped, never
+    # relocated inside the bar.
+    data_labels_on = (spec.data_labels or _DATA_LABEL_MODE_DEFAULT) == "Ends"
+    data_label_line = _text_line_height(_DATA_LABEL_FONT_SIZE, _TEXT_LINE_HEIGHT_FACTOR)
+    data_label_shapes: list[Value] = []
+
+    def push_data_label(anchor: str, x: float, baseline: float, max_width: float, max_height: float, text: str) -> bool:
+        """The single fit gate: ``text_fits_box`` against the room the placement
+        actually has. No fit, no label."""
+        if not text_fits_box(_DATA_LABEL_FONT_SIZE, _TEXT_LINE_HEIGHT_FACTOR, max_width, max_height, text):
+            return False
+        # Label-role ink at the chrome opacity — NEVER the series colour: a
+        # value is a reading of the mark, not a second copy of its identity.
+        data_label_shapes.append(
+            _label(
+                _r2(x),
+                _r2(baseline),
+                _literal(text),
+                _text_style(_LABEL_OPACITY, anchor, _DATA_LABEL_FONT_SIZE, "Normal"),
+            )
+        )
+        return True
+
+    def push_cap_label(cx: float, pitch: float, v: float) -> None:
+        """A value at a bar's cap, centred on ``cx``. ``pitch`` is the distance
+        to the NEXT label's centre — the neighbouring bar's slot — so the budget
+        is what separates two labels rather than what fits one bar."""
+        cap_y = y_scale(v)
+        max_width = max(0.0, pitch - 2.0 * _DATA_LABEL_PADDING)
+        if v < 0.0:
+            push_data_label(
+                "Middle",
+                cx,
+                cap_y + _DATA_LABEL_OFFSET_Y + _DATA_LABEL_FONT_SIZE,
+                max_width,
+                plot_y1 - cap_y - _DATA_LABEL_OFFSET_Y - _DATA_LABEL_PADDING,
+                y_tick_text(v),
+            )
+        else:
+            push_data_label(
+                "Middle",
+                cx,
+                cap_y - _DATA_LABEL_OFFSET_Y,
+                max_width,
+                cap_y - plot_y0 - _DATA_LABEL_OFFSET_Y - _DATA_LABEL_PADDING,
+                y_tick_text(v),
+            )
+
+    def push_endpoint_labels(value_at: Callable[[int], float]) -> None:
+        """The series-endpoint labels, in series order. Two gates, the second the
+        vertical analogue of the cap labels' pitch: every endpoint label shares
+        one x, so the thing they collide with is each other. A label is admitted
+        only when its line clears every ALREADY-ADMITTED one — series order
+        decides who yields, which makes the outcome deterministic."""
+        if n == 0:
+            return
+        label_x = centre_x(n - 1) + _DATA_LABEL_END_OFFSET_X
+        # The budget runs to the PLOT's right edge, not the canvas's: beyond it
+        # lies the legend column, and running into it is the collision the gate
+        # refuses.
+        max_width = max(0.0, plot_x1 - label_x - _DATA_LABEL_PADDING)
+        admitted: list[float] = []
+        for j in range(m):
+            v = value_at(j)
+            baseline = y_scale(v) - _DATA_LABEL_END_NUDGE_Y
+            if not all(abs(b - baseline) >= data_label_line + _DATA_LABEL_PADDING for b in admitted):
+                continue
+            if push_data_label(
+                "Start",
+                label_x,
+                baseline,
+                max_width,
+                baseline - plot_y0 - _DATA_LABEL_PADDING,
+                y_tick_text(v),
+            ):
+                admitted.append(baseline)
+
+    if data_labels_on:
+        if spec.kind in ("Bar", "Column") and stacked:
+            # The TOTAL at the stack cap, once per category.
+            for i in range(n):
+                push_cap_label(stacked_bar_x(i) + stacked_bar_w / 2.0, band_w, cums_for(i)[m])
+        elif spec.kind in ("Bar", "Column"):
+            for j in range(m):
+                for i in range(n):
+                    push_cap_label(grouped_bar_x(i, j) + grouped_bar_w / 2.0, grouped_sub_w, series[j][i])
+        elif spec.kind == "Area" and stacked:
+            # The band's own UPPER boundary is the edge that was drawn, so it is
+            # the cumulative value there — not the series' own datum, which is
+            # nowhere on the picture.
+            last_cums = cums_for(n - 1) if n > 0 else ()
+            push_endpoint_labels(lambda j: last_cums[j + 1])
+        elif spec.kind in ("Line", "Area"):
+            push_endpoint_labels(lambda j: series[j][n - 1])
 
     # ── Legend (Phase 880) — one entry list, four placements ──
     #
@@ -1463,6 +1644,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             + x_labels
             + axis_titles
             + series_shapes
+            # Phase 881 — the values sit ON the series, so they are painted
+            # straight after it and before the legend.
+            + data_label_shapes
             + legend
             + title_shapes
             + subtitle_shapes

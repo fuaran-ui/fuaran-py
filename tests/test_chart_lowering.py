@@ -42,6 +42,10 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # (`Top | Right | Bottom | None`). ABSENT means the host default (`Right`),
     # never "no legend", so it is omitted on every pre-880 case even though the
     # picture many of them lower to moved when the default did.
+    #
+    # Phase 881 — `dataLabels` is a WIRE field carried as the bare enum name
+    # (`Off | Ends`). ABSENT means `Off`, which is also the default, so it is
+    # omitted on every pre-881 case AND every pre-881 golden is unchanged.
     spec = ChartSpec(
         kind=inp["kind"],
         x_field=inp["xField"],
@@ -54,6 +58,7 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         y_title=inp.get("yTitle"),
         subtitle=inp.get("subtitle"),
         legend_position=inp.get("legendPosition"),
+        data_labels=inp.get("dataLabels"),
     )
     return spec, list(inp["data"])
 

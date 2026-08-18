@@ -82,7 +82,7 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
                                 "FUARAN082",
                                 f"{path}.cases",
                                 f"switch has two or more cases matching '{match}' — first-match-wins "
-                                "makes the later case dead",
+                                "makes the later case dead; give each case a distinct match value",
                             )
                         )
                         reported.add(match)
@@ -170,7 +170,8 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
                 Finding(
                     "FUARAN087",
                     path,
-                    f"chart field '{field_name}' is a '{ty}' column the lowering cannot plot numerically",
+                    f"chart field '{field_name}' is a '{ty}' column — the lowering reads non-numeric "
+                    "cells as 0.0, a silently flat series",
                 )
             )
 

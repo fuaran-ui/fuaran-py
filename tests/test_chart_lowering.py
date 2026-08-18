@@ -704,3 +704,128 @@ def test_ssr_bridge_passes_x_scale() -> None:
     assert ">Day<" not in html, "the declared date axis suppresses its fallback title"
     assert ">2026-01-05<" not in html, "and labels calendar ticks, not the cells"
     assert ">05 Jan 26<" in html
+
+
+# ── Phase 921 — the accessible summary + the root's announced name ────────────
+#
+# The goldens above already pin the summary byte-for-byte on every fixture (it is
+# a field of the Drawing they encode). These pin the GRAMMAR's arms by name, so a
+# rewrite that keeps the goldens passing by regenerating them still has to answer
+# for each rule, and they pin the root wiring that gets it ANNOUNCED.
+
+
+def _summary(spec: ChartSpec, rows: list[dict[str, object]]) -> str:
+    from fuaran_py.charts import lower
+
+    # 0.2.0 — the bare JSON string IS the canonical TextSource.Literal form.
+    desc = lower(spec, rows).fields.get("description")
+    assert isinstance(desc, str), "the lowering generated no summary"
+    return desc
+
+
+def test_summary_grammar_arms() -> None:
+    rows: list[dict[str, object]] = [
+        {"region": "North", "sales": 80.0, "target": 100.0},
+        {"region": "South", "sales": 130.0, "target": 110.0},
+        {"region": "East", "sales": 60.0, "target": 90.0},
+    ]
+    summary = _summary(
+        ChartSpec(kind="Bar", x_field="region", y_fields=("sales", "target"), title="Sales vs target"),
+        rows,
+    )
+    assert summary == ("Bar chart. 2 series: sales, target. 3 categories: North to East. Peak sales at South, 130.")
+
+    # `stacked` earns a word only where it changes the geometry, and the peak is
+    # a DATUM, never the stack total.
+    stacked = _summary(
+        ChartSpec(kind="Bar", x_field="region", y_fields=("sales", "target"), title="Sales", stacked=True),
+        rows,
+    )
+    assert stacked.startswith("Stacked bar chart.")
+    assert stacked.endswith("Peak sales at South, 130.")
+
+    # …and not on a kind where the flag is ignored.
+    line = _summary(ChartSpec(kind="Line", x_field="region", y_fields=("sales",), stacked=True), rows)
+    assert line.startswith("Line chart.")
+
+
+def test_summary_series_folding_and_clamp() -> None:
+    five = [f"s{i}" for i in range(5)]
+    rows: list[dict[str, object]] = [{"region": "North", **{f: 1.0 for f in five}}]
+    summary = _summary(ChartSpec(kind="Bar", x_field="region", y_fields=tuple(five)), rows)
+    assert "5 series: s0, s1, s2, s3, and 1 more" in summary
+
+    # The per-name clamp is exactly 32 units INCLUDING the ellipsis.
+    long_name = "monthly_recurring_revenue_in_pounds_sterling"
+    clamped = _summary(
+        ChartSpec(kind="Bar", x_field="region", y_fields=(long_name,)),
+        [{"region": "a region name comfortably past the clamp", long_name: 1.0}],
+    )
+    assert "1 series: monthly_recurring_revenue_in_po…" in clamped
+    assert "a region name comfortably past …" in clamped
+    assert len("monthly_recurring_revenue_in_po…") == 32
+    assert len(clamped) <= 320
+
+
+def test_refused_pie_announces_nothing() -> None:
+    # A refused pie draws no geometry and no legend, because either would be a
+    # claim about data the drawing declined to show. A summary is the same claim.
+    from fuaran_py.charts import lower
+
+    refused = lower(
+        ChartSpec(kind="Pie", x_field="slice", y_fields=("a", "b")),
+        [{"slice": "A", "a": 1.0, "b": 2.0}],
+    )
+    assert refused.fields.get("description") is None
+
+
+def test_drawing_root_announces_its_description() -> None:
+    # `role="img"` presents the drawing as ONE graphic and does not traverse into
+    # it, and `<desc>` is not uniformly mapped to the accessible description — so
+    # the root composes title + description into `aria-label`, the accessible NAME
+    # every assistive technology announces. Byte-parity with the F# builder.
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    def render_drawing(title: str | None, description: str | None) -> str:
+        kind: dict[str, object] = {
+            "$type": "Drawing",
+            "viewBox": {"minX": 0, "minY": 0, "width": 200, "height": 100},
+            "shapes": [],
+            "style": {},
+        }
+        if title is not None:
+            kind["title"] = title
+        if description is not None:
+            kind["description"] = description
+        result = decode_node(json.dumps({"id": "d", "kind": kind}))
+        assert result.ok, getattr(result, "error", result)
+        return render_html(result.value)
+
+    both = render_drawing("Sales vs target", "Bar chart. 2 series: sales, target.")
+    assert (
+        '<svg class="fuaran-drawing" role="img" viewBox="0 0 200 100" '
+        'aria-label="Sales vs target. Bar chart. 2 series: sales, target.">'
+        "<title>Sales vs target</title>"
+        "<desc>Bar chart. 2 series: sales, target.</desc></svg>"
+    ) in both
+
+    # The title is terminated only when it needs to be.
+    assert 'aria-label="Really? D."' in render_drawing("Really?", "D.")
+    assert 'aria-label="Plain. D."' in render_drawing("Plain", "D.")
+    assert 'aria-label="D."' in render_drawing("", "D.")
+
+    # A title-only or bare root is byte-identical to pre-921.
+    assert ('<svg class="fuaran-drawing" role="img" viewBox="0 0 200 100"><title>Bars</title></svg>') in render_drawing(
+        "Bars", None
+    )
+    assert "aria-label" not in render_drawing(None, None)
+
+    # A description-only root announces the description alone.
+    assert 'aria-label="One filled circle."' in render_drawing(None, "One filled circle.")
+
+    # Hostile text is inert inside the ATTRIBUTE — the builder emits raw markup,
+    # so its own XML escape is the whole defence.
+    hostile = render_drawing('a"b', "<script>alert('x') & \"y\"</script>")
+    assert ('aria-label="a&quot;b. &lt;script&gt;alert(&#39;x&#39;) &amp; &quot;y&quot;&lt;/script&gt;"') in hostile
+    assert "<script>" not in hostile

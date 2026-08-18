@@ -1249,6 +1249,70 @@ def _capitalise(s: str) -> str:
     return s[0].upper() + s[1:]
 
 
+# ── The accessible summary (Phase 921) ───────────────────────────────────────
+#
+# NORMATIVE CROSS-HOST SPEC, ported verbatim from the F# reference and pinned by
+# the ``chart-lowering/*`` goldens; ``docs/CHARTS-DRAWING-PRIMITIVE-DESIGN.md``
+# §4i carries the language-neutral statement.
+#
+# The drawing root is ``role="img"``, which presents the chart as ONE graphic and
+# does not traverse into it — so the per-mark ``<title>``s are never announced.
+# Operator decision 2026-08-18: the root keeps that role, and the lowering
+# generates a deterministic summary as the drawing's ``description``, which the
+# SVG builder wires to the root's ``aria-label``. The title is NOT part of it:
+# it is a text source whose bound/i18n arms resolve only at render time, so the
+# builder composes it in front instead.
+
+#: The clause separator + terminator. Periods, not commas: a screen reader pauses
+#: at a sentence boundary.
+_SUMMARY_CLAUSE_SEPARATOR = ". "
+
+#: At most this many series are NAMED before the summary folds the rest into a
+#: count — a legibility bound, not a technical one.
+_SUMMARY_MAX_SERIES_NAMED = 4
+
+#: The per-NAME character cap (a series field, a category label) — untrusted
+#: strings straight off the data feed.
+_SUMMARY_MAX_NAME_CHARS = 32
+
+#: The whole summary's character cap.
+_SUMMARY_MAX_CHARS = 320
+
+
+def _clamp_text(max_chars: int, s: str) -> str:
+    """Truncate to at most ``max_chars``, marking the cut with the ellipsis.
+
+    The cap counts UTF-16 code units, which is what the F#/TypeScript hosts
+    count natively — so a non-BMP character costs two here as it does there, and
+    the cut lands in the same place on every host. A cut never splits a surrogate
+    pair.
+    """
+    units = s.encode("utf-16-le")
+    if len(units) <= max_chars * 2:
+        return s
+    cut = max_chars - 1
+    prev = int.from_bytes(units[(cut - 1) * 2 : cut * 2], "little")
+    if cut > 0 and 0xD800 <= prev <= 0xDBFF:
+        cut -= 1
+    return units[: cut * 2].decode("utf-16-le") + _ELLIPSIS
+
+
+def _summary_kind_words(kind: str, stacked: bool) -> str:
+    """The chart's kind in words. ``stacked`` earns a word only on the two arms
+    where it changes the geometry — the same rule the lowering itself applies."""
+    if kind == "Bar":
+        return "Stacked bar chart" if stacked else "Bar chart"
+    if kind == "Line":
+        return "Line chart"
+    if kind == "Area":
+        return "Stacked area chart" if stacked else "Area chart"
+    if kind == "Scatter":
+        return "Scatter chart"
+    if kind == "Pie":
+        return "Pie chart"
+    return "Heatmap chart"
+
+
 # ── The lowering ─────────────────────────────────────────────────────────────
 
 
@@ -2448,6 +2512,66 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             + subtitle_shapes
         )
 
+    # ── The accessible summary (Phase 921) ───────────────────────────────────
+    #
+    # The grammar is stated at the section head above and normatively in §4i;
+    # this is its four clauses in order. A REFUSED PIE announces nothing, for the
+    # reason Phase 880 gave when it stopped emitting the refused pie's legend: a
+    # claim about data the drawing declined to show.
+    accessible_summary: str | None = None
+    if not pie_refused:
+        named_series = ", ".join(
+            _clamp_text(_SUMMARY_MAX_NAME_CHARS, f) for f in spec.y_fields[:_SUMMARY_MAX_SERIES_NAMED]
+        )
+        if m == 0:
+            series_clause = "no series"
+        elif m > _SUMMARY_MAX_SERIES_NAMED:
+            series_clause = f"{m} series: {named_series}, and {m - _SUMMARY_MAX_SERIES_NAMED} more"
+        else:
+            series_clause = f"{m} series: {named_series}"
+
+        # The extent clause follows the X AXIS's own kind, not the chart's: a
+        # band axis states its first and last category, a continuous axis its
+        # domain endpoints through that axis's own tick formatter.
+        if is_continuous_x:
+            if n == 0:
+                extent_clause = "no points"
+            else:
+                head = "1 point: " if n == 1 else f"{n} points: "
+                extent_clause = f"{head}{x_tick_text(x_nice_lo)} to {x_tick_text(x_nice_hi)}"
+        elif n == 0:
+            extent_clause = "no categories"
+        elif n == 1:
+            extent_clause = f"1 category: {_clamp_text(_SUMMARY_MAX_NAME_CHARS, categories[0])}"
+        else:
+            first = _clamp_text(_SUMMARY_MAX_NAME_CHARS, categories[0])
+            last = _clamp_text(_SUMMARY_MAX_NAME_CHARS, categories[n - 1])
+            extent_clause = f"{n} categories: {first} to {last}"
+
+        clauses = [_summary_kind_words(spec.kind, stacked), series_clause, extent_clause]
+
+        # The peak is the largest SINGLE DATUM — never a stacked total, because
+        # the clause names one series at one category and a total belongs to
+        # neither. Ties resolve to the earliest category then the earliest series
+        # (a strict ``>`` scanned category-major), which is the axis's own
+        # reading order. The number takes the value axis's rendering (the
+        # Phase-876 formatter at the axis's step precision, plus the axis's
+        # display unit in its own words); the category is the datum's OWN label,
+        # verbatim, even on a temporal axis.
+        if n > 0 and m > 0:
+            bi = bj = 0
+            bv = series[0][0]
+            for i in range(n):
+                for j in range(m):
+                    if series[j][i] > bv:
+                        bv, bi, bj = series[j][i], i, j
+            unit_suffix = "" if y_unit_label == "" else f" {y_unit_label}"
+            peak_series = _clamp_text(_SUMMARY_MAX_NAME_CHARS, spec.y_fields[bj])
+            peak_category = _clamp_text(_SUMMARY_MAX_NAME_CHARS, categories[bi])
+            clauses.append(f"Peak {peak_series} at {peak_category}, {y_tick_text(bv)}{unit_suffix}")
+
+        accessible_summary = _clamp_text(_SUMMARY_MAX_CHARS, _SUMMARY_CLAUSE_SEPARATOR.join(clauses) + ".")
+
     kind_fields: dict[str, Value] = {
         "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _W, "height": _H}),
         "shapes": Arr(shapes),
@@ -2455,6 +2579,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     }
     if spec.title is not None:
         kind_fields["title"] = _literal(spec.title)
+    if accessible_summary is not None:
+        kind_fields["description"] = _literal(accessible_summary)
     return Obj("Drawing", kind_fields)
 
 

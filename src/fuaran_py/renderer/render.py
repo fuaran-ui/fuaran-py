@@ -893,6 +893,41 @@ class Renderer:
             )
         return ""
 
+    @staticmethod
+    def _terminate_title(t: str) -> str:
+        """Phase 921 — terminate a title with ``.`` unless it already ends in
+        sentence punctuation, so the composed label reads as two sentences
+        rather than one run-on."""
+        if t == "" or t[-1] in ".!?":
+            return t
+        return t + "."
+
+    def _root_aria_label(self, title: Value | None, description: Value | None) -> str:
+        """Phase 921 — the drawing root's ANNOUNCED accessible name.
+
+        ``role="img"`` presents the drawing as ONE graphic and does not traverse
+        into it, and ``<desc>`` is not uniformly mapped to the accessible
+        description (Chromium has never exposed it) — so the value the markup has
+        carried since Phase 525 is one a reader cannot reach. ``aria-label`` is
+        the accessible NAME, which every assistive technology announces
+        unconditionally for a ``role="img"`` element.
+
+        NOT ``aria-labelledby`` / ``aria-describedby``: both reference elements
+        BY ID, and this builder has no id to give — its whole input is a drawing
+        spec, several drawings routinely share one document, and any minted id
+        would have to be both unique per page and byte-identical across five
+        hosts.
+
+        Emitted ONLY when a description is present, so every pre-921 title-only
+        or bare drawing is byte-identical.
+        """
+        if description is None:
+            return ""
+        desc_text = self._text(description)
+        title_text = self._terminate_title(self._text(title)) if title is not None else ""
+        composed = f"{title_text} {desc_text}" if title_text != "" else desc_text
+        return f' aria-label="{_draw_escape(composed)}"'
+
     def _drawing(self, node: Node, fields: dict[str, Value]) -> str:
         vb = fields.get("viewBox")
         vb_fields = vb.fields if isinstance(vb, Obj) else {}
@@ -908,7 +943,8 @@ class Renderer:
         shapes = fields.get("shapes")
         body = "".join(self._draw_shape(s) for s in shapes.items) if isinstance(shapes, Arr) else ""
         root_style = self._draw_style_attrs(fields.get("style"), False)
-        svg = f'<svg class="fuaran-drawing" role="img" viewBox="{view_box}"{root_style}>{title}{desc}{body}</svg>'
+        aria = self._root_aria_label(t, d)
+        svg = f'<svg class="fuaran-drawing" role="img" viewBox="{view_box}"{aria}{root_style}>{title}{desc}{body}</svg>'
         return element("div", [], svg)
 
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────

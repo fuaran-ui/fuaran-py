@@ -4,8 +4,11 @@
   "family": "pre-emit",
   "vocabulary": "wire-format-fixtures/validator/defect-vocabulary.json",
   "posture": "subset",
-  "postureReason": "A co-equal authoring + rendering tier, so every rule here is in principle in scope. The subset is historical, not designed — and it is a DIFFERENT subset from the TypeScript tier's, which is the divergence this phase exists to make visible.",
+  "postureReason": "A co-equal authoring + rendering tier, so every rule here is in principle in scope. The subset is historical, not designed, and it is a DIFFERENT subset from the TypeScript tier's — the divergence this phase exists to make visible. FUARAN069, named as the highest-value gap when this declaration was first written, is now implemented.",
   "implemented": [
+    "FUARAN-DUP-ID",
+    "FUARAN-EMPTY-ID",
+    "FUARAN069",
     "FUARAN082",
     "FUARAN083",
     "FUARAN086",
@@ -15,11 +18,9 @@
     "FUARAN097"
   ],
   "abstentionDefault": "Not ported. This is an honest 'not yet', not a principled exclusion: the set above is whichever rules this host happened to need, and an unported rule is a gap.",
-  "abstained": {
-    "FUARAN069": "The inert-control rule — the write-back doctrine's own guard, and the one whose absence most misleads an author. Named as the highest-value gap to close on this host rather than left under the default."
-  },
+  "abstained": {},
   "otherFamilies": {},
   "otherFamiliesNote": "Codes this host raises that belong to the reference's BUILD-TIME source-AST walker, not the pre-emit family enumerated in the vocabulary. Recorded so the gate reads them as a different family rather than as a code this host invented. That second family is not yet enumerated; until it is, this list is a declaration of intent, not something the gate can verify.",
-  "machineChecked": false,
-  "machineCheckedNote": "This host embeds the FUARAN code inside the human-readable message text rather than carrying it as a field on the finding, so `implemented` above cannot be checked against what the validator actually raises. Making the code a first-class value is the prerequisite for that check, and is open work."
+  "machineChecked": true,
+  "machineCheckedNote": "The FUARAN code is a first-class field on `Finding`, so `implemented` above is checked against what the validator actually raises: `tests/test_validator_coverage.py` fails on a code raised but not declared, a code declared but not raised, and a code this host invented that is absent from the canonical vocabulary. Recovered by source scan of `Finding(...)` constructor positions rather than by running the validator, because running it would only find the rules some fixture happens to trigger — and the rules no fixture reaches are precisely the ones a coverage check must not miss."
 }

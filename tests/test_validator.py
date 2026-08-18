@@ -15,7 +15,7 @@ def test_clean_tree_has_no_findings() -> None:
 def test_empty_id_is_flagged() -> None:
     node = Node("", Obj("Markdown", {"text": Obj("Literal", {"text": "x"})}))
     findings = validate_node(node)
-    assert [f.code for f in findings] == ["EMPTY_NODE_ID"]
+    assert [f.code for f in findings] == ["FUARAN-EMPTY-ID"]
     assert findings[0].path == "$.id"
 
 
@@ -34,7 +34,7 @@ def test_duplicate_child_id_is_flagged() -> None:
         ),
     )
     findings = validate_node(root)
-    assert any(f.code == "DUPLICATE_NODE_ID" for f in findings)
+    assert any(f.code == "FUARAN-DUP-ID" for f in findings)
 
 
 def test_unknown_kind_is_flagged() -> None:
@@ -85,17 +85,17 @@ def test_chart_grounded_fields_are_clean() -> None:
 
 def test_chart_ungrounded_y_field_is_flagged() -> None:
     findings = validate_node(_chart_node(y_fields=["revenu"]))  # typo — absent from the schema
-    assert [f.code for f in findings] == ["CHART_FIELD_UNGROUNDED"]
+    assert [f.code for f in findings] == ["FUARAN086"]
 
 
 def test_chart_non_numeric_y_field_is_flagged() -> None:
     findings = validate_node(_chart_node(y_fields=["quarter"]))  # a string column
-    assert [f.code for f in findings] == ["CHART_FIELD_TYPE_MISMATCH"]
+    assert [f.code for f in findings] == ["FUARAN087"]
 
 
 def test_scatter_x_field_must_be_numeric() -> None:
     findings = validate_node(_chart_node(kind="Scatter", x_field="quarter"))
-    assert "CHART_FIELD_TYPE_MISMATCH" in [f.code for f in findings]
+    assert "FUARAN087" in [f.code for f in findings]
 
 
 def test_temporal_x_over_a_non_date_column_is_refused() -> None:
@@ -151,12 +151,12 @@ def test_temporal_narrows_the_scatter_x_numeric_arm() -> None:
 
 def test_pie_needs_exactly_one_series() -> None:
     findings = validate_node(_chart_node(kind="Pie", y_fields=["revenue", "cost"]))
-    assert "CHART_PIE_SERIES_SHAPE" in [f.code for f in findings]
+    assert "FUARAN088" in [f.code for f in findings]
 
 
 def test_stacked_is_dead_intent_outside_bar_area() -> None:
     findings = validate_node(_chart_node(kind="Line", stacked=True))
-    assert [f.code for f in findings] == ["CHART_STACKED_MEANINGLESS"]
+    assert [f.code for f in findings] == ["FUARAN089"]
 
 
 def test_non_empty_pipeline_passes_ungrounded() -> None:
@@ -166,3 +166,89 @@ def test_non_empty_pipeline_passes_ungrounded() -> None:
     step = Obj("limit", {"n": 1, "offset": 0})
     findings = validate_node(_chart_node(y_fields=["revenu"], pipeline_items=[step]))
     assert findings == []
+
+
+# ── FUARAN069 — the inert-control rule ───────────────────────────────────────
+#
+# An omitted handler is the DECLARATIVE shape, not a defect: the write-back
+# default is supposed to carry the interaction. The defect is omitting the
+# handler AND pointing the value at something unwritable, which leaves a control
+# that looks interactive and does nothing. Both halves are pinned, because a rule
+# that only ever fires is as useless as one that never does.
+
+_STATE = Obj("State", {"key": "open"})
+_STATIC = Obj("Static", {"value": False})
+
+
+def test_disclosure_without_handler_or_writable_slot_is_inert() -> None:
+    node = Node("d1", Obj("Disclosure", {"heading": "H", "open": _STATIC, "children": Arr([])}))
+    findings = validate_node(node)
+    assert [f.code for f in findings] == ["FUARAN069"]
+    assert "Disclosure on 'd1'" in findings[0].message
+
+
+def test_disclosure_with_writable_slot_is_live() -> None:
+    node = Node("d1", Obj("Disclosure", {"heading": "H", "open": _STATE, "children": Arr([])}))
+    assert validate_node(node) == []
+
+
+def test_disclosure_with_handler_is_live() -> None:
+    node = Node(
+        "d1", Obj("Disclosure", {"heading": "H", "open": _STATIC, "onToggle": "<closure>", "children": Arr([])})
+    )
+    assert validate_node(node) == []
+
+
+def test_only_a_dismissable_modal_can_be_inert() -> None:
+    """A modal that cannot be dismissed by design is not inert, it is modal."""
+    inert = Node("m1", Obj("Modal", {"open": _STATIC, "dismissable": True, "children": Arr([])}))
+    assert [f.code for f in validate_node(inert)] == ["FUARAN069"]
+
+    by_design = Node("m1", Obj("Modal", {"open": _STATIC, "dismissable": False, "children": Arr([])}))
+    assert validate_node(by_design) == []
+
+
+def test_tabs_tag_overlay_counts_as_live() -> None:
+    """`activeTag` over a populated `tabTags` carries the selection when
+    `activeIndex` does not — the second way a Tabs node can be live."""
+    inert = Node("t1", Obj("Tabs", {"activeIndex": _STATIC, "children": Arr([])}))
+    assert [f.code for f in validate_node(inert)] == ["FUARAN069"]
+
+    via_tag = Node(
+        "t1",
+        Obj(
+            "Tabs",
+            {
+                "activeIndex": _STATIC,
+                "tabTags": Arr(["a", "b"]),
+                "activeTag": Obj("State", {"key": "tab"}),
+                "children": Arr([]),
+            },
+        ),
+    )
+    assert validate_node(via_tag) == []
+
+
+def test_filter_binding_is_writable_only_without_a_default() -> None:
+    """A defaulted filter is a read of a computed value, not a slot."""
+    writable = Node("s1", Obj("Select", {"label": "L", "value": Obj("Filter", {"name": "region"})}))
+    assert validate_node(writable) == []
+
+    defaulted = Node("s1", Obj("Select", {"label": "L", "value": Obj("Filter", {"name": "region", "default": "uk"})}))
+    assert [f.code for f in validate_node(defaulted)] == ["FUARAN069"]
+
+
+def test_form_field_reports_its_own_id() -> None:
+    node = Node(
+        "f1",
+        Obj(
+            "Form",
+            {
+                "fields": Arr([Obj("", {"id": "email", "label": "Email", "kind": Obj("Text", {"value": _STATIC})})]),
+                "submitLabel": "Go",
+            },
+        ),
+    )
+    findings = validate_node(node)
+    assert [f.code for f in findings] == ["FUARAN069"]
+    assert "FormField(email)" in findings[0].message

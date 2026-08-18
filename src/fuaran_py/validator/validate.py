@@ -35,9 +35,9 @@ def validate_node(node: Node) -> list[Finding]:
 
 def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) -> None:
     if node.id == "":
-        findings.append(Finding("EMPTY_NODE_ID", f"{path}.id", "node id is empty"))
+        findings.append(Finding("FUARAN-EMPTY-ID", f"{path}.id", "a node carries an empty id"))
     elif node.id in seen_ids:
-        findings.append(Finding("DUPLICATE_NODE_ID", f"{path}.id", f"duplicate node id '{node.id}'"))
+        findings.append(Finding("FUARAN-DUP-ID", f"{path}.id", f"node id '{node.id}' appears more than once"))
     else:
         seen_ids.add(node.id)
 
@@ -50,6 +50,8 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     if node.kind.tag == "Chart":
         _check_chart(node, node.kind, f"{path}.kind", findings)
 
+    _check_inert_control(node, node.kind, f"{path}.kind", findings)
+
     for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
         _walk(child, child_path, findings, seen_ids)
 
@@ -60,9 +62,10 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
     if kind.fields.get("stateKey") == "":
         findings.append(
             Finding(
-                "UNGROUNDED_SWITCH_STATE_KEY",
+                "FUARAN083",
                 f"{path}.stateKey",
-                "switch stateKey is empty — it can never resolve a case and is stuck on its default (FUARAN083)",
+                "switch has an empty stateKey — it can never resolve a case and is stuck on its "
+                "default; name the key it should read",
             )
         )
     cases = kind.fields.get("cases")
@@ -76,9 +79,10 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
                     if match in seen and match not in reported:
                         findings.append(
                             Finding(
-                                "DUPLICATE_SWITCH_MATCH",
+                                "FUARAN082",
                                 f"{path}.cases",
-                                f"duplicate switch match '{match}' (FUARAN082)",
+                                f"switch has two or more cases matching '{match}' — first-match-wins "
+                                "makes the later case dead",
                             )
                         )
                         reported.add(match)
@@ -113,10 +117,10 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
     if chart_kind == "Pie" and len(y_fields) != 1:
         findings.append(
             Finding(
-                "CHART_PIE_SERIES_SHAPE",
+                "FUARAN088",
                 f"{path}.yFields",
                 f"a Pie chart carries {len(y_fields)} series — the lowering refuses other than exactly one "
-                "(plot one share column, or switch kind) (FUARAN088)",
+                "(plot one share column, or switch kind)",
             )
         )
 
@@ -124,9 +128,9 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
     if kind.fields.get("stacked") is True and chart_kind in ("Line", "Scatter", "Pie"):
         findings.append(
             Finding(
-                "CHART_STACKED_MEANINGLESS",
+                "FUARAN089",
                 f"{path}.stacked",
-                f"stacked is meaningless on a {chart_kind} chart — the lowering ignores the flag (FUARAN089)",
+                f"stacked is meaningless on a {chart_kind} chart — the lowering ignores the flag",
             )
         )
 
@@ -156,17 +160,17 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
         if ty is None:
             findings.append(
                 Finding(
-                    "CHART_FIELD_UNGROUNDED",
+                    "FUARAN086",
                     path,
-                    f"chart field '{field_name}' names a column absent from the embedded schema (FUARAN086)",
+                    f"chart field '{field_name}' names a column absent from the embedded schema",
                 )
             )
         elif require_numeric and ty not in _NUMERIC_COLUMN_TYPES:
             findings.append(
                 Finding(
-                    "CHART_FIELD_TYPE_MISMATCH",
+                    "FUARAN087",
                     path,
-                    f"chart field '{field_name}' is a '{ty}' column the lowering cannot plot numerically (FUARAN087)",
+                    f"chart field '{field_name}' is a '{ty}' column the lowering cannot plot numerically",
                 )
             )
 
@@ -218,3 +222,88 @@ def _child_nodes(value: Value, path: str) -> list[tuple[Node, str]]:
         for key, field_value in value.fields.items():
             out.extend(_child_nodes(field_value, f"{path}.{key}"))
     return out
+
+
+# ── FUARAN069 — the inert-control rule (Phase 426 write-back doctrine) ───────
+
+_WRITABLE_BINDING_TAGS = frozenset({"State", "Local"})
+
+
+def _is_write_back_target(value: Value) -> bool:
+    """Is this binding a slot the write-back default can write *to*?
+
+    `State` and `Local` always are. `Filter` is writable only WITHOUT a default:
+    a defaulted filter is a read of a computed value, not a slot. Everything else
+    — `Static`, `Query`, `Computed`, `Transform`, `Selection` — is a read.
+
+    Mirrors the reference host's `isWriteBackTarget`; the wire shape is the same
+    discriminated union, so the same three cases decide it.
+    """
+    if not isinstance(value, Obj):
+        return False
+    tag = value.tag
+    if tag in _WRITABLE_BINDING_TAGS:
+        return True
+    return tag == "Filter" and "default" not in value.fields
+
+
+def _inert(kind: Obj, handler: str, slot: str) -> bool:
+    """No handler and no writable slot: nothing can carry the interaction.
+
+    An omitted handler is the DECLARATIVE shape, not an error — the write-back
+    default is supposed to carry it. The defect is omitting the handler *and*
+    pointing the value at something unwritable, which leaves the control looking
+    interactive and doing nothing.
+    """
+    return handler not in kind.fields and not _is_write_back_target(kind.fields.get(slot))
+
+
+def _check_inert_control(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
+    """FUARAN069 (Warning) — an interactive control that cannot act.
+
+    Reported per control kind with a short descriptor, matching the reference
+    host's sites: Tabs, Disclosure, Modal, Select and Form fields.
+    """
+
+    def report(control: str) -> None:
+        findings.append(
+            Finding(
+                "FUARAN069",
+                path,
+                f"{control} on '{node.id}' has no event handler and no writable value binding "
+                f"— bind its value to $state.<key> or $filters.<name>, or supply the handler",
+            )
+        )
+
+    tag = kind.tag
+    if tag == "Tabs":
+        # The tag overlay is a second way to be live: `activeTag` over a
+        # populated `tabTags` carries the selection when `activeIndex` does not.
+        tag_live = "onSelectTag" in kind.fields or (
+            "tabTags" in kind.fields and _is_write_back_target(kind.fields.get("activeTag"))
+        )
+        if _inert(kind, "onSelect", "activeIndex") and not tag_live:
+            report("Tabs")
+    elif tag == "Disclosure":
+        if _inert(kind, "onToggle", "open"):
+            report("Disclosure")
+    elif tag == "Modal":
+        # Only a DISMISSABLE modal is defective: one that cannot be dismissed by
+        # design is not inert, it is modal.
+        if kind.fields.get("dismissable") is True and _inert(kind, "onDismiss", "open"):
+            report("Modal")
+    elif tag == "Select":
+        if kind.fields.get("multiple") is True:
+            if _inert(kind, "onChangeMulti", "values"):
+                report("Select(multiple)")
+        elif _inert(kind, "onChange", "value"):
+            report("Select")
+    elif tag == "Form":
+        fields = kind.fields.get("fields")
+        if isinstance(fields, Arr):
+            for item in fields.items:
+                if isinstance(item, Obj):
+                    field_kind = item.fields.get("kind")
+                    field_id = item.fields.get("id")
+                    if isinstance(field_kind, Obj) and _inert(field_kind, "onChange", "value"):
+                        report(f"FormField({field_id if isinstance(field_id, str) else '?'})")

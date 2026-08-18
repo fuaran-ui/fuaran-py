@@ -176,8 +176,14 @@ def decode(s: str) -> Bundle:
                 raise TeleportError(HISTORY_DECODE, op_result.error.message)  # type: ignore[union-attr]
             history.append(op_result.value)  # type: ignore[union-attr]
     # 6 — pre-emit validation (node-identity defects refuse).
+    #
+    # The codes are the canonical vocabulary's, not host-local strings: state
+    # re-seat is keyed on stable identity, so this refusal is the whole reason
+    # WIRE_FORMAT.md 17 step 6 exists. Keep it in step with the vocabulary — when
+    # these were host-local names, renaming them to the canonical ones silently
+    # disabled this check, and only this module's own test caught it.
     for finding in validate_node(tree):
-        if finding.code in ("EMPTY_NODE_ID", "DUPLICATE_NODE_ID"):
+        if finding.code in ("FUARAN-EMPTY-ID", "FUARAN-DUP-ID"):
             raise TeleportError(TREE_INVALID, f"tree has a node-identity defect: {finding.message}")
     # 7 — state re-seat.
     state: dict[str, Value] = {}

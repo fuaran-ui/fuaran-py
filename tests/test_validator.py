@@ -103,7 +103,7 @@ def test_temporal_x_over_a_non_date_column_is_refused() -> None:
     # a string column cannot parse as a date, so every row's x would read as the
     # epoch and the chart would draw every point stacked on one date.
     findings = validate_node(_chart_node(x_scale="Temporal"))  # `quarter` is a string column
-    assert [f.code for f in findings] == ["CHART_TEMPORAL_X_NOT_DATE"]
+    assert [f.code for f in findings] == ["FUARAN097"]
 
     # A date column is what the declaration claims, so it passes; and so does a
     # timestamp, whose time-of-day the lowering discards (a documented narrowing,
@@ -144,9 +144,7 @@ def test_temporal_narrows_the_scatter_x_numeric_arm() -> None:
     assert validate_node(_chart_node(kind="Scatter", x_field="day", schema=dated, x_scale="Temporal")) == []
     # The negative control: the same scatter WITHOUT the declaration still wants a
     # numeric x, and a date column is not one.
-    assert [f.code for f in validate_node(_chart_node(kind="Scatter", x_field="day", schema=dated))] == [
-        "CHART_FIELD_TYPE_MISMATCH"
-    ]
+    assert [f.code for f in validate_node(_chart_node(kind="Scatter", x_field="day", schema=dated))] == ["FUARAN087"]
 
 
 def test_pie_needs_exactly_one_series() -> None:

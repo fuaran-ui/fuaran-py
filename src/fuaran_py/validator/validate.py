@@ -192,7 +192,7 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
         if temporal_x and x_type is not None and x_type not in _DATED_COLUMN_TYPES:
             findings.append(
                 Finding(
-                    "CHART_TEMPORAL_X_NOT_DATE",
+                    "FUARAN097",
                     path,
                     f"chart declares a temporal x-axis over field '{x_field}' of type '{x_type}' — a date axis "
                     "needs a date column, and every row's x would read as 1970-01-01; give the column type "

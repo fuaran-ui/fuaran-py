@@ -1449,84 +1449,6 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             acc = max(acc, _text_width(tick_size, t))
         return acc
 
-    # ── Legend placement (Phase 880) ─────────────────────────────────────────
-    #
-    # ONE legend with four placements, resolved HERE — above the margins,
-    # because a ``Right`` legend's column width is an INPUT to the plot
-    # rectangle and a ``Bottom`` legend's band is an input to the bottom margin.
-    # The same acyclicity discipline the text metrics established: everything
-    # the layout reads is computed before the layout that reads it.
-    #
-    # The pie arm's shares are resolved here for the same reason: its legend
-    # labels carry them ("name (NN%)"), so they are layout input, not output.
-    is_pie = spec.kind == "Pie"
-    pie_values = series[0] if is_pie and m == 1 else []
-    pie_total = sum(pie_values)
-    # The Phase-638 bounded-v1 guard, unchanged and merely lifted: exactly one
-    # series, no negative value, a positive total. A refused pie draws no
-    # geometry AND no legend — a legend for a picture that was refused would be
-    # a claim about data the drawing declined to show.
-    pie_refused = is_pie and (m != 1 or any(v < 0.0 for v in pie_values) or pie_total <= 0.0)
-    pie_fractions = [v / pie_total for v in pie_values] if is_pie and not pie_refused else []
-
-    # The legend's rows in draw order — ``(colour, label)``. TWO sources, ONE
-    # shape, which is what Phase 880 unified: the cartesian arms legend their
-    # SERIES and only when there is more than one (with a single series the
-    # title already names it — the pre-880 rule, preserved exactly), while the
-    # pie arm legends its CATEGORIES, which is why a single-series pie legends
-    # and a single-series bar does not. Before this phase these were two
-    # separate emitters with two separate constant sets, and only one of them
-    # could honour a position.
-    legend_entries: list[tuple[str, str]] = []
-    if is_pie:
-        # Routed through the canonical formatter (Phase 876) — one rounding +
-        # rendering rule for every number this module prints. A share is a whole
-        # percent, so the shipped ``NN%`` shape is unchanged.
-        legend_entries = [
-            (_colour_for(i), f"{categories[i]} ({_format_value(None, 1.0, False, 1.0, f * 100.0)}%)")
-            for i, f in enumerate(pie_fractions)
-        ]
-    elif m > 1:
-        legend_entries = [(_colour_for(j), spec.y_fields[j]) for j in range(m)]
-
-    # The placement actually used: the author's explicit spec value where there
-    # is one, else the host default. With no entries at all the answer is
-    # ``None`` whatever either of them said — so an explicit position on a
-    # single-series chart still draws nothing and, more to the point, reserves
-    # no space.
-    if not legend_entries:
-        legend_pos = "None"
-    elif spec.legend_position is not None:
-        legend_pos = spec.legend_position
-    else:
-        legend_pos = _LEGEND_POSITION_DEFAULT
-
-    # COLUMN arms: the widest label decides the column, bounded by
-    # ``_LEGEND_COLUMN_MAX_SHARE`` of the canvas and truncated beyond it — the
-    # margin autosizes' posture, adopted for the same reason. A name with no
-    # bound is a data problem the layout should report by truncating, not absorb
-    # by shrinking the picture.
-    legend_name_budget = max(0.0, _LEGEND_COLUMN_MAX_SHARE * _W - _LEGEND_LABEL_OFFSET_X - _LEGEND_COLUMN_GAP)
-
-    # The band arms pack at each entry's natural width and still run off the
-    # right edge past enough entries. Truncating there would not fix it (the
-    # overflow is in the SUM, not in one name), so the band is left as Phase 879
-    # shipped it and the default moved instead.
-    legend_texts = [
-        _truncate_to_width(tick_size, legend_name_budget, t) if legend_pos == "Right" else t for _, t in legend_entries
-    ]
-
-    legend_column_w = (
-        _r2(_LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X + widest_of(legend_texts)) if legend_pos == "Right" else 0.0
-    )
-
-    # The ``Bottom`` band's height — one line plus its padding, reserved BELOW
-    # everything the bottom margin's autosize already accounts for (the x-axis
-    # title's line included), so the two computations never contend for the same
-    # pixels. The exact mirror of ``subtitle_band`` at the top: one term that
-    # shifts the whole band, present only when the arm is.
-    legend_band_h = _r2(line_height + _AXIS_LABEL_PADDING) if legend_pos == "Bottom" else 0.0
-
     # ── Axis names + subtitle (Phase 878) ────────────────────────────────────
     #
     # Resolved HERE, before any margin, because both margins have to reserve a
@@ -1603,6 +1525,133 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     margin_left = _r2(max(_MARGIN_LEFT, min(left_ceiling, required_left)))
 
     plot_x0 = margin_left
+
+    # ── Legend placement (Phase 880; BAND overflow fallback 2026-08-18) ──────
+    #
+    # ONE legend with four placements, resolved HERE — AFTER the left margin,
+    # whose ``plot_x0`` is where a band packs FROM, and before the plot's right
+    # edge, because a ``Right`` legend's column width is an INPUT to the plot
+    # rectangle and a ``Bottom`` legend's band is an input to the bottom margin.
+    # The same acyclicity discipline the text metrics established: everything
+    # the layout reads is computed before the layout that reads it. Phase 880
+    # resolved this block above ALL the margins; the overflow rule moved it
+    # below the LEFT one, because that is where the band's available width
+    # comes from. Nothing between the two reads the legend, so the block moved
+    # whole.
+    #
+    # The pie arm's shares are resolved here for the same reason: its legend
+    # labels carry them ("name (NN%)"), so they are layout input, not output.
+    is_pie = spec.kind == "Pie"
+    pie_values = series[0] if is_pie and m == 1 else []
+    pie_total = sum(pie_values)
+    # The Phase-638 bounded-v1 guard, unchanged and merely lifted: exactly one
+    # series, no negative value, a positive total. A refused pie draws no
+    # geometry AND no legend — a legend for a picture that was refused would be
+    # a claim about data the drawing declined to show.
+    pie_refused = is_pie and (m != 1 or any(v < 0.0 for v in pie_values) or pie_total <= 0.0)
+    pie_fractions = [v / pie_total for v in pie_values] if is_pie and not pie_refused else []
+
+    # The legend's rows in draw order — ``(colour, label)``. TWO sources, ONE
+    # shape, which is what Phase 880 unified: the cartesian arms legend their
+    # SERIES and only when there is more than one (with a single series the
+    # title already names it — the pre-880 rule, preserved exactly), while the
+    # pie arm legends its CATEGORIES, which is why a single-series pie legends
+    # and a single-series bar does not. Before this phase these were two
+    # separate emitters with two separate constant sets, and only one of them
+    # could honour a position.
+    legend_entries: list[tuple[str, str]] = []
+    if is_pie:
+        # Routed through the canonical formatter (Phase 876) — one rounding +
+        # rendering rule for every number this module prints. A share is a whole
+        # percent, so the shipped ``NN%`` shape is unchanged.
+        legend_entries = [
+            (_colour_for(i), f"{categories[i]} ({_format_value(None, 1.0, False, 1.0, f * 100.0)}%)")
+            for i, f in enumerate(pie_fractions)
+        ]
+    elif m > 1:
+        legend_entries = [(_colour_for(j), spec.y_fields[j]) for j in range(m)]
+
+    # The placement the author ASKED FOR: their explicit spec value where there
+    # is one, else the host default. With no entries at all the answer is
+    # ``None`` whatever either of them said — so an explicit position on a
+    # single-series chart still draws nothing and, more to the point, reserves
+    # no space.
+    if not legend_entries:
+        requested_pos = "None"
+    elif spec.legend_position is not None:
+        requested_pos = spec.legend_position
+    else:
+        requested_pos = _LEGEND_POSITION_DEFAULT
+
+    def band_entry_width(t: str) -> float:
+        """A BAND entry's PITCH: the swatch's label offset, the label's own
+        natural width, and the gap before the next entry. Read by the overflow
+        predicate AND by the band emitter far below — one expression, so the
+        rule can never decide against geometry the drawing does not use. The
+        name is the untruncated one, because a band never truncates."""
+        return _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, t) + _LEGEND_ENTRY_GAP
+
+    # The width a BAND has to pack into: from the plot's left edge, where the
+    # band starts, to the plot's right edge — which on a band arm is the canvas
+    # less the right margin, since a band reserves no column and
+    # ``legend_column_w`` is 0 there by construction. So the term is not
+    # circular, and it is the PLOT's width rather than
+    # canvas-minus-declared-margins: the band packs from ``plot_x0``, the
+    # AUTOSIZED left margin, not from ``_MARGIN_LEFT``.
+    band_available_w = _W - _MARGIN_RIGHT - plot_x0
+
+    # **The BAND overflow rule (operator decision, 2026-08-18).** An explicit
+    # ``Top`` or ``Bottom`` legend whose entries do not pack into one band row
+    # FALLS BACK TO THE RIGHT-HAND COLUMN. A band's width is the SUM of its
+    # entries, so it runs off the canvas once the names are long enough or
+    # numerous enough — and truncating any one name cannot fix a sum, which is
+    # why Phase 879's per-entry natural pitch and Phase 880's repositioning both
+    # left it standing.
+    #
+    # The column never loses information, never grows the band unboundedly, and
+    # reuses layout that already shipped. Two alternatives were considered and
+    # DECLINED: a second row grows the reserved band and moves the plot
+    # rectangle with the entry COUNT (chrome sliding under a data refresh); a
+    # refusal loses the legend entirely, when the author's intent — a visible
+    # legend — is honourable at another edge. So ``Top``/``Bottom`` mean "band
+    # if it fits, column if it cannot"; the wire is unchanged.
+    #
+    # The comparison INCLUDES the last entry's trailing ``_LEGEND_ENTRY_GAP``,
+    # exactly as the emitter computes it — that gap is the clearance to the
+    # right margin. Strict ``>``, so an exact fit stays a band. And the fallback
+    # is UNIFORM: the whole legend moves, never a split across two edges.
+    band_overflows = requested_pos in ("Top", "Bottom") and (
+        sum(band_entry_width(t) for _, t in legend_entries) > band_available_w
+    )
+
+    # The placement actually used.
+    legend_pos = "Right" if band_overflows else requested_pos
+
+    # COLUMN arms: the widest label decides the column, bounded by
+    # ``_LEGEND_COLUMN_MAX_SHARE`` of the canvas and truncated beyond it — the
+    # margin autosizes' posture, adopted for the same reason. A name with no
+    # bound is a data problem the layout should report by truncating, not absorb
+    # by shrinking the picture.
+    legend_name_budget = max(0.0, _LEGEND_COLUMN_MAX_SHARE * _W - _LEGEND_LABEL_OFFSET_X - _LEGEND_COLUMN_GAP)
+
+    # A BAND arm packs at NATURAL width and never truncates: its overflow is in
+    # the SUM, not in one name, so truncating would cost information without
+    # fixing anything — a band that cannot pack falls back to the column above.
+    legend_texts = [
+        _truncate_to_width(tick_size, legend_name_budget, t) if legend_pos == "Right" else t for _, t in legend_entries
+    ]
+
+    legend_column_w = (
+        _r2(_LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X + widest_of(legend_texts)) if legend_pos == "Right" else 0.0
+    )
+
+    # The ``Bottom`` band's height — one line plus its padding, reserved BELOW
+    # everything the bottom margin's autosize already accounts for (the x-axis
+    # title's line included), so the two computations never contend for the same
+    # pixels. The exact mirror of ``subtitle_band`` at the top: one term that
+    # shifts the whole band, present only when the arm is.
+    legend_band_h = _r2(line_height + _AXIS_LABEL_PADDING) if legend_pos == "Bottom" else 0.0
+
     # Phase 880 — a ``Right`` legend takes its column off the PLOT, not off the
     # right margin: the margin stays the clearance between the legend's widest
     # label and the canvas edge, exactly as it was the clearance to the plot
@@ -2265,8 +2314,10 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # BAND (``Top`` / ``Bottom``): Phase 879's horizontal row, entries laid out
     # cumulatively from the plot's left edge at each entry's own natural width —
     # unchanged for ``Top``, which is the pre-880 shape every pre-880 golden
-    # pins. It still runs off the right edge past enough entries; that survives
-    # only on the arms an author asks for explicitly.
+    # pins. A band that cannot PACK into the plot's width no longer runs off the
+    # edge: ``band_overflows`` above sends the whole legend to the column
+    # instead (operator decision, 2026-08-18), so by the time this arm is
+    # reached the entries are known to fit.
     #
     # The label styling is one expression for all four: chrome ink at the label
     # opacity, ``Start``-anchored, tick-sized.
@@ -2327,7 +2378,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             legend.append(
                 _label(_r2(sx + _LEGEND_LABEL_OFFSET_X), _r2(baseline_y), _literal(legend_texts[j]), legend_label_style)
             )
-            lx_acc += _LEGEND_LABEL_OFFSET_X + _text_width(tick_size, legend_texts[j]) + _LEGEND_ENTRY_GAP
+            # The same ``band_entry_width`` the overflow rule measured against.
+            lx_acc += band_entry_width(legend_texts[j])
 
     # ── Visible title (a Label — bigger + emphasised) ──
     title_x = _r2(plot_x0)

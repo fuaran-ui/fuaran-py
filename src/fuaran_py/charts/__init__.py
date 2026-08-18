@@ -417,6 +417,27 @@ def _format_num(n: float) -> str:
 #      ``RelativeTime`` / ``Duration`` are not value-axis formats and fall
 #      through to the base render.
 #   4. Display-unit scaling divides BOTH the value and the step by 10**n.
+#   5. THE INTEGER PART IS RENDERED IN POSITIONAL NOTATION AT EVERY MAGNITUDE,
+#      by an expansion this module owns — never by inheriting a host's default
+#      float→string switch. Grouping walks decimal digits, so handing it an
+#      exponent form corrupts it silently (``_group_thousands("1E+17")`` is
+#      ``"1E,+17"``), and the hosts do not agree on WHEN that form appears: the
+#      .NET ``"R"`` layout that ``format_finite_double`` mirrors (and that the
+#      wire format pins) goes scientific once the leading-digit exponent passes
+#      16, i.e. at 1e17, while JavaScript's ``Number.prototype.toString`` stays
+#      positional until 1e21. So above 1e17 four hosts drew a grouped exponent
+#      and one drew correct digits: the same chart, different bytes.
+#      ``_expand_to_fixed`` re-lays any ``d[.ddd]E±NN`` mantissa/exponent pair
+#      (JavaScript's lower-case ``e+NN`` included) as its digits zero-padded to
+#      ``exp + 1`` places, and leaves an already-positional form untouched — so
+#      every host groups the same digit string and nothing below 1e17 moves.
+#      NOTE the threshold is 1e17, not the 1e15 in ``_format_num`` — that
+#      constant bounds the exact integer fast path, not the notation switch.
+#      The expansion is over the SHORTEST-ROUND-TRIP digits, the canonical
+#      decimal identity of the float, not its exact binary value: 1e21 reads
+#      ``1,000,000,000,000,000,000,000``, never
+#      ``999,999,999,999,999,916,000``. Only the INTEGER part needs this — the
+#      fraction is bounded by ``10**d <= 10**6`` by rule 1's cap.
 
 
 def _dps_of_step(step: float) -> int:
@@ -447,6 +468,38 @@ def _group_thousands(digits: str) -> str:
     return ",".join(parts)
 
 
+def _expand_to_fixed(s: str) -> str:
+    """Expand a canonical round-trip number form into POSITIONAL notation (rule 5).
+
+    ``s`` is whatever the host's shortest-round-trip formatter produced for a
+    non-negative INTEGER-valued float: positional at small magnitudes, and
+    ``d[.ddd]E±NN`` — or JavaScript's lower-case ``e+NN`` — above whichever
+    magnitude that host switches at. Total by construction: a form carrying no
+    exponent is returned unchanged, as is the negative-exponent form an integer
+    part cannot produce.
+    """
+    e_idx = s.find("E")
+    if e_idx < 0:
+        e_idx = s.find("e")
+    if e_idx < 0:
+        return s
+    mant = s[:e_idx]
+    try:
+        exp = int(s[e_idx + 1 :])
+    except ValueError:
+        return s
+    if exp < 0:
+        return s
+    dot = mant.find(".")
+    digits = mant if dot < 0 else mant[:dot] + mant[dot + 1 :]
+    # An integer-valued float's shortest round-trip always has at least as many
+    # places as digits; the guard keeps the function total rather than
+    # describing a reachable case.
+    if len(digits) >= exp + 1:
+        return digits
+    return digits + "0" * (exp + 1 - len(digits))
+
+
 def _render_fixed(dps: int, v: float) -> str:
     """Render ``v`` with EXACTLY ``dps`` decimals — round-half-up on the
     magnitude, comma thousands separators, period decimal point, invariant."""
@@ -457,7 +510,9 @@ def _render_fixed(dps: int, v: float) -> str:
     units = math.floor(abs(v) * scale + 0.5)
     int_part = math.floor(units / scale)
     frac_part = units - int_part * scale
-    int_str = _group_thousands(_format_num(float(int_part)))
+    # Rule 5 — expand before grouping. ``_format_num`` alone would hand the
+    # grouper an exponent form above the host's own switch magnitude.
+    int_str = _group_thousands(_expand_to_fixed(_format_num(float(int_part))))
     body = int_str
     if d > 0:
         raw = _format_num(float(frac_part))

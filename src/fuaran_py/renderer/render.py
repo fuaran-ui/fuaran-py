@@ -772,6 +772,41 @@ class Renderer:
             return ' stroke-linejoin="round" stroke-linecap="round"'
         return ""
 
+    def _draw_tip_child(self, style: Value | None) -> str:
+        """Phase 883 — the mark's hover readout as an SVG ``<title>`` CHILD of its own element.
+
+        That single element is both the native browser tooltip and the element's
+        accessible name, with no script, so a statically-served page carries the
+        readout too. ``<title>`` must be the FIRST child to be the accessible
+        name, which is why every arm below emits it ahead of any other content.
+
+        A tip is the one ``DrawStyle`` field honoured on EVERY shape rather than
+        only on ``Label`` — the marks a reader hovers are bars, wedges and
+        points, and a ``<title>`` is inert geometry-wise on all of them (unlike
+        ``rotation``, whose off-``Label`` emission would MOVE GEOMETRY).
+
+        The text is XML-escaped through the same ``_draw_escape`` the label text
+        and the drawing title/desc already use: this builder emits raw markup, so
+        the escape is the whole defence, and the chart lowering feeds it
+        UNTRUSTED series/category strings straight off the data feed.
+        """
+        fields = style.fields if isinstance(style, Obj) else {}
+        tip = fields.get("tip")
+        if tip is None:
+            return ""
+        return f"<title>{_draw_escape(self._text(tip))}</title>"
+
+    def _draw_close(self, style: Value | None, element_name: str) -> str:
+        """The tail of a shape element carrying no child content of its own.
+
+        Self-closing when untipped — byte-unchanged from every pre-883 drawing —
+        and an open/close pair wrapping the ``<title>`` when tipped.
+        """
+        fields = style.fields if isinstance(style, Obj) else {}
+        if "tip" not in fields:
+            return "/>"
+        return f">{self._draw_tip_child(style)}</{element_name}>"
+
     def _draw_shape(self, sh: Value) -> str:
         if not isinstance(sh, Obj):
             return ""
@@ -781,47 +816,55 @@ class Renderer:
         if tag == "Group":
             children = f.get("children")
             inner = "".join(self._draw_shape(c) for c in children.items) if isinstance(children, Arr) else ""
-            return f'<g class="fuaran-drawing-group"{self._draw_style_attrs(style, False)}>{inner}</g>'
+            return (
+                f'<g class="fuaran-drawing-group"{self._draw_style_attrs(style, False)}>'
+                f"{self._draw_tip_child(style)}{inner}</g>"
+            )
         if tag == "Rectangle":
             rx = f' rx="{_draw_num(f["cornerRadius"])}"' if "cornerRadius" in f else ""
             return (
                 f'<rect class="fuaran-drawing-rect" x="{_draw_num(f.get("x", 0))}"'
                 f' y="{_draw_num(f.get("y", 0))}" width="{_draw_num(f.get("width", 0))}"'
                 f' height="{_draw_num(f.get("height", 0))}"{rx}'
-                f"{self._draw_style_attrs(style, False)}/>"
+                f"{self._draw_style_attrs(style, False)}{self._draw_close(style, 'rect')}"
             )
         if tag == "Line":
             return (
                 f'<line class="fuaran-drawing-line" x1="{_draw_num(f.get("x1", 0))}"'
                 f' y1="{_draw_num(f.get("y1", 0))}" x2="{_draw_num(f.get("x2", 0))}"'
-                f' y2="{_draw_num(f.get("y2", 0))}"{self._draw_style_attrs(style, False)}/>'
+                f' y2="{_draw_num(f.get("y2", 0))}"{self._draw_style_attrs(style, False)}'
+                f"{self._draw_close(style, 'line')}"
             )
         if tag == "Polyline":
             return (
                 f'<polyline class="fuaran-drawing-polyline" points="{_draw_points(f.get("points"))}"'
-                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}/>"
+                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}"
+                f"{self._draw_close(style, 'polyline')}"
             )
         if tag == "Polygon":
             return (
                 f'<polygon class="fuaran-drawing-polygon" points="{_draw_points(f.get("points"))}"'
-                f"{self._draw_style_attrs(style, False)}{self._draw_stroke_join_attrs(style)}/>"
+                f"{self._draw_style_attrs(style, False)}{self._draw_stroke_join_attrs(style)}"
+                f"{self._draw_close(style, 'polygon')}"
             )
         if tag == "Curve":
             return (
                 f'<path class="fuaran-drawing-curve" d="{_draw_path_d(f.get("commands"))}"'
-                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}/>"
+                f"{self._draw_style_attrs(style, True)}{self._draw_stroke_join_attrs(style)}"
+                f"{self._draw_close(style, 'path')}"
             )
         if tag == "Circle":
             return (
                 f'<circle class="fuaran-drawing-circle" cx="{_draw_num(f.get("cx", 0))}"'
                 f' cy="{_draw_num(f.get("cy", 0))}" r="{_draw_num(f.get("r", 0))}"'
-                f"{self._draw_style_attrs(style, False)}/>"
+                f"{self._draw_style_attrs(style, False)}{self._draw_close(style, 'circle')}"
             )
         if tag == "Ellipse":
             return (
                 f'<ellipse class="fuaran-drawing-ellipse" cx="{_draw_num(f.get("cx", 0))}"'
                 f' cy="{_draw_num(f.get("cy", 0))}" rx="{_draw_num(f.get("rx", 0))}"'
-                f' ry="{_draw_num(f.get("ry", 0))}"{self._draw_style_attrs(style, False)}/>'
+                f' ry="{_draw_num(f.get("ry", 0))}"{self._draw_style_attrs(style, False)}'
+                f"{self._draw_close(style, 'ellipse')}"
             )
         if tag == "Label":
             # Phase 877 — the rotation transform is built HERE rather than in
@@ -843,6 +886,9 @@ class Renderer:
             return (
                 f'<text class="fuaran-drawing-label" x="{_draw_num(x)}"'
                 f' y="{_draw_num(y)}"{rot}{self._draw_style_attrs(style, False)}>'
+                # The tip precedes the visible run — `<title>` is the
+                # accessible name only as the FIRST child.
+                f"{self._draw_tip_child(style)}"
                 f"{_draw_escape(self._text(f.get('text')))}</text>"
             )
         return ""

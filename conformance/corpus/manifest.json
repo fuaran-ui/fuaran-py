@@ -1124,6 +1124,14 @@
       "description": "Display/Drawing (Phase 877 — rotated Labels, incl. explicit 0 and 2-dp fraction)"
     },
     {
+      "id": "drawing-tipped-shapes",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/drawing-tipped-shapes.json",
+      "expectedFile": "nodes/drawing-tipped-shapes.json",
+      "description": "Display/Drawing (Phase 883 — tipped shapes, incl. hostile text, Bound tip and explicit empty)"
+    },
+    {
       "id": "empty-state-card",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2089,6 +2097,42 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.stateKey",
       "description": "Switch missing stateKey"
+    },
+    {
+      "id": "reject-nearmiss-column-readonly",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-column-readonly.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.columns[0].readOnly",
+      "description": "column 'readOnly' — named by the census row itself; deliberately NOT aliased to editable:false, because an inverting alias that guesses wrong makes a read-only column editable (Phase 863)"
+    },
+    {
+      "id": "reject-nearmiss-grid-behaviour-record",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-grid-behaviour-record.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.behaviour",
+      "description": "grid 'behaviour' record — charter option O1-C, rejected by design: three optional sibling fields, not a nested record (Phase 860 charter / 863)"
+    },
+    {
+      "id": "reject-nearmiss-grid-current-page",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-grid-current-page.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.currentPage",
+      "description": "grid 'currentPage' — the sharpest near miss: a LITERAL page number is not expressible, the position lives in State so a pager can move it (Phase 863)"
+    },
+    {
+      "id": "reject-nearmiss-grid-sortable",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-grid-sortable.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.sortable",
+      "description": "grid-level 'sortable' — the staticRows spelling reached for on the bound path, where sortability is sortStateKey + per-column narrowing (Phase 863)"
     },
     {
       "id": "reject-null-action-aitool-args",

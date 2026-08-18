@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"DataGrid","columns":[{"field":"note","kind":{"$type":"Text"},"label":"Note","readOnly":true}],"source":{"$type":"Static","value":[]}},"state":{},"style":{"emphasis":"Normal","tone":"Default","weight":"Standard"}}

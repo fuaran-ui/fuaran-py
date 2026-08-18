@@ -988,6 +988,25 @@ def _with_mark(style: Obj, mark_id: str) -> Obj:
     return Obj(style.tag, {**style.fields, "markId": mark_id})
 
 
+# Phase 883 — the separator between the three parts of a hover readout. A middle
+# dot with spaces of its own: not a character a series or category name is likely
+# to contain (a hyphen, a slash and a comma all are), and it reads as a separator
+# rather than as punctuation belonging to either side.
+_TIP_SEPARATOR = " · "
+
+
+def _with_tip(style: Obj, text: str) -> Obj:
+    """Phase 883 — stamp the hover readout onto a data-bearing shape's style.
+
+    An EMPTY readout is dropped rather than encoded: an empty SVG ``<title>``
+    suppresses the native tooltip AND overrides the element's accessible name
+    with nothing, which is worse than having no title at all.
+    """
+    if text == "":
+        return style
+    return Obj(style.tag, {**style.fields, "tip": text})
+
+
 def _style_stroke_ink(opacity: float, width: float) -> Obj:
     """Surface-relative structural stroke (``currentColor`` at a per-role opacity)."""
     return Obj(None, {"stroke": _static(_INK), "strokeWidth": _static(width), "opacity": _static(opacity)})
@@ -1235,6 +1254,42 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
     def y_tick_text(v: float) -> str:
         return _format_value(value_format, y_divisor, y_drop_symbol, y_step, v) + y_tick_suffix
+
+    # ── Hover readout (Phase 883) ────────────────────────────────────────────
+    #
+    # THE TIP IS WHERE FULL PRECISION LIVES. A printed data label (Phase 881)
+    # goes through ``y_tick_text`` — the axis's own formatter, step precision
+    # and display unit — and reads ROUGHLY WHERE. The tip answers the other
+    # question, WHAT EXACTLY IS THIS, so it takes the opposite three decisions:
+    # UNSCALED by the display unit (a tooltip has no unit slot beside it), the
+    # DATUM's own precision rather than the tick step's (an author's EXPLICIT
+    # ``Number``/``Percent`` precision still wins — a declared precision is a
+    # statement about the data, not the axis), and the currency symbol KEPT
+    # (the ticks drop it because the axis-unit label states it once).
+    #
+    # Passing ``v`` as the step is what selects the datum's own precision:
+    # ``_format_value`` derives its decimals from the step when no explicit
+    # precision is declared, so step = value gives the fewest decimals that
+    # reproduce the value exactly.
+    def tip_value_text(v: float) -> str:
+        return _format_value(value_format, 1.0, False, v, v)
+
+    def datum_tip(style: Obj, series_field: str, category_key: str, v: float) -> Obj:
+        """The readout for a PER-DATUM mark (bar, stack segment, wedge, scatter
+        point): "Series · Category · value". Both leading parts are untrusted
+        strings straight off the data feed — the renderer's XML escape is what
+        makes that safe. The series name is the FIELD name, matching the legend
+        and the mark id rather than the capitalised axis title."""
+        return _with_tip(style, f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}{tip_value_text(v)}")
+
+    def series_tip(style: Obj, series_field: str) -> Obj:
+        """The readout for a SERIES-LEVEL mark (a line, an area band or its
+        edge). THE TIP'S GRANULARITY FOLLOWS THE MARK'S IDENTITY GRANULARITY —
+        one element IS the whole series, and SVG resolves a tooltip per
+        ELEMENT, so a single ``<title>`` cannot honestly report one point's
+        value: whichever was chosen would show for a hover anywhere along the
+        line."""
+        return _with_tip(style, series_field)
 
     # ── Linear x-scale (Phase 636 — the Scatter arm's numeric x axis) ──
     # Scatter reads the x-field NUMERICALLY and plots on a linear x-domain (the
@@ -1921,7 +1976,14 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 top = _r2(min(y0, y1) + (gap if y1 < y0 else 0.0))
                 hgt = _r2(max(0.0, abs(y1 - y0) - gap))
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
-                series_shapes.append(_rectangle(bx, top, bw, hgt, None, _with_mark(_style_fill(_colour_for(j)), mark)))
+                # Phase 883 — a stack SEGMENT's tip carries its OWN series
+                # value, never the running total. This is where an interior
+                # segment gets its readout: Phase 881 prints the stack TOTAL
+                # at the cap and nothing else, and pointed here for the rest.
+                seg_style = datum_tip(
+                    _with_mark(_style_fill(_colour_for(j)), mark), spec.y_fields[j], categories[i], series[j][i]
+                )
+                series_shapes.append(_rectangle(bx, top, bw, hgt, None, seg_style))
     elif spec.kind in ("Bar", "Column"):
         bw = grouped_bar_w
         base_y = y_scale(0.0)
@@ -1935,7 +1997,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 top = min(vy, base_y)
                 hgt = _r2(abs(vy - base_y))
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
-                series_shapes.append(_rectangle(bx, top, bw, hgt, None, _with_mark(_style_fill(colour), mark)))
+                bar_style = datum_tip(_with_mark(_style_fill(colour), mark), spec.y_fields[j], categories[i], v)
+                series_shapes.append(_rectangle(bx, top, bw, hgt, None, bar_style))
     elif spec.kind == "Area" and stacked and n > 0:
         # Cumulative bands, bottom band first (painter's order): band j fills
         # between boundary j (below) and boundary j+1 (above); its upper
@@ -1947,9 +2010,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             upper = [(x_centre(i), y_scale(cum_rows[i][j + 1])) for i in range(n)]
             lower_pts = [(x_centre(i), y_scale(cum_rows[i][j])) for i in range(n - 1, -1, -1)]
             series_shapes.append(
-                _polygon(upper + lower_pts, _with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf))
+                _polygon(
+                    upper + lower_pts,
+                    series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf),
+                )
             )
-            series_shapes.append(_polyline(upper, _with_mark(_style_stroke(colour, 2.0), yf)))
+            series_shapes.append(_polyline(upper, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
     elif spec.kind == "Area" and n > 0:
         # Overlaid baseline-closed bands in palette order (painter's order:
         # later series draw over earlier); the translucent fill keeps the
@@ -1961,14 +2027,21 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             yf = spec.y_fields[j]
             points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
             band = [(x_centre(0), base_y), *points, (x_centre(n - 1), base_y)]
-            series_shapes.append(_polygon(band, _with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf)))
-            series_shapes.append(_polyline(points, _with_mark(_style_stroke(colour, 2.0), yf)))
+            series_shapes.append(
+                _polygon(band, series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf))
+            )
+            series_shapes.append(_polyline(points, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
     elif spec.kind == "Line":
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
-            series_shapes.append(_polyline(points, _with_mark(_style_stroke(colour, 2.0), spec.y_fields[j])))
+            series_shapes.append(
+                _polyline(
+                    points,
+                    series_tip(_with_mark(_style_stroke(colour, 2.0), spec.y_fields[j]), spec.y_fields[j]),
+                )
+            )
     elif spec.kind == "Scatter":
         # Fixed-radius point marks per datum (Phase 636). A non-numeric x/y
         # cell reads 0.0 (`_numeric_of`'s posture, shared with the other arms)
@@ -1983,7 +2056,17 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                         x_scale(x_values[i]),
                         y_scale(values[i]),
                         4.0,
-                        _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}"),
+                        # The tip's middle part is the x cell as PROJECTED
+                        # (``categories[i]``), not the mark id's canonical
+                        # numeric form: the id is for object constancy, the
+                        # tip is for a human, and on a temporal axis the
+                        # projection is the ISO date, not a day count.
+                        datum_tip(
+                            _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}"),
+                            yf,
+                            categories[i],
+                            values[i],
+                        ),
                     )
                 )
 
@@ -2222,7 +2305,19 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # ``legend`` in the same slot — geometry, then legend, then titles.
     if spec.kind == "Pie":
         shapes: list[Value] = (
-            _pie_shapes(spec, categories, n, pie_refused, pie_fractions, plot_x0, plot_x1, plot_y0, plot_y1)
+            _pie_shapes(
+                spec,
+                categories,
+                n,
+                pie_refused,
+                pie_fractions,
+                plot_x0,
+                plot_x1,
+                plot_y0,
+                plot_y1,
+                pie_values,
+                datum_tip,
+            )
             + legend
             + title_shapes
             + subtitle_shapes
@@ -2266,6 +2361,8 @@ def _pie_shapes(  # noqa: PLR0914
     plot_x1: float,
     plot_y0: float,
     plot_y1: float,
+    values: list[float],
+    datum_tip: Callable[[Obj, str, str, float], Obj],
 ) -> list[Value]:
     """The Pie arm (Phase 638) — polar, cubic-approximated wedges.
 
@@ -2328,7 +2425,13 @@ def _pie_shapes(  # noqa: PLR0914
         f = fractions[i]
         if f > 0.0:
             colour = _colour_for(i)
-            mark_style = _with_mark(_style_fill(colour), f"{yf}|{categories[i]}")
+            # The wedge's own VALUE, not its share. The share is already
+            # stated, once, in the legend entry (``name (NN%)``); restating it
+            # here would leave the magnitude behind the slice the one number
+            # still unreachable.
+            mark_style = datum_tip(
+                _with_mark(_style_fill(colour), f"{yf}|{categories[i]}"), yf, categories[i], values[i]
+            )
             if f >= 1.0 - 1e-9:
                 # A lone 100% category is a circle — there is no neighbour to
                 # separate from, so no padding.

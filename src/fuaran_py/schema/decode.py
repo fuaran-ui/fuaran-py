@@ -1069,6 +1069,13 @@ def _decode_draw_style(value: object, path: str) -> Value:
     # re-encode to different bytes.
     if "rotation" in obj:
         fields["rotation"] = _decode_number(obj["rotation"], f"{path}.rotation")
+    # Phase 883 — the per-mark hover readout, a full TextSource (so a `Bound`
+    # envelope decodes here as well as the canonical bare-string `Literal`).
+    # Optional, absent = untipped. Keys off PRESENCE for the same reason
+    # `rotation` does, and here the trap is sharper: an explicitly EMPTY tip is
+    # a distinct present value, and `if obj.get("tip"):` would silently drop it.
+    if "tip" in obj:
+        fields["tip"] = _decode_text_source(obj["tip"], f"{path}.tip")
     return Obj(None, fields)
 
 

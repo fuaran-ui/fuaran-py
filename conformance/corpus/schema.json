@@ -2143,6 +2143,9 @@
         },
         "rotation": {
           "type": "number"
+        },
+        "tip": {
+          "$ref": "#/$defs/TextSource"
         }
       }
     },
@@ -3132,6 +3135,15 @@
       "required": [
         "kind",
         "label"
+      ],
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "readOnly"
+            ]
+          }
+        }
       ]
     },
     "GridSpec": {
@@ -3242,6 +3254,57 @@
       "required": [
         "columns",
         "source"
+      ],
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "currentPage"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "page"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "pageIndex"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "sortable"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "onEdit"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "behaviour"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "behavior"
+            ]
+          }
+        }
       ]
     },
     "ChartSpec": {

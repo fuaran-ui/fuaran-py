@@ -3177,6 +3177,9 @@
         "editStateKey": {
           "type": "string"
         },
+        "reorderable": {
+          "type": "boolean"
+        },
         "defaultSort": {
           "type": "object",
           "properties": {

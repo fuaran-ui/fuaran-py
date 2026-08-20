@@ -1396,6 +1396,14 @@
       "description": "Visualisation/Grid (Phase 862 — paging and sorting composed: two behaviours, two state keys, one rule)"
     },
     {
+      "id": "grid-reorderable",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-reorderable.json",
+      "expectedFile": "nodes/grid-reorderable.json",
+      "description": "Visualisation/Grid (Phase 934 — declarative row reorder: omit-when-false flag; edits and reorders share one destination)"
+    },
+    {
       "id": "grid-sort-state-key",
       "kind": "node-round-trip",
       "decoder": "node",

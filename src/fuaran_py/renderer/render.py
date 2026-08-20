@@ -11,8 +11,14 @@ Server semantics mirror that precedent: no runtime, no dispatch. ``Action``-
 bearing nodes render inert (a ``Button`` is dead until a client hydrates it; a
 ``Link`` is a real crawlable ``<a href>``). ``Static`` bindings resolve to their
 value; other bindings resolve from a host-supplied ``sources`` map or fall back
-to the em-dash placeholder. Client-library visualisations (``Chart`` / ``Map`` /
-``DataGrid``) render a deterministic placeholder, never a blank.
+to the em-dash placeholder. A visualisation this host cannot paint (``Map``, a
+not-yet-lowered ``Chart``) renders a deterministic placeholder, never a blank.
+
+**Bound-grid posture (Phase 668) — completeness.** A data-bound ``DataGrid``
+whose columns declare a *declarative* projection renders its rows as a real
+table, resolved through the same render-time compute path every other bound slot
+uses (Phase 648); it does not degrade to a row-count placeholder. The boundary
+that remains is declared rather than incidental — see :meth:`Renderer._data_grid`.
 
 The renderer emits the **body fragment** only — the host owns ``<html>`` /
 ``<head>`` / the ``<link>`` to :func:`fuaran_py.renderer.reference_css_path`.
@@ -1098,13 +1104,98 @@ class Renderer:
             text,
         )
 
+    @staticmethod
+    def _grid_columns(columns: Value) -> list[dict[str, Value]]:
+        """The decoded ``columns`` list as plain field maps (non-objects dropped)."""
+        if not isinstance(columns, Arr):
+            return []
+        return [c.fields for c in columns.items if isinstance(c, Obj)]
+
+    @staticmethod
+    def _grid_cell_text(column: dict[str, Value], row: Obj) -> str:
+        """One bound-grid cell's text, mirroring the reference ``renderCellValue``.
+
+        A column projects its cell either declaratively (``field`` — a row
+        property name that rides the wire) or through a host closure (``value``).
+        The closure does **not** survive serialisation, so a closure-projected
+        column has no server-side cell value and renders empty — which is exactly
+        what the reference renderer does with a decoded grid, for the same reason.
+        """
+        field = column.get("field")
+        if not isinstance(field, str):
+            return ""
+        value = row.fields.get(field)
+        if value is None:
+            return ""
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        if isinstance(value, (int, float)):
+            return format_number(column.get("format"), value)
+        return str(value)
+
+    def _bound_grid(self, columns: list[dict[str, Value]], rows: Arr) -> str:
+        """The resolved rows as the reference grid's own ``<table>`` markup.
+
+        The element shape and class vocabulary match the reference renderer's
+        simple-table grid path exactly (``fuaran-grid`` / ``-header`` / ``-row`` /
+        ``-cell``, a ``<span>`` inside each cell), so a client that later hydrates
+        this region re-renders into markup it already agrees with rather than
+        replacing a foreign placeholder.
+
+        Rich cell kinds (``TonedPill``, ``Checkbox``, ``Link``, ``Progress``, …)
+        render their **text** projection here — this host's inert server semantics
+        for every interactive node, not a special case for grids.
+        """
+        header_cells = "".join(
+            text_element("th", [("class", "fuaran-grid-header")], str(c.get("label", ""))) for c in columns
+        )
+        body_rows = ""
+        for row in rows.items:
+            if not isinstance(row, Obj):
+                continue
+            cells = "".join(
+                element(
+                    "td",
+                    [("class", "fuaran-grid-cell")],
+                    text_element("span", [], self._grid_cell_text(c, row)),
+                )
+                for c in columns
+            )
+            body_rows += element("tr", [("class", "fuaran-grid-row")], cells)
+        thead = element("thead", [], element("tr", [], header_cells))
+        tbody = element("tbody", [], body_rows)
+        return element("table", [("class", "fuaran-grid")], thead + tbody)
+
     def _data_grid(self, node: Node, fields: dict[str, Value]) -> str:
-        # Phase 393 — a static read-only grid renders the semantic <table> (byte-identical to
-        # the retired Table); a data-bound grid renders a client-hydration placeholder.
+        # Phase 393 — a static read-only grid renders the semantic <table>
+        # (byte-identical to the retired Table).
+        #
+        # Phase 668 — the bound-grid posture is COMPLETENESS, matching this
+        # host's stated render-time compute model (Phase 648): a grid is data,
+        # and a static host holding resolved rows while printing "hydrates
+        # client-side" withholds what it already has. A no-JS surface (an email
+        # digest, an ops report) can never recover it, and even where a client
+        # does arrive, the placeholder is markup the client must REPLACE rather
+        # than attach to.
+        #
+        # The boundary that remains is declared, not incidental: a cell is
+        # projected either by `field` (declarative, on the wire) or by a host
+        # closure (`value`), and a closure decodes as the `"<closure>"` sentinel.
+        # So a grid declaring NO field-projected column at all — including one
+        # declaring no columns — keeps the placeholder, because there is nothing
+        # server-side to draw and the placeholder at least says so; a mixed grid
+        # renders, with its closure-projected cells empty. A source that does not
+        # resolve to rows (an unbound Query, an opaque `Static`) likewise keeps
+        # the placeholder: same contract as before, now narrowed to the cases
+        # that genuinely cannot be served.
         static_rows = fields.get("staticRows")
         if isinstance(static_rows, Obj):
             return self._table(node, static_rows.fields)
-        count = _seq_len(resolve_source(fields.get("source"), self.sources))
+        resolved = resolve_source(fields.get("source"), self.sources)
+        columns = self._grid_columns(fields.get("columns"))
+        if isinstance(resolved, Arr) and any(isinstance(c.get("field"), str) for c in columns):
+            return self._bound_grid(columns, resolved)
+        count = _seq_len(resolved)
         return self._make_vis_placeholder(
             "fuaran-grid fuaran-grid-ssr-placeholder",
             "DataGrid",

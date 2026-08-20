@@ -89,16 +89,18 @@ def test_filterable_static_dashboard_prunes_unset_filters_stably() -> None:
     # No scalar slot resolves (the Transform params come from Filters with no
     # defaults), so unset filters PRUNE their pipeline stages: the unfiltered
     # frame flows through. The Line chart's Transform source resolves to all rows
-    # and lowers to inline Drawing SVG; the grid placeholder reports the full
-    # row count of 2. (The Filters block itself is a baseline stub in this host,
-    # unrelated to the compute wiring under test.)
+    # and lowers to inline Drawing SVG; the grid (Phase 668) renders both
+    # unfiltered rows server-side rather than a row-count placeholder. (The
+    # Filters block itself is a baseline stub in this host, unrelated to the
+    # compute wiring under test.)
     server, interactive = _both_surfaces(_decode("filterable-static-dashboard"))
     assert server == interactive, "server-HTML and interactive surfaces diverged"
     for html in (server, interactive):
         assert "fuaran-filters" in html
         assert "fuaran-drawing" in html and "<svg" in html
-        assert 'data-fuaran-ssr-placeholder="DataGrid"' in html
-        assert 'data-fuaran-row-count="2"' in html
+        assert 'data-fuaran-ssr-placeholder="DataGrid"' not in html
+        assert '<table class="fuaran-grid">' in html
+        assert html.count('<tr class="fuaran-grid-row">') == 2
 
 
 @corpus_required
@@ -117,3 +119,56 @@ def test_scalar_law_is_loud_on_ambiguity() -> None:
     transform = grid.kind.fields["source"]
     outcome, value = _scalar_cell(transform, None)
     assert outcome == "error" and value is None
+
+
+# ── Phase 668 — the bound-grid render posture, pinned against the corpus ─────
+#
+# Two corpus grids sit either side of the declared boundary, and both are pinned
+# here so the behaviour is a contract rather than an accident of the placeholder
+# branch: `grid-field-named` declares `field`-projected columns over a Transform
+# source (renders), `grid-transform` declares NO columns at all (keeps the
+# placeholder — there is nothing server-side to draw).
+
+
+@corpus_required
+def test_grid_field_named_renders_its_transform_rows() -> None:
+    server, interactive = _both_surfaces(_decode("grid-field-named"))
+    assert server == interactive, "server-HTML and interactive surfaces diverged"
+    for html in (server, interactive):
+        # The completeness posture: the resolved row, not a row count.
+        assert 'data-fuaran-ssr-placeholder="DataGrid"' not in html
+        assert "hydrates client-side" not in html
+        assert '<table class="fuaran-grid">' in html
+        assert '<th class="fuaran-grid-header">Dept</th>' in html
+        assert '<th class="fuaran-grid-header">Amount</th>' in html
+        assert html.count('<tr class="fuaran-grid-row">') == 1
+        assert '<td class="fuaran-grid-cell"><span>eng</span></td>' in html
+        assert '<td class="fuaran-grid-cell"><span>100</span></td>' in html
+
+
+@corpus_required
+def test_grid_transform_without_columns_keeps_the_declared_placeholder() -> None:
+    # `grid-transform` projects every cell through a `rowKey` / column closure
+    # that does not survive serialisation — it decodes with `columns: []`. There
+    # is no declarative projection to render, so the placeholder stands, and its
+    # count is the RESOLVED one (filter → groupBy sum → sort leaves one row):
+    # the boundary is declared, and even at the boundary the compute ran.
+    server, interactive = _both_surfaces(_decode("grid-transform"))
+    assert server == interactive, "server-HTML and interactive surfaces diverged"
+    for html in (server, interactive):
+        assert 'data-fuaran-ssr-placeholder="DataGrid"' in html
+        assert 'data-fuaran-row-count="1"' in html
+        assert "[Grid: 1 rows" in html
+
+
+@corpus_required
+def test_closure_projected_columns_render_empty_cells() -> None:
+    # `grid-1` mixes a resolvable `Static` row source with a single column whose
+    # projection is a closure (`value: "<closure>"`, no `field`). No column
+    # declares a field, so the grid stays at the declared boundary rather than
+    # emitting a table of blank cells.
+    server, interactive = _both_surfaces(_decode("grid-1"))
+    assert server == interactive, "server-HTML and interactive surfaces diverged"
+    for html in (server, interactive):
+        assert 'data-fuaran-ssr-placeholder="DataGrid"' in html
+        assert 'data-fuaran-row-count="2"' in html

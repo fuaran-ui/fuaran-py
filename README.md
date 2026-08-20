@@ -101,6 +101,35 @@ every string-to-DOM seam (URLs, markdown, attributes) is sanitised. The host own
 the document shell (`<html>` / `<head>` / the `<link>` to the stylesheet); the
 renderer emits the body fragment only.
 
+### Bound-grid rendering — the completeness posture
+
+A `DataGrid` bound to data renders its **rows**, server-side. The `source` is
+resolved through the same render-time compute path every other bound slot uses
+(a `Transform` pipeline is evaluated by the certified evaluator; a `Selection` /
+`Filter` / `State` default resolves), and the resolved rows are emitted as the
+reference grid's own `<table class="fuaran-grid">` markup — the same element
+shape and class vocabulary a client renders, so a page that is later hydrated
+attaches to markup it already agrees with rather than replacing a placeholder.
+
+The posture is *completeness*: a static host that holds the rows and prints a
+row count withholds what it already has, and a no-JS surface — an email digest,
+an ops report, a crawler — can never recover it.
+
+One boundary remains, and it is declared rather than incidental. A column
+projects its cell either **declaratively**, by `field` (a row property name that
+rides the wire), or through a **host closure** (`value`) — and a closure does not
+survive serialisation; it decodes as an opaque sentinel. So:
+
+| Bound grid | Rendered |
+|---|---|
+| at least one `field`-projected column, source resolves to rows | the rows, as a `fuaran-grid` table (closure-projected cells empty) |
+| no `field`-projected column (including no columns at all) | the `[Grid: N rows — hydrates client-side]` placeholder, with `N` the *resolved* row count |
+| source does not resolve to rows | the same placeholder |
+
+Rich cell kinds (`TonedPill`, `Checkbox`, `Link`, `Progress`, …) render their
+**text** projection — the renderer's inert server semantics for every
+interactive node, not a special case for grids.
+
 ### Chart lowering coverage
 
 `fuaran_py.charts` lowers a resolved `Chart` to a canonical `Drawing` subtree

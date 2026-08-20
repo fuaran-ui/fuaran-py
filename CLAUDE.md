@@ -147,8 +147,11 @@ side silently un-wires it.
 so the byte-copied stylesheet styles it exactly as the F#/TS hosts style their
 output. Server semantics mirror the F# SSR precedent: no runtime, no dispatch
 (`Button` inert, `Link` a real `<a href>`), `Static` bindings resolve and the
-rest placeholder to an em-dash, and client-library visualisations render a
-deterministic placeholder.
+rest placeholder to an em-dash, and a visualisation this host cannot paint
+renders a deterministic placeholder. A **data-bound `DataGrid` renders its
+rows** — the completeness posture; the declared boundary (a closure-projected
+column, which cannot survive the wire) is written up in the README's
+"Bound-grid rendering" section.
 
 Two disciplines keep it honest:
 

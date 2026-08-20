@@ -21,7 +21,7 @@ The renderer emits the **body fragment** only — the host owns ``<html>`` /
 from __future__ import annotations
 
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 from ..model import Arr, Node, Obj, Value
 from . import markdown
@@ -181,6 +181,11 @@ class Renderer:
         return None
 
     # ── accessibility projection (best-effort over the structural section) ───
+    #
+    # WHERE the projection lands is a separate question from what it contains,
+    # and `_SEMANTIC_ELEMENT_TAGS` (below the class) is the answer: a kind whose
+    # body IS the node's semantic element carries it there instead of on the
+    # wrapper `<div>`.
 
     def _a11y_attrs(self, node: Node) -> list[tuple[str, str]]:
         a11y = node.extras.get("accessibility")
@@ -212,17 +217,29 @@ class Renderer:
             ("data-fuaran-node-id", node.id),
             ("class", node_class_name(node)),
         ]
-        attrs.extend(self._a11y_attrs(node))
-        return element("div", attrs, self.render_kind(node))
+        # Route the projection: a kind whose body IS the node's semantic element
+        # takes the a11y attributes onto that element; every other kind carries
+        # them on the wrapper, as before. The wrapper keeps the node's address
+        # (`data-fuaran-node-id`) either way.
+        semantic_attrs: list[tuple[str, str]] = []
+        if node.kind.tag in _SEMANTIC_ELEMENT_TAGS:
+            semantic_attrs = self._a11y_attrs(node)
+        else:
+            attrs.extend(self._a11y_attrs(node))
+        return element("div", attrs, self.render_kind(node, semantic_attrs))
 
     # ── kind dispatch ─────────────────────────────────────────────────────────
 
-    def render_kind(self, node: Node) -> str:
+    def render_kind(self, node: Node, semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         kind = node.kind
         tag = kind.tag
         fields = kind.fields
         handler = _DISPATCH.get(tag or "")
         if handler is not None:
+            # The three semantic-element kinds take the routed projection as a
+            # fourth argument; every other handler keeps the uniform signature.
+            if tag in _SEMANTIC_ELEMENT_TAGS:
+                return handler(self, node, fields, semantic_attrs)  # type: ignore[call-arg]
             return handler(self, node, fields)
         # Recognised-but-unhandled kind: render any children so the subtree is
         # never silently dropped (the wrapper already carries the kind class).
@@ -594,7 +611,7 @@ class Renderer:
             parts.append(text_element("div", [("class", "fuaran-fact-help")], self._text(help_text)))
         return element("div", [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")], "".join(parts))
 
-    def _link(self, node: Node, fields: dict[str, Value]) -> str:
+    def _link(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         href_value = resolve_binding(fields.get("href"), self.sources)
         href = sanitize_url_or_blank(href_value if isinstance(href_value, str) else "")
         attrs: list[tuple[str, str]] = [("class", "fuaran-link"), ("href", href)]
@@ -606,9 +623,11 @@ class Renderer:
             attrs.append(("target", target))
         if fields.get("download") is True:
             attrs.append(("download", ""))
+        # The node's a11y projection lands on the anchor.
+        attrs.extend(semantic_attrs)
         return text_element("a", attrs, self._text(fields.get("label")))
 
-    def _image(self, node: Node, fields: dict[str, Value]) -> str:
+    def _image(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         src_value = resolve_binding(fields.get("src"), self.sources)
         src = sanitize_url_or_blank(src_value if isinstance(src_value, str) else "")
         variant = fields.get("variant")
@@ -616,9 +635,10 @@ class Renderer:
             "Avatar": "fuaran-image fuaran-image-avatar",
             "Rounded": "fuaran-image fuaran-image-rounded",
         }.get(str(variant), "fuaran-image")
+        # The a11y projection lands on the `<img>` itself.
         return void_element(
             "img",
-            [("class", cls), ("src", src), ("alt", self._text(fields.get("alt")))],
+            [("class", cls), ("src", src), ("alt", self._text(fields.get("alt"))), *semantic_attrs],
         )
 
     def _list(self, node: Node, fields: dict[str, Value]) -> str:
@@ -949,13 +969,15 @@ class Renderer:
 
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────
 
-    def _button(self, node: Node, fields: dict[str, Value]) -> str:
+    def _button(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         variant = str(fields.get("variant", "Primary")).lower()
         disabled = resolve_binding(fields.get("disabled"), self.sources)
         attrs: list[tuple[str, str]] = [("class", f"fuaran-button fuaran-button-{variant}")]
         tooltip = fields.get("tooltip")
         if tooltip is not None:
             attrs.append(("title", self._text(tooltip)))
+        # Before `disabled`, matching the reference server renderer's order.
+        attrs.extend(semantic_attrs)
         if disabled is True:
             attrs.append(("disabled", ""))
         return text_element("button", attrs, self._text(fields.get("label")))
@@ -1287,6 +1309,22 @@ def _seq_len(value: object) -> int:
 
 # Kind discriminator → renderer method. Built once at import time. The values
 # are unbound methods invoked as `handler(self, node, fields)` in `render_kind`.
+#: Kinds whose body IS the node's semantic element, so the a11y projection
+#: belongs on that element rather than on the wrapper `<div>`.
+#:
+#: Three conditions, all required: the body is a SINGLE root element (not a
+#: container of siblings, not a label-wrapped control); that element carries
+#: native semantics of its own (an interactive role, or a graphic), so `role` /
+#: `aria-*` on an ancestor `<div>` is announced against the wrong node; and the
+#: element IS the node, with nothing else in the body competing for the
+#: accessible name. ``Link`` (``<a>``), ``Button`` (``<button>``) and ``Image``
+#: (``<img>``) satisfy all three. The form-field kinds deliberately do not: a
+#: ``Select``'s control sits inside a ``<label>`` that already names it.
+#:
+#: Tag-level by construction — the wrapper must decide before the body is
+#: rendered, and the only thing it has then is the kind tag.
+_SEMANTIC_ELEMENT_TAGS = frozenset({"Link", "Button", "Image"})
+
 _KindHandler = Callable[["Renderer", Node, dict[str, Value]], str]
 
 _DISPATCH: dict[str, _KindHandler] = {

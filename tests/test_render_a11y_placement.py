@@ -19,7 +19,11 @@ from __future__ import annotations
 from fuaran_py import decode_node
 from fuaran_py.renderer import render_html
 
-A11Y = '"accessibility":{"label":"Home","role":"Link"}'
+# The canonical wire form of a named ARIA role is the lower-case ARIA string
+# ("link"), which is what every host's encoder emits. This fixture said "Link"
+# until the projection stopped case-folding ``role``; it was only ever passing
+# because of the fold this host has now dropped.
+A11Y = '"accessibility":{"label":"Home","role":"link"}'
 
 
 def _render(wire: str) -> str:

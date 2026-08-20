@@ -192,6 +192,12 @@ class Renderer:
     # and `_SEMANTIC_ELEMENT_TAGS` (below the class) is the answer: a kind whose
     # body IS the node's semantic element carries it there instead of on the
     # wrapper `<div>`.
+    #
+    # WHAT it contains is six slots, in the order every reference host emits
+    # them: label, labelledby, describedby, role, live, hidden. The projection is
+    # meant to be one function ported to every host, so a slot missing here is a
+    # silent per-host divergence in the emitted DOM — which is what `hidden` was
+    # until it was added.
 
     def _a11y_attrs(self, node: Node) -> list[tuple[str, str]]:
         a11y = node.extras.get("accessibility")
@@ -207,12 +213,29 @@ class Renderer:
         described_by = a11y.fields.get("describedBy")
         if isinstance(described_by, str):
             out.append(("aria-describedby", described_by))
+        # `role` is an OPEN vocabulary — the named ARIA roles and the custom
+        # escape both travel as the raw string, so a host cannot tell them apart
+        # and the reference tiers all emit what they were given. Case-folding it
+        # here would rewrite a custom role the author cased deliberately; the
+        # named vocabulary is lower-case already, so folding bought nothing and
+        # cost fidelity.
         role = a11y.fields.get("role")
         if isinstance(role, str):
-            out.append(("role", role.lower()))
+            out.append(("role", role))
+        # `liveRegion` is the opposite case — a CLOSED lower-case vocabulary
+        # (polite | assertive | off) a typed host rejects at decode. Folding it
+        # is a no-op for every valid tree and keeps this structural renderer from
+        # emitting an invalid `aria-live` for a tree a typed host would refuse,
+        # so it stays.
         live = a11y.fields.get("liveRegion")
         if isinstance(live, str):
             out.append(("aria-live", live.lower()))
+        # `hidden` is a ``Binding[bool]``: emit ``aria-hidden="true"`` only when
+        # it resolves TRUE. False and unresolved both emit NOTHING —
+        # ``aria-hidden`` is not a tri-state, and emitting "false" on an
+        # unresolved binding would be a claim the tree never made.
+        if resolve_binding(a11y.fields.get("hidden"), self.sources) is True:
+            out.append(("aria-hidden", "true"))
         return out
 
     # ── the node wrapper ─────────────────────────────────────────────────────

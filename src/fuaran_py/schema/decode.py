@@ -1730,12 +1730,77 @@ def _decode_grid_source(value: object, path: str) -> Value:
     return _typed_static_binding(value, path, _decode_row_array, Arr([]), Arr([]), typed_default=True)
 
 
+def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], ...]) -> None:
+    """fuaran#863 — decode-time didactics for the grid-behaviour family's NEAR MISSES
+    (the fuaran#860 charter's rejected-spellings deliverable).
+
+    Every spelling below decoded SILENTLY before: WIRE_FORMAT §2 rule 2 tolerates unknown
+    keys, so a model that reached for the wrong name got a tree that decoded, validated and
+    rendered while the declaration did nothing — the fake-affordance failure in a new guise,
+    and tolerance is what hid it. The narrowing is an ENUMERATED set with an unambiguous
+    canonical form each; rule 2 holds for everything else. Walked in declaration order, so
+    which defect surfaces first is deterministic across hosts.
+    """
+    for found, canonical in candidates:
+        if found in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.{found}",
+                f"'{found}' is not part of the grid vocabulary — it would be ignored, not honoured",
+                canonical,
+            )
+
+
+# Named by the census row itself. Deliberately NOT aliased to `editable: false`: an
+# inverting alias that guesses wrong makes a read-only column editable.
+_COLUMN_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("readOnly", "editable: false — the column flag NARROWS the grid's editable capability"),
+)
+
+_GRID_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    # The sharpest of them: a LITERAL page number is not expressible at all, because the
+    # position lives in State so a control can move it.
+    (
+        "currentPage",
+        'pageStateKey — the page POSITION lives in State as {"page": N} so the pager can move it; '
+        "a literal page number is not expressible",
+    ),
+    (
+        "page",
+        'pageStateKey — the page POSITION lives in State as {"page": N} so the pager can move it; '
+        "a literal page number is not expressible",
+    ),
+    ("pageIndex", 'pageStateKey — the page POSITION lives in State as {"page": N}, 1-based (not a zero-based index)'),
+    (
+        "sortable",
+        "sortStateKey on the grid + sortable on each COLUMN — grid-wide sortable is the staticRows "
+        "spelling; a data-bound grid narrows per column",
+    ),
+    (
+        "onEdit",
+        "editStateKey — the edit DESTINATION is a State key on the grid; onEdit is a per-cell host "
+        "closure and carries no destination across the wire",
+    ),
+    (
+        "behaviour",
+        "sibling fields on the grid (sortStateKey / pageStateKey / pageSize / editStateKey / "
+        "defaultSort) — grid behaviour is not a nested record",
+    ),
+    (
+        "behavior",
+        "sibling fields on the grid (sortStateKey / pageStateKey / pageSize / editStateKey / "
+        "defaultSort) — grid behaviour is not a nested record",
+    ),
+)
+
+
 def _decode_column(value: object, path: str) -> Value:
     """A DataGrid ``ColumnErased`` record (WIRE_FORMAT §3.6): ``kind`` ← ``type``,
     ``label`` ← ``header`` / ``title``, ``format`` / ``width`` omitted-when-default
     (``CellFormat.None`` / ``ColumnWidth.Auto``). ``value`` (closure) + ``field``
     (declarative) are sibling optional slots preserved structurally."""
     obj = _expect_object(value, path)
+    _check_near_misses(obj, path, _COLUMN_NEAR_MISSES)
     fields: dict[str, Value] = {}
     kind_raw, kind_present = _alias_get(obj, "kind", ("type",))
     if kind_present:
@@ -1779,7 +1844,18 @@ def _validate_static_rows(raw: object, path: str) -> None:
     default_sort = raw.get("defaultSort")
     if default_sort is None:
         return
-    ds_path = f"{path}.defaultSort"
+    _validate_default_sort(default_sort, f"{path}.defaultSort")
+
+
+def _validate_default_sort(default_sort: object, ds_path: str) -> None:
+    """Phase 801 / fuaran#861 — the ``{column, direction}`` initial-order declaration.
+
+    ONE checker, shared by the ``staticRows`` spelling and the bound grid's own slot: same
+    record, same bound, same message at a different path. ``column`` is a NON-NEGATIVE
+    index; a negative (or non-integral) value is WRONG_TYPE, which is also what
+    ``schema.json``'s ``minimum: 0`` says. An index PAST the end is deliberately accepted —
+    a relation between sibling values is not something a per-object codec judges.
+    """
     ds = _expect_object(default_sort, ds_path)
     if "column" not in ds:
         _fail(MISSING_FIELD, f"{ds_path}.column", "missing required field 'column'", "non-negative header index")
@@ -1807,6 +1883,24 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     fields: dict[str, Value] = {}
     if "staticRows" in obj:
         _validate_static_rows(obj["staticRows"], f"{path}.staticRows")
+    # fuaran#862 — `pageSize` is how many rows a page holds. A page of zero or fewer rows
+    # names no page at all, so it is WRONG_TYPE — which is also what schema.json's
+    # `minimum: 1` says. Validation only: the field still passes through structurally
+    # below, which is what keeps the round-trip byte-identical for free.
+    if "pageSize" in obj:
+        page_size = obj["pageSize"]
+        if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.pageSize",
+                "pageSize must be an integer page size of 1 or more",
+                "JSON number (integer page size of 1 or more)",
+            )
+    # fuaran#861 — the bound path's declared initial order, checked by the SAME function
+    # the staticRows spelling uses.
+    if "defaultSort" in obj:
+        _validate_default_sort(obj["defaultSort"], f"{path}.defaultSort")
+    _check_near_misses(obj, path, _GRID_NEAR_MISSES)
     src_raw, src_present = _alias_get(obj, "source", ("data", "rows"))
     if src_present:
         fields["source"] = _decode_grid_source(src_raw, f"{path}.source")

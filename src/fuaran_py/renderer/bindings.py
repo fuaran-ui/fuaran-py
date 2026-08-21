@@ -91,6 +91,23 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
     return None
 
 
+def resolve_display_string(binding: Value, sources: BindingSources | None = None) -> str | None:
+    """Resolve a binding to its display-string form, or ``None``.
+
+    The twin of the Rust host's ``try_string``: :func:`resolve_binding` for the
+    value, then the display form — strings as-is, numbers in the deterministic
+    canonical layout, bools as ``true`` / ``false``. A structured value has no
+    display form and yields ``None``, so a caller never renders a container into
+    a text position.
+    """
+    resolved = resolve_binding(binding, sources)
+    if resolved is None:
+        return None
+    if isinstance(resolved, (str, bool, int, float)):
+        return _cell_value_to_text(resolved)
+    return None
+
+
 # ── Render-time compute resolution (Phase 648) ───────────────────────────────
 #
 # A `Bound` `Transform` binding is resolved through the corpus-certified

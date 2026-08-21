@@ -36,6 +36,7 @@ from .bindings import (
     format_number,
     render_text,
     resolve_binding,
+    resolve_display_string,
     resolve_scalar_number,
     resolve_source,
 )
@@ -45,6 +46,28 @@ from .theme import node_class_name
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
+
+
+def _a11y_name(value: Value, sources: BindingSources | None) -> str | None:
+    """Resolve an accessibility name slot to its display string.
+
+    The canonical form is a ``Binding[str]``, resolved through the host sources
+    (``Static`` inline, every keyed case from the map, an unwritten
+    ``Selection`` / ``Filter`` from its declared ``defaultValue``) and rendered
+    by the same display form the text slots use — so a number or bool reaching a
+    name slot reads the way it reads everywhere else, and a structured value
+    yields ``None``.
+
+    A BARE STRING is ALSO accepted, deliberately, as a LENIENT SHORTHAND: it is
+    NOT canonical wire and no encoder emits it. It is kept because this host's
+    own fixtures have authored the slot that way since it landed, and refusing
+    it would break them without moving a single byte of anything an encoder
+    produces. Stated here rather than left ambiguous — the decision is "lenient
+    on the way in, canonical on the way out", the least breaking of the two.
+    """
+    if isinstance(value, str):
+        return value
+    return resolve_display_string(value, sources)
 
 
 # ── Drawing SVG helpers (Phase 525 — ported from F# DrawingSvg) ──────────────
@@ -204,8 +227,15 @@ class Renderer:
         if not isinstance(a11y, Obj):
             return []
         out: list[tuple[str, str]] = []
-        label = a11y.fields.get("label")
-        if isinstance(label, str) and label != "":
+        # ``label`` is a ``Binding[str]`` on the wire (WIRE_FORMAT §3.1;
+        # ``schema.json`` maps ``Accessibility.label`` to ``$ref: Binding``), so
+        # the canonical form is ``{"$type":"Static","value":"Home"}`` and it
+        # resolves through the host sources exactly as the F#/TS/Rust
+        # projections do. The non-empty filter is theirs too: an empty
+        # accessible name is worse than none, because it silences the content
+        # that would otherwise have named the node.
+        label = _a11y_name(a11y.fields.get("label"), self.sources)
+        if label:
             out.append(("aria-label", label))
         labelled_by = a11y.fields.get("labelledBy")
         if isinstance(labelled_by, str):

@@ -74,6 +74,49 @@ def test_projection_emits_the_six_slots_in_reference_order() -> None:
     assert want in got
 
 
+def test_label_static_binding_emits_aria_label() -> None:
+    """``label`` is a ``Binding[str]``, so the CANONICAL authoring — the only form
+    an encoder emits — is a ``Static`` envelope. This host tested for a bare
+    string, so a canonical tree emitted no ``aria-label`` at all: not a subtle
+    degradation, since the node is then announced by its content or not at all.
+    Nothing went red because the fixtures authored the bare form the renderer
+    happened to accept, which is why both directions are pinned here."""
+    assert 'aria-label="Home"' in _wrapper('"label":{"$type":"Static","value":"Home"}')
+
+
+def test_label_resolves_through_host_sources() -> None:
+    """The other half: a keyed binding resolved from the host sources. A
+    projection that understood only ``Static`` would still silently drop every
+    conditionally-named node."""
+    got = _wrapper('"label":{"$type":"State","key":"navLabel"}', {"navLabel": "Primary navigation"})
+    assert 'aria-label="Primary navigation"' in got
+
+
+def test_label_accepts_the_bare_string_shorthand() -> None:
+    """The bare string stays accepted as a lenient, non-canonical shorthand (see
+    ``_a11y_name``). Pinned so a later reader cannot mistake it for an accident —
+    and so dropping it becomes a deliberate act with a red test, not a silent
+    regression in the fixtures that already author it."""
+    assert 'aria-label="Home"' in _wrapper('"label":"Home"')
+
+
+# An unresolved binding and an empty name both emit nothing: ``aria-label=""``
+# suppresses the content that would otherwise have named the node, so it is
+# strictly worse than leaving the slot off.
+@pytest.mark.parametrize(
+    ("section", "sources"),
+    [
+        ('"label":""', None),
+        ('"label":{"$type":"Static","value":""}', None),
+        ('"label":{"$type":"State","key":"navLabel"}', None),
+        ('"label":{"$type":"State","key":"navLabel"}', {"navLabel": ""}),
+    ],
+    ids=["empty-bare", "empty-static", "unresolved-binding", "resolved-empty"],
+)
+def test_label_empty_or_unresolved_emits_nothing(section: str, sources: BindingSources | None) -> None:
+    assert "aria-label" not in _wrapper(section, sources)
+
+
 def test_custom_role_is_emitted_verbatim() -> None:
     """``role`` is an open vocabulary: the named ARIA roles and the custom escape
     both travel as the raw string, so no host can tell them apart and every

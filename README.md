@@ -101,6 +101,91 @@ every string-to-DOM seam (URLs, markdown, attributes) is sanitised. The host own
 the document shell (`<html>` / `<head>` / the `<link>` to the stylesheet); the
 renderer emits the body fragment only.
 
+### Destination policy — ambient, and default-deny
+
+The scheme floor answers *is this URL safe to have*. It does not answer *is this
+destination one the composition declared*, and only the second question closes
+exfiltration: `https://collector.example/?s=…` passes every scheme rule, and in
+an `<img src>` the browser contacts it with **no user act at all**, because
+rendering *is* the request.
+
+So every `href` / `src` the renderer emits — `Link`, `Image`, and every
+destination inside a `Markdown` body — is checked against an **egress policy**
+carried on the render context. It **defaults to deny-non-local**: a decoded tree
+cannot declare its own egress, so absent a host's declaration it gets none. There
+is no caller opt-in anywhere on the path; the guarantee does not depend on a call
+site having remembered to ask.
+
+A host that means to reach off-origin declares it, by name:
+
+```python
+from fuaran_py.renderer import (
+    DENY_NON_LOCAL_EGRESS, EgressClass, HostSuffix, allow_origin, render_html,
+)
+
+policy = allow_origin(HostSuffix("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)
+body = render_html(result.value, egress_policy=policy)
+```
+
+`PERMISSIVE_EGRESS` — every destination, for a hand-authored tree where the
+author is the trust boundary — is reached by that name and no other, so a grep
+finds every host that widened it. The same keyword rides
+`FuaranRuntime(..., egress_policy=…)`, because a client re-render re-issues every
+`<img src>` fetch and a policy holding only on the server half would leak on the
+first dispatch.
+
+Two consequences on adoption, both deliberate:
+
+* A `mailto:` / `tel:` href is **refused** under the default. Those are egress
+  channels with no host for a rule to name, so they can only be permitted
+  wholesale — and permitting them by omission is the failure the default exists
+  to prevent.
+* Same-origin destinations (a relative path, a fragment) are **allowed**, so
+  ordinary in-app links and assets render unchanged. The default denies leaving,
+  not linking.
+
+A refused destination renders as a *refusal* — `href`/`src` becomes the inert
+`about:blank#fuaran-egress-refused` and the element carries a trailing
+`data-fuaran-egress-refused` attribute naming the class and the host
+(`media:collector.example`) — never as a silent neuter: "nothing happened" and
+"this was refused" are different facts, and only one of them is debuggable. The
+marker value **never carries the path or query**, which is exactly where an
+exfiltrated payload sits.
+
+#### Where this host's shape differs — declared, not incidental
+
+The policy model, the verdicts, the refusal URL and the marker spelling are
+identical to the reference host's, and the shared markdown corpus pins them
+byte-for-byte. Four things about how this host *carries* the policy differ, and
+each is a decision rather than an omission:
+
+* **The policy is a keyword argument on the existing entry point**, not a second
+  entry point beside it. The reference tier mints a separate
+  `render…AndEgress` function because its context record has five other optional
+  fields and a parameter per permutation is combinatorial; this host's entry
+  point takes two arguments, so the parameter *is* the declaration and stays
+  greppable at the call site. `Renderer` already existed as the per-render
+  context, so no new object was introduced to hold the field.
+* **The `unsafeUrl` verdict now renders the marked refusal at the `Link` /
+  `Image` call sites**, where before this host emitted a bare `about:blank`. The
+  floor refuses the URL at exactly the same point; what changed is that the seam
+  those call sites go through renders *every* refusal visibly, with the marker
+  value `unsafe-url` distinguishing a floor refusal from a policy one. Any local
+  test that pinned the bare form was updated in the same change.
+* **The markdown seam deliberately keeps the bare `about:blank` for that same
+  verdict**, with no marker. Those bytes are pinned by the shared corpus and have
+  read that way in every conformant host since the markdown renderer shipped;
+  re-spelling them would churn a conformance corpus inside a change about egress,
+  which is where a genuine divergence hides. The reference host draws the line in
+  the same place.
+* **Two of the reference host's call sites have no counterpart here**, because
+  the emissions do not exist in this host: a `DataGrid` link column (this host's
+  grid renders each cell's *text* projection, inert server semantics, so it emits
+  no per-row anchor) and the `route` class (this renderer emits no navigation —
+  `Action`-bearing nodes are dead until a client hydrates them). Both are
+  absences of a sink, not unchecked sinks; if either emission ever lands here it
+  arrives already owing a policy consultation.
+
 ### Bound-grid rendering — the completeness posture
 
 A `DataGrid` bound to data renders its **rows**, server-side. The `source` is

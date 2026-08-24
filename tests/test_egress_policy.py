@@ -329,3 +329,157 @@ def test_policy_is_threaded_not_global() -> None:
     strict_after = to_html_with_egress(DENY_NON_LOCAL_EGRESS, src)
     assert strict_before == strict_after
     assert loose == '<p><a href="https://evil.example/x">x</a></p>\n'
+
+
+# ── The AMBIENT renderer path (no caller opt-in) ────────────────────────────
+#
+# Everything above this line proves the SEAM is right. These prove the RENDERER
+# REACHES it — that a decoded tree's `href` / `src` is policy-checked with no
+# host having asked, which is the whole difference between a policy that is
+# available and one that is ambient.
+
+_COLLECTOR = "https://collector.example/x?s=secret"
+
+
+def _render_default(wire: str) -> str:
+    """Render through the DEFAULT entry point, naming no policy at all."""
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    result = decode_node(wire)
+    assert result.ok, getattr(result, "error", result)
+    return render_html(result.value)
+
+
+def _link_wire(href: str) -> str:
+    import json
+
+    return json.dumps(
+        {
+            "id": "l",
+            "kind": {
+                "$type": "Link",
+                "download": False,
+                "href": {"$type": "Static", "value": href},
+                "label": {"$type": "Literal", "text": "x"},
+            },
+        }
+    )
+
+
+def _image_wire(src: str) -> str:
+    import json
+
+    return json.dumps(
+        {
+            "id": "i",
+            "kind": {
+                "$type": "Image",
+                "src": {"$type": "Static", "value": src},
+                "alt": "a",
+                "variant": "Default",
+            },
+        }
+    )
+
+
+def test_link_node_is_refused_by_default_with_no_policy_named() -> None:
+    html = _render_default(_link_wire(_COLLECTOR))
+    assert 'href="' + EGRESS_REFUSAL_URL + '"' in html
+    assert EGRESS_REFUSAL_ATTRIBUTE + '="hyperlink:collector.example"' in html
+
+
+def test_image_node_is_refused_by_default_with_no_policy_named() -> None:
+    # The MEDIA class is the one that matters most: the browser fetches an
+    # `<img src>` with no user act, so RENDERING the tree IS the request.
+    html = _render_default(_image_wire(_COLLECTOR))
+    assert 'src="' + EGRESS_REFUSAL_URL + '"' in html
+    assert EGRESS_REFUSAL_ATTRIBUTE + '="media:collector.example"' in html
+
+
+@pytest.mark.parametrize("wire", [_link_wire(_COLLECTOR), _image_wire(_COLLECTOR)], ids=["link", "image"])
+def test_no_query_string_survives_anywhere_in_the_emitted_html(wire: str) -> None:
+    """The payload is the query, so the refusal must not carry it — not in the
+    URL it emits, and not in the marker value either. The marker names the class
+    and the host and stops there; a refusal record outlives the session, and the
+    query string of a refused exfiltration attempt IS the exfiltration."""
+    html = _render_default(wire)
+    assert "secret" not in html
+    assert "?s=" not in html
+    assert "/x" not in html
+
+
+def test_download_link_stays_in_the_hyperlink_class() -> None:
+    """`download` is a tree BOOLEAN, and flipping it must not change which rule
+    applies: the class names the SINK the browser reaches, and a `download`
+    anchor is still a hyperlink the user must act on. Scoping it to DOWNLOAD
+    would let a policy denying hyperlinks admit the same destination by flipping
+    one field on the wire."""
+    import json
+
+    wire = json.dumps(
+        {
+            "id": "l",
+            "kind": {
+                "$type": "Link",
+                "download": True,
+                "href": {"$type": "Static", "value": _COLLECTOR},
+                "label": {"$type": "Literal", "text": "x"},
+            },
+        }
+    )
+    html = _render_default(wire)
+    assert EGRESS_REFUSAL_ATTRIBUTE + '="hyperlink:collector.example"' in html
+    assert "download" in html
+
+
+def test_same_origin_destinations_still_render_unchanged_by_default() -> None:
+    """The default denies LEAVING, not linking — an ordinary in-app link and a
+    relative asset are untouched, which is what makes the default adoptable."""
+    html = _render_default(_link_wire("/reports/q3"))
+    assert 'href="/reports/q3"' in html
+    assert EGRESS_REFUSAL_ATTRIBUTE not in html
+
+    html = _render_default(_image_wire("/static/logo.png"))
+    assert 'src="/static/logo.png"' in html
+    assert EGRESS_REFUSAL_ATTRIBUTE not in html
+
+
+def test_a_declared_policy_admits_the_host_by_name() -> None:
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    result = decode_node(_image_wire("https://cdn.example/logo.png"))
+    assert result.ok, getattr(result, "error", result)
+    policy = allow_origin(ExactHost("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)
+    html = render_html(result.value, egress_policy=policy)
+    assert 'src="https://cdn.example/logo.png"' in html
+    assert EGRESS_REFUSAL_ATTRIBUTE not in html
+    # The SAME host under the HYPERLINK class is still refused — class scoping is
+    # not decoration, and a media allowance is not a link allowance.
+    link = decode_node(_link_wire("https://cdn.example/logo.png"))
+    assert link.ok, getattr(link, "error", link)
+    assert EGRESS_REFUSAL_ATTRIBUTE + '="hyperlink:cdn.example"' in render_html(link.value, egress_policy=policy)
+
+
+def test_interactive_runtime_render_is_policy_checked_too() -> None:
+    """The client surface is if anything the sharper case — a re-render re-issues
+    every `<img src>` fetch — so the runtime carries the same default."""
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import PERMISSIVE_EGRESS as _PERMISSIVE
+    from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+
+    # `render()` touches no DOM, but the constructor resolves its browser deps —
+    # so an inert stand-in keeps this a headless test rather than a Pyodide one.
+    deps = BrowserDeps(
+        get_element_by_id=lambda _id: None,
+        set_inner_html=lambda _el, _html: None,
+        add_event_listener=lambda _el, _t, _h: lambda: None,
+    )
+    result = decode_node(_image_wire(_COLLECTOR))
+    assert result.ok, getattr(result, "error", result)
+    strict = FuaranRuntime(result.value, deps=deps)
+    assert EGRESS_REFUSAL_ATTRIBUTE + '="media:collector.example"' in strict.render()
+    # And it is widened BY NAME, never by default.
+    loose = FuaranRuntime(result.value, deps=deps, egress_policy=_PERMISSIVE)
+    assert 'src="' + _COLLECTOR + '"' in loose.render()

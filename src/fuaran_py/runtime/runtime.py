@@ -24,6 +24,7 @@ from ..model import Arr, Node, Obj, Value
 from ..ops import ApplyErr, ApplyResult, apply
 from ..renderer import render_html
 from ..renderer.bindings import BindingSources
+from ..renderer.egress import DENY_NON_LOCAL_EGRESS, EgressPolicy
 from ..result import Ok
 
 # A host event handler: given the node id + DOM event type that fired, return the
@@ -135,10 +136,19 @@ class FuaranRuntime:
         deps: BrowserDeps | None = None,
         events: tuple[str, ...] = ("click",),
         compute_state: ComputeState | None = None,
+        egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
     ) -> None:
         self._tree = tree
         self._on_event = on_event
         self._sources = sources
+        # The ambient destination policy every re-render is performed under
+        # (WIRE_FORMAT §14.1). Defaults to deny, on the same argument the server
+        # renderer makes: an interactive runtime drives a DECODED tree, which
+        # cannot declare its own egress. The client surface is if anything the
+        # sharper case — a re-render re-issues every `<img src>` fetch, so a
+        # policy that held only on the server half would leak on the first
+        # dispatch. Declared BY NAME, so `grep PERMISSIVE_EGRESS` finds it.
+        self._egress_policy = egress_policy
         self._deps = deps if deps is not None else _pyodide_deps()
         self._events = events
         self._root: Any = None
@@ -180,8 +190,8 @@ class FuaranRuntime:
         """The current body-fragment HTML (the same string :meth:`mount` writes)."""
         if self._compute_state:
             merged: BindingSources = {**(self._sources or {}), **self._compute_state}
-            return render_html(self._tree, merged)
-        return render_html(self._tree, self._sources)
+            return render_html(self._tree, merged, self._egress_policy)
+        return render_html(self._tree, self._sources, self._egress_policy)
 
     def mount(self, root_id: str) -> None:
         """Render the tree into the element with id ``root_id`` and wire events."""

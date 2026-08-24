@@ -16,12 +16,34 @@ end-to-end with no client runtime::
 
 The host owns the document shell (``<html>`` / ``<head>`` / the ``<link>`` to
 the reference CSS); this renderer emits the body fragment only.
+
+Every ``href`` / ``src`` the render emits is checked against an **ambient
+destination policy** (WIRE_FORMAT §14.1) that **defaults to deny-non-local** — a
+decoded tree cannot declare its own egress, so absent a host's declaration it
+gets none. A host declares a wider posture by name, as a keyword argument::
+
+    from fuaran_py.renderer import DENY_NON_LOCAL_EGRESS, EgressClass, HostSuffix, allow_origin
+
+    policy = allow_origin(HostSuffix("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)
+    body = render_html(decoded.value, egress_policy=policy)
+
+The policy vocabulary is re-exported here so declaring one needs no submodule
+import; :mod:`fuaran_py.renderer.egress` carries the full model.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from .egress import (
+    DENY_NON_LOCAL_EGRESS,
+    PERMISSIVE_EGRESS,
+    EgressClass,
+    EgressPolicy,
+    ExactHost,
+    HostSuffix,
+    allow_origin,
+)
 from .render import Renderer, render_html
 
 _REFERENCE_CSS = Path(__file__).resolve().parent / "content" / "fuaran-reference.css"
@@ -43,4 +65,16 @@ def reference_css() -> str:
     return _REFERENCE_CSS.read_text(encoding="utf-8")
 
 
-__all__ = ["render_html", "reference_css_path", "reference_css", "Renderer"]
+__all__ = [
+    "DENY_NON_LOCAL_EGRESS",
+    "PERMISSIVE_EGRESS",
+    "EgressClass",
+    "EgressPolicy",
+    "ExactHost",
+    "HostSuffix",
+    "Renderer",
+    "allow_origin",
+    "reference_css",
+    "reference_css_path",
+    "render_html",
+]

@@ -5,7 +5,14 @@ from __future__ import annotations
 import re
 
 from fuaran_py import decode_node
-from fuaran_py.renderer import reference_css_path, render_html
+from fuaran_py.renderer import (
+    DENY_NON_LOCAL_EGRESS,
+    EgressClass,
+    ExactHost,
+    allow_origin,
+    reference_css_path,
+    render_html,
+)
 
 
 def _render(wire: str) -> str:
@@ -110,13 +117,38 @@ def test_stack_orientation_and_wrap_classes() -> None:
     assert "fuaran-stack-wrap" in html
 
 
-def test_link_renders_crawlable_anchor() -> None:
-    html = _render(
-        '{"id":"l","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"https://example.com/x"},'
-        '"label":{"$type":"Literal","text":"Go"}}}'
-    )
+_CRAWLABLE_LINK = (
+    '{"id":"l","kind":{"$type":"Link","download":false,"href":{"$type":"Static","value":"https://example.com/x"},'
+    '"label":{"$type":"Literal","text":"Go"}}}'
+)
+
+
+def test_link_renders_crawlable_anchor_under_a_declared_policy() -> None:
+    """A `Link` is a real crawlable `<a href>`, not an inert span — the server
+    semantics this host has kept since it shipped.
+
+    The destination is now checked against the render's ambient policy, so the
+    off-origin host is DECLARED by name here rather than assumed. That is the
+    posture, not a workaround: the default denies leaving, and a host that means
+    to link out says so in its own source.
+    """
+    result = decode_node(_CRAWLABLE_LINK)
+    assert result.ok, getattr(result, "error", result)
+    policy = allow_origin(ExactHost("example.com"), [EgressClass.HYPERLINK], DENY_NON_LOCAL_EGRESS)
+    html = render_html(result.value, egress_policy=policy)
     assert 'href="https://example.com/x"' in html
     assert ">Go</a>" in html
+    assert "data-fuaran-egress-refused" not in html
+
+
+def test_link_to_an_undeclared_host_is_refused_by_default() -> None:
+    """The same tree through the DEFAULT entry point, with no policy named at
+    all — the ambient half of the guarantee. The marker names the class and the
+    host, never the path or the query."""
+    html = _render(_CRAWLABLE_LINK)
+    assert 'href="about:blank#fuaran-egress-refused"' in html
+    assert 'data-fuaran-egress-refused="hyperlink:example.com"' in html
+    assert "example.com/x" not in html
 
 
 def test_custom_renders_inert_labelled_placeholder() -> None:

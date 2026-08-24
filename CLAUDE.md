@@ -175,6 +175,36 @@ markdown escaped-first then swept. The `Custom` host-renderer registry is a host
 trust boundary — the baseline ships no registry seam, so `Custom` renders an
 inert labelled placeholder.
 
+**Destination policy is AMBIENT on the render context, and defaults to deny.**
+`Renderer.egress_policy` (`fuaran_py.renderer.egress`, the port of the reference
+host's destination-policy section) is consulted by every `href` / `src` the
+renderer emits — the `Link` node's `href` under the `HYPERLINK` class, the
+`Image` node's `src` under `MEDIA`, and the whole markdown body through
+`markdown.to_html_with_egress`. `render_html(..., egress_policy=…)` and
+`FuaranRuntime(..., egress_policy=…)` are the declaration points; both default to
+`DENY_NON_LOCAL_EGRESS`, so a host that declares nothing gets deny, and
+`PERMISSIVE_EGRESS` is reachable only by that name.
+
+Three disciplines follow, and the third is the one that decays quietly:
+
+- **A new emission that carries a URL owes a policy consultation in the same
+  change.** `sanitize_url_or_blank` is the *floor*, not the seam — reaching for
+  it directly at a render call site re-opens the hole the ambient default closed.
+  Use `egress.sanitize_url_for_egress(self.egress_policy, <class>, url)` and
+  splice the returned attribute pairs onto the emitted element, last.
+- **Never widen the default to make a test pass.** The corpus fixtures and the
+  ambient tests in `tests/test_egress_policy.py` are the falsifiers in both
+  directions; a fixture that needs an off-origin host names a policy.
+- **`tests/test_markdown_corpus.py` runs TWO legs.** The seam leg calls
+  `to_html_with_egress` directly; the ambient leg renders a `Markdown` node
+  through `render_html` with **no policy named** for the `denyNonLocal` fixtures.
+  Keep both — the seam leg cannot detect a renderer that stopped reaching the
+  seam, which is precisely the state this host was in while the policy was merely
+  available.
+
+The README's "Destination policy" section carries the host-facing contract and
+the four declared shape differences from the reference host.
+
 ## Op-stream (hash chain)
 
 `fuaran_py.op_stream` is the Python host of the op-stream **hash-chained provenance

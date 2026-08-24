@@ -110,15 +110,32 @@ def test_url_floor_normalises_as_the_url_parser_does() -> None:
     assert sanitize_url("java\x0bscript:alert(1)") is None
 
 
-def test_link_node_with_protocol_relative_href_resolves_to_about_blank() -> None:
+# The two `unsafeUrl` cases below changed shape when the renderer's `href`
+# emission became AMBIENTLY policy-checked: the floor still refuses these URLs at
+# exactly the same point, but the seam the call site now goes through renders
+# EVERY refusal — the floor's included — as the marked
+# `about:blank#fuaran-egress-refused` rather than a bare `about:blank`. The
+# marker value is `unsafe-url`, which distinguishes it from a policy refusal (a
+# `<class>:<host>` value), so nothing is lost by the change and the "why" that
+# was previously only in the logs is now in the document.
+#
+# The MARKDOWN seam deliberately keeps the bare `about:blank` for this verdict —
+# those bytes are pinned by the shared corpus and re-spelling them would churn a
+# conformance corpus inside a change about egress. The two are different seams
+# with different pinned outputs, and that asymmetry is the reference host's too.
+
+
+def test_link_node_with_protocol_relative_href_renders_the_refusal() -> None:
     html = render_link('{"$type":"Static","value":"//evil.example/x"}')
-    assert 'href="about:blank"' in html
+    assert 'href="about:blank#fuaran-egress-refused"' in html
+    assert 'data-fuaran-egress-refused="unsafe-url"' in html
     assert "evil.example" not in html
 
 
-def test_link_node_with_javascript_href_resolves_to_about_blank() -> None:
+def test_link_node_with_javascript_href_renders_the_refusal() -> None:
     html = render_link('{"$type":"Static","value":"javascript:alert(1)"}')
-    assert 'href="about:blank"' in html
+    assert 'href="about:blank#fuaran-egress-refused"' in html
+    assert 'data-fuaran-egress-refused="unsafe-url"' in html
     assert "javascript:" not in html
 
 

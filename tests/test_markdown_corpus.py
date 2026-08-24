@@ -12,6 +12,13 @@ naming the policy the render is performed under. The corpus never carries a
 policy as *data* — a policy an emission can supply is a policy a hostile
 emission can widen — so the host maps the NAME to a policy it CONSTRUCTS, which
 is what :data:`_POLICIES` below is.
+
+**Two legs, and both are needed.** The SEAM leg calls
+``markdown.to_html_with_egress`` directly — it proves the policy-taking function
+is right. The AMBIENT leg renders a ``Markdown`` **node** through
+:func:`fuaran_py.renderer.render_html`, and for the ``denyNonLocal`` fixtures it
+names no policy at all — it proves the RENDERER REACHES that function with the
+context's policy, which is the fact the seam leg structurally cannot establish.
 """
 
 from __future__ import annotations
@@ -21,7 +28,9 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py.renderer import markdown
+from fuaran_py import decode_node
+from fuaran_py.model import Node
+from fuaran_py.renderer import markdown, render_html
 from fuaran_py.renderer.egress import (
     DENY_NON_LOCAL_EGRESS,
     PERMISSIVE_EGRESS,
@@ -100,6 +109,55 @@ def test_markdown_corpus_exercises_a_non_permissive_policy() -> None:
 def test_markdown_render_matches_corpus(fixture: dict) -> None:
     policy = _policy_for(fixture)
     assert markdown.to_html_with_egress(policy, fixture["source"]) == fixture["html"], fixture["id"]
+
+
+def _markdown_node(source: str) -> Node:
+    """A decoded ``Markdown`` node carrying ``source`` as its literal text."""
+    result = decode_node(json.dumps({"id": "md", "kind": {"$type": "Markdown", "text": source}}))
+    assert result.ok, getattr(result, "error", result)
+    return result.value
+
+
+@corpus_required
+@pytest.mark.parametrize(
+    "fixture",
+    [f for f in _markdown_fixtures() if f.get("policy") == "denyNonLocal"],
+    ids=lambda f: f["id"],
+)
+def test_markdown_node_renders_the_deny_fixture_with_no_caller_opt_in(fixture: dict) -> None:
+    """The AMBIENT leg — a ``Markdown`` node through the DEFAULT entry point.
+
+    The seam-level leg above proves the policy-taking markdown function is
+    correct. It cannot prove the renderer REACHES it: that function existed while
+    every emission site still called the pure form, and a decoded tree's egress
+    was therefore policy-checked only where a host had remembered to ask.
+
+    So this leg names NO policy at all. ``render_html(node)`` is the whole call —
+    exactly what a host that has read nothing about §14.1 writes — and the
+    ``denyNonLocal`` fixture's expected HTML must appear byte-exact inside this
+    host's markdown wrapper. It is the acceptance criterion ("no caller opt-in")
+    expressed as an assertion rather than a claim.
+    """
+    html = render_html(_markdown_node(fixture["source"]))
+    assert fixture["html"] in html, fixture["id"]
+
+
+@corpus_required
+@pytest.mark.parametrize(
+    "fixture",
+    [f for f in _markdown_fixtures() if f.get("policy") in ("declaredExample", "permissive")],
+    ids=lambda f: f["id"],
+)
+def test_markdown_node_renders_the_named_policy_fixtures(fixture: dict) -> None:
+    """The other half of the ambient leg: a host that DECLARES a policy gets it.
+
+    A default-deny that could not be widened by name would pass the leg above
+    while being useless, so the two run against the same fixtures from opposite
+    directions — the deny cases with nothing named, these with the fixture's own
+    policy constructed by this host.
+    """
+    html = render_html(_markdown_node(fixture["source"]), egress_policy=_policy_for(fixture))
+    assert fixture["html"] in html, fixture["id"]
 
 
 @corpus_required

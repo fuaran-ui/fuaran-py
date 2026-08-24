@@ -2031,7 +2031,16 @@
       "inputFile": "reject/reject-limit-json-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
       "expectedPath": "$",
-      "description": "§21 max JSON depth — 300 levels of bare array nesting, comfortably past the limit of 256. Well-formed and merely too deep, so LIMIT_EXCEEDED rather than INVALID_JSON (rule 2). Deliberately NOT at the exact boundary: hosts currently disagree by one level there (§21.5 records it), and a fixture pinning the boundary would fail a host over an off-by-one rather than over the rule"
+      "description": "§21 max JSON depth — 257 levels of bare array nesting, ONE past the limit. Well-formed and merely too deep, so LIMIT_EXCEEDED rather than INVALID_JSON (rule 2). Pins the boundary exactly; its at-the-limit twin below pins the other side"
+    },
+    {
+      "id": "reject-limit-json-depth-at-max",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-json-depth-at-max.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$",
+      "description": "§21 max JSON depth — 256 levels, EXACTLY at the limit. Not a valid node, so it must fail; the point is that it fails on SHAPE and not as a limit breach. Rule 1 in the one form the reject machinery can express for a syntactic bound: a host whose guard sits one level too tight answers LIMIT_EXCEEDED here and fails"
     },
     {
       "id": "reject-limit-node-depth",

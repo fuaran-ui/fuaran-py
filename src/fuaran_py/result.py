@@ -1,4 +1,4 @@
-"""Decode result + the six canonical ``DecodeError`` codes.
+"""Decode result + the seven canonical ``DecodeError`` codes.
 
 The decode side never throws on malformed input — it returns a structured,
 recoverable result mirroring the language-neutral wire contract
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# ── The six canonical decode-error codes (WIRE_FORMAT.md §6) ────────────────
+# ── The seven canonical decode-error codes (WIRE_FORMAT.md §6) ────────────────
 INVALID_JSON = "INVALID_JSON"
 MISSING_FIELD = "MISSING_FIELD"
 WRONG_TYPE = "WRONG_TYPE"
@@ -17,7 +17,23 @@ UNKNOWN_DU_CASE = "UNKNOWN_DU_CASE"
 WRONG_NODE_KIND = "WRONG_NODE_KIND"
 EMPTY_NODE_ID = "EMPTY_NODE_ID"
 
-CODES = frozenset({INVALID_JSON, MISSING_FIELD, WRONG_TYPE, UNKNOWN_DU_CASE, WRONG_NODE_KIND, EMPTY_NODE_ID})
+#: A ``WIRE_FORMAT.md`` §21 resource limit was exceeded — the document is
+#: well-formed and merely too large to walk. Deliberately distinct from
+#: ``INVALID_JSON``, which §21.2 rule 2 forbids using for this: calling a
+#: well-formed document malformed sends the author to repair the wrong thing.
+LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
+
+CODES = frozenset(
+    {
+        INVALID_JSON,
+        MISSING_FIELD,
+        WRONG_TYPE,
+        UNKNOWN_DU_CASE,
+        WRONG_NODE_KIND,
+        EMPTY_NODE_ID,
+        LIMIT_EXCEEDED,
+    }
+)
 
 
 @dataclass(frozen=True)

@@ -9,11 +9,18 @@ reusing the node / kind / binding / style / state decoders from
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 
+from ..limits import MAX_NODE_DEPTH
 from ..model import Arr, Obj, Value
-from ..result import INVALID_JSON, MISSING_FIELD, WRONG_TYPE, DecodeError, DecodeResult, Err, Ok
+from ..result import (
+    LIMIT_EXCEEDED,
+    MISSING_FIELD,
+    WRONG_TYPE,
+    DecodeResult,
+    Err,
+    Ok,
+)
 from ..schema.decode import (
     _decode_binding,
     _decode_kind,
@@ -29,6 +36,10 @@ from ..schema.decode import (
     _fail,
     _from_json_strict,
 )
+from ..schema.decode import (
+    _reset_walk as _reset_node_walk,
+)
+from ..shapeguard import check_shape, load_bounded
 
 OP_CASES = frozenset(
     {
@@ -125,7 +136,39 @@ OP_SCHEMAS: dict[str, list[tuple[str, bool, OpFieldDecoder]]] = {
 }
 
 
+# ── The op axis, counted separately from the node axis ───────────────────
+#
+# §21.5's note for implementers is that bounding the NODE decoder is not
+# sufficient: ``Batch`` makes this function self-recursive on a separate axis,
+# and the syntactic bound only LOOKS like adequate cover for it. On the
+# reference host, 2.6 KB of nested Batches killed the process with every
+# node-side guard already in place. Same ceiling, its own counter.
+_op_depth = 0
+
+
+def _reset_op_walk() -> None:
+    global _op_depth
+    _op_depth = 0
+
+
 def _decode_op_value(value: object, path: str) -> Obj:
+    global _op_depth
+
+    if _op_depth >= MAX_NODE_DEPTH:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"op nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
+        )
+
+    _op_depth += 1
+    try:
+        return _decode_op_value_inner(value, path)
+    finally:
+        _op_depth -= 1
+
+
+def _decode_op_value_inner(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, OP_CASES)
     fields: dict[str, Value] = {}
@@ -139,10 +182,14 @@ def _decode_op_value(value: object, path: str) -> Obj:
 
 def decode_op(text: str) -> DecodeResult[Obj]:
     """Decode a canonical-wire ``TreeOp`` document into a tagged :class:`~fuaran_py.model.Obj`."""
-    try:
-        parsed = json.loads(text)
-    except ValueError:
-        return Err(DecodeError(INVALID_JSON, "$", "input is not syntactically valid JSON"))
+    parsed, error = load_bounded(text)
+    if error is not None:
+        return Err(error)
+    shape = check_shape(parsed)
+    if shape is not None:
+        return Err(shape)
+    _reset_op_walk()
+    _reset_node_walk()
     try:
         return Ok(_decode_op_value(parsed, "$"))
     except _Fail as fail:

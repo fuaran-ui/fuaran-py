@@ -11,14 +11,14 @@ while typed validation is filled in incrementally. An unrecognised kind is a
 
 from __future__ import annotations
 
-import json
 from collections.abc import Callable
 from typing import cast
 
+from ..limits import MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value, from_json
 from ..result import (
     EMPTY_NODE_ID,
-    INVALID_JSON,
+    LIMIT_EXCEEDED,
     MISSING_FIELD,
     UNKNOWN_DU_CASE,
     WRONG_NODE_KIND,
@@ -28,6 +28,7 @@ from ..result import (
     Err,
     Ok,
 )
+from ..shapeguard import check_shape, load_bounded
 
 # ── Reserved unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ───────────
 OPAQUE = "<opaque>"
@@ -2253,7 +2254,54 @@ def _decode_state(value: object, path: str) -> Obj:
     return Obj(None, fields)
 
 
+# ── §21 walk bounds for the structural decoder ───────────────────────
+#
+# Node depth and total node count are enforced HERE, on the way down (§21.2
+# rule 4), rather than measured afterwards from the tree that was built. A check
+# that runs after the walk it is meant to bound has already paid the cost it
+# exists to refuse.
+#
+# Module-level counters rather than threaded parameters: `_decode_node_value` is
+# reached from the per-kind field decoders through a table of callables whose
+# signature is `(value, path)`, so threading a depth argument would mean changing
+# every entry in that table and every decoder it names. Sound because decoding is
+# synchronous; `_reset_walk` is called by the public entry points, so a walk that
+# raised part-way through never leaves a counter poisoned for the next caller.
+_walk_depth = 0
+_walk_nodes = 0
+
+
+def _reset_walk() -> None:
+    global _walk_depth, _walk_nodes
+    _walk_depth = 0
+    _walk_nodes = 0
+
+
 def _decode_node_value(value: object, path: str) -> Node:
+    global _walk_depth, _walk_nodes
+
+    if _walk_depth >= MAX_NODE_DEPTH:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"node nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
+        )
+    _walk_nodes += 1
+    if _walk_nodes > MAX_NODES:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"the document holds more than the wire limit MAX_NODES = {MAX_NODES} nodes",
+        )
+
+    _walk_depth += 1
+    try:
+        return _decode_node_value_inner(value, path)
+    finally:
+        _walk_depth -= 1
+
+
+def _decode_node_value_inner(value: object, path: str) -> Node:
     obj = _expect_object(value, path)
 
     if "id" not in obj:
@@ -2284,10 +2332,13 @@ def _decode_node_value(value: object, path: str) -> Node:
 
 def decode_node(text: str) -> DecodeResult[Node]:
     """Decode a canonical-wire ``Node`` document into a :class:`~fuaran_py.model.Node`."""
-    try:
-        parsed = json.loads(text)
-    except ValueError:
-        return Err(DecodeError(INVALID_JSON, "$", "input is not syntactically valid JSON"))
+    parsed, error = load_bounded(text)
+    if error is not None:
+        return Err(error)
+    shape = check_shape(parsed)
+    if shape is not None:
+        return Err(shape)
+    _reset_walk()
     try:
         return Ok(_decode_node_value(parsed, "$"))
     except _Fail as fail:

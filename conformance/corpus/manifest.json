@@ -1460,6 +1460,14 @@
       "description": "Display/Image (Avatar variant)"
     },
     {
+      "id": "limit-node-depth-at-max",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/limit-node-depth-at-max.json",
+      "expectedFile": "nodes/limit-node-depth-at-max.json",
+      "description": "§21 max node depth — a tree at EXACTLY the limit (24 levels). Rule 1: every conformant host MUST decode this; refusing it is non-conformance, not conservatism"
+    },
+    {
       "id": "link-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2015,6 +2023,33 @@
       "expectedErrorCode": "INVALID_JSON",
       "expectedPath": "$",
       "description": "truncated object"
+    },
+    {
+      "id": "reject-limit-json-depth",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-json-depth.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$",
+      "description": "§21 max JSON depth — 300 levels of bare array nesting, comfortably past the limit of 256. Well-formed and merely too deep, so LIMIT_EXCEEDED rather than INVALID_JSON (rule 2). Deliberately NOT at the exact boundary: hosts currently disagree by one level there (§21.5 records it), and a fixture pinning the boundary would fail a host over an off-by-one rather than over the rule"
+    },
+    {
+      "id": "reject-limit-node-depth",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-node-depth.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$",
+      "description": "§21 max node depth — one level past the limit (25). Refused with LIMIT_EXCEEDED, never INVALID_JSON (rule 2) and never a throw (rule 3)"
+    },
+    {
+      "id": "reject-limit-op-depth",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-limit-op-depth.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$",
+      "description": "§21.5 the op axis — 25 nested TreeOp.Batch. Counted separately from the node axis; the syntactic bound only LOOKS like cover for it"
     },
     {
       "id": "reject-missing-binding-type",

@@ -15,14 +15,46 @@ buckets (see ``../fuaran-dotnet/docs/MARKDOWN.md``):
 * DEFERRED — emoji / footnotes / heading anchors / sub-sup / definition lists /
         the full named-entity table render escaped-literal until added.
 
-Escapes by construction (no raw-HTML passthrough; URLs via
-``sanitize_url_or_blank``); the result still passes through
-``sanitize_markdown_html`` as defence in depth.
+Escapes by construction (no raw-HTML passthrough; URLs through the scheme
+floor); the result still passes through ``sanitize_markdown_html`` as defence in
+depth.
+
+**Destination policy (WIRE_FORMAT §14.1).** The scheme floor answers "is this
+URL safe to have"; it does not answer "is this destination one the composition
+declared". :func:`to_html_with_egress` consults an
+:class:`~fuaran_py.renderer.egress.EgressPolicy` for every link
+(``EgressClass.HYPERLINK``) and image (``EgressClass.MEDIA``) destination, and a
+refused one renders the inert ``about:blank#fuaran-egress-refused`` href plus a
+``data-fuaran-egress-refused`` marker naming the class and the host — never the
+path or the query, since the query string of a refused exfiltration attempt is
+the payload itself.
+
+:func:`to_html` SURVIVES AS THE PERMISSIVE CASE — ``to_html_with_egress`` under
+``PERMISSIVE_EGRESS``, byte-for-byte. The corpus is a cross-host byte-parity
+contract, so flipping the pure function's default would rewrite existing
+fixtures in five hosts in one act, and a mass churn is exactly where a real
+divergence hides; keeping it named also makes an unpolicied markdown render
+greppable, which is the property the refusal shape exists to give.
+
+THE SCHEME FLOOR'S OWN ANSWER IS UNCHANGED. A URL the floor rejects
+(``javascript:``, an unknown scheme, a protocol-relative reference) still
+renders the bare ``about:blank`` it has rendered since Phase 292, with **no**
+marker — see :func:`_markdown_destination`.
 """
 
 from __future__ import annotations
 
-from .sanitize import sanitize_markdown_html, sanitize_url_or_blank
+from .egress import (
+    EGRESS_REFUSAL_URL,
+    PERMISSIVE_EGRESS,
+    Allowed,
+    EgressClass,
+    EgressPolicy,
+    UnsafeUrl,
+    check_destination,
+    egress_refusal_marker,
+)
+from .sanitize import sanitize_markdown_html
 
 # ── Fable/host-parity primitives ─────────────────────────────────────────────
 # Explicit whitespace / digit classes (NOT str.isspace / str.isdigit) so F#,
@@ -163,7 +195,50 @@ def _is_scheme_char(c: str) -> bool:
     return ("a" <= c <= "z") or ("A" <= c <= "Z") or ("0" <= c <= "9") or c in "+.-"
 
 
-def _scan_autolink(text: str, i: int) -> tuple[tuple, int] | None:
+# ── Destination policy at the link / image seam ──────────────────────────────
+
+
+def _markdown_destination(policy: EgressPolicy, cls: EgressClass, url: str) -> tuple[str, list[tuple[str, str]]]:
+    """The ``href`` / ``src`` a markdown destination emits under ``policy``,
+    plus the refusal markers to splice in as trailing attributes.
+
+    Three verdict groups, and the middle one is a deliberate decision rather
+    than an oversight:
+
+    * ALLOWED — the normalised URL, no marker. Identical to what
+      ``sanitize_url_or_blank`` returned before this seam existed, so a
+      permissive render is byte-for-byte what it always was.
+    * UNSAFE (the SCHEME FLOOR refused) — the bare ``about:blank``, no marker.
+      The floor's answer is a different fact from a policy refusal: it says
+      "this URL is not safe to render at all", it has said it in that exact
+      spelling in every conformant host since Phase 292, and it is pinned by the
+      shared ``sanitization/`` corpus. Re-spelling it here would churn that
+      corpus inside a change about EGRESS — mixing two decisions into one set of
+      bytes, which is where a genuine divergence hides.
+    * REFUSED BY POLICY — the inert ``about:blank#fuaran-egress-refused`` plus a
+      marker naming the class and, where there is one, the host. Never the path
+      or the query.
+    """
+    verdict = check_destination(policy, cls, url)
+    if isinstance(verdict, Allowed):
+        return (verdict.url, [])
+    if isinstance(verdict, UnsafeUrl):
+        return ("about:blank", [])
+    marker = egress_refusal_marker(verdict)
+    return (EGRESS_REFUSAL_URL, [marker] if marker is not None else [])
+
+
+def _egress_attrs(markers: list[tuple[str, str]]) -> str:
+    """Render refusal markers as trailing HTML attributes.
+
+    Emitted LAST on the element so an adopting host's diff against the
+    pre-policy bytes is a pure suffix — every attribute that was there is still
+    where it was.
+    """
+    return "".join(" " + k + '="' + _escape_html(v) + '"' for k, v in markers)
+
+
+def _scan_autolink(policy: EgressPolicy, text: str, i: int) -> tuple[tuple, int] | None:
     close = text.find(">", i)
     if close < 0:
         return None
@@ -178,10 +253,38 @@ def _scan_autolink(text: str, i: int) -> tuple[tuple, int] | None:
     )
     looks_email = not looks_uri and "@" in body and ":" not in body and body.find("@") > 0
     if looks_uri:
-        safe = sanitize_url_or_blank(body)
-        return (("raw", '<a href="' + _escape_html(safe) + '">' + _escape_html(body) + "</a>"), close + 1)
+        safe, markers = _markdown_destination(policy, EgressClass.HYPERLINK, body)
+        return (
+            (
+                "raw",
+                '<a href="' + _escape_html(safe) + '"' + _egress_attrs(markers) + ">" + _escape_html(body) + "</a>",
+            ),
+            close + 1,
+        )
     if looks_email:
-        return (("raw", '<a href="mailto:' + _escape_html(body) + '">' + _escape_html(body) + "</a>"), close + 1)
+        # An email autolink has no URL of its own — the `mailto:` is the
+        # renderer's, so the policy is asked about the destination the renderer
+        # is about to emit. On acceptance the ORIGINAL bytes are emitted rather
+        # than the normalised form, so a permissive render is unchanged to the
+        # byte.
+        verdict = check_destination(policy, EgressClass.HYPERLINK, "mailto:" + body)
+        if isinstance(verdict, Allowed):
+            return (("raw", '<a href="mailto:' + _escape_html(body) + '">' + _escape_html(body) + "</a>"), close + 1)
+        marker = egress_refusal_marker(verdict)
+        markers = [marker] if marker is not None else []
+        return (
+            (
+                "raw",
+                '<a href="'
+                + _escape_html(EGRESS_REFUSAL_URL)
+                + '"'
+                + _egress_attrs(markers)
+                + ">"
+                + _escape_html(body)
+                + "</a>",
+            ),
+            close + 1,
+        )
     return None
 
 
@@ -303,7 +406,7 @@ def _plain_text(nodes: list) -> str:
     return "".join(out)
 
 
-def _scan_bare_autolink(text: str, i: int) -> tuple[tuple, int] | None:
+def _scan_bare_autolink(policy: EgressPolicy, text: str, i: int) -> tuple[tuple, int] | None:
     n = len(text)
 
     def starts(p: str) -> bool:
@@ -326,11 +429,14 @@ def _scan_bare_autolink(text: str, i: int) -> tuple[tuple, int] | None:
         return None
     raw = text[i:j]
     href = "http://" + raw if raw.startswith("www.") else raw
-    safe = sanitize_url_or_blank(href)
-    return (("raw", '<a href="' + _escape_html(safe) + '">' + _escape_html(raw) + "</a>"), j)
+    safe, markers = _markdown_destination(policy, EgressClass.HYPERLINK, href)
+    return (
+        ("raw", '<a href="' + _escape_html(safe) + '"' + _egress_attrs(markers) + ">" + _escape_html(raw) + "</a>"),
+        j,
+    )
 
 
-def _tokenize(refs: dict, text: str) -> list:
+def _tokenize(policy: EgressPolicy, refs: dict, text: str) -> list:
     toks: list = []
     n = len(text)
     i = 0
@@ -346,22 +452,40 @@ def _tokenize(refs: dict, text: str) -> list:
 
     def make_image(label_text: str, url: str, title_opt: str | None) -> None:
         flush()
-        alt = _plain_text(_parse_inlines(refs, label_text))
-        safe = sanitize_url_or_blank(url)
+        alt = _plain_text(_parse_inlines(policy, refs, label_text))
+        safe, markers = _markdown_destination(policy, EgressClass.MEDIA, url)
         title_attr = (' title="' + _escape_html(title_opt) + '"') if title_opt is not None else ""
         toks.append(
             (
                 "node",
-                ("raw", '<img src="' + _escape_html(safe) + '" alt="' + _escape_html(alt) + '"' + title_attr + " />"),
+                (
+                    "raw",
+                    '<img src="'
+                    + _escape_html(safe)
+                    + '" alt="'
+                    + _escape_html(alt)
+                    + '"'
+                    + title_attr
+                    + _egress_attrs(markers)
+                    + " />",
+                ),
             )
         )
 
     def make_link(label_text: str, url: str, title_opt: str | None) -> None:
         flush()
-        inner = _render_inlines(_parse_inlines(refs, label_text))
-        safe = sanitize_url_or_blank(url)
+        inner = _render_inlines(_parse_inlines(policy, refs, label_text))
+        safe, markers = _markdown_destination(policy, EgressClass.HYPERLINK, url)
         title_attr = (' title="' + _escape_html(title_opt) + '"') if title_opt is not None else ""
-        toks.append(("node", ("raw", '<a href="' + _escape_html(safe) + '"' + title_attr + ">" + inner + "</a>")))
+        toks.append(
+            (
+                "node",
+                (
+                    "raw",
+                    '<a href="' + _escape_html(safe) + '"' + title_attr + _egress_attrs(markers) + ">" + inner + "</a>",
+                ),
+            )
+        )
 
     while i < n:
         c = text[i]
@@ -390,7 +514,7 @@ def _tokenize(refs: dict, text: str) -> list:
                 pending.append(c)
                 i += 1
         elif c == "<":
-            al = _scan_autolink(text, i)
+            al = _scan_autolink(policy, text, i)
             if al:
                 flush()
                 toks.append(("node", al[0]))
@@ -502,7 +626,7 @@ def _tokenize(refs: dict, text: str) -> list:
             toks.append(("node", ("hard",) if hard else ("soft",)))
             i += 1
         elif c in "hw" and (i == 0 or _is_ws(prev_char()) or prev_char() in "(*_~"):
-            ba = _scan_bare_autolink(text, i)
+            ba = _scan_bare_autolink(policy, text, i)
             if ba:
                 flush()
                 toks.append(("node", ba[0]))
@@ -604,12 +728,12 @@ def _process_emphasis(toks: list) -> list:
     return result
 
 
-def _parse_inlines(refs: dict, text: str) -> list:
-    return _process_emphasis(_tokenize(refs, text))
+def _parse_inlines(policy: EgressPolicy, refs: dict, text: str) -> list:
+    return _process_emphasis(_tokenize(policy, refs, text))
 
 
-def _render_inline(refs: dict, text: str) -> str:
-    return _render_inlines(_parse_inlines(refs, text))
+def _render_inline(policy: EgressPolicy, refs: dict, text: str) -> str:
+    return _render_inlines(_parse_inlines(policy, refs, text))
 
 
 # ── Block parsing ─────────────────────────────────────────────────────────────
@@ -970,19 +1094,19 @@ def _align_attr(a: str) -> str:
     return ""
 
 
-def _render_blocks(refs: dict, blocks: list) -> str:
-    return "".join(_render_block(refs, b) for b in blocks)
+def _render_blocks(policy: EgressPolicy, refs: dict, blocks: list) -> str:
+    return "".join(_render_block(policy, refs, b) for b in blocks)
 
 
-def _render_block(refs: dict, b: tuple) -> str:
+def _render_block(policy: EgressPolicy, refs: dict, b: tuple) -> str:
     tag = b[0]
     if tag == "hr":
         return "<hr />\n"
     if tag == "heading":
         lvl = b[1]
-        return "<h" + str(lvl) + ">" + _render_inline(refs, b[2]) + "</h" + str(lvl) + ">\n"
+        return "<h" + str(lvl) + ">" + _render_inline(policy, refs, b[2]) + "</h" + str(lvl) + ">\n"
     if tag == "paragraph":
-        return "<p>" + _render_inline(refs, b[1]) + "</p>\n"
+        return "<p>" + _render_inline(policy, refs, b[1]) + "</p>\n"
     if tag == "fenced":
         lang, content = b[1], b[2]
         cls = "" if lang == "" else ' class="language-' + _escape_html(lang) + '"'
@@ -990,13 +1114,15 @@ def _render_block(refs: dict, b: tuple) -> str:
     if tag == "indented":
         return "<pre><code>" + _escape_html(b[1]) + "\n</code></pre>\n"
     if tag == "blockquote":
-        return "<blockquote>\n" + _render_blocks(refs, b[1]) + "</blockquote>\n"
+        return "<blockquote>\n" + _render_blocks(policy, refs, b[1]) + "</blockquote>\n"
     if tag == "table":
         headers, aligns, rows = b[1], b[2], b[3]
         out: list[str] = ['<table class="fuaran-table"><thead><tr>']
         for idx, h in enumerate(headers):
             a = aligns[idx] if idx < len(aligns) else "none"
-            out.append('<th class="fuaran-table-header"' + _align_attr(a) + ">" + _render_inline(refs, h) + "</th>")
+            out.append(
+                '<th class="fuaran-table-header"' + _align_attr(a) + ">" + _render_inline(policy, refs, h) + "</th>"
+            )
         out.append("</tr></thead><tbody>")
         for row in rows:
             out.append('<tr class="fuaran-table-row">')
@@ -1004,21 +1130,25 @@ def _render_block(refs: dict, b: tuple) -> str:
                 cell = row[idx] if idx < len(row) else ""
                 a = aligns[idx] if idx < len(aligns) else "none"
                 out.append(
-                    '<td class="fuaran-table-cell"' + _align_attr(a) + ">" + _render_inline(refs, cell) + "</td>"
+                    '<td class="fuaran-table-cell"'
+                    + _align_attr(a)
+                    + ">"
+                    + _render_inline(policy, refs, cell)
+                    + "</td>"
                 )
             out.append("</tr>")
         out.append("</tbody></table>\n")
         return "".join(out)
     if tag == "bullet":
-        return "<ul>\n" + _render_items(refs, b[1], b[2]) + "</ul>\n"
+        return "<ul>\n" + _render_items(policy, refs, b[1], b[2]) + "</ul>\n"
     if tag == "ordered":
         start_num, tight, items = b[1], b[2], b[3]
         start_attr = "" if start_num == 1 else ' start="' + str(start_num) + '"'
-        return "<ol" + start_attr + ">\n" + _render_items(refs, tight, items) + "</ol>\n"
+        return "<ol" + start_attr + ">\n" + _render_items(policy, refs, tight, items) + "</ol>\n"
     return ""
 
 
-def _render_items(refs: dict, tight: bool, items: list) -> str:
+def _render_items(policy: EgressPolicy, refs: dict, tight: bool, items: list) -> str:
     out: list[str] = []
     for item in items:
         task = item["task"]
@@ -1033,25 +1163,49 @@ def _render_items(refs: dict, tight: bool, items: list) -> str:
             inner_parts: list[str] = []
             for blk in item["blocks"]:
                 if blk[0] == "paragraph":
-                    inner_parts.append(_render_inline(refs, blk[1]))
+                    inner_parts.append(_render_inline(policy, refs, blk[1]))
                 else:
-                    inner_parts.append("\n" + _render_block(refs, blk))
+                    inner_parts.append("\n" + _render_block(policy, refs, blk))
             out.append("<li" + li_class + ">" + checkbox + "".join(inner_parts) + "</li>\n")
         else:
-            out.append("<li" + li_class + ">\n" + checkbox + _render_blocks(refs, item["blocks"]) + "</li>\n")
+            out.append("<li" + li_class + ">\n" + checkbox + _render_blocks(policy, refs, item["blocks"]) + "</li>\n")
     return "".join(out)
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
-def to_html(source: str) -> str:
-    """Render GFM markdown ``source`` to deterministic, cross-host HTML."""
+def to_html_with_egress(policy: EgressPolicy, source: str) -> str:
+    """Render GFM markdown ``source`` under a destination policy (§14.1).
+
+    Every link and image destination is checked against ``policy``: an allowed
+    one emits the normalised URL exactly as before, and a refused one emits the
+    inert ``about:blank#fuaran-egress-refused`` plus a trailing
+    ``data-fuaran-egress-refused`` marker naming the class and the host.
+
+    The policy is threaded as a parameter rather than held in module state —
+    a module-level global would make the renderer non-reentrant, so two
+    concurrent renders under different policies would decide each other's
+    destinations.
+    """
     if not source:
         return ""
     normalized = source.replace("\r\n", "\n").replace("\r", "\n")
     raw_lines = normalized.split("\n")
     refs, lines = _extract_ref_defs(raw_lines)
     blocks = _parse_blocks(lines)
-    html = _render_blocks(refs, blocks)
+    html = _render_blocks(policy, refs, blocks)
     return sanitize_markdown_html(html)
+
+
+def to_html(source: str) -> str:
+    """Render GFM markdown ``source`` to deterministic, cross-host HTML.
+
+    The PERMISSIVE case of :func:`to_html_with_egress`, byte-for-byte: every
+    destination the scheme floor accepts is emitted as authored. This is the
+    pure ``source -> html`` function the shared corpus has pinned since Phase
+    292. A host rendering a DECODED (wire) tree wants
+    :func:`to_html_with_egress` with its own policy — the emission cannot
+    declare its own egress, so absent a host's declaration it should get none.
+    """
+    return to_html_with_egress(PERMISSIVE_EGRESS, source)

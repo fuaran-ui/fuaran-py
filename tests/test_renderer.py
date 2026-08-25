@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
+from _reference_host import reference_host_root
 from fuaran_py import decode_node
 from fuaran_py.renderer import (
     DENY_NON_LOCAL_EGRESS,
@@ -170,10 +173,23 @@ def test_style_section_projects_role_and_voice_fragments() -> None:
 
 
 def test_reference_css_is_byte_identical_to_the_f_sharp_canonical() -> None:
-    # The reference CSS ships as a byte-copy; when the F# sibling is checked out
-    # alongside, assert the copy has not drifted (the operator-discipline sync).
+    """The byte-copy has not drifted from the F# canonical stylesheet.
+
+    The reference host is located through ``_reference_host`` rather than by a
+    hard-coded relative path: this check previously walked to a ``fuaran``
+    sibling renamed to ``fuaran-dotnet``, and — worse than the parity gate's
+    skip — reported a **pass** while comparing nothing, because a missing
+    canonical was a silent no-op. An absent host is now an explicit skip and a
+    resolved host with no stylesheet is a failure.
+    """
     css = reference_css_path()
     assert css.is_file()
-    fsharp = css.resolve().parents[5] / "fuaran" / "src" / "Fuaran.UI.Renderer" / "content" / "fuaran-reference.css"
-    if fsharp.is_file():
-        assert css.read_bytes() == fsharp.read_bytes(), "reference CSS copy has drifted from the F# canonical"
+    root = reference_host_root()
+    if root is None:
+        pytest.skip("F# reference host not checked out alongside — nothing to compare the byte-copy against")
+    canonical = root / "src" / "Fuaran.UI.Renderer" / "content" / "fuaran-reference.css"
+    assert canonical.is_file(), (
+        f"the F# reference host resolved at {root} but its canonical stylesheet is missing at {canonical} — "
+        "update the path rather than letting this comparison quietly do nothing"
+    )
+    assert css.read_bytes() == canonical.read_bytes(), "reference CSS copy has drifted from the F# canonical"

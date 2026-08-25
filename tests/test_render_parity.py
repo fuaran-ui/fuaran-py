@@ -12,6 +12,12 @@ It is a cross-host parity lock, the rendering analogue of the wire-format corpus
 the F# host's vocabulary is the authority, and a pass proves this host does not
 drift from it. When the F# sibling is not checked out alongside (standalone
 ``fuaran-py`` clone), the test skips — mirroring the corpus skip in ``_corpus``.
+
+**That skip is load-bearing and was silently mis-firing.** The reference host is
+located through ``tests/_reference_host.py``, which accepts every spelling the
+sibling has shipped under and reports a cross-host checkout that cannot find one
+as a failure rather than a skip — see that module, and
+``test_reference_host_resolves_in_a_cross_host_checkout`` below.
 """
 
 from __future__ import annotations
@@ -21,19 +27,26 @@ import re
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
+from _reference_host import reference_host_root, vacuous_gate_diagnosis
 from fuaran_py import decode_node
 from fuaran_py.renderer import render_html
 
-# tests/_corpus.py resolves CORPUS_ROOT under the Fuaran-UI estate root; the F#
-# reference renderer sources live in the `fuaran` sibling next to it.
-_ESTATE_ROOT = CORPUS_ROOT.parent
-_REFERENCE_RENDERER_FILES = [
-    _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Server" / "Render.fs",
-    _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer" / "Render.fs",
-    _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Core" / "Theme.fs",
+# The reference renderer sources, relative to whichever spelling of the F# host
+# is checked out. Resolution walks up from THIS repo's root (not from the corpus,
+# whose own location varies with the snapshot fallback) — see _reference_host.
+_REFERENCE_HOST_ROOT = reference_host_root()
+_REFERENCE_RENDERER_SOURCES = (
+    ("Fuaran.UI.Renderer.Server", "Render.fs"),
+    ("Fuaran.UI.Renderer", "Render.fs"),
+    ("Fuaran.UI.Renderer.Core", "Theme.fs"),
     # Phase 525 — the Drawing SVG class vocabulary (fuaran-drawing*) lives here.
-    _ESTATE_ROOT / "fuaran" / "src" / "Fuaran.UI.Renderer.Core" / "DrawingSvg.fs",
-]
+    ("Fuaran.UI.Renderer.Core", "DrawingSvg.fs"),
+)
+_REFERENCE_RENDERER_FILES = (
+    []
+    if _REFERENCE_HOST_ROOT is None
+    else [_REFERENCE_HOST_ROOT / "src" / project / name for project, name in _REFERENCE_RENDERER_SOURCES]
+)
 
 _CLASS_TOKEN = re.compile(r"fuaran-[a-zA-Z0-9-]*")
 
@@ -54,13 +67,43 @@ def _reference_vocabulary() -> tuple[frozenset[str], frozenset[str]]:
 
 
 def _reference_renderer_available() -> bool:
-    return all(p.is_file() for p in _REFERENCE_RENDERER_FILES)
+    return bool(_REFERENCE_RENDERER_FILES) and all(p.is_file() for p in _REFERENCE_RENDERER_FILES)
 
 
 reference_renderer_required = pytest.mark.skipif(
     not _reference_renderer_available(),
     reason="F# reference renderer source not found alongside fuaran-py",
 )
+
+
+def test_reference_host_resolves_in_a_cross_host_checkout() -> None:
+    """The parity gate is not allowed to go quiet in a cross-host checkout.
+
+    Every other test in this file skips when the reference host is missing, which
+    is right for a standalone clone and catastrophic in a workspace checkout: it
+    is exactly how this gate spent months green while checking nothing after the
+    ``fuaran`` → ``fuaran-dotnet`` rename. This one never skips, so a future
+    rename surfaces as a red test rather than a silent skip.
+    """
+    diagnosis = vacuous_gate_diagnosis()
+    assert diagnosis is None, diagnosis
+
+
+def test_reference_renderer_sources_are_all_present_when_the_host_is() -> None:
+    """A resolved host with a moved source file must fail, not skip.
+
+    ``reference_renderer_required`` is an all-or-nothing gate, so an F# project or
+    file rename would take the whole oracle offline in the same silent way the
+    directory rename did. Naming the missing paths keeps that a one-line fix.
+    """
+    if _REFERENCE_HOST_ROOT is None:
+        pytest.skip("no F# reference host checked out (the cross-host guard covers the wrong-path case)")
+    missing = [str(p) for p in _REFERENCE_RENDERER_FILES if not p.is_file()]
+    assert not missing, (
+        f"the F# reference host resolved at {_REFERENCE_HOST_ROOT} but these vocabulary sources are missing: "
+        f"{missing}. Update _REFERENCE_RENDERER_SOURCES to the new paths — leaving them stale silently "
+        "disables the whole class-vocabulary parity gate."
+    )
 
 
 def _emitted_classes(html: str) -> set[str]:

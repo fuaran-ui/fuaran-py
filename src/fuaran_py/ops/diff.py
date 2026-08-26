@@ -288,7 +288,7 @@ def diff(before: Node, after: Node) -> list[Obj]:
     ops: list[Obj] = []
     intermediate = before
     for moved_id, new_parent in _detect_moves(before, after):
-        move_op = Obj("MoveNode", {"newParentId": new_parent, "newPosition": 0, "target": moved_id})
+        move_op = Obj("MoveNode", {"newParentId": new_parent, "target": moved_id})
         result = apply(move_op, intermediate)
         if isinstance(result, Ok):
             ops.append(move_op)

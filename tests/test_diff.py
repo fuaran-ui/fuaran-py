@@ -284,10 +284,29 @@ def test_cross_parent_move_round_trips() -> None:
     box_a = Node("box-a", Obj("Box", {"children": Arr([inner_a]), "layout": Obj("Auto", {}), "role": "Group"}), {})
     box_b = Node("box-b", Obj("Box", {"children": Arr([]), "layout": Obj("Auto", {}), "role": "Group"}), {})
     root = Node("root", Obj("Box", {"children": Arr([box_a, box_b]), "layout": Obj("Auto", {}), "role": "Group"}), {})
-    after = _apply_all([Obj("MoveNode", {"newParentId": "box-b", "newPosition": 0, "target": "a1"})], root)
+    after = _apply_all([Obj("MoveNode", {"newParentId": "box-b", "target": "a1"})], root)
     ops = diff(root, after)
     assert any(op.tag == "MoveNode" for op in ops)
     _round_trips(root, after)
+
+
+@corpus_required
+def test_cross_parent_move_emits_no_position() -> None:
+    """The emitted ``MoveNode`` carries no ordinal — ``MoveNode`` appends.
+
+    Pinned on the *serialized* op rather than on the decoded fields, because that is
+    where the defect reached: ``encode_op`` is an unfiltered pass-through, so a dead
+    field left on the constructed op travels to the wire. An assertion over
+    ``op.fields`` would pass while the wire still carried it.
+    """
+    inner_a = Node("a1", Obj("Markdown", {"text": Obj("Literal", {"text": "a1"})}), {})
+    box_a = Node("box-a", Obj("Box", {"children": Arr([inner_a]), "layout": Obj("Auto", {}), "role": "Group"}), {})
+    box_b = Node("box-b", Obj("Box", {"children": Arr([]), "layout": Obj("Auto", {}), "role": "Group"}), {})
+    root = Node("root", Obj("Box", {"children": Arr([box_a, box_b]), "layout": Obj("Auto", {}), "role": "Group"}), {})
+    after = _apply_all([Obj("MoveNode", {"newParentId": "box-b", "target": "a1"})], root)
+    moves = [op for op in diff(root, after) if op.tag == "MoveNode"]
+    assert moves, "the cross-parent move pre-pass should emit a MoveNode"
+    assert encode_op(moves[0]) == '{"$type":"MoveNode","newParentId":"box-b","target":"a1"}'
 
 
 # ── ReplaceRoot (root id change) ─────────────────────────────────────────────

@@ -67,20 +67,29 @@ def test_a_corrupted_sample_is_caught(tmp_path: Path) -> None:
     A cross-host gate that has never rejected anything is not yet a gate.
     """
     source_dir = _seed(tmp_path)
-    victim = source_dir / "node-0000.json"
+
+    # Pick the victim by SHAPE, not by index. This used to anchor on
+    # `node-0000.json` starting with `{"id":`, which held only while the
+    # alphabetically-first node fixture had no earlier key; the corpus grew an
+    # `accessibility`-bearing family and the corruption silently stopped
+    # applying, turning the go-red self-test into a failure about itself.
+    candidates = sorted(p for p in source_dir.glob("node-*.json") if '"style"' not in p.read_text(encoding="utf-8"))
+    assert candidates, "no seeded node sample without a `style` key -- pick a different corruption"
+    victim = candidates[0]
     pristine = victim.read_text(encoding="utf-8")
 
-    # Re-order two canonical keys: still valid, decodable wire — but no longer
-    # the canonical byte sequence, so the re-encode must not reproduce it.
-    corrupted = pristine.replace('{"id":', '{"style":{"tone":"Warning"},"id":', 1)
-    assert corrupted != pristine, "the corruption did not apply -- the fixture shape changed"
+    # Lead with `style`: still valid, decodable wire — but `style` sorts last of
+    # the node's members, so leading with it is not the canonical byte sequence
+    # and the re-encode must not reproduce it.
+    assert pristine.startswith("{"), pristine[:40]
+    corrupted = '{"style":{"tone":"Warning"},' + pristine[1:]
     victim.write_text(corrupted, encoding="utf-8", newline="")
 
     result = run(tmp_path, report=lambda _msg: None)
 
     assert not result.ok, "a non-canonical sample slipped through the exchange"
     assert len(result.failures) == 1, result.failures
-    assert "node-0000.json" in result.failures[0]
+    assert victim.name in result.failures[0]
 
     victim.write_text(pristine, encoding="utf-8", newline="")
     assert run(tmp_path, report=lambda _msg: None).ok, "restoring the sample did not restore the green run"

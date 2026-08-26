@@ -169,6 +169,7 @@ BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical",
 HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
 STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
 FONT_VOICE = frozenset({"Default", "Display", "Structural"})
+LIVE_REGION = frozenset({"polite", "assertive", "off"})
 IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
@@ -412,6 +413,47 @@ def _typed_static_binding(
 
         return _normalise_binding_obj(obj, path, on_default=_default)
     return _normalise_binding_obj(obj, path)
+
+
+def _decode_binding_scalar(value: object, path: str, expect: Callable[[object, str], Value], what: str) -> Value:
+    """A ``Binding<str>`` / ``Binding<bool>`` slot — the typed SCALAR positions.
+
+    Written out rather than routed through :func:`_typed_static_binding` for one
+    reason: an absent / ``null`` ``Static`` payload at a scalar slot is a REFUSAL
+    on the reference host (``requireString``/``requireBool`` reject ``JNull``),
+    and that helper's ``on_null`` parameter can only normalise, never refuse.
+
+    §3.6's bare-scalar coercion is about SHAPE — every ``Binding`` case is a
+    ``$type``-discriminated object, so a bare scalar can only mean ``Static`` —
+    and the slot's own ``'T`` still governs the VALUE. Without the type check
+    ``{"hidden": "yes"}`` decoded happily with its value preserved, which is why
+    this host answered none of the corpus's a11y reject vectors.
+
+    The non-``Static`` arms keep the untyped ``defaultValue`` handling the
+    pre-429 typed slots already have (see :func:`_typed_static_binding`'s
+    ``typed_default`` note): routing those onto the slot parser is a separate
+    behaviour change with no fixture pinning it.
+    """
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": expect(value, path)})
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
+    if tag == "Static":
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
+            _fail(WRONG_TYPE, f"{path}.value", f"expected {what} at {path}.value")
+        return Obj("Static", {"value": expect(raw, f"{path}.value")})
+    if tag == "Bound":
+        return _decode_binding_scalar(_require(obj, "binding", path), f"{path}.binding", expect, what)
+    return _normalise_binding_obj(obj, path)
+
+
+def _decode_binding_string(value: object, path: str) -> Value:
+    return _decode_binding_scalar(value, path, _expect_string, "a string")
+
+
+def _decode_binding_bool(value: object, path: str) -> Value:
+    return _decode_binding_scalar(value, path, _expect_bool, "a boolean")
 
 
 def _decode_select_option(value: object, path: str) -> Value:
@@ -1078,7 +1120,10 @@ def _decode_draw_style(value: object, path: str) -> Value:
     fields: dict[str, Value] = {}
     for key in ("fill", "opacity", "stroke", "strokeWidth"):
         if key in obj:
-            fields[key] = _decode_binding(obj[key], f"{path}.{key}")
+            # `fill` / `stroke` are Binding<string> (a colour token); the two
+            # numeric siblings stay untyped pending the scalar-slot sweep.
+            decoder = _decode_binding_string if key in ("fill", "stroke") else _decode_binding
+            fields[key] = decoder(obj[key], f"{path}.{key}")
     # Text-only fields (Phase 528.1) — bare enum / number / string, not bindings;
     # all optional, omitted when unset (byte-unchanged for non-text shapes).
     if "textAnchor" in obj:
@@ -1345,7 +1390,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "Link": [
         ("download", True, _decode_bool),
-        ("href", True, _decode_binding),
+        ("href", True, _decode_binding_string),
         ("label", True, _decode_text_source),
         # Phase 812 — optional closed enumeration; unknown case rejects
         # UNKNOWN_DU_CASE at $.kind.protection via the _enum default-deny.
@@ -1355,7 +1400,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "Image": [
         ("alt", True, _decode_text_source),
-        ("src", True, _decode_binding),
+        ("src", True, _decode_binding_string),
         ("variant", True, _enum_decoder(IMAGE_VARIANT, "variant")),
     ],
     "List": [
@@ -1366,7 +1411,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
         ("dismissable", False, _omit_default_bool(True)),
         ("message", True, _decode_text_source),
-        ("open", True, _decode_binding),
+        ("open", True, _decode_binding_bool),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
     ],
     "CodeBlock": [
@@ -1402,7 +1447,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         # `source` aliases `options` / `data` (§3.6).
         ("source", True, _decode_binding_select_options, ("options", "data")),
         ("value", True, _decode_binding_string_opt),
-        ("disabled", False, _decode_binding),
+        ("disabled", False, _decode_binding_bool),
         ("placeholder", False, _decode_text_source),
         # Multi-select (Phase 291) — both optional; omitted on a single-select.
         ("multiple", False, _decode_bool),
@@ -1415,7 +1460,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         # closure-sentinel handlers it is a genuine wire-survivable Action, so it
         # decodes through the null-strict action decoder when present.
         ("onDismiss", False, _decode_action),
-        ("open", True, _decode_binding),
+        ("open", True, _decode_binding_bool),
         ("heading", False, _decode_text_source, ("title",)),
     ],
     "ScrollArea": [
@@ -2291,7 +2336,7 @@ def _decode_form(obj: dict, path: str) -> Obj:
     if "submitLabel" in obj:
         fields["submitLabel"] = _decode_text_source(obj["submitLabel"], f"{path}.submitLabel")
     if "disabled" in obj:
-        fields["disabled"] = _decode_binding(obj["disabled"], f"{path}.disabled")
+        fields["disabled"] = _decode_binding_bool(obj["disabled"], f"{path}.disabled")
     for key, raw in obj.items():
         if key not in ("$type", "fields", "onSubmit", "submitLabel", "disabled"):
             fields[key] = from_json(raw)
@@ -2356,6 +2401,34 @@ def _decode_style(value: object, path: str) -> Obj:
         vo = _enum(obj["voice"], f"{path}.voice", FONT_VOICE, "voice")
         if vo != "Default":
             fields["voice"] = vo
+    return Obj(None, fields)
+
+
+def _decode_accessibility(value: object, path: str) -> Obj:
+    """The §3.1 Accessibility trait.
+
+    This was ``from_json`` — a structural pass-through, so every malformed
+    payload decoded with its value preserved verbatim and this host answered
+    none of the corpus's six a11y reject vectors. ``label`` / ``hidden`` are
+    ordinary ``Binding`` slots (the 2026-08-25 §3.1 ruling), so the §3.6
+    bare-scalar coercion applies to their SHAPE while the slot's own type still
+    governs the value; ``liveRegion`` is a closed token set; ``role`` is open to
+    any role NAME but not to any VALUE.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "label" in obj:
+        fields["label"] = _decode_binding_string(obj["label"], f"{path}.label")
+    if "labelledBy" in obj:
+        fields["labelledBy"] = _expect_string(obj["labelledBy"], f"{path}.labelledBy")
+    if "describedBy" in obj:
+        fields["describedBy"] = _expect_string(obj["describedBy"], f"{path}.describedBy")
+    if "role" in obj:
+        fields["role"] = _expect_string(obj["role"], f"{path}.role")
+    if "liveRegion" in obj:
+        fields["liveRegion"] = _enum(obj["liveRegion"], f"{path}.liveRegion", LIVE_REGION, "liveRegion")
+    if "hidden" in obj:
+        fields["hidden"] = _decode_binding_bool(obj["hidden"], f"{path}.hidden")
     return Obj(None, fields)
 
 
@@ -2442,7 +2515,7 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
         if style.fields:
             extras["style"] = style
     if "accessibility" in obj:
-        extras["accessibility"] = from_json(obj["accessibility"])
+        extras["accessibility"] = _decode_accessibility(obj["accessibility"], f"{path}.accessibility")
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

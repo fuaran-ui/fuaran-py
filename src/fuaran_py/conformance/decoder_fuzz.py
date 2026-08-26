@@ -697,35 +697,6 @@ OP_SUBJECT = Subject(name="decode_op", run=_round_trip(decode_op, encode_op))
 REAL_SUBJECTS: tuple[Subject, ...] = (NODE_SUBJECT, OP_SUBJECT)
 
 
-#: The ONE observed-and-excluded defect class, named rather than numbered so a
-#: reader meets the reason at the point of the exclusion.
-#:
-#: The wire specification's §5 requires every host to EMIT the quoted ``"NaN"`` /
-#: ``"Infinity"`` / ``"-Infinity"`` sentinels for a non-finite number, and its §7
-#: requires a decoder to ACCEPT them at a float slot. This host emits them and
-#: does not accept them at every such slot, so ``decode → encode → decode`` does
-#: not close on a document carrying a non-finite number. The specification already
-#: records this as a §7 conformance defect rather than an open question.
-#:
-#: Excluded here, not because it is unimportant, but because it spans more than
-#: one host: fixing it in one alone would manufacture a new divergence of exactly
-#: the kind the cross-host parity work exists to close. It is COUNTED and PRINTED
-#: on every run, and it disappears on its own the moment the decoder accepts what
-#: it emits.
-#:
-#: Keyed on the CAUSE — a sentinel in the canonical form — never on a fixture id
-#: or an iteration number: the seed pool is the shared corpus, so the generated
-#: stream renumbers whenever the corpus moves, and an exclusion keyed to an
-#: iteration would silence a different defect next week.
-KNOWN_NONFINITE_HOLE = "known-nonfinite-roundtrip-hole"
-
-_NON_FINITE_SENTINELS = ('"NaN"', '"Infinity"', '"-Infinity"')
-
-
-def is_known_nonfinite_hole(canonical: str) -> bool:
-    return any(s in canonical for s in _NON_FINITE_SENTINELS)
-
-
 @dataclass(frozen=True, slots=True)
 class Verdict:
     """``kind`` is the coarse class; the rest is detail for the report.
@@ -739,7 +710,7 @@ class Verdict:
 
     @property
     def is_counterexample(self) -> bool:
-        return self.kind not in ("rejected", "clean", KNOWN_NONFINITE_HOLE)
+        return self.kind not in ("rejected", "clean")
 
     @property
     def verdict_class(self) -> str:
@@ -817,9 +788,8 @@ def check(subject: Subject, budgets: Budgets, text: str) -> Measured:
             len(canonical),
         )
     if result.re_decoded is None:
-        kind = KNOWN_NONFINITE_HOLE if is_known_nonfinite_hole(canonical) else "canonical-refused"
         return Measured(
-            Verdict(kind, f"the decoder's own output re-decodes as {result.re_decoded_code}"),
+            Verdict("canonical-refused", f"the decoder's own output re-decodes as {result.re_decoded_code}"),
             elapsed,
             len(canonical),
         )
@@ -909,9 +879,6 @@ class RunStats:
     seed_count: int = 0
     reject_codes: dict[str, int] = field(default_factory=dict)
     accepted: int = 0
-    #: The one EXCLUDED defect class, counted and published rather than dropped:
-    #: an exclusion nobody can see reads as "found nothing".
-    known_nonfinite_holes: int = 0
     max_decode_ms: float = 0.0
     max_amplification: float = 0.0
     elapsed_seconds: float = 0.0
@@ -953,8 +920,6 @@ def run(
                 stats.reject_codes[verdict.detail] = stats.reject_codes.get(verdict.detail, 0) + 1
             elif verdict.kind == "clean":
                 stats.accepted += 1
-            elif verdict.kind == KNOWN_NONFINITE_HOLE:
-                stats.known_nonfinite_holes += 1
             else:
                 target = verdict.verdict_class
 
@@ -991,8 +956,7 @@ def summarise(stats: RunStats) -> str:
     return (
         f"{stats.inputs} inputs ({stats.iterations} iterations x {per_iteration} entry points) "
         f"in {stats.elapsed_seconds:.1f} s — accepted {stats.accepted}, refused [{codes}], "
-        f"{len(stats.counterexamples)} counterexamples, {stats.known_nonfinite_holes} known "
-        f"non-finite round-trip holes (§7, EXCLUDED); max decode {stats.max_decode_ms:.0f} ms; "
+        f"{len(stats.counterexamples)} counterexamples; max decode {stats.max_decode_ms:.0f} ms; "
         f"max canonical amplification {stats.max_amplification:.1f} x"
     )
 
@@ -1015,7 +979,6 @@ def evidence_record(stats: RunStats, cfg: Config, corpus_root: Path | None) -> d
         "accepted": stats.accepted,
         "rejectCodes": dict(sorted(stats.reject_codes.items())),
         "counterexamples": len(stats.counterexamples),
-        "knownNonFiniteRoundTripHoles": stats.known_nonfinite_holes,
         "maxDecodeMs": round(stats.max_decode_ms, 3),
         "maxCanonicalAmplification": round(stats.max_amplification, 3),
         "elapsedSeconds": round(stats.elapsed_seconds, 3),

@@ -998,10 +998,38 @@ def _decode_action(value: object, path: str) -> Value:
     return _from_json_strict(obj, path)
 
 
+#: The three §5/§7 quoted sentinels for a non-finite number, mapped to the value
+#: they denote. §7 is symmetric with §5: a float slot accepts BOTH a JSON number
+#: and the quoted spelling this host itself emits for a non-finite. Without them
+#: a document this host encodes is one it cannot read back — ``decode → encode →
+#: decode`` does not close on any non-finite number, and a peer host's canonical
+#: output is undecodable here.
+_NON_FINITE_SENTINELS: dict[str, float] = {
+    "NaN": float("nan"),
+    "Infinity": float("inf"),
+    "-Infinity": float("-inf"),
+}
+
+
 def _decode_number(value: object, path: str) -> Value:
-    # A JSON number — an ``int`` or ``float`` (e.g. Date.step in seconds). bool is an
-    # int subclass; reject it as it is never a numeric value here.
+    # A JSON number — an ``int`` or ``float`` (e.g. Date.step in seconds) — or one
+    # of the three §7 non-finite sentinel strings. bool is an int subclass; reject
+    # it as it is never a numeric value here.
+    #
+    # This is the FLOAT-slot choke point. Integer slots go through ``_expect_int``,
+    # which is unreachable from here, so a sentinel at an integer slot stays a
+    # WRONG_TYPE — §7 widens float slots and nothing else.
+    #
+    # The float is returned rather than the sentinel string so decode is idempotent
+    # at the TREE level and not merely at the byte level: ``json.loads`` already
+    # turns the bare overflowing literal ``-1e999`` into ``-inf``, so answering a
+    # re-decode of its own canonical form with a ``str`` would hand a consumer a
+    # float the first time and a string the second.
     value = _unwrap_static_envelope(value)
+    if isinstance(value, str):
+        sentinel = _NON_FINITE_SENTINELS.get(value)
+        if sentinel is not None:
+            return sentinel
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(WRONG_TYPE, path, f"expected a number at {path}")
     return value  # type: ignore[return-value]
@@ -1731,7 +1759,7 @@ def _decode_grid_source(value: object, path: str) -> Value:
     return _typed_static_binding(value, path, _decode_row_array, Arr([]), Arr([]), typed_default=True)
 
 
-def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], ...]) -> None:
+def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], ...], vocabulary: str = "grid") -> None:
     """fuaran#863 — decode-time didactics for the grid-behaviour family's NEAR MISSES
     (the fuaran#860 charter's rejected-spellings deliverable).
 
@@ -1747,7 +1775,7 @@ def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], 
             _fail(
                 WRONG_TYPE,
                 f"{path}.{found}",
-                f"'{found}' is not part of the grid vocabulary — it would be ignored, not honoured",
+                f"'{found}' is not part of the {vocabulary} vocabulary — it would be ignored, not honoured",
                 canonical,
             )
 
@@ -2143,6 +2171,90 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
     return Obj(tag, fields)
 
 
+TEXT_FORMATS = frozenset({"email", "url", "tel"})
+COMPARE_OPS = frozenset({"eq", "neq", "lt", "lte", "gt", "gte"})
+
+#: The rule slot's rejected spellings. Small and enumerated for the same reason the
+#: grid's set is: rule 2's tolerance of unknown keys is right for a field a future
+#: profile may add and wrong for a near miss of one that exists, because the tree
+#: then decodes and renders while constraining nothing.
+FORM_FIELD_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("validation", "rule"),
+    ("constraints", "rule"),
+    ("validate", "rule"),
+)
+
+
+def _decode_compare_rule(value: object, path: str) -> Value:
+    """The cross-field operand. ``against`` is a ``Binding``, and that IS the
+    cross-field mechanism rather than an accident of typing: any read slot may take a
+    Binding, and the auto-bind rule already puts every form field's value in State
+    under the field's own id, so ``{"$type":"State","key":"<sibling id>"}`` reads the
+    sibling with no coordination vocabulary at all."""
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "against": _decode_binding(_require(obj, "against", path), f"{path}.against"),
+            "op": _enum(_require(obj, "op", path), f"{path}.op", COMPARE_OPS, "CompareOp"),
+        },
+    )
+
+
+def _decode_field_rule(value: object, path: str) -> Value:
+    """A field's declared constraint — ``FormFieldKind`` names the CONTROL, this names
+    the ACCEPTED SET. Every slot is optional structurally, and two shapes are refused
+    here as POLICY:
+
+    * a rule with every slot absent. A rule that constrains nothing is a defect, not a
+      no-op: it decodes, validates and renders while declaring nothing, which is the
+      fake-affordance shape the near-miss table also forecloses, arriving through an
+      empty object instead of a wrong key. ``message`` alone does not rescue it — the
+      message is the prose shown when some OTHER slot is unmet, so a message-only rule
+      is the help-text failure wearing the new vocabulary's clothes.
+    * ``minLength`` above ``maxLength``. The ordered-pair rule applied to a length
+      pair: an inverted bound admits no value at all, so the field can never be
+      submitted and the form is dead on arrival.
+
+    Neither is a shape — both are relations BETWEEN slots — which is why they live here
+    rather than in the structural layer.
+    """
+    obj = _expect_object(value, path)
+    out: dict[str, Value] = {}
+    if "format" in obj:
+        out["format"] = _enum(obj["format"], f"{path}.format", TEXT_FORMATS, "TextFormat")
+    if "pattern" in obj:
+        out["pattern"] = _expect_string(obj["pattern"], f"{path}.pattern")
+    if "minLength" in obj:
+        out["minLength"] = _expect_int(obj["minLength"], f"{path}.minLength")
+    if "maxLength" in obj:
+        out["maxLength"] = _expect_int(obj["maxLength"], f"{path}.maxLength")
+    if "compare" in obj:
+        out["compare"] = _decode_compare_rule(obj["compare"], f"{path}.compare")
+    if "message" in obj:
+        out["message"] = _decode_text_source(obj["message"], f"{path}.message")
+
+    if not any(k in out for k in ("format", "pattern", "minLength", "maxLength", "compare")):
+        _fail(
+            WRONG_TYPE,
+            path,
+            "a rule that constrains nothing is a defect, not a no-op — declare at least one of "
+            "format / pattern / minLength / maxLength / compare, or omit 'rule' entirely",
+            "FieldRule with at least one constraint slot",
+        )
+
+    lo, hi = out.get("minLength"), out.get("maxLength")
+    if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"minLength {lo} is above maxLength {hi} — an inverted length bound admits no value "
+            "at all, so the field could never be submitted",
+            "minLength <= maxLength",
+        )
+    return Obj(None, out)
+
+
 def _decode_form(obj: dict, path: str) -> Obj:
     """Form: typed fields (id ← name, WIRE_FORMAT §3.6; kind through the shared
     FormFieldKind decoder with the 0.2.1 `FormFieldId` auto-bind context),
@@ -2154,6 +2266,9 @@ def _decode_form(obj: dict, path: str) -> Obj:
         for i, fld in enumerate(arr):
             fpath = f"{path}.fields[{i}]"
             fobj = _expect_object(fld, fpath)
+            # The near-miss check runs BEFORE the rule decode, so a field carrying
+            # both `validation` and a well-formed `rule` still names the ignored key.
+            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form field")
             id_raw, id_present = _alias_get(fobj, "id", ("name",))
             if not id_present:
                 _fail(MISSING_FIELD, f"{fpath}.id", "missing required field 'id'")
@@ -2164,8 +2279,10 @@ def _decode_form(obj: dict, path: str) -> Obj:
             ffields["required"] = _expect_bool(_require(fobj, "required", fpath), f"{fpath}.required")
             if "help" in fobj:
                 ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
+            if "rule" in fobj:
+                ffields["rule"] = _decode_field_rule(fobj["rule"], f"{fpath}.rule")
             for key, raw in fobj.items():
-                if key not in ("id", "name", "kind", "label", "required", "help"):
+                if key not in ("id", "name", "kind", "label", "required", "help", "rule"):
                     ffields[key] = from_json(raw)
             norm.append(Obj(None, ffields))
         fields["fields"] = Arr(norm)

@@ -157,7 +157,7 @@ def test_remove_child_round_trips() -> None:
 def test_insert_child_round_trips() -> None:
     before = _call_into()
     new_child = Node("fresh-note", Obj("Markdown", {"text": Obj("Literal", {"text": "new"})}), {})
-    after = _apply_all([Obj("InsertChild", {"child": new_child, "parentId": before.id, "position": 2})], before)
+    after = _apply_all([Obj("InsertChild", {"child": new_child, "parentId": before.id})], before)
     ops = diff(before, after)
     assert any(op.tag == "InsertChild" for op in ops)
     _round_trips(before, after)

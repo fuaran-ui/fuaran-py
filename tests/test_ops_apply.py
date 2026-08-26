@@ -213,21 +213,18 @@ def test_insert_into_childless_kind() -> None:
     assert _err(_apply_op(op, base)) == "ChildlessKind"
 
 
-def test_insert_appends_and_ignores_a_legacy_position() -> None:
+def test_insert_appends_and_the_apply_engine_has_no_ordinal() -> None:
     """0.4.0: InsertChild appends, so there is no out-of-range case to reject.
 
-    A legacy ``position`` is accepted and ignored for the migration window, so a
-    stored v1 op still applies — as an append, wherever its ordinal pointed.
+    fuaran#687 closed the migration window during which a legacy ``position`` was
+    accepted and ignored, so the field cannot reach a decoded op at all — the
+    decoder refuses it by name (``tests/test_retired_position.py``). This test
+    builds ops DIRECTLY rather than through the codec, so the assertion left to
+    make here is the apply engine's: it appends, and it holds no ordinal for a
+    stray key to influence.
     """
     base = fuaran.stack("s", children=[fuaran.markdown("a", "x"), fuaran.markdown("b", "y")])
     child = _decode_tree(fuaran.markdown("new", "z"))
-    for pos in (0, 5):
-        op = Obj("InsertChild", {"child": child, "parentId": "s", "position": pos})
-        result = _apply_op(op, base)
-        assert isinstance(result, Ok), result
-        assert _child_ids(result.value) == ["a", "b", "new"], f"legacy position {pos} must be ignored"
-
-    # The canonical, positionless form does the same thing.
     result = _apply_op(Obj("InsertChild", {"child": child, "parentId": "s"}), base)
     assert isinstance(result, Ok), result
     assert _child_ids(result.value) == ["a", "b", "new"]
@@ -298,7 +295,7 @@ def test_reorder_mismatch() -> None:
 
 def test_move_into_own_descendant_is_cycle() -> None:
     base = fuaran.stack("outer", children=[fuaran.stack("inner", children=[fuaran.markdown("leaf", "x")])])
-    op = Obj("MoveNode", {"newParentId": "inner", "newPosition": 0, "target": "outer"})
+    op = Obj("MoveNode", {"newParentId": "inner", "target": "outer"})
     assert _err(_apply_op(op, base)) == "KindMismatch"
 
 

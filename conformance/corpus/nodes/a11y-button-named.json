@@ -1,0 +1,1 @@
+{"accessibility":{"label":{"$type":"Static","value":"Refresh revenue figures"},"role":"button"},"id":"a11y-button-named","kind":{"$type":"Button","icon":"refresh","label":"Refresh","onClick":{"$type":"Chain","ops":[]},"variant":"Secondary"}}

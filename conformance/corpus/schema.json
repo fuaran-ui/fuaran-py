@@ -78,6 +78,25 @@
         "DateTime"
       ]
     },
+    "TextFormat": {
+      "type": "string",
+      "enum": [
+        "email",
+        "url",
+        "tel"
+      ]
+    },
+    "CompareOp": {
+      "type": "string",
+      "enum": [
+        "eq",
+        "neq",
+        "lt",
+        "lte",
+        "gt",
+        "gte"
+      ]
+    },
     "MathDisplay": {
       "type": "string",
       "enum": [
@@ -2849,6 +2868,71 @@
         "value"
       ]
     },
+    "CompareRule": {
+      "type": "object",
+      "properties": {
+        "against": {
+          "$ref": "#/$defs/Binding"
+        },
+        "op": {
+          "$ref": "#/$defs/CompareOp"
+        }
+      },
+      "required": [
+        "against",
+        "op"
+      ]
+    },
+    "FieldRule": {
+      "type": "object",
+      "properties": {
+        "compare": {
+          "$ref": "#/$defs/CompareRule"
+        },
+        "format": {
+          "$ref": "#/$defs/TextFormat"
+        },
+        "maxLength": {
+          "type": "integer"
+        },
+        "message": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "minLength": {
+          "type": "integer"
+        },
+        "pattern": {
+          "type": "string"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "format"
+          ]
+        },
+        {
+          "required": [
+            "pattern"
+          ]
+        },
+        {
+          "required": [
+            "minLength"
+          ]
+        },
+        {
+          "required": [
+            "maxLength"
+          ]
+        },
+        {
+          "required": [
+            "compare"
+          ]
+        }
+      ]
+    },
     "FormField": {
       "type": "object",
       "properties": {
@@ -2866,6 +2950,9 @@
         },
         "help": {
           "$ref": "#/$defs/TextSource"
+        },
+        "rule": {
+          "$ref": "#/$defs/FieldRule"
         }
       },
       "required": [
@@ -2873,6 +2960,29 @@
         "kind",
         "label",
         "required"
+      ],
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "validation"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "constraints"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "validate"
+            ]
+          }
+        }
       ]
     },
     "FormSpec": {
@@ -4709,6 +4819,15 @@
             "$type",
             "child",
             "parentId"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "position"
+                ]
+              }
+            }
           ]
         },
         {
@@ -4743,6 +4862,15 @@
             "$type",
             "newParentId",
             "target"
+          ],
+          "allOf": [
+            {
+              "not": {
+                "required": [
+                  "newPosition"
+                ]
+              }
+            }
           ]
         },
         {

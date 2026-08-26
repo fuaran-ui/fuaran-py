@@ -168,9 +168,46 @@ def _decode_op_value(value: object, path: str) -> Obj:
         _op_depth -= 1
 
 
+# RETIRED positional slots, one per op (fuaran#687, closing the window fuaran#681 opened).
+#
+# fuaran#681 removed the field and every host then ACCEPTED AND IGNORED it so each
+# could adopt independently. Silence was the whole mechanism: the loop below walks
+# the op's schema and never looks at anything else, so *not reading it* was the
+# tolerance. That is why closing the window cannot be done by deletion — there was
+# never a read to delete, and the field would go on decoding silently forever. The
+# close is an explicit refusal BY NAME, on the ``_check_near_misses`` pattern and
+# for its reason: a key that no-ops is worse than one that fails, because the op
+# decodes, applies, and puts the node somewhere other than where the ordinal asked.
+_OP_RETIRED_FIELDS: dict[str, str] = {
+    "InsertChild": "position",
+    "MoveNode": "newPosition",
+}
+
+
+def _check_retired_positional(obj: dict, tag: str, path: str) -> None:
+    """Refuse a retired positional slot by name.
+
+    Called BEFORE the schema loop, mirroring the ``FormField`` near-miss ordering,
+    so an op carrying both a retired ordinal and some other defect names the
+    ordinal rather than reporting a defect the author would fix without ever
+    learning the field is gone. The ordering is identical in all five hosts, so
+    which defect surfaces first is deterministic.
+    """
+    name = _OP_RETIRED_FIELDS.get(tag)
+    if name is not None and name in obj:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.{name}",
+            f"'{name}' was removed from the wire format — {tag} appends, "
+            "and order is stated by naming ids with ReorderChildren",
+            "a Batch of the structural op followed by ReorderChildren",
+        )
+
+
 def _decode_op_value_inner(value: object, path: str) -> Obj:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, OP_CASES)
+    _check_retired_positional(obj, tag, path)
     fields: dict[str, Value] = {}
     for name, required, dec in OP_SCHEMAS[tag]:
         if name in obj:

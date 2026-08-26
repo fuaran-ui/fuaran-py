@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-loading-placeholder","kind":{"$type":"FragmentDecl","body":{"id":"loading-placeholder","kind":{"$type":"Skeleton","rows":3}},"holes":[{"$type":"Repeat","countSpace":{"$type":"IntRange","max":8,"min":1},"name":"rows"}],"name":"loading-placeholder"}}

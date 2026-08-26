@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-labelled-metric-row-ref","kind":{"$type":"FragmentRef","args":{"label":{"$type":"Str","value":"Open incidents"},"value":{"$type":"Float","value":42}},"name":"labelled-metric-row"}}

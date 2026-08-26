@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-empty-state-panel-ref","kind":{"$type":"FragmentRef","args":{"action":{"$type":"SlotArg","tree":{"accessibility":{"role":"button"},"id":"raise","kind":{"$type":"Button","label":"Raise one","onClick":{"$type":"Chain","ops":[]},"variant":"Primary"}}},"title":{"$type":"Str","value":"No incidents"}},"name":"empty-state-panel"}}

@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-confirm-action-pair-ref","kind":{"$type":"FragmentRef","args":{"cancelLabel":{"$type":"Str","value":"Keep it"},"confirmLabel":{"$type":"Str","value":"Delete report"}},"name":"confirm-action-pair"}}

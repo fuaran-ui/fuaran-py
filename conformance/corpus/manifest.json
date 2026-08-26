@@ -684,6 +684,14 @@
       "description": "Phase 719 — the compact authoring twin of `scalar-transform-composition`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
     },
     {
+      "id": "lenient-shape-a11y-label-bare-scalar",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-shape-a11y-label-bare-scalar.json",
+      "expectedFile": "lenient/lenient-shape-a11y-label-bare-scalar.expected.json",
+      "description": "fuaran#957 ruling — the Accessibility trait's `label` (Binding<string>) and `hidden` (Binding<bool>) are ordinary Binding slots: a bare string / bool coerces to `Static` per the general §3.6 scalar rule (decode-only, canonical envelope on re-encode). Pinned at this position because two hosts once implemented the slot as bare-string-ONLY — the opposite error."
+    },
+    {
       "id": "lenient-shape-binding-scalar-fraction",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -866,6 +874,54 @@
       "inputFile": "lenient/lenient-window-cumsum-legacy.json",
       "expectedFile": "lenient/lenient-window-cumsum-legacy.expected.json",
       "description": "2026-07-19 rename — the legacy cumSum window-fn tag coerces to the canonical cumulSum"
+    },
+    {
+      "id": "a11y-alert-assertive",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-alert-assertive.json",
+      "expectedFile": "nodes/a11y-alert-assertive.json",
+      "description": "Accessibility (Phase 955 — the announcement pair: role alert + liveRegion assertive)"
+    },
+    {
+      "id": "a11y-button-named",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-button-named.json",
+      "expectedFile": "nodes/a11y-button-named.json",
+      "description": "Accessibility (Phase 955 — Button: an explicit named role on a kind that already has a native one)"
+    },
+    {
+      "id": "a11y-image-decorative",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-image-decorative.json",
+      "expectedFile": "nodes/a11y-image-decorative.json",
+      "description": "Accessibility (Phase 955 — Image: the decorative shape, empty alt + hidden Static true)"
+    },
+    {
+      "id": "a11y-link-labelled",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-link-labelled.json",
+      "expectedFile": "nodes/a11y-link-labelled.json",
+      "description": "Accessibility (Phase 955 — Link: the accessible name overriding the visible 'Read more' text)"
+    },
+    {
+      "id": "a11y-wrapper-all-slots",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-wrapper-all-slots.json",
+      "expectedFile": "nodes/a11y-wrapper-all-slots.json",
+      "description": "Accessibility (Phase 955 — all six trait slots at once on a wrapper; Static label, named role, polite)"
+    },
+    {
+      "id": "a11y-wrapper-state-bound",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-wrapper-state-bound.json",
+      "expectedFile": "nodes/a11y-wrapper-state-bound.json",
+      "description": "Accessibility (Phase 955 — State-bound label + hidden, mixed-case custom role doc-pageFooter, off)"
     },
     {
       "id": "badge-1",
@@ -1228,6 +1284,14 @@
       "description": "Input/Form (Phase 596 — symmetric auto-bind, omitted-value fields)"
     },
     {
+      "id": "form-field-rules",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-field-rules.json",
+      "expectedFile": "nodes/form-field-rules.json",
+      "description": "Input/Form (Phase 864 — declared field rules: format / pattern / length pair / cross-field compare)"
+    },
+    {
       "id": "form-local-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1306,6 +1370,134 @@
       "inputFile": "nodes/frag-ref-args.json",
       "expectedFile": "nodes/frag-ref-args.json",
       "description": "FragmentRef (parameterised — value + slot args)"
+    },
+    {
+      "id": "frag-stdlib-confirm-action-pair",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-confirm-action-pair.json",
+      "expectedFile": "nodes/frag-stdlib-confirm-action-pair.json",
+      "description": "FragmentDecl (stdlib 'confirm-action-pair' — A primary confirm and a secondary cancel, both writing one declared state key.)"
+    },
+    {
+      "id": "frag-stdlib-confirm-action-pair-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-confirm-action-pair-ref.json",
+      "expectedFile": "nodes/frag-stdlib-confirm-action-pair-ref.json",
+      "description": "FragmentRef (stdlib 'confirm-action-pair' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-empty-state-panel",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-empty-state-panel.json",
+      "expectedFile": "nodes/frag-stdlib-empty-state-panel.json",
+      "description": "FragmentDecl (stdlib 'empty-state-panel' — A titled nothing-to-show card whose call to action is a caller-supplied Button slot.)"
+    },
+    {
+      "id": "frag-stdlib-empty-state-panel-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-empty-state-panel-ref.json",
+      "expectedFile": "nodes/frag-stdlib-empty-state-panel-ref.json",
+      "description": "FragmentRef (stdlib 'empty-state-panel' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-filter-bar",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-filter-bar.json",
+      "expectedFile": "nodes/frag-stdlib-filter-bar.json",
+      "description": "FragmentDecl (stdlib 'filter-bar' — A free-text chip and a status chip, both bound to their own host filter keys.)"
+    },
+    {
+      "id": "frag-stdlib-filter-bar-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-filter-bar-ref.json",
+      "expectedFile": "nodes/frag-stdlib-filter-bar-ref.json",
+      "description": "FragmentRef (stdlib 'filter-bar' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-kpi-strip",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-kpi-strip.json",
+      "expectedFile": "nodes/frag-stdlib-kpi-strip.json",
+      "description": "FragmentDecl (stdlib 'kpi-strip' — A headed horizontal strip of one to six figures — the dashboard's top band.)"
+    },
+    {
+      "id": "frag-stdlib-kpi-strip-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-kpi-strip-ref.json",
+      "expectedFile": "nodes/frag-stdlib-kpi-strip-ref.json",
+      "description": "FragmentRef (stdlib 'kpi-strip' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-labelled-metric-row",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-labelled-metric-row.json",
+      "expectedFile": "nodes/frag-stdlib-labelled-metric-row.json",
+      "description": "FragmentDecl (stdlib 'labelled-metric-row' — A label and its figure on one line — the smallest read-only composite in the set.)"
+    },
+    {
+      "id": "frag-stdlib-labelled-metric-row-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-labelled-metric-row-ref.json",
+      "expectedFile": "nodes/frag-stdlib-labelled-metric-row-ref.json",
+      "description": "FragmentRef (stdlib 'labelled-metric-row' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-loading-placeholder",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-loading-placeholder.json",
+      "expectedFile": "nodes/frag-stdlib-loading-placeholder.json",
+      "description": "FragmentDecl (stdlib 'loading-placeholder' — One to eight skeleton rows — the shape a list takes while its query is in flight.)"
+    },
+    {
+      "id": "frag-stdlib-loading-placeholder-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-loading-placeholder-ref.json",
+      "expectedFile": "nodes/frag-stdlib-loading-placeholder-ref.json",
+      "description": "FragmentRef (stdlib 'loading-placeholder' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-metric-card",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-metric-card.json",
+      "expectedFile": "nodes/frag-stdlib-metric-card.json",
+      "description": "FragmentDecl (stdlib 'metric-card' — A card carrying one headline figure and the caption that qualifies it.)"
+    },
+    {
+      "id": "frag-stdlib-metric-card-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-metric-card-ref.json",
+      "expectedFile": "nodes/frag-stdlib-metric-card-ref.json",
+      "description": "FragmentRef (stdlib 'metric-card' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-section-header",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-section-header.json",
+      "expectedFile": "nodes/frag-stdlib-section-header.json",
+      "description": "FragmentDecl (stdlib 'section-header' — An eyebrow above a title, at a caller-chosen heading level.)"
+    },
+    {
+      "id": "frag-stdlib-section-header-ref",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-section-header-ref.json",
+      "expectedFile": "nodes/frag-stdlib-section-header-ref.json",
+      "description": "FragmentRef (stdlib 'section-header' — a representative application)"
     },
     {
       "id": "glayout-1",
@@ -1980,6 +2172,60 @@
       "description": "UpdateStyle (Phase 147 Role=Eyebrow + Voice=Structural)"
     },
     {
+      "id": "reject-a11y-hidden-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-hidden-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.hidden",
+      "description": "accessibility.hidden bare scalar of the wrong type — §3.6 leniency is about SHAPE, not type (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-labelledby-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-labelledby-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.labelledBy",
+      "description": "accessibility.labelledBy not a NodeId string (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-liveregion-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-liveregion-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.liveRegion",
+      "description": "accessibility.liveRegion not a JSON string (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-liveregion-unknown",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-liveregion-unknown.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.accessibility.liveRegion",
+      "description": "accessibility.liveRegion outside the closed set — the message names polite | assertive | off (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-not-object",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-not-object.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility",
+      "description": "accessibility is not an object — the trait is a record, not a bare label (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-role-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-role-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.role",
+      "description": "accessibility.role not a JSON string — the slot is open to any role NAME, not to any value (Phase 955)"
+    },
+    {
       "id": "reject-daterange-unordered",
       "kind": "reject",
       "decoder": "node",
@@ -1996,6 +2242,33 @@
       "expectedErrorCode": "EMPTY_NODE_ID",
       "expectedPath": "$.id",
       "description": "Empty top-level id"
+    },
+    {
+      "id": "reject-fieldrule-empty",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-fieldrule-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].rule",
+      "description": "FieldRule declaring no constraint — a message alone is not a rule (Phase 864)"
+    },
+    {
+      "id": "reject-fieldrule-length-unordered",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-fieldrule-length-unordered.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].rule",
+      "description": "FieldRule minLength above maxLength — the ordered-pair rule on a length pair (Phase 864)"
+    },
+    {
+      "id": "reject-formfield-near-miss-validation",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-formfield-near-miss-validation.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].validation",
+      "description": "'validation' near-miss on a FormField — the canonical key is 'rule' (Phase 864)"
     },
     {
       "id": "reject-invalid-empty",
@@ -2259,6 +2532,15 @@
       "description": "InsertChild missing parentId"
     },
     {
+      "id": "reject-op-insertchild-retired-position",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-insertchild-retired-position.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.position",
+      "description": "InsertChild carries the retired 'position' — the migration window is closed (Phase 687)"
+    },
+    {
       "id": "reject-op-missing-type",
       "kind": "reject",
       "decoder": "op",
@@ -2266,6 +2548,15 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.$type",
       "description": "Op missing $type entirely"
+    },
+    {
+      "id": "reject-op-movenode-retired-newposition",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-movenode-retired-newposition.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.newPosition",
+      "description": "MoveNode carries the retired 'newPosition' — the migration window is closed (Phase 687)"
     },
     {
       "id": "reject-op-reorderchildren-wrongtype",

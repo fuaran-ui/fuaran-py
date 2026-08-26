@@ -1,0 +1,1 @@
+{"accessibility":{"liveRegion":"assertive","role":"alert"},"id":"a11y-alert-assertive","kind":{"$type":"Callout","body":"The file exceeded the size limit.","dismissable":true,"heading":"Upload failed","icon":"alert","tone":"Critical"}}

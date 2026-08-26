@@ -1,0 +1,1 @@
+{"id":"f1","kind":{"$type":"Form","fields":[{"id":"email","kind":{"$type":"Text"},"label":"Work email","required":true,"rule":{"message":"Must be a valid email"}}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Save"}}

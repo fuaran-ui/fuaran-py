@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-metric-card-ref","kind":{"$type":"FragmentRef","args":{"caption":{"$type":"Str","value":"minutes, vs. 162 last month"},"title":{"$type":"Str","value":"Mean time to resolve"},"value":{"$type":"Float","value":137}},"name":"metric-card"}}

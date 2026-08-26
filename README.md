@@ -357,6 +357,38 @@ hosts; `fuaran_py.canonical.format_finite_double` re-lays-out those digits into 
 canonical fixed-point/scientific form (the cross-host divergence zone — large
 exponents, sign padding, `-0` collapse — is pinned by the corpus float fixtures).
 
+## Retired wire vocabulary — the positional slot on `InsertChild` / `MoveNode`
+
+`InsertChild` and `MoveNode` both **append**; `ReorderChildren` states order by naming
+child ids. The integer `position` / `newPosition` these two ops once carried was removed
+from the wire format, and this host **REFUSES** it: `WRONG_TYPE` at `$.position` /
+`$.newPosition`, with a message naming `ReorderChildren`. Placing a node anywhere but
+last is `Batch [InsertChild …, ReorderChildren …]`.
+
+There was a migration window during which every host accepted and ignored the field so
+the hosts could adopt independently. It is **closed**. How it closed is worth knowing,
+because it is not the obvious thing: the op decoder walks each op's schema and never
+looks at anything else, so *not reading* the ordinal **was** the tolerance — there was
+never a read to delete. Closing the window therefore meant ADDING a refusal, not removing
+an acceptance; a host that merely stopped mentioning the field would have gone on
+accepting it forever, indistinguishable from one that had never adopted.
+
+The refusal is **by name** and is the enumerated-near-miss narrowing of WIRE_FORMAT §2
+rule 2: a genuinely unknown key is still tolerated, because a slot a future profile may
+add must stay addable. It is checked **before** the schema loop, so an op carrying both a
+retired ordinal and another defect names the ordinal — identically ordered in every host,
+so which defect surfaces first is deterministic. Certified by the corpus fixtures
+`reject-op-insertchild-retired-position` / `reject-op-movenode-retired-newposition` and
+pinned by `tests/test_retired_position.py`.
+
+**The encoder applies no schema filter**, so this refusal is the decode-side guarantee
+only: a construction site that leaves a dead key on an op still reaches the wire, where a
+conformant decoder — including this one — now refuses it. Whether the encoder should
+filter to the schema is an open question, recorded here rather than implied closed.
+
+This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is recorded
+here rather than in a `STABILITY.md` it does not have.
+
 ## Conformance
 
 `fuaran-py` round-trips the shared wire-format corpus byte-for-byte and surfaces

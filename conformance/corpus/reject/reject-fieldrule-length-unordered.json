@@ -1,0 +1,1 @@
+{"id":"f1","kind":{"$type":"Form","fields":[{"id":"username","kind":{"$type":"Text"},"label":"Username","required":true,"rule":{"minLength":24,"maxLength":3}}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Save"}}

@@ -1,0 +1,1 @@
+{"id":"frag-stdlib-kpi-strip-ref","kind":{"$type":"FragmentRef","args":{"count":{"$type":"Int","value":3},"heading":{"$type":"Str","value":"This week"}},"name":"kpi-strip"}}

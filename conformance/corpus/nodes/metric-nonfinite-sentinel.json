@@ -1,0 +1,1 @@
+{"id":"metric-nonfinite-sentinel","kind":{"$type":"Metric","format":{"$type":"Currency","code":"GBP"},"icon":"trending-up","label":"Revenue","subtext":"vs last month","tone":"Brand","trend":{"$type":"Static","value":"NaN"},"trendFormat":{"$type":"Percent","decimals":1},"value":{"$type":"Static","value":"Infinity"}}}

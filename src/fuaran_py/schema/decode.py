@@ -11,6 +11,7 @@ while typed validation is filled in incrementally. An unrecognised kind is a
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import cast
 
@@ -454,6 +455,28 @@ def _decode_binding_string(value: object, path: str) -> Value:
 
 def _decode_binding_bool(value: object, path: str) -> Value:
     return _decode_binding_scalar(value, path, _expect_bool, "a boolean")
+
+
+def _decode_binding_float(value: object, path: str) -> Value:
+    """A ``Binding<float>`` slot — §7's FLOAT accept set at a binding position.
+
+    Same machinery as the string/bool slots above, and deliberately so: §3.6's
+    bare-scalar coercion decides only that a bare scalar can only mean ``Static``
+    — the slot's own ``'T`` still governs the VALUE — so both arms (the
+    ``{"$type":"Static","value":X}`` envelope AND the bare scalar) route through
+    :func:`_decode_number`, which is the one place the accept set is written down.
+    """
+    return _decode_binding_scalar(value, path, _decode_number, "a number")
+
+
+def _decode_binding_int(value: object, path: str) -> Value:
+    """A ``Binding<int>`` slot — §7's INTEGER accept set at a binding position.
+
+    Its parser is :func:`_decode_integer`, NOT :func:`_decode_number`: the two
+    numeric slot classes accept different sets, and routing both through one
+    parser is precisely the defect this pair exists to prevent.
+    """
+    return _decode_binding_scalar(value, path, _decode_integer, "an integer")
 
 
 def _decode_select_option(value: object, path: str) -> Value:
@@ -1058,9 +1081,10 @@ def _decode_number(value: object, path: str) -> Value:
     # of the three §7 non-finite sentinel strings. bool is an int subclass; reject
     # it as it is never a numeric value here.
     #
-    # This is the FLOAT-slot choke point. Integer slots go through ``_expect_int``,
-    # which is unreachable from here, so a sentinel at an integer slot stays a
-    # WRONG_TYPE — §7 widens float slots and nothing else.
+    # This is the FLOAT-slot choke point. Integer slots go through ``_expect_int``
+    # (a bare int position) or ``_decode_integer`` (a ``Binding<int>`` slot), both
+    # unreachable from here, so a sentinel at an integer slot stays a WRONG_TYPE —
+    # §7 widens float slots and nothing else.
     #
     # The float is returned rather than the sentinel string so decode is idempotent
     # at the TREE level and not merely at the byte level: ``json.loads`` already
@@ -1075,6 +1099,42 @@ def _decode_number(value: object, path: str) -> Value:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(WRONG_TYPE, path, f"expected a number at {path}")
     return value  # type: ignore[return-value]
+
+
+def _decode_integer(value: object, path: str) -> Value:
+    """The INTEGER-slot choke point — §7's *other* numeric accept set.
+
+    §7 is asymmetric on purpose, and the asymmetry is the whole content of this
+    function::
+
+        a FLOAT slot accepts  { JSON number } ∪ { "NaN", "Infinity", "-Infinity" }
+        an INT  slot accepts  { JSON number }                     (truncating)
+
+    An integer has no non-finite form, so a *correctly spelled* sentinel string
+    here is a ``WRONG_TYPE`` — the case that makes the two sets distinguishable
+    rather than merely stated. The truncating integer cast mirrors the reference
+    host's ``requireInt`` (``JNumber n -> Ok(int n)``).
+
+    Three Python-specific traps, all of them silent if missed:
+
+    * ``bool`` is an ``int`` subclass, so it is tested FIRST — ``True`` would
+      otherwise satisfy ``isinstance(v, int)`` and truncate to ``1``.
+    * The sentinel widening is a *membership test against three exact strings*
+      (:data:`_NON_FINITE_SENTINELS`) and lives in :func:`_decode_number` alone;
+      a ``float(s)`` in a ``try`` would accept ``"nan"``, ``"inf"``, ``"1e5"``
+      and ``"  NaN "`` at both slot classes.
+    * A non-finite ``float`` — reachable only through ``json.loads``'s default
+      acceptance of the bare ``NaN`` / ``Infinity`` *tokens*, a §20
+      decode-determinism question this does not reopen — is refused rather than
+      cast, because ``int(float("nan"))`` raises and decoding is TOTAL: a typed
+      refusal, never an exception.
+    """
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(WRONG_TYPE, path, f"expected an integer at {path}")
+    if isinstance(value, float) and not math.isfinite(value):
+        _fail(WRONG_TYPE, path, f"expected a finite integer at {path} — an integer slot has no non-finite form")
+    return int(cast(float, value))
 
 
 # ── Drawing (Phase 524) ────────────────────────────────────────────────────
@@ -1120,9 +1180,10 @@ def _decode_draw_style(value: object, path: str) -> Value:
     fields: dict[str, Value] = {}
     for key in ("fill", "opacity", "stroke", "strokeWidth"):
         if key in obj:
-            # `fill` / `stroke` are Binding<string> (a colour token); the two
-            # numeric siblings stay untyped pending the scalar-slot sweep.
-            decoder = _decode_binding_string if key in ("fill", "stroke") else _decode_binding
+            # `fill` / `stroke` are Binding<string> (a colour token); `opacity` /
+            # `strokeWidth` are Binding<float> — typed here, closing the numeric
+            # half of the sweep Phase 956 opened on the scalar slots.
+            decoder = _decode_binding_string if key in ("fill", "stroke") else _decode_binding_float
             fields[key] = decoder(obj[key], f"{path}.{key}")
     # Text-only fields (Phase 528.1) — bare enum / number / string, not bindings;
     # all optional, omitted when unset (byte-unchanged for non-text shapes).
@@ -1316,12 +1377,12 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("emphasis", False, _omit_default_emphasis_enum),
         ("format", False, _omit_default_format),
         ("label", True, _decode_text_source),
-        ("value", True, _decode_binding, ("data",)),
+        ("value", True, _decode_binding_float, ("data",)),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
         ("weight", False, _omit_default_enum(WEIGHT, {}, "Standard", "weight")),
         ("icon", False, _decode_string),
         ("subtext", False, _decode_text_source),
-        ("trend", False, _decode_binding),
+        ("trend", False, _decode_binding_float),
         ("trendFormat", False, _decode_cell_format),
     ],
     # The labeled TEXT fact (2026-07-17) — Metric's complementary kind: only
@@ -1349,7 +1410,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("icon", False, _decode_string),
     ],
     "Progress": [
-        ("fraction", True, _decode_binding),
+        ("fraction", True, _decode_binding_float),
         # 0.2.0 — omitted-when-false on both boundaries.
         ("indeterminate", False, _omit_default_bool(False)),
         ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
@@ -1385,7 +1446,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("emphasis", False, _decode_emphasis_flag),
         ("format", False, _omit_default_format),
         ("label", True, _decode_text_source),
-        ("value", True, _decode_binding, ("data",)),
+        ("value", True, _decode_binding_float, ("data",)),
         ("help", False, _decode_text_source),
     ],
     "Link": [
@@ -1468,6 +1529,21 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("orientation", True, _enum_decoder(SCROLL_ORIENTATION, "orientation")),
         ("maxHeight", False, _decode_int),
         ("maxWidth", False, _decode_int),
+    ],
+    # Tabs / Stepper carry the language's only two ``Binding<int>`` slots, and
+    # had no typed schema at all — so the whole kind reached the structural
+    # pass-through and `activeIndex: true` decoded happily. These entries are
+    # DELIBERATELY MINIMAL: they type the numeric slot and nothing else, leaving
+    # every other key (`children`, `tabHeaders`, `tabTags`, `activeTag`,
+    # `onSelect`, …) to the same structural preservation it had before, so the
+    # blast radius is the slot this phase is about. Requiredness follows the
+    # reference host: `activeIndex` is optional (`tryField`), `activeStep`
+    # required (`requireField`).
+    "Tabs": [
+        ("activeIndex", False, _decode_binding_int),
+    ],
+    "Stepper": [
+        ("activeStep", True, _decode_binding_int),
     ],
     # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
     # field schema, because it re-nests `layout` and role-validates.
@@ -2165,7 +2241,9 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
             bound("max", _decode_string)
             bound("step", _decode_number)
     elif tag in ("Number", "RangedNumber"):
-        value_slot(_decode_binding, _AUTO_NUMBER)
+        # Binding<float> on the reference host — the numeric control's value is a
+        # float slot, so it takes the §7 sentinels and refuses everything else.
+        value_slot(_decode_binding_float, _AUTO_NUMBER)
         if tag == "RangedNumber":
             bound("min", _decode_number)
             bound("max", _decode_number)

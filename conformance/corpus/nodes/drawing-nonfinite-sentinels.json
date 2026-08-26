@@ -1,0 +1,1 @@
+{"id":"drawing-nonfinite-sentinels","kind":{"$type":"Drawing","shapes":[{"$type":"Circle","cx":"NaN","cy":50,"r":20,"style":{}}],"style":{},"title":"Non-finite sentinels at typed float slots","viewBox":{"height":120,"minX":"-Infinity","minY":"NaN","width":"Infinity"}}}

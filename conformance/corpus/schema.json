@@ -1029,7 +1029,18 @@
               "const": "Numeric"
             },
             "value": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -1130,7 +1141,18 @@
               "const": "Flex"
             },
             "weight": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -1313,13 +1335,46 @@
             },
             "value": true,
             "min": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "max": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "step": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -1394,13 +1449,46 @@
               "$ref": "#/$defs/Binding"
             },
             "min": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "max": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "step": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -1475,7 +1563,18 @@
               "type": "string"
             },
             "step": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -1503,7 +1602,18 @@
               "type": "string"
             },
             "step": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -2088,16 +2198,60 @@
       "type": "object",
       "properties": {
         "height": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "minX": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "minY": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "width": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         }
       },
       "required": [
@@ -2111,10 +2265,32 @@
       "type": "object",
       "properties": {
         "x": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "y": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         }
       },
       "required": [
@@ -2149,7 +2325,18 @@
           "$ref": "#/$defs/TextAnchor"
         },
         "fontSize": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "emphasis": {
           "$ref": "#/$defs/Emphasis"
@@ -2161,7 +2348,18 @@
           "type": "string"
         },
         "rotation": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "tip": {
           "$ref": "#/$defs/TextSource"
@@ -2286,22 +2484,77 @@
               "const": "Rectangle"
             },
             "height": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "style": {
               "$ref": "#/$defs/DrawStyle"
             },
             "width": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "x": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "y": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "cornerRadius": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -2323,16 +2576,60 @@
               "$ref": "#/$defs/DrawStyle"
             },
             "x1": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "x2": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "y1": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "y2": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -2417,13 +2714,46 @@
               "const": "Circle"
             },
             "cx": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "cy": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "r": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "style": {
               "$ref": "#/$defs/DrawStyle"
@@ -2444,16 +2774,60 @@
               "const": "Ellipse"
             },
             "cx": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "cy": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "rx": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "ry": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "style": {
               "$ref": "#/$defs/DrawStyle"
@@ -2481,10 +2855,32 @@
               "$ref": "#/$defs/TextSource"
             },
             "x": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "y": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -3483,10 +3879,32 @@
           "$ref": "#/$defs/TextSource"
         },
         "latitude": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "longitude": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         }
       },
       "required": [
@@ -3499,10 +3917,32 @@
       "type": "object",
       "properties": {
         "centreLatitude": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "centreLongitude": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         },
         "source": {
           "$ref": "#/$defs/Binding"
@@ -3706,7 +4146,18 @@
           }
         },
         "weight": {
-          "type": "number"
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
         }
       },
       "required": [
@@ -4086,10 +4537,32 @@
               "const": "FloatRange"
             },
             "max": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             },
             "min": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -4172,7 +4645,18 @@
               "const": "Float"
             },
             "value": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -4325,7 +4809,18 @@
               "const": "Float"
             },
             "value": {
-              "type": "number"
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
             }
           },
           "required": [

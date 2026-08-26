@@ -1,0 +1,1 @@
+{"id":"n1","kind":{"$type":"Metric","format":{"$type":"None"},"label":{"$type":"Literal","text":"L"},"trend":{"$type":"Static","value":true},"value":{"$type":"Static","value":1.0}}}

@@ -140,6 +140,40 @@ The exchange's directory names (`fsharp` / `python`) are a cross-repo contract
 with the sibling's `--check-fuzz-samples <dir> <host>` argument; renaming either
 side silently un-wires it.
 
+### Decoder robustness fuzz (`fuaran_py.conformance.decoder_fuzz` + `tests/test_decoder_fuzz.py`)
+
+A third generative floor, and the only one aimed at inputs a conformant emitter would never produce.
+The refusal contract — decoding is TOTAL, so a malformed or hostile input yields a structured typed
+error, never an exception and never a hang — is asserted against **generated** hostile input rather
+than against the curated reject corpus alone. A curated corpus is evidence about the author's
+imagination.
+
+- **The bounded run IS the PR gate.** It landed in the suite `pytest` already runs, so no workflow
+  change was needed and none can silently switch it off.
+- **The long run is a CLI**, and it writes its own machine-readable record:
+  `python -m fuaran_py.conformance.decoder_fuzz --long --iterations 250000 --evidence <file>`.
+- **The go-red self-test is permanent, and so is its inverse.** Five mutants, one per invariant, plus
+  a pin that each is PARTIAL — a mutant that broke every input would make the harness look sensitive
+  while testing nothing.
+- **The allocation invariant is split in two, deliberately.** The main stream carries a cheap
+  canonical-output amplification proxy; `test_pathological_inputs_stay_inside_an_allocation_budget`
+  spends `tracemalloc` on the pathological family, where an adversarial shape would actually
+  amplify. Neither half is the whole invariant, and the docstrings say which is which.
+- **`RecursionError` is the escape this host most needs to see.** A recursive-descent decoder that
+  lets the interpreter's stack limit answer for it has no depth guard, whatever its §21 constant
+  says. `check` catches it and reports it as a counterexample rather than letting it propagate.
+- **The generator is a SIBLING of the reference one, not a transpile.** Same five input families; a
+  different byte stream, necessarily — the reference alphabet carries lone surrogates a `str` cannot
+  encode to UTF-8 at all, and the module names that gap rather than closing it silently.
+- **The `duplicate-key` mutator and the `NaN` / `Infinity` / `1e999` / `+1` tokens are generated
+  deliberately, and nothing here asserts which answer is right.** Those are §20 "Decode
+  determinism", landed PROPOSED and not yet ratified; crash-freedom on them is in scope, agreement
+  is not.
+
+`fuaran_py.conformance.refusal_report` is the companion emitter: this host's refusal class for every
+reject fixture, as JSON, for a cross-host runner that compares the hosts to each other rather than
+each to the corpus in isolation.
+
 ## Renderer (Phase 239)
 
 `fuaran_py.renderer.render_html` walks a decoded `Node` tree and emits a

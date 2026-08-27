@@ -132,6 +132,13 @@
         "Loud"
       ]
     },
+    "TrendPolarity": {
+      "type": "string",
+      "enum": [
+        "HigherIsBetter",
+        "LowerIsBetter"
+      ]
+    },
     "StyleRole": {
       "type": "string",
       "enum": [
@@ -4307,6 +4314,9 @@
         },
         "trendFormat": {
           "$ref": "#/$defs/CellFormat"
+        },
+        "trendPolarity": {
+          "$ref": "#/$defs/TrendPolarity"
         },
         "icon": {
           "type": "string"

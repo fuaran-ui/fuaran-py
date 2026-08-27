@@ -50,6 +50,9 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     if node.kind.tag == "Chart":
         _check_chart(node, node.kind, f"{path}.kind", findings)
 
+    if node.kind.tag == "Form":
+        _check_field_rules(node, node.kind, f"{path}.kind", findings)
+
     _check_inert_control(node, node.kind, f"{path}.kind", findings)
 
     for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
@@ -209,6 +212,111 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
         ground(x_field, require_numeric=chart_kind == "Scatter" and not temporal_x)
     for yf in y_fields:
         ground(yf, require_numeric=True)
+
+
+# ── The declared-rule family (fuaran#864, FUARAN100 / FUARAN101) ─────────────
+#
+# `FormField.rule` declares the ACCEPTED SET where `FormFieldKind` names the
+# CONTROL, so the two can disagree, and the two ways they disagree are both
+# decidable from the field alone: a slot the control cannot honour, and a literal
+# operand duplicating a bound the control already declares. Neither needs the
+# tree, which is why they are here while FUARAN099 — the third rule of the same
+# phase — is a declared abstention (see `validator-coverage.json`): that one asks
+# whether ANYTHING IN THE TREE writes a state key, and this host has no
+# tree-wide write-key projection to answer with.
+
+_RULE_SLOTS: tuple[tuple[str, str], ...] = (
+    ("format", "rule.format"),
+    ("pattern", "rule.pattern"),
+    ("minLength", "rule.minLength"),
+    ("maxLength", "rule.maxLength"),
+)
+
+#: Controls that can honour `rule.format` (the `email` / `url` / `tel`
+#: shorthands): a free-text single-line control and nothing else. `TextArea` is
+#: excluded deliberately — the reference host's table, where a multi-line control
+#: is not a place an email shorthand applies.
+_HONOURS_FORMAT = frozenset({"Text"})
+
+#: Controls that can honour the text bounds (`pattern` / `minLength` /
+#: `maxLength`): the two that carry a string value.
+_HONOURS_TEXT_BOUNDS = frozenset({"Text", "TextArea"})
+
+#: Controls declaring their own numeric / temporal bounds, which a LITERAL
+#: compare operand can duplicate (FUARAN101). `compare` itself is absent from the
+#: unhonourable table on purpose: it compares the field's VALUE, which every
+#: control has.
+_BOUNDED_CONTROLS = frozenset({"RangedNumber", "Range", "Date", "DateRange"})
+
+#: Which of a control's declared bounds each comparison operator duplicates.
+#: `eq` / `neq` duplicate neither and are silent.
+_DUPLICATED_BOUND: dict[str, str] = {"gt": "min", "gte": "min", "lt": "max", "lte": "max"}
+
+
+def _check_field_rules(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
+    """FUARAN100 (Warning) — a rule slot the field's control cannot honour, so the
+    constraint is carried and never applied (dead intent).
+
+    FUARAN101 (Warning) — a compare against a LITERAL while the control already
+    declares the equivalent bound: two sources for one bound, free to disagree,
+    and nothing decides which wins.
+    """
+    fields = kind.fields.get("fields")
+    if not isinstance(fields, Arr):
+        return
+    for i, item in enumerate(fields.items):
+        if not isinstance(item, Obj):
+            continue
+        rule = item.fields.get("rule")
+        if not isinstance(rule, Obj):
+            continue
+        field_id = item.fields.get("id")
+        field_id_s = field_id if isinstance(field_id, str) else "?"
+        control_obj = item.fields.get("kind")
+        control = control_obj.tag if isinstance(control_obj, Obj) and control_obj.tag is not None else "?"
+        rule_path = f"{path}.fields.{i}.rule"
+
+        for slot, label in _RULE_SLOTS:
+            if slot not in rule.fields:
+                continue
+            honoured = control in (_HONOURS_FORMAT if slot == "format" else _HONOURS_TEXT_BOUNDS)
+            if not honoured:
+                findings.append(
+                    Finding(
+                        "FUARAN100",
+                        f"{rule_path}.{slot}",
+                        f"form '{node.id}' field '{field_id_s}' declares {label} on a {control} control, "
+                        "which cannot honour it — the constraint is carried and never applied (dead "
+                        "intent); move the rule to a text control, or drop the slot. If a host you "
+                        "target DOES honour it, this warning is expected and can be ignored",
+                    )
+                )
+
+        compare = rule.fields.get("compare")
+        if not isinstance(compare, Obj):
+            continue
+        against = compare.fields.get("against")
+        # Only a LITERAL operand can duplicate a static bound — a `State` read is
+        # a value that changes, which is what the rule slot is for.
+        if not (isinstance(against, Obj) and against.tag == "Static"):
+            continue
+        if control not in _BOUNDED_CONTROLS:
+            continue
+        op = compare.fields.get("op")
+        bound = _DUPLICATED_BOUND.get(op) if isinstance(op, str) else None
+        if bound is None or bound not in (control_obj.fields if isinstance(control_obj, Obj) else {}):
+            continue
+        findings.append(
+            Finding(
+                "FUARAN101",
+                f"{rule_path}.compare",
+                f"form '{node.id}' field '{field_id_s}' compares against a LITERAL while its control "
+                f"already declares {control}.{bound} — two sources for one bound, free to disagree, and "
+                "nothing decides which wins; drop the compare and keep the control's bound, or make the "
+                'operand read something that changes ({"$type":"State","key":"<sibling field id>"}), '
+                "which is what the rule slot is for",
+            )
+        )
 
 
 def _child_nodes(value: Value, path: str) -> list[tuple[Node, str]]:

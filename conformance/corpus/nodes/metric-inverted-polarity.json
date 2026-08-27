@@ -1,0 +1,1 @@
+{"id":"metric-inverted-polarity","kind":{"$type":"Metric","format":{"$type":"Duration","style":"Compact","unit":"Minutes"},"label":"Avg wait","subtext":"still above target","tone":"Warning","trend":{"$type":"Static","value":-0.0734},"trendFormat":{"$type":"Percent","decimals":2},"trendPolarity":"LowerIsBetter","value":{"$type":"Static","value":80}}}

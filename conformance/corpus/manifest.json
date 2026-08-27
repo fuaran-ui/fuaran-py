@@ -1796,6 +1796,14 @@
       "description": "Display/Metric (float divergence-zone — 1e21 scientific)"
     },
     {
+      "id": "metric-inverted-polarity",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-inverted-polarity.json",
+      "expectedFile": "nodes/metric-inverted-polarity.json",
+      "description": "Display/Metric (Phase 867 — inverted trendPolarity: a falling wait time is an improvement)"
+    },
+    {
       "id": "metric-invoke",
       "kind": "node-round-trip",
       "decoder": "node",

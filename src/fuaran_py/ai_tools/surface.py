@@ -43,6 +43,10 @@ _VALUE_SPACE_ENUMS: dict[str, Any] = {
     "ScrollOrientation": t.ScrollOrientation,
     "DateVariant": t.DateVariant,
     "MathDisplay": t.MathDisplay,
+    # fuaran#867 — the two-case polarity enum. `Neutral` is reserved and is
+    # deliberately absent from the alias, so an agent offered this projection
+    # cannot pick a case the decoder refuses.
+    "TrendPolarity": t.TrendPolarity,
     "BoxRole": t.BoxRole,
     "FileReadEncoding": t.FileReadEncoding,
 }

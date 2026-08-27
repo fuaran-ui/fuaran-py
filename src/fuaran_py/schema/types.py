@@ -48,6 +48,10 @@ ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
 DateVariant = Literal["Date", "Time", "DateTime"]
 MathDisplay = Literal["Inline", "Block"]
 IconSize = Literal["Small", "Medium", "Large"]  # Phase 821 — the Icon display kind
+# fuaran#867 — which direction of movement is an improvement. `Neutral` is
+# RESERVED and deliberately absent: the slot is an enum precisely so that a later
+# admission is a bare-string addition rather than a type replacement.
+TrendPolarity = Literal["HigherIsBetter", "LowerIsBetter"]
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -937,6 +941,7 @@ class Metric:
     subtext: TextSource | None = None
     trend: Binding | None = None
     trend_format: CellFormat | None = None
+    trend_polarity: TrendPolarity = "HigherIsBetter"
 
     def to_wire(self) -> Obj:
         # Phase 460 — the stylistic fields are omitted-when-default (WIRE_FORMAT §3.6).
@@ -951,6 +956,9 @@ class Metric:
                 "tone": None if self.tone == "Default" else self.tone,
                 "trend": self.trend,
                 "trendFormat": self.trend_format,
+                # fuaran#867 — omitted-when-`HigherIsBetter`, so every Metric
+                # authored before the slot existed encodes byte-identically.
+                "trendPolarity": None if self.trend_polarity == "HigherIsBetter" else self.trend_polarity,
                 "value": self.value,
                 "weight": None if self.weight == "Standard" else self.weight,
             },
@@ -1480,6 +1488,67 @@ FormFieldKind = (
 )
 
 
+# ── FieldRule (fuaran#864, WIRE_FORMAT §3.6) ────────────────────────────────
+# A field's declared CONSTRAINT — the accepted set, where `FormFieldKind` names
+# the CONTROL. An optional record field rather than a discriminator case, so a
+# form authored before it encodes byte-identically.
+
+CompareOp = Literal["eq", "neq", "lt", "lte", "gt", "gte"]
+
+#: The `format` shorthands a text control can honour.
+RuleFormat = Literal["email", "url", "tel"]
+
+
+@dataclass(frozen=True)
+class CompareRule:
+    """``FieldRule.compare`` — this field's value against another operand.
+
+    Both slots are required on the wire. Point ``against`` at a sibling field's
+    id via ``State`` (a form field's value lives in State under its own id) to
+    express "end date on or after start date"; a ``Static`` operand is a literal
+    bound and is what FUARAN101 measures against the control's own min/max.
+    """
+
+    against: Binding
+    op: CompareOp
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"against": self.against, "op": self.op})
+
+
+@dataclass(frozen=True)
+class FieldRule:
+    """A ``FormField``'s declared constraint. Every slot is optional, but a rule
+    with NO constraint slot at all is a decode error, not a no-op — ``message``
+    alone does not rescue it, since a message is the prose shown when some
+    *other* slot is unmet.
+
+    ``pattern`` carries ECMA-262 source with HTML ``pattern`` semantics —
+    implicitly anchored to the whole value — so a browser, a static projection
+    and a native surface agree without a second definition.
+    """
+
+    compare: CompareRule | None = None
+    format: RuleFormat | None = None
+    max_length: int | None = None
+    message: TextSource | None = None
+    min_length: int | None = None
+    pattern: str | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            None,
+            {
+                "compare": self.compare,
+                "format": self.format,
+                "maxLength": self.max_length,
+                "message": self.message,
+                "minLength": self.min_length,
+                "pattern": self.pattern,
+            },
+        )
+
+
 @dataclass(frozen=True)
 class FormField:
     id: str
@@ -1487,10 +1556,20 @@ class FormField:
     kind: FormFieldKind
     required: bool = False
     help: TextSource | None = None
+    # fuaran#864 — omitted when absent, so every pre-864 field is byte-unchanged.
+    rule: FieldRule | None = None
 
     def to_wire(self) -> Value:
         return _obj(
-            None, {"help": self.help, "id": self.id, "kind": self.kind, "label": self.label, "required": self.required}
+            None,
+            {
+                "help": self.help,
+                "id": self.id,
+                "kind": self.kind,
+                "label": self.label,
+                "required": self.required,
+                "rule": self.rule,
+            },
         )
 
 

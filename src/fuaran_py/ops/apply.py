@@ -38,6 +38,7 @@ from ..schema.decode import (
     ORIENTATION,
     TEXT_SOURCE_CASES,
     TONE,
+    TREND_POLARITY,
     WEIGHT,
 )
 
@@ -349,6 +350,10 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Emphasis": ("emphasis", _coerce_enum(EMPHASIS)),
         "Trend": ("trend", _coerce_binding_number),
         "TrendFormat": ("trendFormat", _coerce_cell_format),
+        # fuaran#867 — the UpdateProp twin of the decoder's `trendPolarity`
+        # slot. `_coerce_enum` refuses anything outside the two-case set, so
+        # the reserved `Neutral` is rejected here exactly as it is on decode.
+        "TrendPolarity": ("trendPolarity", _coerce_enum(TREND_POLARITY)),
         "Icon": ("icon", _coerce_string),
         "Subtext": ("subtext", _coerce_text_source),
     },

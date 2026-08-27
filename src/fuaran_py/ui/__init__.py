@@ -37,6 +37,8 @@ from ..schema.types import (
     Action,
     Binding,
     CellFormat,
+    CompareRule,
+    FieldRule,
     Kind,
     SemanticStyle,
     StateBehaviour,
@@ -209,6 +211,52 @@ class format:  # noqa: N801, A001 — namespace object, mirrors the cross-tier `
     def relative_time(unit: t.RelativeTimeUnit) -> CellFormat:
         """Phase 819 — the English relative form ("3 minutes ago" / "in 2 hours")."""
         return t.RelativeTimeFormat(unit)
+
+
+# ── Declared field constraints (the ``rule`` namespace, fuaran#864) ──────────
+
+
+class rule:  # noqa: N801 — namespace object, mirrors the cross-tier `rule.*` slot
+    """``FieldRule`` constructors — a form field's declared ACCEPTED SET.
+
+    ``FormFieldKind`` names the control; this names what the control accepts. A
+    rule that constrains nothing is a decode error rather than a no-op, so each
+    constructor below fills at least one constraint slot, and ``message`` is only
+    ever the prose shown when some other slot is unmet::
+
+        t.FormField("work-email", t.LiteralText("Work email"), t.TextField(...),
+                    required=True, rule=rule.format("email"))
+    """
+
+    @staticmethod
+    def format(fmt: t.RuleFormat, message: t.TextInput | None = None) -> t.FieldRule:  # noqa: A003
+        """One of the ``email`` / ``url`` / ``tel`` shorthands. Text controls only —
+        the validator raises FUARAN100 where the control cannot honour it."""
+        return t.FieldRule(format=fmt, message=_text(message) if message is not None else None)
+
+    @staticmethod
+    def pattern(source: str, message: t.TextInput | None = None) -> t.FieldRule:
+        """ECMA-262 source with HTML ``pattern`` semantics — implicitly anchored
+        to the whole value, so every host agrees without a second definition."""
+        return t.FieldRule(pattern=source, message=_text(message) if message is not None else None)
+
+    @staticmethod
+    def length(
+        minimum: int | None = None, maximum: int | None = None, message: t.TextInput | None = None
+    ) -> t.FieldRule:
+        """A character-length bound. An inverted pair (``minimum`` above
+        ``maximum``) admits no value at all and is a decode error."""
+        return t.FieldRule(
+            min_length=minimum, max_length=maximum, message=_text(message) if message is not None else None
+        )
+
+    @staticmethod
+    def compare(against: Binding, op: t.CompareOp, message: t.TextInput | None = None) -> t.FieldRule:
+        """This field's value against another operand. Point ``against`` at a
+        sibling field's id — ``binding.state("<field id>")`` — for the ordered-pair
+        shapes; a literal operand duplicates a bound the control may already carry
+        (FUARAN101)."""
+        return t.FieldRule(compare=t.CompareRule(against, op), message=_text(message) if message is not None else None)
 
 
 # ── Per-kind ARIA defaults (the ``accessibility`` namespace) ─────────────────
@@ -465,7 +513,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         subtext: t.TextInput | None = None,
         trend: t.NumberInput | None = None,
         trend_format: CellFormat | None = None,
+        trend_polarity: t.TrendPolarity = "HigherIsBetter",
     ) -> UiNode:
+        # fuaran#867 — `trend_polarity` says which way the quantity IMPROVES;
+        # `tone` says how the reading STANDS. Never derive one from the other:
+        # a falling wait time on a tile the author deliberately toned `Warning`
+        # is an improvement from a bad place, and one slot could not say both.
         kind = t.Metric(
             label=_text(label),
             value=_metric_value(value),
@@ -477,6 +530,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             subtext=_text(subtext) if subtext is not None else None,
             trend=_num_binding(trend) if trend is not None else None,
             trend_format=trend_format,
+            trend_polarity=trend_polarity,
         )
         return _node(id, kind, accessibility.metric)
 
@@ -847,6 +901,10 @@ __all__ = [
     "binding",
     "action",
     "format",
+    # fuaran#864 — the declared field-constraint vocabulary.
+    "rule",
+    "FieldRule",
+    "CompareRule",
     "node",
     "accessibility",
     "encode",

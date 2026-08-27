@@ -185,6 +185,11 @@ DURATION_UNIT = frozenset({"Seconds", "Minutes", "Hours"})
 DURATION_STYLE = frozenset({"Compact", "Clock", "Long"})
 RELATIVE_TIME_UNIT = frozenset({"Second", "Minute", "Hour", "Day", "Week", "Month", "Year"})
 ICON_SIZE = frozenset({"Small", "Medium", "Large"})  # Phase 821 — the Icon display kind
+# fuaran#867 — `Metric.trendPolarity`: which direction of movement is an
+# improvement. `Neutral` is RESERVED and deliberately NOT a case — that is the
+# whole reason the slot is a two-case enum rather than an `inverted: bool`, since
+# a later admission is then a bare-string addition and not a type replacement.
+TREND_POLARITY = frozenset({"HigherIsBetter", "LowerIsBetter"})
 
 # ── Lenient-ingest enum aliases (WIRE_FORMAT.md §3.6, decode-only) ──────────
 # The encoder never emits an alias; a re-encode normalises to the canonical DU
@@ -1384,6 +1389,11 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("subtext", False, _decode_text_source),
         ("trend", False, _decode_binding_float),
         ("trendFormat", False, _decode_cell_format),
+        # fuaran#867 — `trendPolarity` is omitted-when-`HigherIsBetter` (§3.6's
+        # omit-when-default table). An absent `trend` makes the slot inert: a
+        # Metric with no trend that declares a polarity is legal and says nothing,
+        # so nothing here couples the two.
+        ("trendPolarity", False, _omit_default_enum(TREND_POLARITY, {}, "HigherIsBetter", "trendPolarity")),
     ],
     # The labeled TEXT fact (2026-07-17) — Metric's complementary kind: only
     # `label` + `value` required; `tone` / `emphasis` omitted-when-default on

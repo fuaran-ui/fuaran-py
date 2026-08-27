@@ -1,0 +1,1 @@
+{"id":"i","kind":{"$type":"Image","alt":{"$type":"Literal","text":"Hero"},"expandable":"true","src":{"$type":"Static","value":"/hero.jpg"},"variant":"Default"}}

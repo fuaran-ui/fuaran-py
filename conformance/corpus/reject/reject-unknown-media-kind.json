@@ -1,0 +1,1 @@
+{"id":"m","kind":{"$type":"Media","kind":{"$type":"Stream"},"label":"Live feed","src":{"$type":"Static","value":"/live.m3u8"}}}

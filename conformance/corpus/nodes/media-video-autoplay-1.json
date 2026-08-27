@@ -1,0 +1,1 @@
+{"id":"media-video-autoplay-1","kind":{"$type":"Media","controls":false,"kind":{"$type":"Video","autoplay":true},"label":"Ambient loop","loop":true,"src":{"$type":"Static","value":"/ambient.mp4"}}}

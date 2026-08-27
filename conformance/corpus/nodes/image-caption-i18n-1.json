@@ -1,0 +1,1 @@
+{"id":"image-caption-i18n-1","kind":{"$type":"Image","alt":"Fishing boats moored at first light","caption":{"$type":"I18n","args":{"year":1908},"key":"gallery.caption.harbour"},"src":{"$type":"Static","value":"/harbour.jpg"},"variant":"Default"}}

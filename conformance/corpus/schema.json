@@ -62,6 +62,31 @@
         "Rounded"
       ]
     },
+    "ImageFit": {
+      "type": "string",
+      "enum": [
+        "Natural",
+        "Cover",
+        "Contain"
+      ]
+    },
+    "ImageAspect": {
+      "type": "string",
+      "enum": [
+        "Natural",
+        "Square",
+        "FourThree",
+        "ThreeTwo",
+        "SixteenNine"
+      ]
+    },
+    "ImageLoading": {
+      "type": "string",
+      "enum": [
+        "Eager",
+        "Lazy"
+      ]
+    },
     "ScrollOrientation": {
       "type": "string",
       "enum": [
@@ -4409,8 +4434,29 @@
         "alt": {
           "$ref": "#/$defs/TextSource"
         },
+        "aspectRatio": {
+          "$ref": "#/$defs/ImageAspect"
+        },
+        "caption": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "expandable": {
+          "type": "boolean"
+        },
+        "fit": {
+          "$ref": "#/$defs/ImageFit"
+        },
+        "loading": {
+          "$ref": "#/$defs/ImageLoading"
+        },
         "src": {
           "$ref": "#/$defs/Binding_str"
+        },
+        "srcSet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SrcSetEntry"
+          }
         },
         "variant": {
           "$ref": "#/$defs/ImageVariant"
@@ -4420,6 +4466,79 @@
         "alt",
         "src",
         "variant"
+      ]
+    },
+    "SrcSetEntry": {
+      "type": "object",
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/Binding_str"
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "src",
+        "width"
+      ]
+    },
+    "MediaSpec": {
+      "type": "object",
+      "properties": {
+        "controls": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/MediaKind"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "loop": {
+          "type": "boolean"
+        },
+        "src": {
+          "$ref": "#/$defs/Binding_str"
+        }
+      },
+      "required": [
+        "kind",
+        "label",
+        "src"
+      ]
+    },
+    "MediaKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Video"
+            },
+            "autoplay": {
+              "type": "boolean"
+            },
+            "poster": {
+              "$ref": "#/$defs/Binding_str"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Audio"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        }
       ]
     },
     "ListSpec": {
@@ -5605,6 +5724,24 @@
             },
             {
               "$ref": "#/$defs/ImageSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Media"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/MediaSpec"
             }
           ]
         },

@@ -154,6 +154,206 @@ def test_link_to_an_undeclared_host_is_refused_by_default() -> None:
     assert "example.com/x" not in html
 
 
+# ── The media wave's NORMATIVE render obligations (WIRE_FORMAT §3.6.2–§3.6.6) ──
+#
+# Every assertion below pins a claim the wire spec states NORMATIVELY, and each is
+# a claim a host could violate while round-tripping the bytes perfectly — which is
+# exactly why they are tested at the renderer rather than assumed from the codec.
+
+
+def test_image_presentation_tokens_map_to_classes_and_never_to_style() -> None:
+    """§3.6.2 — the tokens are CLASSES, never CSS values. `Natural` emits no class
+    on either axis, so the pre-phase emission is untouched."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","aspectRatio":"SixteenNine","fit":"Cover",'
+        '"loading":"Lazy","src":{"$type":"Static","value":"/hero.jpg"},"variant":"Default"}}'
+    )
+    assert {"fuaran-image", "fuaran-image-fit-cover", "fuaran-image-aspect-sixteen-nine"} <= _classes(html)
+    assert 'loading="lazy"' in html
+    assert "style=" not in html
+    # `Eager` / `Natural` are the identity: no attribute, no class, byte-identical
+    # to what a pre-1077 document always emitted.
+    plain = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","src":{"$type":"Static","value":"/hero.jpg"},"variant":"Default"}}'
+    )
+    assert "loading=" not in plain
+    assert "fuaran-image-fit" not in plain and "fuaran-image-aspect" not in plain
+
+
+def test_image_srcset_is_emitted_ascending_by_width_whatever_the_wire_order() -> None:
+    """§3.6.4 — the wire preserves the AUTHOR's array order; ascending-by-width is
+    the RENDERER's canonicalisation. The fixture is authored DESCENDING precisely
+    so a renderer that emitted wire order fails this."""
+    result = decode_node(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","src":{"$type":"Static","value":"/harbour.jpg"},'
+        '"srcSet":[{"src":{"$type":"Static","value":"/h-1600.jpg"},"width":1600},'
+        '{"src":{"$type":"Static","value":"/h-800.jpg"},"width":800},'
+        '{"src":{"$type":"Static","value":"/h-400.jpg"},"width":400}],"variant":"Default"}}'
+    )
+    assert result.ok, getattr(result, "error", result)
+    # The codec kept the author's order — the rule the renderer's sort must not
+    # be allowed to hide.
+    assert [e.fields["width"] for e in result.value.kind.fields["srcSet"].items] == [1600, 800, 400]
+    html = render_html(result.value)
+    assert 'srcset="/h-400.jpg 400w, /h-800.jpg 800w, /h-1600.jpg 1600w"' in html
+    assert 'sizes="100vw"' in html
+
+
+def test_image_srcset_candidate_failing_the_url_floor_is_dropped_not_neutered() -> None:
+    """§3.6.4 — the primary `src` must exist so it collapses to the refusal URL; a
+    candidate has no such obligation, and offering a rendition guaranteed to fail
+    is worse than offering one fewer."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","src":{"$type":"Static","value":"/local.jpg"},'
+        '"srcSet":[{"src":{"$type":"Static","value":"/local-400.jpg"},"width":400},'
+        '{"src":{"$type":"Static","value":"https://cdn.example/x-800.jpg"},"width":800}],"variant":"Default"}}'
+    )
+    assert 'srcset="/local-400.jpg 400w"' in html
+    assert "cdn.example" not in html
+    assert "about:blank" not in html  # the dropped candidate is absent, never neutered
+
+
+def test_expandable_wraps_the_image_in_a_real_anchor_to_the_resolved_src() -> None:
+    """§3.6.5 — the rendered baseline is a REAL LINK, and the marker attribute is
+    VALUELESS. A scripted control, or a marked-up element with no navigable
+    target, would be conformant to nothing."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","expandable":true,'
+        '"src":{"$type":"Static","value":"/harbour.jpg"},"variant":"Default"}}'
+    )
+    assert '<a class="fuaran-image-expand" href="/harbour.jpg" data-fuaran-expandable=""><img' in html
+    assert "</a>" in html
+    assert "onclick" not in html
+
+
+def test_expandable_over_a_refused_src_emits_no_anchor_and_no_marker() -> None:
+    """§3.6.5 — a link to the refusal URL is exactly the dead affordance the rule
+    forbids. The image still renders, carrying its refusal marker."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","expandable":true,'
+        '"src":{"$type":"Static","value":"https://cdn.example/harbour.jpg"},"variant":"Default"}}'
+    )
+    assert "fuaran-image-expand" not in html
+    assert "data-fuaran-expandable" not in html
+    assert "<a " not in html
+    assert "data-fuaran-egress-refused" in html  # the image itself still says why
+
+
+def test_expandable_with_a_caption_nests_figure_anchor_img() -> None:
+    """§3.6.5 — `figure > a > img`, with the `<figcaption>` as the ANCHOR'S
+    SIBLING: the caption is deliberately OUTSIDE the link target."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","caption":"The harbour at dawn","expandable":true,'
+        '"src":{"$type":"Static","value":"/harbour.jpg"},"variant":"Default"}}'
+    )
+    assert '<figure class="fuaran-image-figure"><a class="fuaran-image-expand"' in html
+    assert '</a><figcaption class="fuaran-image-figure-caption">The harbour at dawn</figcaption></figure>' in html
+
+
+def test_an_image_without_a_caption_emits_no_wrapper_at_all() -> None:
+    """§3.6.3 — not an empty `<figure>`, not a wrapper with an empty caption: the
+    emission is the bare `<img>` a pre-1078 document always produced."""
+    html = _render(
+        '{"id":"i","kind":{"$type":"Image","alt":"Hero","src":{"$type":"Static","value":"/h.jpg"},"variant":"Default"}}'
+    )
+    assert "figure" not in html
+    assert "figcaption" not in html
+
+
+def test_media_always_carries_an_aria_label() -> None:
+    """§3.6.6 — the label is mandatory and has no decorative case, so unlike
+    `Image`'s `alt` there is no branch: the attribute is emitted whatever the
+    label resolves to."""
+    for wire, tag in (
+        (
+            '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video"},"label":"Studio walkthrough",'
+            '"src":{"$type":"Static","value":"/w.mp4"}}}',
+            "video",
+        ),
+        (
+            '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Audio"},"label":"Commentary",'
+            '"src":{"$type":"Static","value":"/c.mp3"}}}',
+            "audio",
+        ),
+    ):
+        html = _render(wire)
+        assert f"<{tag} " in html and f"</{tag}>" in html, "media elements are NOT void elements"
+        assert "aria-label=" in html
+        # `controls` is omit-at-TRUE on the wire: an absent key is the ACCESSIBLE
+        # value, so the transport is present unless the document spends a key.
+        assert 'controls=""' in html
+
+
+def test_media_autoplay_is_never_emitted_without_muted() -> None:
+    """§3.6.6, the sharpest of the three obligations. The pairing is not a default
+    a caller overrides — it is what the declaration MEANS, which is why the wire
+    carries no separate `muted` slot to get out of step with it. A host emitting
+    `autoplay` alone produces a video that silently never starts."""
+    html = _render(
+        '{"id":"m","kind":{"$type":"Media","controls":false,"kind":{"$type":"Video","autoplay":true},'
+        '"label":"Ambient loop","loop":true,"src":{"$type":"Static","value":"/ambient.mp4"}}}'
+    )
+    assert 'autoplay=""' in html
+    assert 'muted=""' in html
+    assert 'loop=""' in html
+    assert "controls=" not in html
+
+
+def test_media_without_autoplay_is_never_muted() -> None:
+    """The converse, and a defect of the same family in the other direction:
+    muting a video the reader pressed play on."""
+    html = _render(
+        '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video"},"label":"Walkthrough",'
+        '"src":{"$type":"Static","value":"/w.mp4"}}}'
+    )
+    assert "autoplay" not in html
+    assert "muted" not in html
+
+
+def test_audio_has_no_autoplay_pathway_at_all() -> None:
+    """§3.6.6 — stronger than a default of `false`. The value has nowhere to land
+    on the wire, and nothing for this arm to branch on in the emission."""
+    result = decode_node(
+        '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Audio","autoplay":true},"label":"Commentary",'
+        '"src":{"$type":"Static","value":"/c.mp3"}}}'
+    )
+    assert result.ok, getattr(result, "error", result)
+    assert "autoplay" not in result.value.kind.fields["kind"].fields
+    html = render_html(result.value)
+    assert "autoplay" not in html
+    assert "muted" not in html
+
+
+def test_media_poster_failing_the_url_floor_is_dropped_while_src_collapses() -> None:
+    """§3.6.6 — the two URLs differ in what a REFUSAL means. An element must have
+    a source; a `<video>` with no poster shows its first frame, which is a working
+    rendering, whereas a poster pointing at the refusal URL is a broken image
+    painted over the player."""
+    html = _render(
+        '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video","poster":{"$type":"Static",'
+        '"value":"https://cdn.example/poster.jpg"}},"label":"Walkthrough",'
+        '"src":{"$type":"Static","value":"https://cdn.example/w.mp4"}}}'
+    )
+    assert "poster=" not in html  # dropped
+    assert 'src="about:blank#fuaran-egress-refused"' in html  # collapsed, with its marker
+    assert "data-fuaran-egress-refused" in html
+
+
+def test_media_poster_under_a_declared_policy_is_emitted() -> None:
+    """The positive half — without it the test above would pass on a renderer that
+    never emitted a poster at all."""
+    result = decode_node(
+        '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video","poster":{"$type":"Static",'
+        '"value":"https://cdn.example/poster.jpg"}},"label":"Walkthrough",'
+        '"src":{"$type":"Static","value":"https://cdn.example/w.mp4"}}}'
+    )
+    assert result.ok, getattr(result, "error", result)
+    policy = allow_origin(ExactHost("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)
+    html = render_html(result.value, egress_policy=policy)
+    assert 'poster="https://cdn.example/poster.jpg"' in html
+    assert "data-fuaran-egress-refused" not in html
+
+
 def test_custom_renders_inert_labelled_placeholder() -> None:
     html = _render('{"id":"c","kind":{"$type":"Custom","moduleId":"deal-flow","componentId":"TrendCard"}}')
     assert "fuaran-kind-custom-placeholder" in html

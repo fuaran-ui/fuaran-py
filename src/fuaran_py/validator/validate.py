@@ -53,10 +53,47 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     if node.kind.tag == "Form":
         _check_field_rules(node, node.kind, f"{path}.kind", findings)
 
+    if node.kind.tag == "Media":
+        _check_media_label(node, node.kind, f"{path}.kind", findings)
+
     _check_inert_control(node, node.kind, f"{path}.kind", findings)
 
     for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
         _walk(child, child_path, findings, seen_ids)
+
+
+def _check_media_label(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
+    """FUARAN108 (fuaran#1076) — a media transport with no accessible name.
+
+    Only a LITERAL is judged. A ``Bound`` or ``I18n`` label resolves at render
+    time from data this walk cannot see, so calling it empty would be a guess.
+    What is left is the case that is decidable and is also the case that actually
+    happens: an author who fills the source and forgets the name.
+
+    Whitespace counts as empty. A label of ``" "`` is not a name a listener can
+    act on, and admitting it would make the rule trivially evadable by a space —
+    which is worse than not having the rule, because the document would then carry
+    a green gate saying it had been checked.
+
+    Error rather than Warning because there is no legitimate shape it refuses: a
+    media element is a transport, not a picture, so unlike an image's ``alt``
+    there is no honest empty case for it to have.
+    """
+    label = kind.fields.get("label")
+    # A decoded `TextSource.Literal` IS the bare string on this host's structural
+    # model; every other case is an `Obj` and is deliberately not judged.
+    if isinstance(label, str) and label.strip() == "":
+        findings.append(
+            Finding(
+                "FUARAN108",
+                f"{path}.label",
+                f"media node '{node.id}' has an EMPTY label — a media element is a transport, not a "
+                "picture, so it is never decorative and there is no honest empty case the way there is "
+                'for an image\'s alt; without a name it is announced to a screen reader as "video" or '
+                '"audio" and nothing more, telling the reader that a player exists and not what it '
+                "plays. Give 'label' the text a listener needs to decide whether to play it",
+            )
+        )
 
 
 def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:

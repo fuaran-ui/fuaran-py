@@ -35,6 +35,10 @@ from ..schema.decode import (
     EMPHASIS,
     HEADING_VARIANT,
     ICON_SIZE,
+    IMAGE_ASPECT,
+    IMAGE_FIT,
+    IMAGE_LOADING,
+    IMAGE_VARIANT,
     ORIENTATION,
     TEXT_SOURCE_CASES,
     TONE,
@@ -332,6 +336,15 @@ def _coerce_string_option(v: Value) -> _Coerced:
     return _Coerced(False, detail="expected a string or null")
 
 
+def _coerce_text_source_option(v: Value) -> _Coerced:
+    """An optional TextSource field (fuaran#1078 — ``Image.Caption``): a value sets
+    it, ``null`` clears it. A cleared field is REMOVED from the model — absence is
+    structural, never ``"k":null`` — which `_update_field` does on an ok ``None``."""
+    if v is None:
+        return _Coerced(True, None)
+    return _coerce_text_source(v)
+
+
 _Coercer = Callable[[Value], _Coerced]
 _NOT_SUPPORTED = "__not_supported__"
 
@@ -404,6 +417,43 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Rel": ("rel", _coerce_string),
         "Target": ("target", _coerce_string),
         "Download": ("download", _coerce_bool),
+    },
+    # fuaran#1077–1080 — the `Image` field surface (mirrors the reference
+    # `updateImage`). The presentation slots are ordinary closed-enum fields and
+    # join on the same terms as `Variant`; `Caption` is an optional TextSource, so
+    # a `null` clears it; `Expandable` is an ordinary bool.
+    #
+    # `Src` and `SrcSet` are NAMED rather than left to fall through to
+    # `UnknownField`, so the answer is "not yet" rather than "no such field" — the
+    # distinction the two results exist to make. Both hold `Binding`s, and there
+    # is no field-level coercion from an untyped value to a binding-bearing
+    # structure; inventing one for these slots alone would put a bespoke parser on
+    # the update path. Reach them with `EditNode`.
+    "Image": {
+        "Alt": ("alt", _coerce_text_source),
+        "Variant": ("variant", _coerce_enum(IMAGE_VARIANT)),
+        "Fit": ("fit", _coerce_enum(IMAGE_FIT)),
+        "AspectRatio": ("aspectRatio", _coerce_enum(IMAGE_ASPECT)),
+        "Loading": ("loading", _coerce_enum(IMAGE_LOADING)),
+        "Caption": ("caption", _coerce_text_source_option),
+        "Expandable": ("expandable", _coerce_bool),
+        "Src": ("src", _NOT_SUPPORTED),
+        "SrcSet": ("srcSet", _NOT_SUPPORTED),
+    },
+    # fuaran#1076 — the `Media` field surface. `Label`, `Controls` and `Loop` are
+    # ordinary coercible scalars. `Src` and `Kind` are both named, for the two
+    # DIFFERENT reasons the not-supported / unknown-field split exists to record:
+    # `Src` is a `Binding` with no scalar coercion, exactly as `Image.Src` is;
+    # `Kind` is a discriminated union carrying its own payload, so setting it from
+    # a scalar would mean either inventing a spelling for "Video with these two
+    # slots" or silently resetting the video-only slots on every switch — a
+    # whole-node `EditNode` says what the author means without either.
+    "Media": {
+        "Label": ("label", _coerce_text_source),
+        "Controls": ("controls", _coerce_bool),
+        "Loop": ("loop", _coerce_bool),
+        "Src": ("src", _NOT_SUPPORTED),
+        "Kind": ("kind", _NOT_SUPPORTED),
     },
     # Layout (Children -> structural child ops)
     # Box (Phase 390) is NOT in this flat table — its legacy-compat field surface

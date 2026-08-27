@@ -1,0 +1,1 @@
+{"id":"len-image","kind":{"$type":"Image","alt":{"$type":"Literal","text":"User avatar"},"aspectRatio":"Natural","fit":"Natural","loading":"Eager","src":{"$type":"Static","value":"/avatar.png"},"variant":"Avatar"}}

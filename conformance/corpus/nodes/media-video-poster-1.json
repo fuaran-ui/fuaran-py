@@ -1,0 +1,1 @@
+{"id":"media-video-poster-1","kind":{"$type":"Media","kind":{"$type":"Video","poster":{"$type":"Static","value":"/walkthrough-poster.jpg"}},"label":"Studio walkthrough","src":{"$type":"Static","value":"/walkthrough.mp4"}}}

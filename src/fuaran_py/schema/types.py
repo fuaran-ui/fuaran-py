@@ -44,6 +44,17 @@ StyleRole = Literal["None", "Eyebrow", "Data", "Lede", "Caption"]
 FontVoice = Literal["Default", "Display", "Structural"]
 LiveRegion = Literal["polite", "assertive", "off"]
 ImageVariant = Literal["Default", "Avatar", "Rounded"]
+# fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). Closed
+# TOKEN vocabularies, never CSS values: `ImageAspect` names one of four ratios and
+# carries no number, pair or stylesheet spelling. `fit` says what happens to
+# pixels that do not match the box; `aspectRatio` reserves the box BEFORE the
+# image arrives; a host derives neither from the other.
+ImageFit = Literal["Natural", "Cover", "Contain"]
+ImageAspect = Literal["Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"]
+# `Eager` is the default deliberately, and it is not the "unoptimised" value:
+# deferring an above-the-fold image DELAYS the largest contentful paint, and only
+# the author knows where the image sits — so the format declines to guess.
+ImageLoading = Literal["Eager", "Lazy"]
 ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
 DateVariant = Literal["Date", "Time", "DateTime"]
 MathDisplay = Literal["Inline", "Block"]
@@ -1105,13 +1116,133 @@ class Link:
 
 
 @dataclass(frozen=True)
+class SrcSetEntry:
+    """fuaran#1080 — one responsive candidate: an alternate rendition of the SAME
+    picture at a declared intrinsic pixel width, from which a client picks one.
+
+    ``width`` is the ``w`` descriptor and MUST be a positive integer. Widths
+    rather than device-pixel-ratio descriptors or per-entry media conditions:
+    those are alternative candidate-selection algebras, and a list mixing them is
+    one a browser refuses outright.
+    """
+
+    src: Binding
+    width: int
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"src": self.src, "width": self.width})
+
+
+@dataclass(frozen=True)
 class Image:
     alt: TextSource
     src: Binding
     variant: ImageVariant = "Default"
+    # fuaran#1077 — omitted at their identity defaults on both boundaries, so a
+    # default-presentation image emits exactly the pre-phase three fields.
+    fit: ImageFit = "Natural"
+    aspect_ratio: ImageAspect = "Natural"
+    loading: ImageLoading = "Eager"
+    # fuaran#1078 — CONTENT, not an identity default: absent means absent. A full
+    # `TextSource`, so a caption is i18n-capable on exactly the terms `alt` is.
+    caption: TextSource | None = None
+    # fuaran#1080 — the EMPTY tuple is the identity: an image with no alternate
+    # renditions and one with an empty list are the same document, so both emit
+    # no key. Authored ORDER is preserved verbatim on the wire; ascending-by-width
+    # is the renderer's canonicalisation, not the codec's.
+    src_set: tuple[SrcSetEntry, ...] = ()
+    # fuaran#1079 — the only slot on the record that declares an INTERACTION
+    # rather than a picture. It says the full-size asset is REACHABLE from the
+    # rendered image, not that a lightbox appears.
+    expandable: bool = False
 
     def to_wire(self) -> Obj:
-        return _obj("Image", {"alt": self.alt, "src": self.src, "variant": self.variant})
+        return _obj(
+            "Image",
+            {
+                "alt": self.alt,
+                "aspectRatio": None if self.aspect_ratio == "Natural" else self.aspect_ratio,
+                "caption": self.caption,
+                "expandable": True if self.expandable else None,
+                "fit": None if self.fit == "Natural" else self.fit,
+                "loading": None if self.loading == "Eager" else self.loading,
+                "src": self.src,
+                "srcSet": list(self.src_set) if self.src_set else None,
+                "variant": self.variant,
+            },
+        )
+
+
+# ── Media (WIRE_FORMAT.md §3.6.6) ───────────────────────────────────────────
+#
+# ONE kind, two variants — never two kinds. Everything a video surface and an
+# audio surface share is stated once on :class:`Media`; only the slots that
+# genuinely differ live in the variant, and there are two of them, both on
+# :class:`Video`.
+
+
+@dataclass(frozen=True)
+class Video:
+    """The video variant. ``autoplay`` is a DECLARATION whose rendering is
+    constrained: a host that honours it MUST emit it together with a muted
+    attribute, which is why there is deliberately no separate ``muted`` slot for a
+    second knob to disagree with."""
+
+    autoplay: bool = False
+    poster: Binding | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj("Video", {"autoplay": True if self.autoplay else None, "poster": self.poster})
+
+
+@dataclass(frozen=True)
+class Audio:
+    """The audio variant, whose payload is the discriminator alone.
+
+    It declares NO autoplay slot, and that is stronger than a default of
+    ``False``: a slot that defaults to off is one a document can switch on, and
+    there is no document this format wants to be able to state in which a page
+    begins making sound unbidden.
+    """
+
+    def to_wire(self) -> Obj:
+        return _obj("Audio", {})
+
+
+MediaKind = Video | Audio
+
+
+@dataclass(frozen=True)
+class Media:
+    """A playback surface. ``label`` is REQUIRED — the one place the media
+    contract differs from ``Image``'s: an image can honestly be decorative and say
+    so with an empty ``alt``, but a media element is a TRANSPORT and is never
+    decorative, and there is no value to default to that would not be a fabricated
+    name for someone else's recording.
+
+    ``controls`` is omitted at TRUE (the second such slot after
+    ``Toast.dismissable``): a media element without a transport cannot be paused,
+    seeked or muted by a keyboard user at all, so the accessible setting is what a
+    document gets for free and taking it away is the deviation that costs a key.
+    """
+
+    src: Binding
+    label: TextSource
+    kind: MediaKind = field(default_factory=Video)
+    controls: bool = True
+    loop: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Media",
+            {
+                "controls": None if self.controls else False,
+                "kind": self.kind,
+                "label": self.label,
+                "loop": True if self.loop else None,
+                "src": self.src,
+            },
+        )
 
 
 @dataclass(frozen=True)

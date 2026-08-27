@@ -28,6 +28,7 @@ modifiers; ``accessibility`` the per-kind ARIA defaults.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace as _replace
 
 from ..canonical import encode_value
@@ -576,8 +577,90 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         src: t.StringInput,
         alt: t.TextInput,
         variant: t.ImageVariant = "Default",
+        fit: t.ImageFit = "Natural",
+        aspect_ratio: t.ImageAspect = "Natural",
+        loading: t.ImageLoading = "Eager",
+        caption: t.TextInput | None = None,
+        src_set: Sequence[tuple[t.StringInput, int]] = (),
+        expandable: bool = False,
     ) -> UiNode:
-        return _node(id, t.Image(_text(alt), _str_binding(src), variant), accessibility.none)
+        """A picture. The six slots past ``variant`` are the fuaran#1077–1080
+        additions, each at its identity default here so an authored image is
+        byte-identical to what it was before they existed.
+
+        ``src_set`` takes ``(src, width)`` pairs rather than constructed entries
+        because the two members are both required and there is nothing else to
+        say; the authored ORDER is carried to the wire verbatim, and the renderer
+        sorts ascending by width at emission.
+        """
+        return _node(
+            id,
+            t.Image(
+                _text(alt),
+                _str_binding(src),
+                variant,
+                fit=fit,
+                aspect_ratio=aspect_ratio,
+                loading=loading,
+                caption=None if caption is None else _text(caption),
+                src_set=tuple(t.SrcSetEntry(_str_binding(s), w) for s, w in src_set),
+                expandable=expandable,
+            ),
+            accessibility.none,
+        )
+
+    @staticmethod
+    def video(
+        id: str,  # noqa: A002
+        *,
+        src: t.StringInput,
+        label: t.TextInput,
+        controls: bool = True,
+        loop: bool = False,
+        autoplay: bool = False,
+        poster: t.StringInput | None = None,
+    ) -> UiNode:
+        """A video transport (fuaran#1076).
+
+        ``label`` is required and has no decorative case — a media element is a
+        control a reader focuses, plays, pauses and seeks, and one with no
+        accessible name is announced as "video" and nothing more. ``controls``
+        defaults to TRUE because the accessible setting is what a document gets
+        for free. Declaring ``autoplay`` means autoplay-with-muted at every
+        conformant host; there is no separate muted knob to disagree with it.
+        """
+        return _node(
+            id,
+            t.Media(
+                _str_binding(src),
+                _text(label),
+                kind=t.Video(autoplay=autoplay, poster=None if poster is None else _str_binding(poster)),
+                controls=controls,
+                loop=loop,
+            ),
+            accessibility.none,
+        )
+
+    @staticmethod
+    def audio(
+        id: str,  # noqa: A002
+        *,
+        src: t.StringInput,
+        label: t.TextInput,
+        controls: bool = True,
+        loop: bool = False,
+    ) -> UiNode:
+        """An audio transport (fuaran#1076).
+
+        There is deliberately no ``autoplay`` parameter, and its absence is the
+        design rather than an omission: the ``Audio`` variant declares no such
+        slot in the type, on the wire, or in the emission.
+        """
+        return _node(
+            id,
+            t.Media(_str_binding(src), _text(label), kind=t.Audio(), controls=controls, loop=loop),
+            accessibility.none,
+        )
 
     @staticmethod
     def divider(id: str) -> UiNode:  # noqa: A002

@@ -853,16 +853,197 @@ class Renderer:
             "Avatar": "fuaran-image fuaran-image-avatar",
             "Rounded": "fuaran-image fuaran-image-rounded",
         }.get(str(variant), "fuaran-image")
+        # fuaran#1077 — the presentation tokens map to CLASSES and nothing else:
+        # no value from the tree ever reaches a style attribute. `Natural` emits
+        # NO class on either axis, so a pre-phase tree's class attribute is
+        # byte-identical to what it was.
+        cls += _IMAGE_FIT_CLASS.get(str(fields.get("fit")), "")
+        cls += _IMAGE_ASPECT_CLASS.get(str(fields.get("aspectRatio")), "")
+        # fuaran#1080 — the responsive candidate list. Three properties, each
+        # load-bearing:
+        #
+        # SANITISED PER ENTRY, at the same MEDIA class the primary `src` uses. A
+        # candidate is a URL the browser fetches with no user act — exactly what
+        # the floor exists for — so routing only the primary through it would make
+        # this slot a documented way around the one rule this node has.
+        #
+        # A FAILING ENTRY IS DROPPED, not neutered. The `<img>`'s `src` must
+        # exist, so it collapses to the refusal URL; a candidate has no such
+        # obligation, and offering the browser a rendition guaranteed to fail is
+        # worse than offering it one fewer. The primary `src` stays the fallback
+        # the whole mechanism rests on.
+        #
+        # ASCENDING BY WIDTH, sorted HERE. The wire preserves authored array order
+        # (§3.6.4), so canonical output is the RENDERER's obligation, not the
+        # codec's — and `sorted` is stable, so two entries at one width keep their
+        # authored order rather than swapping on a re-render.
+        srcset_attrs: list[tuple[str, str]] = []
+        raw_srcset = fields.get("srcSet")
+        if isinstance(raw_srcset, Arr):
+            candidates: list[str] = []
+            for entry in sorted(
+                (e for e in raw_srcset.items if isinstance(e, Obj)),
+                key=lambda e: e.fields.get("width", 0),  # type: ignore[arg-type,return-value]
+            ):
+                resolved = resolve_binding(entry.fields.get("src"), self.sources)
+                safe, refusal = sanitize_url_for_egress(
+                    self.egress_policy, EgressClass.MEDIA, resolved if isinstance(resolved, str) else ""
+                )
+                # The refusal is read from the seam's own marker list, never by
+                # string-comparing the URL it substitutes, so a later change to
+                # that substitute cannot silently turn a dropped candidate into a
+                # served one.
+                if safe == "" or refusal:
+                    continue
+                candidates.append(f"{safe} {entry.fields.get('width')}w")
+            if candidates:
+                # `sizes` is BOUNDED, and `100vw` is the only value the tree can
+                # justify: nothing in the document says how wide this element will
+                # be laid out, and the language has no media-query slot for an
+                # author to say so.
+                srcset_attrs = [("srcset", ", ".join(candidates)), ("sizes", "100vw")]
+        # fuaran#1077 — `Eager` emits no attribute at all (the browser's own
+        # default); only `Lazy` is a positive declaration. Deferring an
+        # above-the-fold image is a regression, which is why the default is not
+        # the "optimised" value and a host MUST NOT infer laziness from position.
+        loading_attrs: list[tuple[str, str]] = [("loading", "lazy")] if fields.get("loading") == "Lazy" else []
         # The a11y projection lands on the `<img>` itself; the refusal marker last.
-        return void_element(
+        img = void_element(
             "img",
             [
                 ("class", cls),
                 ("src", src),
                 ("alt", self._text(fields.get("alt"))),
+                *srcset_attrs,
+                *loading_attrs,
                 *semantic_attrs,
                 *egress_attrs,
             ],
+        )
+        # fuaran#1079 — the expansion affordance. The BASELINE IS A REAL LINK, not
+        # a marked-up control waiting for script: `<a href="{the sanitised src}">`
+        # around the `<img>` means a reader with no JavaScript — a crawler, a text
+        # browser, a locked-down client, a hydration that failed — clicks the
+        # thumbnail and gets the full-size asset in the browser's own viewer.
+        # `data-fuaran-expandable` is VALUELESS (the slot is a bool whose `false`
+        # is the absence of the attribute) and is a marker ON a working link,
+        # never the mechanism.
+        #
+        # A REFUSED `src` EMITS NO ANCHOR — §3.6.4's dropped-candidate rule turned
+        # on the affordance. A link to the refusal URL is exactly the dead control
+        # this design exists to avoid; the image still renders with its refusal
+        # marker, and the reader is simply not offered an expansion that could not
+        # work.
+        #
+        # NOTHING CROSSES THE DISPATCH GATE: no `Action`, no handler, no onclick.
+        # The wire says the asset is reachable, the anchor makes it reachable, and
+        # where the picture opens is a rendering choice.
+        if fields.get("expandable") is True and src != "" and not egress_attrs:
+            img = element(
+                "a",
+                [("class", "fuaran-image-expand"), ("href", src), ("data-fuaran-expandable", "")],
+                img,
+            )
+        # fuaran#1078 — the caption. ABSENT returns the emission UNTOUCHED, which
+        # is the acceptance criterion expressed as control flow rather than as a
+        # claim: there is no wrapper to be byte-identical to, because there is no
+        # wrapper. Present, it is the semantic BINDING an ad-hoc sibling text node
+        # could never state — assistive technology announces the two together
+        # instead of reading the caption as the next paragraph. Nothing moves onto
+        # the `<figure>`: the a11y projection, the egress marker and the sanitised
+        # `src` all stay on the element they describe.
+        #
+        # The NESTING is `figure > a > img`, with the `<figcaption>` as the
+        # ANCHOR'S SIBLING — the caption is deliberately OUTSIDE the link target.
+        # It is prose a reader selects, quotes and reads, not a second click
+        # surface, and putting interactive content inside the element whose job is
+        # to LABEL the image inverts what `<figure>`/`<figcaption>` expresses.
+        caption = fields.get("caption")
+        if caption is None:
+            return img
+        return element(
+            "figure",
+            [("class", "fuaran-image-figure")],
+            img + text_element("figcaption", [("class", "fuaran-image-figure-caption")], self._text(caption)),
+        )
+
+    def _media(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
+        """fuaran#1076 — the media transport. Deterministic, script-free markup: a
+        real ``<video>`` / ``<audio>`` a browser plays with no runtime, exactly as
+        ``Image`` emits a real ``<img>``.
+
+        Four things here are CONTRACT rather than choice, and each is stated
+        normatively in the wire spec (§3.6.6) because a host that got any of them
+        wrong would still round-trip the bytes perfectly:
+
+        * ``aria-label`` ALWAYS. The label is mandatory on the wire and there is
+          no decorative case, so unlike ``Image``'s ``alt`` there is no branch.
+        * ``autoplay`` NEVER WITHOUT ``muted``. The pairing is not a default a
+          caller can override — it is what the declaration MEANS, which is why the
+          wire carries no separate ``muted`` slot to get out of step with it.
+          Every mainstream browser blocks unmuted autoplay anyway, so an unmuted
+          emission would produce a player that silently never starts: the
+          declaration would be a lie and the failure would be invisible. The
+          converse holds too — no ``muted`` where ``autoplay`` is absent.
+        * NO AUTOPLAY PATHWAY ON AUDIO, at all. Not "off by default": the
+          ``Audio`` case carries no slot to read, so this arm has nothing to
+          branch on and cannot acquire one by a later edit here.
+        * BOTH URLS THROUGH THE EGRESS FLOOR. ``src`` and ``poster`` are each
+          fetched with no user act. They differ in what a REFUSAL means: an
+          element must have a source, so ``src`` collapses to the refusal URL and
+          carries the marker, while a poster simply LEAVES — a ``<video>`` with no
+          poster shows its first frame, which is a working rendering, whereas a
+          poster pointing at the refusal URL is a broken image painted over the
+          player.
+        """
+        src_value = resolve_binding(fields.get("src"), self.sources)
+        src, egress_attrs = sanitize_url_for_egress(
+            self.egress_policy, EgressClass.MEDIA, src_value if isinstance(src_value, str) else ""
+        )
+        kind = fields.get("kind")
+        variant = kind.tag if isinstance(kind, Obj) else "Video"
+        shared: list[tuple[str, str]] = [
+            ("src", src),
+            ("aria-label", self._text(fields.get("label"))),
+        ]
+        if fields.get("controls") is not False:
+            shared.append(("controls", ""))
+        if fields.get("loop") is True:
+            shared.append(("loop", ""))
+        if variant == "Audio":
+            # `element`, not `void_element`: `<video>` / `<audio>` are NOT void
+            # elements. A self-closed `<audio …/>` leaves the parser inside the
+            # element and swallows the rest of the document as its fallback
+            # content — the one mistake here that produces a page which looks
+            # broken everywhere EXCEPT the node that caused it.
+            return element(
+                "audio",
+                [("class", "fuaran-media fuaran-media-audio"), *shared, *semantic_attrs, *egress_attrs],
+                "",
+            )
+        kind_fields = kind.fields if isinstance(kind, Obj) else {}
+        poster_attrs: list[tuple[str, str]] = []
+        if "poster" in kind_fields:
+            resolved = resolve_binding(kind_fields.get("poster"), self.sources)
+            safe_poster, poster_refusal = sanitize_url_for_egress(
+                self.egress_policy, EgressClass.MEDIA, resolved if isinstance(resolved, str) else ""
+            )
+            if safe_poster != "" and not poster_refusal:
+                poster_attrs.append(("poster", safe_poster))
+        autoplay_attrs: list[tuple[str, str]] = (
+            [("autoplay", ""), ("muted", "")] if kind_fields.get("autoplay") is True else []
+        )
+        return element(
+            "video",
+            [
+                ("class", "fuaran-media fuaran-media-video"),
+                *shared,
+                *poster_attrs,
+                *autoplay_attrs,
+                *semantic_attrs,
+                *egress_attrs,
+            ],
+            "",
         )
 
     def _list(self, node: Node, fields: dict[str, Value]) -> str:
@@ -1633,7 +1814,24 @@ def _seq_len(value: object) -> int:
 #:
 #: Tag-level by construction — the wrapper must decide before the body is
 #: rendered, and the only thing it has then is the kind tag.
-_SEMANTIC_ELEMENT_TAGS = frozenset({"Link", "Button", "Image"})
+#: ``Media`` (fuaran#1076) satisfies all three: a single ``<video>`` / ``<audio>``
+#: root, native transport semantics of its own, and nothing else in the body
+#: competing for the accessible name. ``Image`` keeps its membership when the
+#: caption or expansion wrapper is present — the projection stays on the ``<img>``
+#: the attributes describe, which is what the wrapper is wrapped AROUND, and is
+#: byte-parity with the reference server renderer.
+_SEMANTIC_ELEMENT_TAGS = frozenset({"Link", "Button", "Image", "Media"})
+
+#: fuaran#1077 — the presentation tokens' class mappings. Absent from each map is
+#: ``Natural``, which emits NO class on either axis, so a pre-phase image's class
+#: attribute is byte-identical to what it always was.
+_IMAGE_FIT_CLASS = {"Cover": " fuaran-image-fit-cover", "Contain": " fuaran-image-fit-contain"}
+_IMAGE_ASPECT_CLASS = {
+    "Square": " fuaran-image-aspect-square",
+    "FourThree": " fuaran-image-aspect-four-three",
+    "ThreeTwo": " fuaran-image-aspect-three-two",
+    "SixteenNine": " fuaran-image-aspect-sixteen-nine",
+}
 
 _KindHandler = Callable[["Renderer", Node, dict[str, Value]], str]
 
@@ -1659,6 +1857,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Fact": Renderer._fact,
     "Link": Renderer._link,
     "Image": Renderer._image,
+    "Media": Renderer._media,
     "List": Renderer._list,
     "Toast": Renderer._toast,
     "CodeBlock": Renderer._code_block,

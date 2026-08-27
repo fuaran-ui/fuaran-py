@@ -1,0 +1,1 @@
+{"id":"m","kind":{"$type":"Metric","label":"Avg wait","trend":{"$type":"Static","value":-0.0734},"trendPolarity":"Neutral","value":{"$type":"Static","value":80}}}

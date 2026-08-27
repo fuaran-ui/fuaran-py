@@ -30,6 +30,7 @@
     "Map",
     "Markdown",
     "Math",
+    "Media",
     "Metric",
     "Modal",
     "Mount",
@@ -626,6 +627,38 @@
       "inputFile": "lenient/lenient-grid-transform-param-compact.json",
       "expectedFile": "lenient/lenient-grid-transform-param-compact.expected.json",
       "description": "Phase 719 — the compact authoring twin of `grid-transform-param`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
+    },
+    {
+      "id": "lenient-image-caption-envelope",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-image-caption-envelope.json",
+      "expectedFile": "lenient/lenient-image-caption-envelope.expected.json",
+      "description": "Image — the enveloped `{\"$type\":\"Literal\"}` TextSource form on `caption` decodes and canonicalises to the bare string, exactly as it does on `alt` (Phase 1078). The slot is a full `TextSource`, so a host that narrowed it to a plain string cannot decode this input at all."
+    },
+    {
+      "id": "lenient-image-empty-srcset",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-image-empty-srcset.json",
+      "expectedFile": "lenient/lenient-image-empty-srcset.expected.json",
+      "description": "Image — an explicitly EMPTY `srcSet` decodes and canonicalises away to the omitted form (Phase 1080). Absent and `[]` denote the same document, so an image that declares no alternate renditions costs no key on the wire"
+    },
+    {
+      "id": "lenient-image-explicit-defaults",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-image-explicit-defaults.json",
+      "expectedFile": "lenient/lenient-image-explicit-defaults.expected.json",
+      "description": "Image — explicit-default `fit`/`aspectRatio`/`loading` decode and canonicalise away (omitted-when-default on both boundaries from day one, Phase 1077), and the bare-string TextSource shorthand applies to `alt`. The canonical minimal Image is exactly the pre-phase three-field form."
+    },
+    {
+      "id": "lenient-image-explicit-expandable-false",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-image-explicit-expandable-false.json",
+      "expectedFile": "lenient/lenient-image-explicit-expandable-false.expected.json",
+      "description": "Image — an explicit `expandable: false` decodes and canonicalises away to the omitted form (Phase 1079). `false` is the identity: not declaring an expansion and declaring that there is none are the same document"
     },
     {
       "id": "lenient-master-detail-preselected-compact",
@@ -1660,6 +1693,54 @@
       "description": "Display/Image (Avatar variant)"
     },
     {
+      "id": "image-caption-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-caption-1.json",
+      "expectedFile": "nodes/image-caption-1.json",
+      "description": "Display/Image (Phase 1078 — literal caption)"
+    },
+    {
+      "id": "image-caption-i18n-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-caption-i18n-1.json",
+      "expectedFile": "nodes/image-caption-i18n-1.json",
+      "description": "Display/Image (Phase 1078 — i18n caption with args)"
+    },
+    {
+      "id": "image-expandable-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-expandable-1.json",
+      "expectedFile": "nodes/image-expandable-1.json",
+      "description": "Display/Image (Phase 1079 — expandable, the declaration alone)"
+    },
+    {
+      "id": "image-expandable-figure-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-expandable-figure-1.json",
+      "expectedFile": "nodes/image-expandable-figure-1.json",
+      "description": "Display/Image (Phase 1079 — expandable + caption + srcSet, the gallery thumbnail)"
+    },
+    {
+      "id": "image-presentation-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-presentation-1.json",
+      "expectedFile": "nodes/image-presentation-1.json",
+      "description": "Display/Image (Phase 1077 — fit / aspectRatio / loading all off-default)"
+    },
+    {
+      "id": "image-srcset-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/image-srcset-1.json",
+      "expectedFile": "nodes/image-srcset-1.json",
+      "description": "Display/Image (Phase 1080 — three-candidate srcSet, authored descending)"
+    },
+    {
       "id": "limit-node-depth-at-max",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1746,6 +1827,38 @@
       "inputFile": "nodes/math-1.json",
       "expectedFile": "nodes/math-1.json",
       "description": "Display/Math (block LaTeX)"
+    },
+    {
+      "id": "media-audio-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-audio-1.json",
+      "expectedFile": "nodes/media-audio-1.json",
+      "description": "Display/Media (Phase 1076 — the Audio variant, whose payload is the discriminator alone)"
+    },
+    {
+      "id": "media-video-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-video-1.json",
+      "expectedFile": "nodes/media-video-1.json",
+      "description": "Display/Media (Phase 1076 — video at its minimum, both bool defaults omitted)"
+    },
+    {
+      "id": "media-video-autoplay-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-video-autoplay-1.json",
+      "expectedFile": "nodes/media-video-autoplay-1.json",
+      "description": "Display/Media (Phase 1076 — autoplay declared, both shared bools off-default)"
+    },
+    {
+      "id": "media-video-poster-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-video-poster-1.json",
+      "expectedFile": "nodes/media-video-poster-1.json",
+      "description": "Display/Media (Phase 1076 — video with a poster frame in the case payload)"
     },
     {
       "id": "metric-1",
@@ -1898,6 +2011,14 @@
       "inputFile": "nodes/select-1.json",
       "expectedFile": "nodes/select-1.json",
       "description": "Input/Select"
+    },
+    {
+      "id": "shared-source-seeded-pair",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/shared-source-seeded-pair.json",
+      "expectedFile": "nodes/shared-source-seeded-pair.json",
+      "description": "Visualisation/Grid + Display/Badge (Phase 1075 — the seeded shared source: one declared table, two readers)"
     },
     {
       "id": "skel-1",
@@ -2348,6 +2469,33 @@
       "description": "'validation' near-miss on a FormField — the canonical key is 'rule' (Phase 864)"
     },
     {
+      "id": "reject-image-expandable-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-image-expandable-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.expandable",
+      "description": "Image expandable `\"true\"` — the stringified boolean, refused rather than coerced. A truthiness rule would have to rule on `\"false\"` and `\"\"` too, and two hosts ruling differently would disagree about whether the document declares an affordance at all"
+    },
+    {
+      "id": "reject-image-srcset-nonpositive-width",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-image-srcset-nonpositive-width.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.srcSet[1].width",
+      "description": "SrcSetEntry width 0 — refused: a `w` descriptor names the intrinsic pixel width a browser selects on, so a non-positive value describes a candidate that can never be selected. The first entry is well-formed on purpose, so the path has to identify the second"
+    },
+    {
+      "id": "reject-image-srcset-null",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-image-srcset-null.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.srcSet",
+      "description": "Image srcSet `null` — refused. Absent means the EMPTY LIST (the missing-list-field decode class); a present null is a second spelling for an absence that already has one, and admitting it would let two hosts disagree about the canonical bytes of the same document"
+    },
+    {
       "id": "reject-invalid-empty",
       "kind": "reject",
       "decoder": "node",
@@ -2409,6 +2557,24 @@
       "expectedErrorCode": "LIMIT_EXCEEDED",
       "expectedPath": "$",
       "description": "§21.5 the op axis — 25 nested TreeOp.Batch. Counted separately from the node axis; the syntactic bound only LOOKS like cover for it"
+    },
+    {
+      "id": "reject-media-autoplay-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-media-autoplay-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.kind.autoplay",
+      "description": "Media autoplay `\"true\"` — the stringified boolean, refused rather than coerced. A truthiness rule would have to rule on `\"false\"` and `\"\"` too, and two hosts ruling differently would disagree about whether a page starts playing by itself"
+    },
+    {
+      "id": "reject-media-missing-label",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-media-missing-label.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.label",
+      "description": "Media with no `label` — refused. The accessible name is mandatory because a transport has no decorative case, and there is no value to default to that would not be a fabricated name for someone else's recording"
     },
     {
       "id": "reject-missing-binding-type",
@@ -2717,6 +2883,15 @@
       "description": "Drawing Shape $type 'Blob' — the closed-shape default-deny (Phase 524)"
     },
     {
+      "id": "reject-unknown-image-aspect",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-image-aspect.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.aspectRatio",
+      "description": "ImageAspect value '16/9' — the CSS ratio spelling, refused: the slot is a closed token vocabulary (Square | FourThree | ThreeTwo | SixteenNine), and admitting a numeric pair would reintroduce the free-form escape the tokens replace"
+    },
+    {
       "id": "reject-unknown-link-protection",
       "kind": "reject",
       "decoder": "node",
@@ -2724,6 +2899,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.protection",
       "description": "LinkProtection value 'rot13' — the closed protection DU default-denies (Phase 812)"
+    },
+    {
+      "id": "reject-unknown-media-kind",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-media-kind.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.kind.$type",
+      "description": "MediaKind case 'Stream' — refused. The variant set is closed at Video | Audio; a third surface is an admission, not a spelling a decoder may guess at. The path carries `.$type` because MediaKind is discriminated, unlike the bare-enum slots"
     },
     {
       "id": "reject-unknown-mount-direction",
@@ -2760,6 +2944,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.style.tone",
       "description": "ToneVariant value 'Magenta'"
+    },
+    {
+      "id": "reject-unknown-trend-polarity",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-trend-polarity.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.trendPolarity",
+      "description": "TrendPolarity value 'Neutral' — RESERVED, not admitted (§3.6.1 clause 5); refused exactly like a name nobody has proposed, so a later admission is an ADDITION rather than a re-meaning of shipped bytes"
     },
     {
       "id": "reject-wrongnodekind-sparkler",

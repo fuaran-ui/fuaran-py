@@ -40,6 +40,12 @@ _VALUE_SPACE_ENUMS: dict[str, Any] = {
     "FontVoice": t.FontVoice,
     "LiveRegion": t.LiveRegion,
     "ImageVariant": t.ImageVariant,
+    # fuaran#1077 — the three presentation token vocabularies. Offered as value
+    # spaces precisely because they are CLOSED: an agent handed the projection
+    # cannot reach for a CSS ratio the decoder refuses.
+    "ImageFit": t.ImageFit,
+    "ImageAspect": t.ImageAspect,
+    "ImageLoading": t.ImageLoading,
     "ScrollOrientation": t.ScrollOrientation,
     "DateVariant": t.DateVariant,
     "MathDisplay": t.MathDisplay,

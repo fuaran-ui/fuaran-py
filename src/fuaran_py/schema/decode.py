@@ -172,6 +172,20 @@ STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
 FONT_VOICE = frozenset({"Default", "Display", "Structural"})
 LIVE_REGION = frozenset({"polite", "assertive", "off"})
 IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
+# fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). All
+# three are CLOSED TOKEN vocabularies, never CSS values: `aspectRatio` names one
+# of four ratios and carries no number, pair or stylesheet spelling ("16 / 9",
+# "16:9", 1.7778), because admitting an arbitrary ratio would put an
+# author-supplied value in a style attribute — the free-form escape this format
+# does not have. Each is omitted at its identity default on BOTH boundaries.
+IMAGE_FIT = frozenset({"Natural", "Cover", "Contain"})
+IMAGE_ASPECT = frozenset({"Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"})
+IMAGE_LOADING = frozenset({"Eager", "Lazy"})
+# fuaran#1076 — the `MediaKind` variant set (WIRE_FORMAT §3.6.6), CLOSED at two.
+# `$type`-discriminated rather than a bare enum, so an unknown case reports at
+# `<path>.$type`; a third surface is an ADDITION later, never a spelling a
+# decoder may guess at today.
+MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
@@ -268,6 +282,7 @@ KNOWN_KINDS = frozenset(
         "LabelValueRow",
         "Link",
         "Image",
+        "Media",  # fuaran#1076 — the playback surface (Video | Audio)
         "List",
         "Toast",
         "CodeBlock",
@@ -745,6 +760,87 @@ def _omit_default_width(value: object, path: str) -> object:
     if obj.get("$type") == "Auto":
         return _DROP
     return from_json(value)
+
+
+# ── Image srcSet + MediaKind (WIRE_FORMAT §3.6.4 / §3.6.6) ─────────────────
+
+
+def _decode_srcset_entry(value: object, path: str) -> Value:
+    """One ``SrcSetEntry`` — ``{"src":<Binding<string>>,"width":<positive int>}``.
+
+    Both members are required *within* the entry. ``width`` is the ``w``
+    descriptor a client selects on, and the POSITIVE floor is a decode rule
+    rather than a validator one: zero is refused as firmly as a negative,
+    because a ``0w`` candidate is not a small image but one a client can never
+    select — admitting it would let the wire state a rendition no host can
+    render. The published schema says the same thing as ``minimum: 1``.
+    """
+    obj = _expect_object(value, path)
+    src = _decode_binding_string(_require(obj, "src", path), f"{path}.src")
+    width = _expect_int(_require(obj, "width", path), f"{path}.width")
+    if width <= 0:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.width",
+            f"srcSet width must be a POSITIVE integer pixel width, got {width}",
+            "JSON number (positive integer pixel width)",
+        )
+    return Obj(None, {"src": src, "width": width})
+
+
+def _decode_srcset(value: object, path: str) -> object:
+    """``Image.srcSet`` — the MISSING-LIST-FIELD decode class, and the one slot in
+    this decoder most worth reading.
+
+    An ABSENT ``srcSet`` is the EMPTY LIST: on the structural model that is the
+    key simply not being carried, which is exactly what the empty list denotes,
+    so the two spellings are one document by construction. An EMPTY array
+    therefore ``_DROP``s to the same shape (the encode half of the rule), and a
+    present ``null`` is REFUSED rather than read as absence — absence already has
+    a spelling, and admitting a second would let two conformant hosts emit
+    different canonical bytes for one document.
+
+    The array ORDER is the author's and is preserved verbatim. Canonicalisation
+    sorts object KEYS (§2) and never array elements; a codec that sorted here
+    would emit bytes it did not decode. Ascending-by-width is the RENDERER's
+    canonicalisation, and putting the sort there is what lets both rules be true.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_decode_srcset_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_media_kind(value: object, path: str) -> Value:
+    """``MediaSpec.kind`` — which playback surface this is.
+
+    ``$type``-discriminated, so an unknown case reports at ``<path>.$type`` (the
+    ``Binding`` / ``TextSource`` position) rather than at the bare slot.
+
+    ``Audio`` declares NO fields, and the absence of an autoplay slot is stronger
+    than a default of ``false``: a slot that defaults to off is one a document
+    can switch on, and there is no document this format wants to be able to state
+    in which a page begins making sound unbidden. A carried
+    ``{"$type":"Audio","autoplay":true}`` therefore decodes to an audio surface
+    that does not autoplay, because the value has nowhere to land — it is dropped
+    rather than preserved structurally, since carrying it forward would re-mint
+    on the wire exactly the pathway the case exists not to have.
+    """
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, MEDIA_KIND_CASES)
+    if tag == "Audio":
+        return Obj("Audio", {})
+    fields: dict[str, Value] = {}
+    # Omitted at `false`, and a present non-boolean is refused rather than
+    # coerced — the `Image.expandable` ruling, on the slot where getting it wrong
+    # starts playing a video the document says not to.
+    if "autoplay" in obj:
+        autoplay = _expect_bool(obj["autoplay"], f"{path}.autoplay")
+        if autoplay:
+            fields["autoplay"] = True
+    if "poster" in obj:
+        fields["poster"] = _decode_binding_string(obj["poster"], f"{path}.poster")
+    return Obj("Video", fields)
 
 
 def _alias_get(obj: dict, canonical: str, aliases: tuple[str, ...]) -> tuple[object, bool]:
@@ -1471,8 +1567,55 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "Image": [
         ("alt", True, _decode_text_source),
+        # fuaran#1077 — the three presentation slots, omitted at their identity
+        # defaults on BOTH boundaries, so a document written before they existed
+        # decodes to today's behaviour and re-encodes to the bytes it already had.
+        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
+        # fuaran#1078 — a caption is CONTENT, so it is NOT an identity default:
+        # there is no default caption the way there is a default fit, and the slot
+        # takes the ordinary optional-field posture (omitted when absent). It is a
+        # full `TextSource`, not a string — the rule a second host is most likely
+        # to break, because a caption reads like a string and narrowing the slot
+        # costs nothing until somebody needs a locale.
+        ("caption", False, _decode_text_source),
+        # fuaran#1079 — an ordinary omit-at-`false` bool. A present non-boolean is
+        # a WRONG_TYPE, never a truthiness coercion: a decoder that guessed at
+        # `"true"` would have to rule on `"false"` and `""` too, at which point two
+        # conformant hosts can disagree about whether the document declares an
+        # affordance at all.
+        ("expandable", False, _omit_default_bool(False)),
+        ("fit", False, _omit_default_enum(IMAGE_FIT, {}, "Natural", "fit")),
+        ("loading", False, _omit_default_enum(IMAGE_LOADING, {}, "Eager", "loading")),
         ("src", True, _decode_binding_string),
+        # fuaran#1080 — absent MEANS the empty list and `null` is refused; see
+        # `_decode_srcset`.
+        ("srcSet", False, _decode_srcset),
         ("variant", True, _enum_decoder(IMAGE_VARIANT, "variant")),
+    ],
+    # fuaran#1076 — the playback surface. ONE kind, two variants: everything a
+    # video surface and an audio surface SHARE is stated once on the record (the
+    # source, the accessible name, whether the transport is shown, whether
+    # playback repeats), and only the slots that genuinely differ live in the
+    # `$type`-discriminated variant at `kind`.
+    #
+    # `label` is REQUIRED, and this is the one place the media contract differs
+    # from `Image`'s: an image can honestly be decorative and say so with an empty
+    # `alt`, but a media element is a TRANSPORT — a control a reader focuses,
+    # plays, pauses and seeks — so it is never decorative, and there is no value
+    # to default to that would not be a fabricated name for someone else's
+    # recording.
+    #
+    # `controls` is omitted at TRUE — the second such slot in the vocabulary after
+    # `Toast.dismissable`, and the polarity is deliberate: a media element without
+    # a transport cannot be paused, seeked or muted by a keyboard user at all, so
+    # the accessible setting is what a document gets for free and taking it away
+    # is the deviation that costs a key. `loop` takes the ordinary polarity.
+    "Media": [
+        ("controls", False, _omit_default_bool(True)),
+        ("kind", True, _decode_media_kind),
+        ("label", True, _decode_text_source),
+        ("loop", False, _omit_default_bool(False)),
+        ("src", True, _decode_binding_string),
     ],
     "List": [
         ("items", True, _decode_text_source_array),

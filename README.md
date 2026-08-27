@@ -109,9 +109,15 @@ exfiltration: `https://collector.example/?s=…` passes every scheme rule, and i
 an `<img src>` the browser contacts it with **no user act at all**, because
 rendering *is* the request.
 
-So every `href` / `src` the renderer emits — `Link`, `Image`, and every
+So every `href` / `src` the renderer emits — `Link`, `Image` (its `src`, and
+*each* `srcSet` candidate), `Media` (its `src` and its poster frame), and every
 destination inside a `Markdown` body — is checked against an **egress policy**
-carried on the render context. It **defaults to deny-non-local**: a decoded tree
+carried on the render context. Every one of those is a URL fetched with no user
+act, so they take one rule; what differs is only what a **refusal** means. A slot
+the element cannot do without collapses to the refusal URL and carries its
+marker; a slot it can — a `srcSet` candidate, a poster frame, an expansion anchor
+— is **dropped instead**, because offering a rendition or an affordance that
+cannot work is worse than offering one fewer. It **defaults to deny-non-local**: a decoded tree
 cannot declare its own egress, so absent a host's declaration it gets none. There
 is no caller opt-in anywhere on the path; the guarantee does not depend on a call
 site having remembered to ask.

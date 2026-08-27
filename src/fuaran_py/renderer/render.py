@@ -51,10 +51,68 @@ from .bindings import (
 )
 from .egress import DENY_NON_LOCAL_EGRESS, EgressClass, EgressPolicy, sanitize_url_for_egress
 from .html import element, escape_text, text_element, void_element
-from .theme import node_class_name
+from .theme import node_class_name, trend_sentiment
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
+
+
+# ── FormField.rule → the platform's own constraint attributes (fuaran#864) ───
+#
+# A static emitter MUST project a declared rule into the PLATFORM's constraint
+# vocabulary, so the platform — here, the browser receiving this HTML — is what
+# enforces it: `pattern` carries ECMA-262 source with HTML `pattern` semantics
+# (implicitly anchored to the whole value), and `minlength` / `maxlength` are the
+# native length bounds. Emitted in the same order as the reference server
+# renderer, the Phase 801 discipline: a progressive-enhancement script that reads
+# one host's markup reads the other's unchanged.
+#
+# TWO RECORDED LIMITS, each a declaration rather than a silent drop.
+#
+# `compare` has NO HTML equivalent. It is emitted as a
+# `data-fuaran-field-compare` DECLARATION — matching the reference renderers'
+# marker — so a reader can see the constraint was carried and not dropped, and it
+# is NOT claimed as coverage: nothing in the platform reads that attribute, and
+# this emitter produces inert markup with no gate of its own. A cross-field
+# comparison is enforced by a rendering host's submit gate and, non-bypassably,
+# by a server-side re-check.
+#
+# And `type` is emitted only WHERE A FORMAT RULE DECLARES IT. The reference host
+# always emits a control `type`; this host's baseline form projection never has,
+# so emitting `type="text"` now would change the bytes of every form this host
+# has ever rendered in order to state the default. The narrowing is deliberate:
+# a declared `format` retypes the control, an undeclared one leaves the markup
+# exactly as it was. The wider control-typing gap is the baseline's, not this
+# slot's, and is recorded in the README's form-field note.
+
+_RULE_FORMAT_INPUT_TYPES = {"email": "email", "url": "url", "tel": "tel"}
+
+
+def _field_rule_attrs(rule: Value, control_tag: str | None) -> list[tuple[str, str]]:
+    """The HTML constraint attributes a decoded ``FormField.rule`` projects to."""
+    if not isinstance(rule, Obj):
+        return []
+    out: list[tuple[str, str]] = []
+    fmt = rule.fields.get("format")
+    if isinstance(fmt, str) and fmt in _RULE_FORMAT_INPUT_TYPES:
+        out.append(("type", _RULE_FORMAT_INPUT_TYPES[fmt]))
+    pattern = rule.fields.get("pattern")
+    # `<textarea>` has no `pattern` attribute in HTML — emit nothing rather than
+    # an attribute the platform ignores.
+    if isinstance(pattern, str) and control_tag != "TextArea":
+        out.append(("pattern", pattern))
+    for slot, attr in (("minLength", "minlength"), ("maxLength", "maxlength")):
+        bound = rule.fields.get(slot)
+        if isinstance(bound, int) and not isinstance(bound, bool):
+            out.append((attr, str(bound)))
+    compare = rule.fields.get("compare")
+    if isinstance(compare, Obj):
+        op = compare.fields.get("op")
+        against = compare.fields.get("against")
+        key = against.fields.get("key") if isinstance(against, Obj) and against.tag == "State" else None
+        if isinstance(op, str):
+            out.append(("data-fuaran-field-compare", f"{op}:{key if isinstance(key, str) else ''}"))
+    return out
 
 
 def _a11y_name(value: Value, sources: BindingSources | None) -> str | None:
@@ -614,8 +672,32 @@ class Renderer:
         trend_binding = fields.get("trend")
         if trend_binding is not None:
             trend = resolve_scalar_number(trend_binding, self.sources)
-            trend_text = format_number(fields.get("trendFormat"), trend) if trend is not None else ""
-            parts.append(text_element("div", [("class", "fuaran-metric-trend")], trend_text))
+            if trend is None:
+                # Unresolved: the bare div, byte-for-byte as before. There is no
+                # sentiment to state, and inventing `unchanged` would be a claim.
+                parts.append(text_element("div", [("class", "fuaran-metric-trend")], ""))
+            else:
+                # fuaran#867 — the trend element carries a SENTIMENT, not an
+                # unconditional success class. Mirrors the reference server
+                # renderer byte-for-byte; `tone` still colours the tile alone and
+                # is neither read from nor written to here.
+                sentiment, glyph = trend_sentiment(fields.get("trendPolarity"), trend)
+                parts.append(
+                    element(
+                        "div",
+                        [("class", f"fuaran-metric-trend fuaran-metric-trend-{sentiment}")],
+                        text_element(
+                            "span",
+                            [
+                                ("class", "fuaran-metric-trend-glyph"),
+                                ("role", "img"),
+                                ("aria-label", sentiment),
+                            ],
+                            glyph,
+                        )
+                        + escape_text(format_number(fields.get("trendFormat"), trend)),
+                    )
+                )
         subtext = fields.get("subtext")
         if subtext is not None:
             parts.append(text_element("div", [("class", "fuaran-metric-subtext")], self._text(subtext)))
@@ -1174,10 +1256,11 @@ class Renderer:
         label = element(
             "span", [("class", "fuaran-form-field-label")], escape_text(self._text(field.fields.get("label")))
         )
-        control = void_element(
-            "input",
-            [("class", "fuaran-form-field-control"), ("data-fuaran-field", field_id)],
-        )
+        control_kind = field.fields.get("kind")
+        control_tag = control_kind.tag if isinstance(control_kind, Obj) else None
+        attrs: list[tuple[str, str]] = [("class", "fuaran-form-field-control"), ("data-fuaran-field", field_id)]
+        attrs.extend(_field_rule_attrs(field.fields.get("rule"), control_tag))
+        control = void_element("input", attrs)
         return element("label", [("class", "fuaran-form-field")], label + control)
 
     def _filters(self, node: Node, fields: dict[str, Value]) -> str:

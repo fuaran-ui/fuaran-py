@@ -215,6 +215,46 @@ Rich cell kinds (`TonedPill`, `Checkbox`, `Link`, `Progress`, …) render their
 **text** projection — the renderer's inert server semantics for every
 interactive node, not a special case for grids.
 
+### Form-field rendering — what a declared rule reaches
+
+A `FormField.rule` declares the **accepted set** (`FormFieldKind` names the
+control). A static emitter's job is to project that into the *platform's own*
+constraint vocabulary, so the platform — here, the browser receiving this HTML —
+is what enforces it rather than a script that may never load:
+
+| Rule slot | Rendered as |
+|---|---|
+| `format` (`email` / `url` / `tel`) | the input's `type`, so the browser enforces the shorthand |
+| `pattern` | the HTML `pattern` attribute (ECMA-262 source, anchored to the whole value) |
+| `minLength` / `maxLength` | `minlength` / `maxlength` |
+| `compare` | **declared, not enforced** — `data-fuaran-field-compare="<op>:<key>"` |
+| `message` | *not rendered* — see the note below |
+
+Three boundaries, each declared rather than incidental.
+
+**`compare` has no HTML equivalent.** It is emitted as a declaration matching the
+reference renderers' marker so a reader can see the constraint was carried and
+not dropped, and it is explicitly **not claimed as coverage**: nothing in the
+platform reads that attribute, and this emitter produces inert markup with no
+gate of its own. A cross-field comparison is enforced by a rendering host's
+submit gate and, non-bypassably, by a server-side re-check.
+
+**`message` is not rendered**, for the same reason it is not rendered by the
+reference server host: the unmet message needs an element for the field to be
+described *by*, and minting that markup means minting class vocabulary that is
+parity-locked across every renderer and both stylesheet copies. That is a
+renderer change with its own cross-host change-set.
+
+**`pattern` is omitted on a `TextArea`**, which has no such attribute in HTML.
+Emitting one would look like coverage and be inert.
+
+One narrowing is this host's own and worth stating: the reference host always
+emits a control `type`, and this baseline never has, so `type` appears here only
+where a `format` rule declares it. Every form rendered before the rule slot
+existed is therefore byte-unchanged. The wider gap — this baseline projects one
+generic `<input>` per field rather than a per-control element — is the baseline's
+and not the rule slot's.
+
 ### Chart lowering coverage
 
 `fuaran_py.charts` lowers a resolved `Chart` to a canonical `Drawing` subtree

@@ -26,7 +26,11 @@ dependencies = []   # dependency-light: the codec uses only the Python standard 
 # Dev-only tooling. The runtime codec stays standard-library-only (see CLAUDE.md);
 # jsonschema (the schema-validity conformance leg) and hypothesis (generative
 # cross-host parity) are test dependencies, never imported by src/fuaran_py.
-dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6", "jsonschema>=4.23", "hypothesis>=6.100"]
+# ruff is capped below 0.16: from 0.16 `ruff format` reformats python inside
+# markdown code blocks, so an unpinned CI install changed the gate with no
+# commit (README.md went red 2026-08-27 while local 0.15.x passed). Adopting
+# the markdown formatting is a deliberate act: reformat + raise the cap together.
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6,<0.16", "jsonschema>=4.23", "hypothesis>=6.100"]
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"

@@ -7751,7 +7751,121 @@
         "hidden": {
           "$ref": "#/$defs/Binding_bool"
         }
-      }
+      },
+      "allOf": [
+        {
+          "not": {
+            "required": [
+              "aria-label"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaLabel"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "aria-labelledby"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaLabelledBy"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "labelledby"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "aria-describedby"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaDescribedBy"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "describedby"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "aria-role"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaRole"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "aria-live"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaLive"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "live"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "liveregion"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "aria-hidden"
+            ]
+          }
+        },
+        {
+          "not": {
+            "required": [
+              "ariaHidden"
+            ]
+          }
+        }
+      ]
     },
     "Node": {
       "type": "object",

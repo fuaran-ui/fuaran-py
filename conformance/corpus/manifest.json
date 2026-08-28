@@ -2667,6 +2667,42 @@
       "description": "Switch missing stateKey"
     },
     {
+      "id": "reject-nearmiss-a11y-aria-hidden",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-a11y-aria-hidden.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.aria-hidden",
+      "description": "accessibility 'aria-hidden' — the ARIA ATTRIBUTE name where the wire wants the slot name 'hidden'; the projection slot two hosts once dropped entirely (Phase 959)"
+    },
+    {
+      "id": "reject-nearmiss-a11y-arialabel",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-a11y-arialabel.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.ariaLabel",
+      "description": "accessibility 'ariaLabel' — the camelCase JSX prior for the accessible name; MEASURED in the emission corpora, and the whole declaration vanished (Phase 959)"
+    },
+    {
+      "id": "reject-nearmiss-a11y-live",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-a11y-live.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.live",
+      "description": "accessibility 'live' — the sharpest of the set: six measured emissions against liveRegion's twelve, and the HTML idiom it comes from also spells a BOOLEAN, so it is not a safe alias (Phase 959)"
+    },
+    {
+      "id": "reject-nearmiss-a11y-liveregion-case",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-nearmiss-a11y-liveregion-case.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.liveregion",
+      "description": "accessibility 'liveregion' — the canonical slot name un-cased to the ARIA attribute spelling; the wire is camelCase (Phase 959)"
+    },
+    {
       "id": "reject-nearmiss-column-readonly",
       "kind": "reject",
       "decoder": "node",

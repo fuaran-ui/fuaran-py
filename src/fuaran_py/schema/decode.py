@@ -2046,7 +2046,13 @@ def _decode_grid_source(value: object, path: str) -> Value:
     return _typed_static_binding(value, path, _decode_row_array, Arr([]), Arr([]), typed_default=True)
 
 
-def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], ...], vocabulary: str = "grid") -> None:
+def _check_near_misses(
+    obj: dict,
+    path: str,
+    candidates: tuple[tuple[str, str], ...],
+    vocabulary: str = "grid",
+    consequence: str = "",
+) -> None:
     """fuaran#863 — decode-time didactics for the grid-behaviour family's NEAR MISSES
     (the fuaran#860 charter's rejected-spellings deliverable).
 
@@ -2056,13 +2062,19 @@ def _check_near_misses(obj: dict, path: str, candidates: tuple[tuple[str, str], 
     and tolerance is what hid it. The narrowing is an ENUMERATED set with an unambiguous
     canonical form each; rule 2 holds for everything else. Walked in declaration order, so
     which defect surfaces first is deterministic across hosts.
+
+    ``consequence`` is an optional trailing clause naming what the silence costs in
+    that particular vocabulary (fuaran#959) — the refusal is didactic, and the
+    didactic is sharper when it says what was lost, not only what was ignored.
+    Empty for the grid, whose message the four other hosts pin unchanged.
     """
     for found, canonical in candidates:
         if found in obj:
             _fail(
                 WRONG_TYPE,
                 f"{path}.{found}",
-                f"'{found}' is not part of the {vocabulary} vocabulary — it would be ignored, not honoured",
+                f"'{found}' is not part of the {vocabulary} vocabulary — it would be ignored, "
+                f"not honoured{consequence}",
                 canonical,
             )
 
@@ -2473,6 +2485,47 @@ FORM_FIELD_NEAR_MISSES: tuple[tuple[str, str], ...] = (
     ("validate", "rule"),
 )
 
+#: The ``Accessibility`` trait's near-miss set (fuaran#959 — the fuaran#863 discipline
+#: applied to the §3.1 trait).
+#:
+#: Rule 2's tolerance of unknown keys is right for a slot a future profile may add and
+#: wrong for a near miss of one that exists. That silence is sharper here than anywhere
+#: else in the vocabulary, for a reason peculiar to this trait: it has NO VISIBLE OUTPUT.
+#: A mislabelled column is on screen; an ignored ``ariaLabel`` looks identical to an
+#: honoured one from every side, so the refusal is the only feedback that can ever arrive.
+#:
+#: Refused rather than aliased. ``ariaLabel`` IS an unambiguous synonym, so admission
+#: turns on §16's other half — a shorthand earns its place by being a genuine assist to
+#: the emitting model, and a six-character key rename is not one. ``live`` settles it:
+#: the HTML idiom it comes from also spells a BOOLEAN, so an alias would bind a
+#: possibly-boolean prior onto a closed token set.
+#:
+#: ``live`` and ``ariaLabel`` are named by MEASURED evidence (6 and 1 emissions against
+#: ``liveRegion``'s 12 and ``label``'s 44, across 12,722 language-tier emissions); the
+#: rest of their families ride in with them. Declaration order is identical in all five
+#: hosts, so which defect surfaces first is deterministic.
+A11Y_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("aria-label", "label — the accessible name, a Binding<string> (a bare string is the §3.6 shorthand)"),
+    ("ariaLabel", "label — the accessible name, a Binding<string> (a bare string is the §3.6 shorthand)"),
+    ("aria-labelledby", "labelledBy — the id of a sibling node whose text carries the name"),
+    ("ariaLabelledBy", "labelledBy — the id of a sibling node whose text carries the name"),
+    ("labelledby", "labelledBy — the slot name is camelCase on the wire, not the ARIA attribute spelling"),
+    ("aria-describedby", "describedBy — the id of a sibling node whose text carries the description"),
+    ("ariaDescribedBy", "describedBy — the id of a sibling node whose text carries the description"),
+    ("describedby", "describedBy — the slot name is camelCase on the wire, not the ARIA attribute spelling"),
+    ("aria-role", "role — the ARIA role NAME as a bare string"),
+    ("ariaRole", "role — the ARIA role NAME as a bare string"),
+    ("aria-live", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("ariaLive", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("live", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("liveregion", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("aria-hidden", "hidden — a Binding<bool> (a bare bool is the §3.6 shorthand)"),
+    ("ariaHidden", "hidden — a Binding<bool> (a bare bool is the §3.6 shorthand)"),
+)
+
+#: What the silence costs at this position, appended to the refusal message.
+A11Y_NEAR_MISS_CONSEQUENCE = ", and the intent would reach assistive technology as nothing at all"
+
 
 def _decode_compare_rule(value: object, path: str) -> Value:
     """The cross-field operand. ``against`` is a ``Binding``, and that IS the
@@ -2660,6 +2713,10 @@ def _decode_accessibility(value: object, path: str) -> Obj:
     any role NAME but not to any VALUE.
     """
     obj = _expect_object(value, path)
+    # fuaran#959 — the near-miss check runs BEFORE the slot reads, matching the
+    # ``FormField`` ordering, so a trait carrying both ``ariaLabel`` and a well-formed
+    # ``label`` still names the ignored key rather than decoding half the intent silently.
+    _check_near_misses(obj, path, A11Y_NEAR_MISSES, "accessibility", A11Y_NEAR_MISS_CONSEQUENCE)
     fields: dict[str, Value] = {}
     if "label" in obj:
         fields["label"] = _decode_binding_string(obj["label"], f"{path}.label")

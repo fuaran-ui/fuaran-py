@@ -51,6 +51,7 @@ from .bindings import (
 )
 from .egress import DENY_NON_LOCAL_EGRESS, EgressClass, EgressPolicy, sanitize_url_for_egress
 from .html import element, escape_text, text_element, void_element
+from .seeds import with_state_seeds
 from .theme import node_class_name, trend_sentiment
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
@@ -1910,4 +1911,9 @@ def render_html(
     """
     fragments: dict[str, Node] = {}
     _collect_fragments(node, fragments)
-    return Renderer(sources, fragments, egress_policy).render_node(node)
+    # WIRE_FORMAT §24.4 — the whole tree's ``Binding.State`` declarations seed
+    # their slots BEFORE any binding resolves, so a reader that carries no data
+    # of its own reads what a sibling declared. Laid UNDER the caller's own
+    # sources: a seed is never an override. See :mod:`fuaran_py.renderer.seeds`.
+    seeded = with_state_seeds(node, sources)
+    return Renderer(seeded, fragments, egress_policy).render_node(node)

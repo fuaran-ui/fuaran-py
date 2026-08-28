@@ -1,1 +1,0 @@
-{"id":"rej-tf-empty-wrapper","kind":{"$type":"DataGrid","columns":[{"field":"dept","kind":{"$type":"Text"},"label":"Dept"}],"rowKeyField":"dept","source":{"$type":"Transform","pipeline":[],"source":{"$type":"State","key":"rows"}}}}

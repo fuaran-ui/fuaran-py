@@ -972,6 +972,19 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     live_tag = source_raw_orig.get("$type") if isinstance(source_raw_orig, dict) else None
     preserved = live_tag in ("State", "Selection", "Query")
     has_carried = isinstance(source_raw_orig, dict) and "defaultValue" in source_raw_orig
+    # §16 / §24.4 — an EMPTY carried array is the EMPTY TABLE, not a malformed
+    # source. An initially-empty live collection ("count the requests in an
+    # empty log") is a complete intent with zero rows and no columns to infer,
+    # and under §24.4 it is also how a reader spells "I read this key and carry
+    # no data of my own" while a SIBLING reader's declaration seeds the slot.
+    # Sending it through the columnar codec instead ACCUSES it: a bare ``[]``
+    # has no first row to transpose from, so it reaches ``decode_source_json``
+    # as an array and surfaces ``MALFORMED_SHAPE: expected object, got array``
+    # against a document the reference hosts decode — which is what kept
+    # ``nodes/shared-source-seeded-pair`` red on this host. The binding is
+    # preserved exactly as the carried-data arm preserves it; only the snapshot
+    # VALIDATION is skipped, because an empty array has nothing to validate.
+    empty_carried = has_carried and source_raw_orig["defaultValue"] == []  # type: ignore[index]
     if preserved and live_tag == "State" and not has_carried:
         # No carried data — the 815 path (unwrap a legacy `value` payload, or
         # surface the columnar codec's own missing-field didactic).
@@ -979,7 +992,7 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     if preserved:
         assert isinstance(source_raw_orig, dict)
         source = _decode_binding(source_raw_orig, f"{path}.source")
-        if live_tag == "State":
+        if live_tag == "State" and not empty_carried:
             # Validate the carried data as the initial snapshot (didactics
             # byte-identical to the 815 snapshot decode); the preserved binding
             # stays the stored source.

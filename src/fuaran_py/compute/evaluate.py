@@ -316,12 +316,32 @@ def _transpose_row_major(data: object) -> object:
     return data
 
 
+def _lift_store_value(raw: object) -> object:
+    """Lift a store value to the raw JSON shape the columnar codec reads.
+
+    The store legitimately holds values in EITHER representation, and this
+    function is the one place that has to know it. A host that hands the
+    renderer parsed JSON puts ``list``/``dict`` in the store; the tree's own
+    values — a ``defaultValue`` returned by ``resolve_binding``, and since
+    §24.4 a SEED laid under the host's sources — are structural ``Arr`` / ``Obj``
+    model values. Before seeding, a structural value could only reach here if a
+    host deliberately put one there; seeding makes it the PRIMARY path for the
+    charter's own pair, so it stops being a corner.
+
+    ``encode_value`` is the same conversion the ``defaultValue`` fallback below
+    already performs, applied one step earlier so both entry points agree.
+    """
+    if isinstance(raw, (Arr, Obj)):
+        return json.loads(encode_value(raw))
+    return raw
+
+
 def _live_source(source_value: Obj, state: ComputeState) -> object:
     """Materialise a live source's current data as raw columnar JSON: the
     host-seeded store value when present, else the carried defaultValue, else
     the empty table."""
     key = source_value.fields.get(_LIVE_SOURCE_KEYS[source_value.tag or ""])
-    raw: object | None = state.get(key) if isinstance(key, str) else None
+    raw: object | None = _lift_store_value(state.get(key)) if isinstance(key, str) else None
     if raw is None:
         dv = source_value.fields.get("defaultValue")
         raw = json.loads(encode_value(dv)) if dv is not None else None

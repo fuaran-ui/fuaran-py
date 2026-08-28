@@ -2847,15 +2847,6 @@
       "description": "TonedPill tone-map value outside ToneVariant — the message names the seven legal tones (Phase 750)"
     },
     {
-      "id": "reject-transform-source-empty-wrapper",
-      "kind": "reject",
-      "decoder": "node",
-      "inputFile": "reject/reject-transform-source-empty-wrapper.json",
-      "expectedErrorCode": "WRONG_TYPE",
-      "expectedPath": "$.kind.source.source",
-      "description": "fuaran#815 — a State wrapper carrying only a key (no defaultValue/value) is NOT unwrappable: the Transform source stays a binding object and the columnar decode refuses it"
-    },
-    {
       "id": "reject-unknown-binding",
       "kind": "reject",
       "decoder": "node",

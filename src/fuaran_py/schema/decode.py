@@ -929,8 +929,13 @@ def _normalise_transform_source(raw: object) -> object:
     1. a ``State``/``Static``/``Bound`` binding WRAPPER around the data unwraps
        to its ``defaultValue``/``value`` (initial-snapshot semantics — a LIVE
        state-sourced Transform is deliberately not this). A wrapper carrying
-       neither passes through UNCHANGED and fails in the columnar decode (the
-       ``reject-transform-source-empty-wrapper`` fixture pins it);
+       neither passes through UNCHANGED. It used to fail in the columnar decode
+       (``reject/reject-transform-source-empty-wrapper``, retired by
+       fuaran#1085); §16 now ACCEPTS the bare ``State`` wrapper as a live source
+       over the empty snapshot, and ``_decode_transform_binding`` takes that arm
+       BEFORE reaching this normalisation — so the pass-through here is reached
+       only by the ``Static`` / ``Bound`` spellings, which name no live slot and
+       still fail;
     2. ROW-MAJOR data (an array of row objects) transposes to the canonical
        columnar ``{"columns": …}`` shape — FIRST-row key set (sorted ordinal
        ascending, the F# Map ordering), absent cells (and non-object rows)
@@ -964,9 +969,10 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     verbatim (canonical re-encode is byte-for-byte — one wire dialect) and the
     compute evaluator re-derives against the current store, falling back to the
     initial snapshot from the binding's carried default data. A State wrapper
-    carrying NO data still errors didactically through the columnar codec (the
-    815 posture), and a State wrapper's carried data is snapshot-VALIDATED here
-    so the ragged-rows didactic stays byte-identical to the snapshot era."""
+    carrying NO data — the bare ``{"$type":"State","key":k}`` — is a live source
+    over the EMPTY initial snapshot (§16), and a State wrapper's carried data is
+    snapshot-VALIDATED here so the ragged-rows didactic stays byte-identical to
+    the snapshot era."""
     source_raw_orig = _require(obj, "source", path)
     pipeline_raw = _require(obj, "pipeline", path)
     live_tag = source_raw_orig.get("$type") if isinstance(source_raw_orig, dict) else None
@@ -984,15 +990,23 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     # ``nodes/shared-source-seeded-pair`` red on this host. The binding is
     # preserved exactly as the carried-data arm preserves it; only the snapshot
     # VALIDATION is skipped, because an empty array has nothing to validate.
+    # §16 (fuaran#1085) — an ABSENT ``defaultValue`` takes the same arm. The bare
+    # ``{"$type":"State","key":k}`` is a live source over the EMPTY initial
+    # snapshot, exactly as a Selection / Query source already was. It surfaced
+    # the columnar codec's missing-field didactic until now, which was correct
+    # while nothing else could fill the slot; under §24.4 a sibling reader's
+    # declaration fills it, so the refusal was rejecting the most direct spelling
+    # of "I read this key and carry no data of my own" — the one ``FUARAN106``'s
+    # remedy text tells an author to write. The two spellings say ONE thing and
+    # decode to the same live source; neither is normalised into the other, so
+    # each still re-encodes to its own bytes (``_decode_binding``'s State arm
+    # already omits an absent default).
     empty_carried = has_carried and source_raw_orig["defaultValue"] == []  # type: ignore[index]
-    if preserved and live_tag == "State" and not has_carried:
-        # No carried data — the 815 path (unwrap a legacy `value` payload, or
-        # surface the columnar codec's own missing-field didactic).
-        preserved = False
+    carries_no_data = empty_carried or not has_carried
     if preserved:
         assert isinstance(source_raw_orig, dict)
         source = _decode_binding(source_raw_orig, f"{path}.source")
-        if live_tag == "State" and not empty_carried:
+        if live_tag == "State" and not carries_no_data:
             # Validate the carried data as the initial snapshot (didactics
             # byte-identical to the 815 snapshot decode); the preserved binding
             # stays the stored source.

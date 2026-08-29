@@ -26,11 +26,17 @@ dependencies = []   # dependency-light: the codec uses only the Python standard 
 # Dev-only tooling. The runtime codec stays standard-library-only (see CLAUDE.md);
 # jsonschema (the schema-validity conformance leg) and hypothesis (generative
 # cross-host parity) are test dependencies, never imported by src/fuaran_py.
-# ruff is capped below 0.16: from 0.16 `ruff format` reformats python inside
-# markdown code blocks, so an unpinned CI install changed the gate with no
-# commit (README.md went red 2026-08-27 while local 0.15.x passed). Adopting
-# the markdown formatting is a deliberate act: reformat + raise the cap together.
-dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.6,<0.16", "jsonschema>=4.23", "hypothesis>=6.100"]
+# ruff floors at 0.16 and caps below 0.17. From 0.16 `ruff format` also formats
+# python inside markdown code blocks; that arrived through an unpinned CI install
+# and changed the gate with no commit (README.md went red 2026-08-27 while local
+# 0.15.x passed), so 0.16 was capped OUT until the reformat could be taken
+# deliberately. It has been: the README blocks were reformatted and the floor
+# raised in the same commit, which is what makes the formatting a decision rather
+# than something that happened. The upper bound is the half that keeps working —
+# it is not distrust of any particular release, it is that a formatter which can
+# rewrite the gate must not be able to do so between two runs of it. Adopting the
+# next minor is the same deliberate act: reformat, then move both bounds.
+dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.16,<0.17", "jsonschema>=4.23", "hypothesis>=6.100"]
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"

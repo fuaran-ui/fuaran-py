@@ -126,7 +126,11 @@ A host that means to reach off-origin declares it, by name:
 
 ```python
 from fuaran_py.renderer import (
-    DENY_NON_LOCAL_EGRESS, EgressClass, HostSuffix, allow_origin, render_html,
+    DENY_NON_LOCAL_EGRESS,
+    EgressClass,
+    HostSuffix,
+    allow_origin,
+    render_html,
 )
 
 policy = allow_origin(HostSuffix("cdn.example"), [EgressClass.MEDIA], DENY_NON_LOCAL_EGRESS)

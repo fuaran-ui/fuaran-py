@@ -2485,6 +2485,12 @@ FORM_FIELD_NEAR_MISSES: tuple[tuple[str, str], ...] = (
     ("validate", "rule"),
 )
 
+#: What the silence costs at this position, appended to the refusal message — the same
+#: shape as ``A11Y_NEAR_MISS_CONSEQUENCE``, and pinned to the reference hosts' wording.
+#: A near-missed rule slot does not merely go unread: the field still renders, and it
+#: constrains nothing at all.
+FORM_FIELD_NEAR_MISS_CONSEQUENCE = ", and the field would accept anything"
+
 #: The ``Accessibility`` trait's near-miss set (fuaran#959 — the fuaran#863 discipline
 #: applied to the §3.1 trait).
 #:
@@ -2610,7 +2616,7 @@ def _decode_form(obj: dict, path: str) -> Obj:
             fobj = _expect_object(fld, fpath)
             # The near-miss check runs BEFORE the rule decode, so a field carrying
             # both `validation` and a well-formed `rule` still names the ignored key.
-            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form field")
+            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form field", FORM_FIELD_NEAR_MISS_CONSEQUENCE)
             id_raw, id_present = _alias_get(fobj, "id", ("name",))
             if not id_present:
                 _fail(MISSING_FIELD, f"{fpath}.id", "missing required field 'id'")

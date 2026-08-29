@@ -70,6 +70,29 @@ def test_the_corpus_rule_rejects_are_refused(fixture: str) -> None:
     assert not decode_node(src).ok
 
 
+@pytest.mark.parametrize("spelling", ["validation", "constraints", "validate"])
+def test_the_near_miss_refusal_names_what_the_silence_costs(spelling: str) -> None:
+    """The full didactic, pinned byte-for-byte.
+
+    An op-side reject fixture asserts code and path only, so the MESSAGE is a
+    host-local obligation — and it is the whole point of the refusal: a near miss
+    that only says "no" sends the author looking for a spelling, where naming the
+    consequence says why the spelling matters. The trailing clause was the half
+    this host omitted; pinning the whole string is what keeps the four hosts from
+    drifting a word at a time.
+    """
+    wire = _form(f'{{"id":"email","kind":{{"$type":"Text"}},"label":"Work email","{spelling}":{{}}}}')
+    result = decode_node(wire)
+    assert not result.ok, f"'{spelling}' decoded — the near-miss narrowing is not reaching this key"
+    assert result.error.code == "WRONG_TYPE"
+    assert result.error.path == f"$.kind.fields[0].{spelling}"
+    assert result.error.message == (
+        f"'{spelling}' is not part of the form field vocabulary — it would be ignored, "
+        "not honoured, and the field would accept anything"
+    )
+    assert result.error.expected_shape == "rule"
+
+
 # ── The authoring surface ────────────────────────────────────────────────────
 
 

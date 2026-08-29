@@ -30,9 +30,10 @@ Canonical use::
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 #: The artefact's file name at the corpus root.
 ARTIFACT_NAME = "render-fidelity.json"
@@ -61,6 +62,41 @@ class RichTier:
 
 
 @dataclass(frozen=True)
+class ObligationVocabularyEntry:
+    """One token of the CLOSED obligation vocabulary the artefact enumerates.
+
+    Closed, and that is the property doing the work: an open free-form vocabulary
+    would let a host accept a claim it has no checker for, whereas a closed one
+    means a host can enumerate what exists independently of the rows it happens
+    to read — and report an id it does not implement.
+    """
+
+    id: str
+    meaning: str
+
+
+@dataclass(frozen=True)
+class RenderObligation:
+    """One checkable claim a kind owes, bound to the section that states it."""
+
+    id: str
+    """The vocabulary token — resolvable against ``obligation_vocabulary``."""
+    statement: str
+    """The normative sentence FOR THAT KIND.
+
+    The same claim reads differently on a transport (an accessible name is
+    mandatory on the wire) and on a decorative image (it is the empty string),
+    which is why the statement is per-row rather than per-vocabulary-token.
+    """
+    section: str
+    """The ``WIRE_FORMAT.md`` section that states the claim.
+
+    An obligation with no section is an assertion about a host's habits rather
+    than about the specification, and is not admissible.
+    """
+
+
+@dataclass(frozen=True)
 class FidelityRow:
     """One kind's declared render-fidelity posture."""
 
@@ -74,6 +110,14 @@ class FidelityRow:
     fixtures: tuple[str, ...]
     """Corpus-relative fixture paths pinning the fallback."""
     contract: str
+    obligations: tuple[RenderObligation, ...] = ()
+    """The checkable claims this kind owes.
+
+    Empty states no checkable claim; it is NOT a statement that the row's
+    ``fallback`` prose is optional. Defaulted so a row carrying no
+    ``obligations`` key parses rather than failing — obligations are additive
+    within a major version, and a reader must survive a row that predates them.
+    """
 
 
 @dataclass(frozen=True)
@@ -83,6 +127,7 @@ class RenderFidelityManifest:
     description: str
     tiers: tuple[tuple[str, str], ...]
     kinds: tuple[FidelityRow, ...]
+    obligation_vocabulary: tuple[ObligationVocabularyEntry, ...] = field(default_factory=tuple)
 
 
 class RenderFidelityError(ValueError):
@@ -115,6 +160,32 @@ def _parse_rich(value: Any, kind: str) -> RichTier:
     )
 
 
+def _parse_obligations(value: Any, kind: str) -> tuple[RenderObligation, ...]:
+    """Parse a row's ``obligations``.
+
+    An ABSENT key parses as empty — the rows that declare no checkable claim are
+    the majority, and obligations arrived additively — while a present but
+    non-array value is a defect and is named as one.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RenderFidelityError(f"render-fidelity: {kind}.obligations must be an array")
+    obligations: list[RenderObligation] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise RenderFidelityError(f"render-fidelity: {kind}.obligations[] must hold objects")
+        where = f"{kind}.obligations[]"
+        obligations.append(
+            RenderObligation(
+                id=_require_str(entry, "id", where),
+                statement=_require_str(entry, "statement", where),
+                section=_require_str(entry, "section", where),
+            )
+        )
+    return tuple(obligations)
+
+
 def parse_manifest(value: Any) -> RenderFidelityManifest:
     """Parse the generated artefact, naming the offending path on any defect."""
     if not isinstance(value, dict):
@@ -145,6 +216,7 @@ def parse_manifest(value: Any) -> RenderFidelityManifest:
                 rich=_parse_rich(entry.get("rich"), kind),
                 fixtures=tuple(fixtures),
                 contract=_require_str(entry, "contract", kind),
+                obligations=_parse_obligations(entry.get("obligations"), kind),
             )
         )
 
@@ -153,6 +225,20 @@ def parse_manifest(value: Any) -> RenderFidelityManifest:
         if not isinstance(entry, dict):
             raise RenderFidelityError("render-fidelity: manifest.tiers[] must hold objects")
         tiers.append((_require_str(entry, "tier", "tiers[]"), _require_str(entry, "meaning", "tiers[]")))
+
+    raw_vocabulary = value.get("obligationVocabulary")
+    if raw_vocabulary is not None and not isinstance(raw_vocabulary, list):
+        raise RenderFidelityError("render-fidelity: manifest.obligationVocabulary must be an array")
+    vocabulary: list[ObligationVocabularyEntry] = []
+    for entry in raw_vocabulary or []:
+        if not isinstance(entry, dict):
+            raise RenderFidelityError("render-fidelity: manifest.obligationVocabulary[] must hold objects")
+        vocabulary.append(
+            ObligationVocabularyEntry(
+                id=_require_str(entry, "id", "obligationVocabulary[]"),
+                meaning=_require_str(entry, "meaning", "obligationVocabulary[]"),
+            )
+        )
 
     raw_id = value.get("$id")
     raw_description = value.get("description")
@@ -163,6 +249,7 @@ def parse_manifest(value: Any) -> RenderFidelityManifest:
         description=raw_description if isinstance(raw_description, str) else "",
         tiers=tuple(tiers),
         kinds=tuple(kinds),
+        obligation_vocabulary=tuple(vocabulary),
     )
 
 
@@ -234,3 +321,119 @@ def delivered_tier(row: FidelityRow, target: Literal["no_script", "hydrated"]) -
     fallback even after hydration.
     """
     return "rich" if target == "hydrated" and row.rich.cls == "clientOnly" else "fallback"
+
+
+# ── Obligation coverage (WIRE_FORMAT.md §13) ────────────────────────────────
+#
+# The reporting shape every adopting host uses, declared here so the hosts answer
+# the same question in the same words rather than each inventing a way to say "we
+# did not check that". The port of the F# ``Fuaran.UI.RenderFidelity`` coverage
+# surface and the TypeScript ``reportObligations`` family.
+#
+# The `fallback` prose in the artefact is complete and normative, and a machine
+# cannot check a paragraph. A host can render a kind, pass every byte-parity
+# fixture in the corpus, and still have silently dropped a claim that paragraph
+# states — none of them is a missing discriminator arm, so no codec test and no
+# type checker reaches them. These functions are how a host says which ones it
+# actually checked.
+
+
+def all_obligations(manifest: RenderFidelityManifest) -> tuple[tuple[str, RenderObligation], ...]:
+    """Every declared obligation, paired with the kind that owes it, in table order."""
+    return tuple((row.kind, obligation) for row in manifest.kinds for obligation in row.obligations)
+
+
+@dataclass(frozen=True)
+class Asserted:
+    """The host renders the kind and its suite checks the claim in EMITTED OUTPUT."""
+
+    status: ClassVar[Literal["asserted"]] = "asserted"
+
+
+@dataclass(frozen=True)
+class Unchecked:
+    """The host renders the kind and has no checker for the claim.
+
+    The case the whole mechanism exists for. NOT CHECKED IS NOT PASSED: a host
+    that renders a kind and does not assert one of its claims must say so, WITH a
+    reason, and fail its gate unless the exemption is declared in the suite. An
+    obligation that quietly falls out of a host's suite is exactly the silent
+    failure the closed vocabulary replaces.
+    """
+
+    reason: str
+    status: ClassVar[Literal["unchecked"]] = "unchecked"
+
+
+@dataclass(frozen=True)
+class NotRendered:
+    """The host does not render the kind at all.
+
+    Distinct from :class:`Unchecked`: nothing is owed, rather than owed and
+    unpaid. It is still printed — a reader must be able to tell the two apart
+    without consulting the host's source.
+    """
+
+    reason: str
+    status: ClassVar[Literal["notRendered"]] = "notRendered"
+
+
+type ObligationOutcome = Asserted | Unchecked | NotRendered
+
+
+@dataclass(frozen=True)
+class ObligationReport:
+    """One line of a host's obligation report."""
+
+    kind: str
+    claim_id: str
+    statement: str
+    section: str
+    outcome: ObligationOutcome
+
+
+def report_obligations(
+    manifest: RenderFidelityManifest,
+    status_of: Callable[[str, str], ObligationOutcome],
+) -> tuple[ObligationReport, ...]:
+    """Project the manifest through a host's own answer, one line per declared obligation.
+
+    The ENUMERATION is the manifest's, never the host's — so a newly declared
+    obligation appears in the report the moment it lands rather than when someone
+    remembers it. ``status_of`` is called with ``(kind, claim_id)``.
+    """
+    return tuple(
+        ObligationReport(
+            kind=kind,
+            claim_id=obligation.id,
+            statement=obligation.statement,
+            section=obligation.section,
+            outcome=status_of(kind, obligation.id),
+        )
+        for kind, obligation in all_obligations(manifest)
+    )
+
+
+def unasserted_obligations(report: Sequence[ObligationReport]) -> tuple[ObligationReport, ...]:
+    """The report lines a host must SURFACE: everything it did not assert.
+
+    Empty is the only silent result — anything else is printed, so an unchecked
+    obligation is visible in the run rather than inferable from its absence.
+    """
+    return tuple(line for line in report if line.outcome.status != "asserted")
+
+
+def describe_obligation_report(line: ObligationReport) -> str:
+    """The one-line rendering of a report line.
+
+    Byte-for-byte the sentence the F# and TypeScript hosts print, so the five
+    hosts answer the same question in the same words.
+    """
+    outcome = line.outcome
+    if isinstance(outcome, Asserted):
+        rendered = "asserted"
+    elif isinstance(outcome, Unchecked):
+        rendered = f"UNCHECKED ({outcome.reason})"
+    else:
+        rendered = f"not rendered ({outcome.reason})"
+    return f"{line.kind}/{line.claim_id} [{line.section}]: {rendered}"

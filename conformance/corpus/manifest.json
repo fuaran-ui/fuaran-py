@@ -1989,6 +1989,14 @@
       "description": "Display/Media (Phase 1076 — the Audio variant, whose payload is the discriminator alone)"
     },
     {
+      "id": "media-audio-transcript-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-audio-transcript-1.json",
+      "expectedFile": "nodes/media-audio-transcript-1.json",
+      "description": "Display/Media (Phase 1110 — the audio transcript floor)"
+    },
+    {
       "id": "media-video-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2005,12 +2013,28 @@
       "description": "Display/Media (Phase 1076 — autoplay declared, both shared bools off-default)"
     },
     {
+      "id": "media-video-captions-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-video-captions-1.json",
+      "expectedFile": "nodes/media-video-captions-1.json",
+      "description": "Display/Media (Phase 1110 — one captions track, elected default)"
+    },
+    {
       "id": "media-video-poster-1",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/media-video-poster-1.json",
       "expectedFile": "nodes/media-video-poster-1.json",
       "description": "Display/Media (Phase 1076 — video with a poster frame in the case payload)"
+    },
+    {
+      "id": "media-video-tracks-2",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/media-video-tracks-2.json",
+      "expectedFile": "nodes/media-video-tracks-2.json",
+      "description": "Display/Media (Phase 1110 — three tracks, authored order, two default elections)"
     },
     {
       "id": "metric-1",
@@ -2744,6 +2768,24 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.label",
       "description": "Media with no `label` — refused. The accessible name is mandatory because a transport has no decorative case, and there is no value to default to that would not be a fabricated name for someone else's recording"
+    },
+    {
+      "id": "reject-media-track-default-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-media-track-default-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.tracks[0].default",
+      "description": "a track `default` of `\"true\"` — the stringified boolean, refused rather than coerced. Two hosts ruling differently on truthiness would disagree about which caption track opens, which is a difference the reader meets on the first frame"
+    },
+    {
+      "id": "reject-media-track-missing-srclang",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-media-track-missing-srclang.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.tracks[0].srcLang",
+      "description": "a text track with no `srcLang` — refused. The language tag is what orders a track menu, drives pronunciation and tells two same-labelled tracks apart; there is no value to default to that would not be an invented claim about someone else's recording. The path carries the ARRAY INDEX, so a document with four tracks names the one at fault"
     },
     {
       "id": "reject-missing-binding-type",

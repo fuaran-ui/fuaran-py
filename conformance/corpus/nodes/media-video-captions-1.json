@@ -1,0 +1,1 @@
+{"id":"media-video-captions-1","kind":{"$type":"Media","kind":{"$type":"Video"},"label":"Studio walkthrough","src":{"$type":"Static","value":"/walkthrough.mp4"},"tracks":[{"default":true,"kind":"Captions","label":"English captions","src":{"$type":"Static","value":"/walkthrough.en.vtt"},"srcLang":"en"}]}}

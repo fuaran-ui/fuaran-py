@@ -1,0 +1,1 @@
+{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video"},"label":"Studio walkthrough","src":{"$type":"Static","value":"/walkthrough.mp4"},"tracks":[{"kind":"Captions","label":"English captions","src":{"$type":"Static","value":"/walkthrough.en.vtt"}}]}}

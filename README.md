@@ -18,7 +18,7 @@ without a client runtime.
 |---|---|
 | `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. See [docs/AUTHORING.md](docs/AUTHORING.md) and [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py). |
 | `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
-| `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops). |
+| `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops), plus the [placement helpers](#placement-helpers--fuaran_pyopsplacement) — placed insert / move / nudge and the clone verbs, which emit only those 11 ops. |
 | `fuaran_py.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
 | `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
 | `fuaran_py.op_stream` | The hash-chained provenance log — the `StreamEntry` envelope, a host-side SHA-256 chain, an in-memory sink, and replay. Reproduces the committed cross-host chain hashes byte-for-byte. |
@@ -438,6 +438,47 @@ filter to the schema is an open question, recorded here rather than implied clos
 
 This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is recorded
 here rather than in a `STABILITY.md` it does not have.
+
+## Placement helpers — `fuaran_py.ops.placement`
+
+The section above leaves every caller deriving the sibling permutation itself. That
+derivation is shipped once, in `fuaran_py.ops.placement`:
+
+```python
+from fuaran_py.ops import After, Last, Target, duplicate_op, move_op, nudge_op, place_op
+
+place_op(tree, child, Target("sidebar", After("filters")))  # placed insert
+move_op(tree, "chart", Target("main", Last()))  # placed move
+nudge_op(tree, "chart", -1)  # keyboard move-up
+duplicate_op(tree, "chart", Target("main", After("chart")))  # clone beside its source
+```
+
+`Placement` is `Last()` | `First()` | `Before(anchor)` | `After(anchor)` — an id, never
+an ordinal, for the reason the section above gives. `can_place` is the same verdict
+without the op, for greying out an illegal drop without a dry-run apply.
+
+**These helpers emit only existing `TreeOp` shapes** — `InsertChild`, `MoveNode`,
+`ReorderChildren`, and `Batch` of those. There is **no new wire vocabulary, no new
+fixture family, and no conformance obligation** attached to any of it: the emitted op
+goes through the ordinary `apply` gate exactly as a hand-written one does, and a host
+that never imports this module reads the same bytes. The reorder leg is dropped whenever
+appending already yields the wanted order, so the common case stays a single bare op.
+
+Two behaviours are worth knowing before you rely on them:
+
+- **An anchor that is not among the destination's post-op children is REFUSED**
+  (`UnknownAnchor`), not silently appended. The only op that could honour such an anchor
+  is a `ReorderChildren` naming it, which `apply` refuses as `OrderingMismatch`; saying so
+  before emission beats a rejection after it. Every other refusal is a pre-statement of
+  the apply-time refusal the emitted op would have met, so a helper verdict and an apply
+  verdict never disagree.
+- **The clone verbs remap ids across the whole traversal surface**, not just the
+  structural child lists — the id-uniqueness contract is tree-wide, so a clone keeping an
+  old id inside a `Switch` case or a `State` slot would smuggle a duplicate past it.
+  Colliding ids are remapped and non-colliding ones preserved, so `paste_op` keeps a
+  lifted subtree's identity where it can while `duplicate_op` (every id collides)
+  remaps all of them. The minting strategy is injectable — `derived_ids` (the default,
+  `<id>-copy`, `-copy-2`, …) or `sequential_ids(prefix)` for deterministic replay.
 
 ## Conformance
 

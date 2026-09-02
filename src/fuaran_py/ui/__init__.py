@@ -260,6 +260,55 @@ class rule:  # noqa: N801 — namespace object, mirrors the cross-tier `rule.*` 
         return t.FieldRule(compare=t.CompareRule(against, op), message=_text(message) if message is not None else None)
 
 
+# ── Timed-text tracks (the ``track`` namespace, fuaran#1110) ─────────────────
+
+
+class track:  # noqa: N801 — namespace object, mirrors the `rule.*` sub-record shape
+    """``TrackEntry`` constructors, ONE PER ``TrackKind`` case.
+
+    One constructor per case rather than a single one taking the kind as a
+    string: the vocabulary is closed at four, so surfacing it as four names
+    makes the closure visible where an author reads it and removes the spelling
+    from what they have to get right. ``metadata`` is not among them, and its
+    absence is the design — its cues are rendered by no user agent and read only
+    by script, so a declarative document naming it would state an intent no
+    conformant host could honour.
+
+    All four take the same four values, and only ``default`` is optional::
+
+        fuaran.video("walkthrough", src="/w.mp4", label="Studio walkthrough",
+                     tracks=[track.captions(src="/w.en.vtt", src_lang="en",
+                                            label="English captions", default=True)])
+
+    Authored ORDER is carried to the wire verbatim and kept by the renderer — a
+    reader picks a track from a menu the user agent builds in document order.
+    """
+
+    @staticmethod
+    def _entry(kind: t.TrackKind, src: t.StringInput, src_lang: str, label: t.TextInput, default: bool) -> t.TrackEntry:
+        return t.TrackEntry(kind, _text(label), _str_binding(src), src_lang, default)
+
+    @staticmethod
+    def subtitles(*, src: t.StringInput, src_lang: str, label: t.TextInput, default: bool = False) -> t.TrackEntry:
+        """A translation of the dialogue, for a reader who can hear the audio."""
+        return track._entry("Subtitles", src, src_lang, label, default)
+
+    @staticmethod
+    def captions(*, src: t.StringInput, src_lang: str, label: t.TextInput, default: bool = False) -> t.TrackEntry:
+        """Dialogue plus the non-speech sound, for a reader who cannot hear it."""
+        return track._entry("Captions", src, src_lang, label, default)
+
+    @staticmethod
+    def descriptions(*, src: t.StringInput, src_lang: str, label: t.TextInput, default: bool = False) -> t.TrackEntry:
+        """A narration of what is shown, for a reader who cannot see it."""
+        return track._entry("Descriptions", src, src_lang, label, default)
+
+    @staticmethod
+    def chapters(*, src: t.StringInput, src_lang: str, label: t.TextInput, default: bool = False) -> t.TrackEntry:
+        """Named navigation points along the timeline."""
+        return track._entry("Chapters", src, src_lang, label, default)
+
+
 # ── Per-kind ARIA defaults (the ``accessibility`` namespace) ─────────────────
 #
 # Mirrors F# ``Defaults.Accessibility`` / TS ``defaults.accessibility``: decorative
@@ -633,6 +682,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         loop: bool = False,
         autoplay: bool = False,
         poster: t.StringInput | None = None,
+        tracks: Sequence[t.TrackEntry] = (),
+        transcript: t.TextInput | None = None,
     ) -> UiNode:
         """A video transport (fuaran#1076).
 
@@ -642,6 +693,13 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         defaults to TRUE because the accessible setting is what a document gets
         for free. Declaring ``autoplay`` means autoplay-with-muted at every
         conformant host; there is no separate muted knob to disagree with it.
+
+        ``tracks`` takes constructed :class:`track` entries rather than tuples —
+        five members is past what a positional tuple reads as, and the closed
+        kind is better spelled by the constructor's name than by the caller.
+        ``transcript`` renders as a disclosure BESIDE the transport, never as a
+        child of it: a media element admits only source-ish children, so a
+        transcript in there is fallback content a browser never shows.
         """
         return _node(
             id,
@@ -651,6 +709,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
                 kind=t.Video(autoplay=autoplay, poster=None if poster is None else _str_binding(poster)),
                 controls=controls,
                 loop=loop,
+                tracks=tuple(tracks),
+                transcript=None if transcript is None else _text(transcript),
             ),
             accessibility.none,
         )
@@ -663,16 +723,31 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         label: t.TextInput,
         controls: bool = True,
         loop: bool = False,
+        tracks: Sequence[t.TrackEntry] = (),
+        transcript: t.TextInput | None = None,
     ) -> UiNode:
         """An audio transport (fuaran#1076).
 
         There is deliberately no ``autoplay`` parameter, and its absence is the
         design rather than an omission: the ``Audio`` variant declares no such
         slot in the type, on the wire, or in the emission.
+
+        ``transcript`` (fuaran#1110) is on the SPEC rather than on the video
+        case, and this is the arm that explains the placement: a recording with
+        no visual channel has nowhere else to put its words, where a video can
+        usually be served by captions riding the timeline it already has.
         """
         return _node(
             id,
-            t.Media(_str_binding(src), _text(label), kind=t.Audio(), controls=controls, loop=loop),
+            t.Media(
+                _str_binding(src),
+                _text(label),
+                kind=t.Audio(),
+                controls=controls,
+                loop=loop,
+                tracks=tuple(tracks),
+                transcript=None if transcript is None else _text(transcript),
+            ),
             accessibility.none,
         )
 
@@ -1002,6 +1077,8 @@ __all__ = [
     "rule",
     "FieldRule",
     "CompareRule",
+    # fuaran#1110 — the timed-text track constructors, one per closed kind.
+    "track",
     "node",
     "accessibility",
     "encode",

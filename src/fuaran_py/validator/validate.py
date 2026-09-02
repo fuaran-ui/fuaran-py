@@ -95,6 +95,34 @@ def _check_media_label(node: Node, kind: Obj, path: str, findings: list[Finding]
             )
         )
 
+    # FUARAN113 (fuaran#1110) — the same judgement, per track. Reported
+    # INDEPENDENTLY of FUARAN108 rather than short-circuiting on it: a node can
+    # carry both defects, and a walk that reported only the node-level one would
+    # send an author back for a second pass after fixing it.
+    #
+    # The wire REQUIRES the member (`reject-media-track-missing-srclang` is its
+    # sibling for `srcLang`); what a decoder cannot refuse is the empty value
+    # that satisfies the requirement while meaning nothing, which is exactly the
+    # split §3.6.6 draws between the wire and an authoring-side gate.
+    tracks = kind.fields.get("tracks")
+    if isinstance(tracks, Arr):
+        for i, entry in enumerate(tracks.items):
+            if not isinstance(entry, Obj):
+                continue
+            label = entry.fields.get("label")
+            if isinstance(label, str) and label.strip() == "":
+                findings.append(
+                    Finding(
+                        "FUARAN113",
+                        f"{path}.tracks[{i}].label",
+                        f"media node '{node.id}' carries a text track at index {i} with an EMPTY label - a "
+                        "track's label IS its entry in the user agent's track menu, and it is the only thing "
+                        "that tells one track from another there, so an unlabelled one is offered as its kind "
+                        "alone and a reader choosing between two captions tracks is shown two identical "
+                        "choices. Give the track's 'label' the text a reader needs to pick it",
+                    )
+                )
+
 
 def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
     """Switch-specific structural checks (Phase 392): duplicate match values

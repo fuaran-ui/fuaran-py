@@ -19,7 +19,7 @@ import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py.schema import types as t
-from fuaran_py.ui import accessibility, action, binding, encode, fuaran, node
+from fuaran_py.ui import accessibility, action, binding, encode, fuaran, node, track
 
 
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
@@ -362,6 +362,41 @@ def _authored() -> dict[str, t.UiNode]:
                 "content": t.SlotArg(fuaran.markdown("slot-tree", "Bound slot")),
                 "count": t.ScalarInt(7),
             },
+        ),
+        # fuaran#1110 — the tracks and the transcript, authored rather than
+        # decoded. The codec fixtures prove decode→encode byte parity; these
+        # three prove the AUTHORING surface reaches the same bytes, which is the
+        # half `to_wire` owns: the omit-at-empty on `tracks`, the omit-at-false
+        # on a track's `default`, and the ordinary optional on `transcript`.
+        "media-video-captions-1": fuaran.video(
+            "media-video-captions-1",
+            src="/walkthrough.mp4",
+            label="Studio walkthrough",
+            tracks=[track.captions(src="/walkthrough.en.vtt", src_lang="en", label="English captions", default=True)],
+        ),
+        # Authored in an order no sort produces (a `gd` subtitles track ahead of
+        # two `en` captions ones), so a codec that sorted the array would fail
+        # here rather than pass by accident — the `srcSet` rule's opposite.
+        "media-video-tracks-2": fuaran.video(
+            "media-video-tracks-2",
+            src="/restoration-2.mp4",
+            label="Harbour restoration, part two",
+            tracks=[
+                track.subtitles(src="/restoration-2.gd.vtt", src_lang="gd", label="Gàidhlig"),
+                track.captions(src="/restoration-2.en.vtt", src_lang="en", label="English captions", default=True),
+                track.captions(
+                    src="/restoration-2.en-verbose.vtt",
+                    src_lang="en",
+                    label="English captions (verbose)",
+                    default=True,
+                ),
+            ],
+        ),
+        "media-audio-transcript-1": fuaran.audio(
+            "media-audio-transcript-1",
+            src="/commentary.mp3",
+            label="Curator's commentary",
+            transcript="The harbour was rebuilt twice: once after the storm of 1908, and again in 1953.",
         ),
         "format-bindings": fuaran.stack(
             "format-bindings",

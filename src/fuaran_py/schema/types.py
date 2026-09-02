@@ -1241,6 +1241,46 @@ class Audio:
 
 MediaKind = Video | Audio
 
+#: fuaran#1110 — the closed track vocabulary (WIRE_FORMAT §3.6.6). ``Metadata``
+#: is deliberately absent: its cues are rendered by no user agent and read only
+#: by script, so a declarative document naming it would state an intent no
+#: conformant host could honour without leaving the vocabulary.
+TrackKind = Literal["Subtitles", "Captions", "Descriptions", "Chapters"]
+
+
+@dataclass(frozen=True)
+class TrackEntry:
+    """fuaran#1110 — one timed-text track, and the strictest record on the wire:
+    four of its five members are required.
+
+    ``src_lang`` is required on EVERY kind, where HTML makes ``srclang``
+    mandatory only on a subtitles track — the extra strictness costs an author
+    one value and buys a menu a user agent can order, a speech engine can
+    pronounce and a reader can tell apart. ``label`` is required because it is
+    the entry the track menu shows and the only thing telling one track from
+    another there. ``default`` is the one omitted-at-``False`` slot; at most one
+    track per KIND may carry it at render time, and a later election is emitted
+    without the attribute rather than dropped.
+    """
+
+    kind: TrackKind
+    label: TextSource
+    src: Binding
+    src_lang: str
+    default: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            None,
+            {
+                "default": True if self.default else None,
+                "kind": self.kind,
+                "label": self.label,
+                "src": self.src,
+                "srcLang": self.src_lang,
+            },
+        )
+
 
 @dataclass(frozen=True)
 class Media:
@@ -1261,6 +1301,17 @@ class Media:
     kind: MediaKind = field(default_factory=Video)
     controls: bool = True
     loop: bool = False
+    # fuaran#1110 — the EMPTY tuple is the identity, exactly as `Image.src_set`'s
+    # is: a transport with no tracks and one with an empty list are the same
+    # document, so both emit no key. Authored ORDER is carried verbatim, and here
+    # the RENDERER keeps it too — a reader picks from a menu built in document
+    # order, so sorting it would be rewriting someone else's menu.
+    tracks: tuple[TrackEntry, ...] = ()
+    # fuaran#1110 — an ordinary optional rather than an identity default: absent
+    # means the document offers no transcript, which is a different statement
+    # from offering an empty one. It lives on the SPEC and not on `Video`
+    # because it is the affordance an AUDIO surface needs most.
+    transcript: TextSource | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1271,6 +1322,8 @@ class Media:
                 "label": self.label,
                 "loop": True if self.loop else None,
                 "src": self.src,
+                "tracks": list(self.tracks) if self.tracks else None,
+                "transcript": self.transcript,
             },
         )
 

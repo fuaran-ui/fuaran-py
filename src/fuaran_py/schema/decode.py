@@ -186,6 +186,14 @@ IMAGE_LOADING = frozenset({"Eager", "Lazy"})
 # `<path>.$type`; a third surface is an ADDITION later, never a spelling a
 # decoder may guess at today.
 MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
+# fuaran#1110 — the `TrackKind` set (WIRE_FORMAT §3.6.6), CLOSED at four and a
+# BARE enum rather than a `$type`-discriminated case, so an unknown spelling
+# reports at the slot itself. `metadata` is deliberately NOT a member: its cues
+# are rendered by no user agent and read only by script, so a declarative
+# document naming it would state an intent no conformant host could honour
+# without leaving the vocabulary. A fifth kind is an ADDITION later, never a
+# spelling a decoder may guess at today.
+TRACK_KIND = frozenset({"Subtitles", "Captions", "Descriptions", "Chapters"})
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
@@ -809,6 +817,57 @@ def _decode_srcset(value: object, path: str) -> object:
     if not items:
         return _DROP
     return Arr([_decode_srcset_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_track_entry(value: object, path: str) -> Value:
+    """One ``TrackEntry`` — the STRICTEST record on the wire (fuaran#1110).
+
+    Four of the five members are required: ``kind``, ``label``, ``src`` and
+    ``srcLang``. Only ``default`` is optional, and it is the ordinary
+    omitted-at-``false`` bool, refused rather than coerced when it carries a
+    stringified boolean — the ``Image.expandable`` ruling one level further in,
+    at the position a host decoding array elements with a looser walker than its
+    records would get wrong.
+
+    ``srcLang`` is required on EVERY kind, where HTML makes ``srclang``
+    mandatory only on a subtitles track. The extra strictness costs an author
+    one value and buys a menu a user agent can order, a speech engine can
+    pronounce and a reader can tell apart; a track with no language is one
+    nothing downstream can route, and there is no value to default to that would
+    not be an invented claim about someone else's recording.
+
+    ``label`` is required for the reason ``MediaSpec.label`` is: it is the entry
+    a user agent puts in its track menu and the only thing distinguishing one
+    track from another there. The wire requires the MEMBER; the empty value that
+    satisfies the requirement while meaning nothing is an authoring-gate matter
+    (FUARAN113), not a decode one.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "default" in obj and _expect_bool(obj["default"], f"{path}.default"):
+        fields["default"] = True
+    fields["kind"] = _enum(_require(obj, "kind", path), f"{path}.kind", TRACK_KIND, "track kind")
+    fields["label"] = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    fields["src"] = _decode_binding_string(_require(obj, "src", path), f"{path}.src")
+    fields["srcLang"] = _expect_string(_require(obj, "srcLang", path), f"{path}.srcLang")
+    return Obj(None, fields)
+
+
+def _decode_tracks(value: object, path: str) -> object:
+    """``MediaSpec.tracks`` — the MISSING-LIST-FIELD decode class again, on the
+    ``Image.srcSet`` rule exactly (see :func:`_decode_srcset` for why absent,
+    empty and ``null`` are three different answers and only two of them decode).
+
+    The array ORDER is the author's and is preserved verbatim — and here that is
+    a rule the RENDERER also keeps, which is the opposite of ``srcSet``'s. A
+    browser picks ONE candidate from a srcset by an algorithm, so ordering it is
+    canonicalisation; a reader picks a track from a menu the user agent builds in
+    document order, so ordering it would be rewriting someone else's menu.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_decode_track_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
 
 
 def _decode_media_kind(value: object, path: str) -> Value:
@@ -1643,6 +1702,18 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("label", True, _decode_text_source),
         ("loop", False, _omit_default_bool(False)),
         ("src", True, _decode_binding_string),
+        # fuaran#1110 — the timed-text tracks and the text alternative, both on
+        # the SPEC rather than on the `Video` case. The second placement is the
+        # one worth explaining: a transcript is the affordance an AUDIO surface
+        # needs most, because a recording with no visual channel has nowhere else
+        # to put its words, where a video can usually be served by captions
+        # riding the timeline it already has.
+        #
+        # `tracks` is absent-MEANS-empty and refuses `null` (`_decode_tracks`);
+        # `transcript` is an ordinary optional, so absent and empty are different
+        # statements — one offers no transcript, the other offers an empty one.
+        ("tracks", False, _decode_tracks),
+        ("transcript", False, _decode_text_source),
     ],
     "List": [
         ("items", True, _decode_text_source_array),

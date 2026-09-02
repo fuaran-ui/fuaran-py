@@ -70,6 +70,15 @@
         "Contain"
       ]
     },
+    "TrackKind": {
+      "type": "string",
+      "enum": [
+        "Subtitles",
+        "Captions",
+        "Descriptions",
+        "Chapters"
+      ]
+    },
     "ImageAspect": {
       "type": "string",
       "enum": [
@@ -4501,12 +4510,47 @@
         },
         "src": {
           "$ref": "#/$defs/Binding_str"
+        },
+        "tracks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TrackEntry"
+          }
+        },
+        "transcript": {
+          "$ref": "#/$defs/TextSource"
         }
       },
       "required": [
         "kind",
         "label",
         "src"
+      ]
+    },
+    "TrackEntry": {
+      "type": "object",
+      "properties": {
+        "default": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/$defs/TrackKind"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "src": {
+          "$ref": "#/$defs/Binding_str"
+        },
+        "srcLang": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "label",
+        "src",
+        "srcLang"
       ]
     },
     "MediaKind": {

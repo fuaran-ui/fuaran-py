@@ -39,7 +39,8 @@ conformant host. Cross-repo development conventions (port allocation, formatting
 
 ## Language baseline
 
-CPython **3.13+** (the workspace-chosen floor for this sibling; uses PEP 695
+CPython **3.12+** (the floor is what PEP 695 needs — a data-science audience largely
+sits on 3.11/3.12, so the floor was dropped from 3.13 on 2026-09-02; it uses PEP 695
 type parameters / `type` aliases). The Python analogue of the workspace's
 F#-10/.NET-10 pinning.
 

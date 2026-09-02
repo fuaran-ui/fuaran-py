@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fuaran-py"
-version = "0.0.1"
+version = "0.0.2"
 description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Andrew J. Willshire", email = "andrew@fuaran.com" }]
@@ -16,6 +16,7 @@ classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries",
   "Typing :: Typed",
@@ -53,7 +54,7 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.12"
 files = ["src/fuaran_py"]
 ignore_missing_imports = true
 warn_unused_ignores = false

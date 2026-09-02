@@ -42,7 +42,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location $PSScriptRoot
 
 function Find-Python {
-    # Resolve a real CPython 3.13+ interpreter. The bare `python` on PATH is often
+    # Resolve a real CPython 3.12+ interpreter. The bare `python` on PATH is often
     # the Windows Store alias stub (under WindowsApps), which is not a usable
     # interpreter — skip it explicitly.
     $venvPython = Join-Path $PSScriptRoot '.venv\Scripts\python.exe'
@@ -60,7 +60,7 @@ function Find-Python {
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) { return $candidate }
     }
-    throw "No real CPython 3.13+ interpreter found. Install one (e.g. winget install Python.Python.3.13)."
+    throw "No real CPython 3.12+ interpreter found. Install one (e.g. winget install Python.Python.3.13)."
 }
 
 $python = Find-Python

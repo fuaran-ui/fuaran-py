@@ -34,7 +34,7 @@ without a client runtime.
 pip install -e ".[dev]"   # editable + dev tooling (pytest / mypy / ruff)
 ```
 
-Requires CPython **3.13+**. The runtime codec has **no third-party dependencies** —
+Requires CPython **3.12+**. The runtime codec has **no third-party dependencies** —
 it uses only the standard library.
 
 ## Use

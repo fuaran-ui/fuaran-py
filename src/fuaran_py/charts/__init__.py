@@ -1092,6 +1092,20 @@ def _literal(text: str) -> Value:
     return text
 
 
+def _literal_text_of(source: Value) -> str | None:
+    """The text behind a ``Literal`` text source, or ``None`` for the ``Bound``
+    and ``I18n`` arms. Both literal spellings answer — the bare string is
+    canonical (§16) and the ``{"$type":"Literal","text":…}`` envelope stays
+    decode-accepted — so a host that has not normalised its input still measures
+    the text it will draw."""
+    if isinstance(source, str):
+        return source
+    if isinstance(source, Obj) and source.tag == "Literal":
+        text = source.fields.get("text")
+        return text if isinstance(text, str) else None
+    return None
+
+
 # ── Shape builders (tagged ``$type`` objects) ────────────────────────────────
 
 
@@ -1142,23 +1156,32 @@ class ChartSpec:
     Mirrors the F# ``ChartSpec`` fields the lowering reads: ``kind`` (``Bar``
     grouped + stacked, ``Line``, ``Area`` overlaid + stacked, ``Scatter``,
     ``Pie`` are lowered; ``Heatmap`` produces an empty drawing), the ``x_field``
-    category (Scatter: numeric) column, the ``y_fields`` series columns, an
-    optional literal ``title``, and ``stacked`` (Bar/Area geometry only).
+    category (Scatter: numeric) column, the ``y_fields`` series columns, the
+    optional ``title``, and ``stacked`` (Bar/Area geometry only).
+
+    Phase 1143 — the four ``TextSource``-typed fields (``title``, ``x_title``,
+    ``y_title``, ``subtitle``) carry a wire ``TextSource``: the bare string that
+    is the canonical ``Literal`` form (§16), or a tagged ``Obj`` for the
+    ``Literal`` envelope / ``Bound`` / ``I18n`` arms. Every arm CROSSES into the
+    drawing unresolved and resolves at RENDER time; none is dropped, and none is
+    resolved here. They were ``str`` until 1143, which made that unrepresentable
+    and silently dropped every non-literal arm at the bridge. The cross-host
+    statement is the reference host's ``docs/CHART-LOWERING-TEXT-CONTRACT.md``.
     """
 
     kind: str
     x_field: str
     y_fields: tuple[str, ...]
-    title: str | None = None
+    title: Value | None = None
     stacked: bool = field(default=False)
     # Phase 878 — the axis names + the subtitle. WIRE fields, on the same side
     # of the D8 line as ``title``: what an axis is CALLED is the author's
     # meaning, where and how it is drawn stays the host's. All three are
     # optional, and the axis titles are DEFAULT-ON — an absent one falls back to
     # the capitalised field name, so an axis is never nameless.
-    x_title: str | None = None
-    y_title: str | None = None
-    subtitle: str | None = None
+    x_title: Value | None = None
+    y_title: Value | None = None
+    subtitle: Value | None = None
     # Phase 880 — WHERE the legend sits, and whether it sits anywhere at all.
     # A WIRE field for the same reason the titles above are (D8): the edge an
     # author wants the legend on is their meaning; the column widths and pitches
@@ -1521,17 +1544,21 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # same dependency Phase 879 established when the bottom margin started
     # reserving the x-axis title's line.
 
-    def axis_title_of(declared: str | None, fallback_field: str) -> str | None:
-        """An axis title: the author's own text when declared, else the
-        capitalised field name — which is exactly what the x axis has always
-        drawn, now stated once and applied to both axes. ``None`` only where
-        there is no honest fallback: an empty field name, or a y axis carrying
-        no series at all."""
+    def axis_title_of(declared: Value | None, fallback_field: str) -> Value | None:
+        """An axis title: the author's own text source when declared, else a
+        ``Literal`` of the capitalised field name — which is exactly what the x
+        axis has always drawn, now stated once and applied to both axes.
+        ``None`` only where there is no honest fallback: an empty field name, or
+        a y axis carrying no series at all.
+
+        The fallback answers ABSENCE only (the text contract, clause 5): a
+        declared title of any arm wins, and is never substituted for because it
+        could not be resolved here."""
         if declared is not None:
             return declared
         if fallback_field == "":
             return None
-        return _capitalise(fallback_field)
+        return _literal(_capitalise(fallback_field))
 
     # Phase 882 wires §4e's date-axis rule: a SELF-EVIDENT DATE AXIS SUPPRESSES
     # ITS DEFAULT TITLE — an axis reading "Jan Feb Mar" does not need the word
@@ -1561,9 +1588,16 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     subtitle_band = _text_line_height(subtitle_size, _TEXT_LINE_HEIGHT_FACTOR) if spec.subtitle is not None else 0.0
     margin_top = _r2(_MARGIN_TOP + subtitle_band)
 
-    def bound_text(font_size: float, extent: float, t: str) -> str:
-        """Bound a title to the extent it runs along."""
-        return _truncate_to_width(font_size, extent, t)
+    def bound_text(font_size: float, extent: float, t: Value) -> Value:
+        """Bound a title to the extent it runs along. Only a ``Literal`` can be
+        truncated — the text behind a ``Bound`` or ``I18n`` arm is not known
+        here — and that is the honest boundary: those pass through and may
+        overrun, which is a visible fact rather than a silently wrong
+        measurement (the text contract, clause 4, identical on every host)."""
+        literal = _literal_text_of(t)
+        if literal is None:
+            return t
+        return _literal(_truncate_to_width(font_size, extent, literal))
 
     # ── Left margin ──
     # The truncation budget is derived from the CEILING — a constant — so the
@@ -2046,7 +2080,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 # ``legend_band_h`` is 0 on every other arm, so the pre-880
                 # baseline is unchanged.
                 _r2(_H - legend_band_h - _AXIS_TITLE_BOTTOM_OFFSET),
-                _literal(bound_text(tick_size, plot_w, x_title)),
+                bound_text(tick_size, plot_w, x_title),
                 _text_style(None, "Middle", tick_size, "Normal"),
             )
         )
@@ -2059,7 +2093,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             _label(
                 _r2(_Y_AXIS_TITLE_OFFSET_X),
                 _r2((plot_y0 + plot_y1) / 2.0),
-                _literal(bound_text(tick_size, plot_h, y_title)),
+                bound_text(tick_size, plot_h, y_title),
                 _text_style(None, "Middle", tick_size, "Normal", _r2(-_Y_AXIS_TITLE_DEGREES)),
             )
         )
@@ -2449,7 +2483,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     title_x = _r2(plot_x0)
     title_shapes: list[Value] = []
     if spec.title is not None:
-        title_shapes.append(_label(title_x, 22.0, _literal(spec.title), _text_style(None, "Start", title_size, "Loud")))
+        title_shapes.append(_label(title_x, 22.0, spec.title, _text_style(None, "Start", title_size, "Loud")))
 
     # ── Subtitle (Phase 878) — the muted line under the title ──
     #
@@ -2464,7 +2498,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             _label(
                 title_x,
                 _SUBTITLE_BASELINE_Y,
-                _literal(bound_text(subtitle_size, plot_w, spec.subtitle)),
+                bound_text(subtitle_size, plot_w, spec.subtitle),
                 _text_style(_LABEL_OPACITY, "Start", subtitle_size, "Normal"),
             )
         )
@@ -2578,7 +2612,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         "style": Obj(None, {}),
     }
     if spec.title is not None:
-        kind_fields["title"] = _literal(spec.title)
+        kind_fields["title"] = spec.title
     if accessible_summary is not None:
         kind_fields["description"] = _literal(accessible_summary)
     return Obj("Drawing", kind_fields)

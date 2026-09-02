@@ -1657,17 +1657,20 @@ class Renderer:
             return None
         y_fields = tuple(y for y in y_fields_raw.items if isinstance(y, str))
 
-        # 0.2.0 — the canonical Literal is the bare string (the envelope stays
-        # decode-accepted, so both spellings resolve here). Shared by every
-        # TextSource-typed chart field (title, xTitle, yTitle, subtitle).
-        def literal_text(src: Value) -> str | None:
-            if isinstance(src, str):
-                return src
-            if isinstance(src, Obj) and src.tag == "Literal":
-                text = src.fields.get("text")
-                return text if isinstance(text, str) else None
-            return None
-
+        # Phase 1143 — the four TextSource-typed fields (title, xTitle, yTitle,
+        # subtitle) cross the bridge UNRESOLVED, whichever arm they carry. The
+        # lowering reaches its labels with the text source itself and a Bound or
+        # I18n arm resolves at RENDER time, where this host's sources and
+        # catalogue are; the lowering reserves space by the PRESENCE of these
+        # fields and never by their text, which is what makes that affordable.
+        #
+        # This bridge kept the LITERAL arm only until 1143 and dropped the rest,
+        # so an authored I18n title vanished from a localised chart and a bound
+        # axis name was silently replaced by a capitalised column name. The
+        # cross-host statement is the reference host's
+        # ``docs/CHART-LOWERING-TEXT-CONTRACT.md``; a bare string is still the
+        # canonical Literal spelling and needs no unwrapping — an absent field
+        # is absent, which is what ``.get`` already yields.
         stacked = fields.get("stacked") is True
 
         # Phase 876 — the declared value-axis number format crosses the bridge
@@ -1699,13 +1702,13 @@ class Renderer:
             kind=kind,
             x_field=x_field,
             y_fields=y_fields,
-            title=literal_text(fields.get("title")),
+            title=fields.get("title"),
             stacked=stacked,
             value_format=value_format,
             # Phase 878 — the axis names + the muted subtitle.
-            x_title=literal_text(fields.get("xTitle")),
-            y_title=literal_text(fields.get("yTitle")),
-            subtitle=literal_text(fields.get("subtitle")),
+            x_title=fields.get("xTitle"),
+            y_title=fields.get("yTitle"),
+            subtitle=fields.get("subtitle"),
             legend_position=legend_position,
             data_labels=data_labels,
             x_scale=x_scale,

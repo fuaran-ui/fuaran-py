@@ -227,6 +227,49 @@ def test_ssr_bridge_passes_all_declared_chart_fields() -> None:
     assert ">0%<" in html  # value_format Percent (a bare "0" tick without it)
 
 
+def test_ssr_bridge_carries_non_literal_text_sources() -> None:
+    # Phase 1143 — the four TextSource-typed fields cross the bridge UNRESOLVED
+    # and resolve at RENDER time. Until 1143 this bridge kept the LITERAL arm
+    # only: a Bound title vanished from the picture entirely and a Bound axis
+    # name was silently replaced by the capitalised column name, which is what
+    # makes the second assertion below the discriminating one — the fallback
+    # standing IS the old behaviour, and it reads as a perfectly ordinary chart.
+    from fuaran_py import decode_node
+    from fuaran_py.renderer import render_html
+
+    bound = {"$type": "Bound", "binding": {"$type": "Static", "value": "Resolved at render time"}}
+    wire = json.dumps(
+        {
+            "id": "chart-bound-titles",
+            "kind": {
+                "$type": "Chart",
+                "kind": "Bar",
+                "xField": "quarter",
+                "yFields": ["share"],
+                "stacked": False,
+                "title": bound,
+                "xTitle": {
+                    "$type": "Bound",
+                    "binding": {"$type": "Static", "value": "Bound axis name"},
+                },
+                "source": {
+                    "$type": "Static",
+                    "value": [{"quarter": "Q1", "share": 0.42}, {"quarter": "Q2", "share": 0.55}],
+                },
+            },
+        }
+    )
+    result = decode_node(wire)
+    assert result.ok, getattr(result, "error", result)
+    html = render_html(result.value)
+    assert "<svg" in html and "ssr-placeholder" not in html
+    assert "Resolved at render time" in html, "a Bound title was dropped at the bridge"
+    assert "Bound axis name" in html, "a Bound axis title was dropped at the bridge"
+    # The capitalised-field-name fallback answers ABSENCE only: a declared arm
+    # is never substituted for because the bridge could not resolve it.
+    assert ">Quarter<" not in html
+
+
 def test_ssr_bridge_passes_legend_position() -> None:
     # Phase 880. Two halves, each discriminating against the default (`Right`):
     # the corpus fixture declares `Bottom`, so its render must DIFFER from the

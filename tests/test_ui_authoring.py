@@ -74,6 +74,11 @@ def _authored() -> dict[str, t.UiNode]:
         "dash-empty": node.bare(fuaran.dashboard("dash-empty")),
         "stack-1": fuaran.stack("stack-1", children=[metric_1, markdown_1]),
         "glayout-1": fuaran.grid_layout("glayout-1", children=[metric_1], cols=12),
+        # WIRE_FORMAT §3.6.7 — the column-fill mode. `gap` is otherwise
+        # unreachable on the wire, so both fixtures are authored: without and
+        # with it.
+        "masonry-1": fuaran.masonry_layout("masonry-1", children=[metric_1, markdown_1], cols=3),
+        "masonry-gap": fuaran.masonry_layout("masonry-gap", children=[metric_1, markdown_1], cols=4, gap=16),
         "split-1": fuaran.split_panel("split-1", children=[metric_1, markdown_1], weight=0.6),
         "card-1": node.bare(fuaran.card("card-1", children=[metric_1], heading="Insights")),
         "step-1": node.bare(fuaran.stepper("step-1", children=[markdown_1, markdown_2], active_step=1)),

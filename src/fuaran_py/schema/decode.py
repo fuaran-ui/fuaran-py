@@ -190,7 +190,7 @@ SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
 BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
-BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Auto"})  # Phase 390
+BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Masonry", "Auto"})  # Phase 390; Masonry §3.6.7
 BUTTON_VARIANT = frozenset({"Primary", "Secondary", "Tertiary", "Destructive"})
 LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render strategy
 # Phase 819 — the Duration / RelativeTime format enums (shared by CellFormat
@@ -1769,7 +1769,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
 #
 # The wire is: {"$type":"Box","children":[…],"heading":<TextSource>?,
 #   "layout":{…},"role":"Group|Card|Dashboard|Separator"}. The nested `layout`
-# is `$type`-discriminated (Flex | Grid | Auto). Mirrors the F# `decodeLayoutKind`
+# is `$type`-discriminated (Flex | Grid | Masonry | Auto). Mirrors the F# `decodeLayoutKind`
 # "Box" branch: role-validated, layout re-built, heading optional. The four
 # retired container tags decode-upgrade to the equivalent Box on read (a legacy
 # tag never re-encodes to its old form — it round-trips as Box).
@@ -1805,6 +1805,38 @@ def _decode_box_layout(value: object, path: str) -> Obj:
         if "templateColumns" in obj:
             gfields["templateColumns"] = _expect_string(obj["templateColumns"], f"{path}.templateColumns")
         return Obj("Grid", gfields)
+    if tag == "Masonry":
+        # WIRE_FORMAT §3.6.7 — column-FILL. `cols` is REQUIRED and must be a
+        # POSITIVE integer, on the §3.6.4 `srcSet` width-floor pattern:
+        # `column-count: 0` is invalid CSS, so a container declaring it would
+        # fall back to whatever the host stylesheet last said and the wire
+        # would be carrying a layout whose rendered result is host-defined.
+        #
+        # There is deliberately NO auto-column leniency of the kind the `Grid`
+        # arm above carries. A column-less `Grid` canonicalises to `Auto`
+        # because the language already owns that concept; `Auto` is a ROW-fill
+        # mode, so rewriting a masonry into it would discard the author's whole
+        # intent rather than recover it. The absence is a MISSING_FIELD and a
+        # non-positive value is refused rather than repaired.
+        #
+        # `cols` aliases `columns` (§3.6), as on `Grid`. There is no
+        # `templateColumns` twin: the multi-column model has no track list for
+        # one to name, and its absence is what keeps this case bounded.
+        cols_raw, cols_present = _alias_get(obj, "cols", ("columns",))
+        if not cols_present:
+            _fail(MISSING_FIELD, f"{path}.cols", "missing required field 'cols'", "positive integer column count")
+        cols = _expect_int(cols_raw, f"{path}.cols")
+        if cols <= 0:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.cols",
+                f"masonry column count must be positive, got {cols}",
+                "JSON number (positive integer column count)",
+            )
+        mfields: dict[str, Value] = {"cols": cols}
+        if "gap" in obj:
+            mfields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        return Obj("Masonry", mfields)
     # Auto
     return Obj("Auto", {})
 

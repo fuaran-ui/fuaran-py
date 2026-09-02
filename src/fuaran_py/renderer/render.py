@@ -456,6 +456,32 @@ class Renderer:
                 [("class", "fuaran-layout-grid"), ("style", style)],
                 self._children_html(fields),
             )
+        if role == "Group" and layout_mode == "Masonry":
+            # WIRE_FORMAT §3.6.7 — column-FILL, realised through the CSS
+            # MULTI-COLUMN family (`column-count`, and the `gap` shorthand's
+            # `column-gap` half), which the specification makes NORMATIVE.
+            # `grid-template-rows: masonry` is the other candidate spelling and
+            # must NOT be substituted: it is not deterministically supported
+            # across engines, so a document rendered through it would lay out as
+            # a masonry for some readers and as an ordinary grid for others, and
+            # a layout mode whose result depends on which engine reads it is not
+            # a wire contract.
+            #
+            # The break-avoidance obligation (`.fuaran-layout-masonry > *`) is
+            # the reference stylesheet's, exactly as on the F#/TS hosts — the
+            # class hook here is what carries it.
+            lf = layout_obj.fields if layout_obj is not None else {}
+            cols = lf.get("cols")
+            cols = cols if isinstance(cols, int) else 1
+            style = f"column-count:{cols}"
+            gap = lf.get("gap")
+            if isinstance(gap, int):
+                style = f"{style};gap:{gap}px"
+            return element(
+                "div",
+                [("class", "fuaran-layout-masonry"), ("style", style)],
+                self._children_html(fields),
+            )
         # Group + Flex (the default / fallthrough).
         lf = layout_obj.fields if layout_obj is not None else {}
         dir_class = "fuaran-stack-horizontal" if lf.get("direction") == "Horizontal" else "fuaran-stack-vertical"

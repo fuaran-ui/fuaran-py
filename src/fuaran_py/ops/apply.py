@@ -500,9 +500,10 @@ def _update_box(field: str, value: Value, kind: Obj) -> _Outcome:
 
     The retired kinds' field names stay addressable so pre-merge op-streams
     replaying against an upgraded Box keep working: ``Orientation`` / ``Wrap``
-    mutate a Flex box's nested layout; ``Cols`` / ``TemplateColumns`` mutate a
-    Grid box's; ``Heading`` sets the top-level heading. A field that does not
-    match the box's current layout mode is UnknownField.
+    mutate a Flex box's nested layout; ``Cols`` mutates a Grid *or* Masonry box's
+    (both carry a column count under that name — §3.6.7) and ``TemplateColumns``
+    a Grid box's alone; ``Heading`` sets the top-level heading. A field that does
+    not match the box's current layout mode is UnknownField.
     """
     layout = kind.fields.get("layout")
     layout_obj = layout if isinstance(layout, Obj) else None
@@ -533,7 +534,11 @@ def _update_box(field: str, value: Value, kind: Obj) -> _Outcome:
     if field == "Wrap" and mode == "Flex":
         result = _coerce_bool(value)
         return with_layout_field("wrap", result.value) if result.ok else _Outcome("typeMismatch", detail=result.detail)
-    if field == "Cols" and mode == "Grid":
+    if field == "Cols" and mode in ("Grid", "Masonry"):
+        # WIRE_FORMAT §3.6.7 — `Masonry` carries the same column count under the
+        # same field name, so it takes the same arm. Omitting it would leave the
+        # introspection surface advertising `Cols` on a masonry box while the
+        # apply engine answered `unknownField`. Mirrors F# `Apply.fs`.
         result = _coerce_int(value)
         return with_layout_field("cols", result.value) if result.ok else _Outcome("typeMismatch", detail=result.detail)
     if field == "TemplateColumns" and mode == "Grid":

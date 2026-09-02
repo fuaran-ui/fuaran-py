@@ -2,7 +2,7 @@
   "version": 1,
   "schema": "schema.json",
   "idl": "idl.json",
-  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
   "kinds": [
     "Badge",
     "Box",
@@ -59,7 +59,143 @@
     "TextArea",
     "Toggle"
   ],
+  "ops": [
+    "Batch",
+    "EditNode",
+    "InsertChild",
+    "MoveNode",
+    "RemoveNode",
+    "ReorderChildren",
+    "ReplaceBinding",
+    "ReplaceRoot",
+    "UpdateProp",
+    "UpdateState",
+    "UpdateStyle"
+  ],
   "fixtures": [
+    {
+      "id": "card-reject-bad-version",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-bad-version.json",
+      "expectedErrorCode": "UNSUPPORTED_VERSION",
+      "expectedPath": "$.$card",
+      "description": "a card format version this decoder does not implement (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-bundle-bad-version",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card-bundle",
+      "inputFile": "cards/card-reject-bundle-bad-version.json",
+      "expectedErrorCode": "UNSUPPORTED_VERSION",
+      "expectedPath": "$.$cards",
+      "description": "a bundle format version this decoder does not implement (WIRE_FORMAT 25.2)"
+    },
+    {
+      "id": "card-reject-bundle-duplicate",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card-bundle",
+      "inputFile": "cards/card-reject-bundle-duplicate.json",
+      "expectedErrorCode": "DUPLICATE_CARD",
+      "expectedPath": "$.cards[1]",
+      "description": "two cards for one identity: a document with no order to appeal to, so which description a reader gets would depend on decoder implementation detail (WIRE_FORMAT 25.2)"
+    },
+    {
+      "id": "card-reject-empty-enum",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-empty-enum.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.props[0].type",
+      "description": "`enum()` is unrepresentable in the tag spelling — an enum admitting nothing, spelled as though it admitted one empty choice (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-hash-not-object",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-hash-not-object.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.contentHash",
+      "description": "the digest is carried WITH its algorithm; a bare string would make two digests under different algorithms comparable (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-missing-hash",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-missing-hash.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.contentHash",
+      "description": "the content hash is REQUIRED — without it a card can never be more than a name match, and the three-way verdict collapses to its weakest case for every node (WIRE_FORMAT 25.4)"
+    },
+    {
+      "id": "card-reject-missing-module",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-missing-module.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.moduleId",
+      "description": "half an identity is not an identity (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-payload-no-language",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-payload-no-language.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.props[0].payload.language",
+      "description": "a gate with no language names a judge for nothing; the language is the declaration and the gate is the annotation on it (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-required-not-bool",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-required-not-bool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.props[0].required",
+      "description": "requiredness is a boolean, not a spelling (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-reject-stray-key",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-stray-key.json",
+      "expectedErrorCode": "UNDECLARED_FIELD",
+      "expectedPath": "$.renderer",
+      "description": "default-deny by shape: an undeclared key is refused, never ignored — a card is a protocol artefact and its evolution is the version tag (WIRE_FORMAT 25.3)"
+    },
+    {
+      "id": "card-reject-unknown-prop-type",
+      "kind": "contract-card-reject",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-reject-unknown-prop-type.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.props[0].type",
+      "description": "a prop type tag this build cannot resolve is refused at the boundary rather than read as permissive — guessing would turn a check into a pass (WIRE_FORMAT 25.3)"
+    },
+    {
+      "id": "card-bundle",
+      "kind": "contract-card-round-trip",
+      "decoder": "contract-card-bundle",
+      "inputFile": "cards/card-bundle.json",
+      "expectedFile": "cards/card-bundle.json",
+      "description": "a two-card bundle, emitted sorted by (moduleId, componentId) whatever order the cards were supplied in (WIRE_FORMAT 25.2)"
+    },
+    {
+      "id": "card-full",
+      "kind": "contract-card-round-trip",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-full.json",
+      "expectedFile": "cards/card-full.json",
+      "description": "summary, required + optional props, an enum type tag, and both payload states — gated and ungated (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "card-minimal",
+      "kind": "contract-card-round-trip",
+      "decoder": "contract-card",
+      "inputFile": "cards/card-minimal.json",
+      "expectedFile": "cards/card-minimal.json",
+      "description": "identity + content hash, no props and no summary (WIRE_FORMAT 25.1)"
+    },
     {
       "id": "elc-ans-accept-full",
       "kind": "elicitation-answer-accept",
@@ -1797,6 +1933,22 @@
       "description": "Display/Markdown"
     },
     {
+      "id": "masonry-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/masonry-1.json",
+      "expectedFile": "nodes/masonry-1.json",
+      "description": "Layout/Masonry (Phase 1082 — column-fill, three columns)"
+    },
+    {
+      "id": "masonry-gap",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/masonry-gap.json",
+      "expectedFile": "nodes/masonry-gap.json",
+      "description": "Layout/Masonry (Phase 1082 — explicit gap)"
+    },
+    {
       "id": "master-detail-multi-field",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1963,6 +2115,14 @@
       "inputFile": "nodes/multiselect-1.json",
       "expectedFile": "nodes/multiselect-1.json",
       "description": "Input/Select (multi-select — list value)"
+    },
+    {
+      "id": "multiselect-chip-list-param",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/multiselect-chip-list-param.json",
+      "expectedFile": "nodes/multiselect-chip-list-param.json",
+      "description": "Layout/Box (Phase 610 — multi-select chip + DataGrid scoped by a list-valued in/param)"
     },
     {
       "id": "now-environment-binding",
@@ -2422,6 +2582,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.activeStep",
       "description": "Binding<int> Static payload is a §7 non-finite sentinel — the sentinels are FLOAT-slot only; an integer slot has no non-finite form (Phase 1064)"
+    },
+    {
+      "id": "reject-box-masonry-nonpositive-cols",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-box-masonry-nonpositive-cols.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.layout.cols",
+      "description": "Masonry cols 0 — refused: a column count names how many columns the children fill, so a non-positive one describes a layout no renderer can realise. Refused rather than canonicalised to `Auto`, unlike a column-less `Grid`: that leniency works because `Auto` already means the browser's own choice, and masonry has no such case for the rewrite to land on"
     },
     {
       "id": "reject-daterange-unordered",

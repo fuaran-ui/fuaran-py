@@ -745,6 +745,25 @@ class GridTemplate:
 
 
 @dataclass(frozen=True)
+class MasonryLayout:
+    """Column-fill masonry (WIRE_FORMAT §3.6.7). ``$type`` = ``Masonry``.
+
+    ``Grid`` fills by ROW, ``Masonry`` fills by COLUMN, and no value of any
+    ``Grid`` field changes that — which is why this is a fourth case rather than
+    a fifth field on :class:`GridTemplate`. ``cols`` is required and POSITIVE;
+    there is deliberately no ``templateColumns`` twin, because the multi-column
+    model that realises the mode has no track list for one to name.
+    """
+
+    cols: int = 3
+    gap: int | None = None
+
+    def to_wire(self) -> Value:
+        # Ordinal key order (cols < gap); gap omitted when ``None``.
+        return _obj("Masonry", {"cols": self.cols, "gap": self.gap})
+
+
+@dataclass(frozen=True)
 class AutoLayout:
     """Responsive auto-tile — the retired ``Dashboard``. ``$type`` = ``Auto``."""
 
@@ -752,8 +771,8 @@ class AutoLayout:
         return Obj("Auto", {})
 
 
-BoxLayout = FlexLayout | GridTemplate | AutoLayout
-"""How a ``Box`` arranges its children (``Flex`` | ``Grid`` | ``Auto``)."""
+BoxLayout = FlexLayout | GridTemplate | MasonryLayout | AutoLayout
+"""How a ``Box`` arranges its children (``Flex`` | ``Grid`` | ``Masonry`` | ``Auto``)."""
 
 
 @dataclass(frozen=True)
@@ -798,6 +817,17 @@ def GridLayout(  # noqa: N802
 ) -> Box:
     """Retired ``GridLayout`` — a ``Box`` with ``Grid`` layout + ``Group`` role."""
     return Box(children=children, layout=GridTemplate(cols=cols, template_columns=template_columns), role="Group")
+
+
+def MasonryLayoutBox(  # noqa: N802
+    children: tuple[UiNode, ...] = (), cols: int = 3, gap: int | None = None
+) -> Box:
+    """A ``Box`` with ``Masonry`` layout + ``Group`` role (WIRE_FORMAT §3.6.7).
+
+    The default column count is 3 rather than :func:`GridLayout`'s 12: a masonry
+    column is a real column of content, not a track in a fine-grained span grid.
+    """
+    return Box(children=children, layout=MasonryLayout(cols=cols, gap=gap), role="Group")
 
 
 @dataclass(frozen=True)

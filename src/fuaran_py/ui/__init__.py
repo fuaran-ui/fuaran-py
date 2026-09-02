@@ -381,6 +381,20 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.GridLayout(tuple(children or ()), cols, template_columns), accessibility.none)
 
     @staticmethod
+    def masonry_layout(
+        id: str,  # noqa: A002
+        *,
+        children: list[UiNode] | None = None,
+        cols: int = 3,
+        gap: int | None = None,
+    ) -> UiNode:
+        """The masonry hang (WIRE_FORMAT §3.6.7) — children fill DOWN each column
+        rather than across each row. The default is 3 columns rather than
+        :meth:`grid_layout`'s 12: a masonry column is a real column of content,
+        not a track in a fine-grained span grid."""
+        return _node(id, t.MasonryLayoutBox(tuple(children or ()), cols, gap), accessibility.none)
+
+    @staticmethod
     def split_panel(
         id: str,  # noqa: A002
         *,

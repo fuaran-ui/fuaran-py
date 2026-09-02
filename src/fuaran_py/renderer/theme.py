@@ -95,7 +95,8 @@ def _box_kind_class(kind: Obj) -> str:
     """The `fuaran-kind-*` hook for a Box, derived from role + layout mode.
 
     Mirrors F# `Theme.kindClass`: Dashboard→dashboard, Card→card,
-    Separator→divider, Group+Grid→grid-layout, Group+(Flex|Auto)→stack.
+    Separator→divider, Group+Grid→grid-layout, Group+Masonry→masonry,
+    Group+(Flex|Auto)→stack.
     """
     role = kind.fields.get("role")
     layout = kind.fields.get("layout")
@@ -108,6 +109,11 @@ def _box_kind_class(kind: Obj) -> str:
         return "fuaran-kind-divider"
     if role == "Group" and layout_mode == "Grid":
         return "fuaran-kind-grid-layout"
+    if role == "Group" and layout_mode == "Masonry":
+        # WIRE_FORMAT §3.6.7 — `Masonry` has no retired kind to inherit a hook
+        # from, and deliberately does NOT share the grid's: the two modes fill
+        # differently, so a host styling "the grid container" must not catch both.
+        return "fuaran-kind-masonry"
     # Group + (Flex | Auto), and any unexpected role, fall to stack.
     return "fuaran-kind-stack"
 

@@ -26,6 +26,32 @@ Semantics pinned to the reference host:
   ("an unset filter is no constraint") — the one host-side leniency; the core evaluator
   stays strict, so a bound param substitutes to its literal and an unbound param that
   reaches a non-filter step is a named ``UNBOUND_PARAM`` failure, never a guess.
+* **LIST params (Phase 610 / fuaran-core#91).** A ``params`` entry whose ``from`` binding
+  resolves to an ARRAY of scalars is a **list param** — a multi-select chip's selection —
+  and the pipeline reads it through the membership test's ``param`` form
+  (``InParam``, wire ``{"$type":"in","expr":…,"param":…}``). Three rules, and each is
+  observable:
+
+  1. It resolves by **SUBSTITUTION, not through the evaluation env**:
+     :func:`substitute_list_params` rewrites every bound ``InParam`` to the literal
+     ``InList`` form *before* the prune and *before* evaluation, which is why the
+     evaluator's ``InParam`` arm is a strict ``UNBOUND_PARAM`` error rather than a
+     lookup. A pipeline reaching the evaluator with an ``InParam`` still in it names an
+     unbound param and fails loudly rather than passing silently.
+  2. An **EMPTY selection is UNBOUND**, never ``InList(x, [])``: the dependent ``filter``
+     step prunes under the same lenient "unset ⇒ no constraint" rule an unset scalar chip
+     already gets, so deselecting everything shows the **unfiltered** table rather than an
+     empty one. "Nothing selected" is the absence of a constraint, not a constraint no row
+     satisfies.
+  3. A **kind mismatch reaches the strict refusal**: a list bound to a name the pipeline
+     reads as a scalar ``Param``, or a scalar bound to one it reads as an ``InParam``,
+     substitutes nothing — and because the name IS bound (just to the other kind) the
+     prune does not fire either, so the surviving hole reaches the evaluator's
+     ``UNBOUND_PARAM``. Never a silent wrong scoping.
+
+  One ``_expr_param_names``-driven prune covers both param kinds with no second rule: a
+  substituted step names no param at all, while an unsubstituted one still names its own —
+  and the reactivity edge is derived from the same walk.
 * **Embedded only.** A ``Ref`` source is ``UNRESOLVED_SOURCE`` (Phase 282 evaluates
   embedded sources), matching the reference.
 * **Output shape.** Rows are ``list[dict[str, object]]`` keyed by column name, a null cell
@@ -51,6 +77,9 @@ from ..dataframe import (
     Embedded,
     EvalError,
     Filter,
+    InList,
+    InParam,
+    IsNull,
     Lit,
     Not,
     Param,
@@ -115,6 +144,19 @@ class ParamUnbound:
 
 
 @dataclass(frozen=True)
+class ParamResolvedList:
+    """The param's source resolved to a NON-EMPTY list of scalar cells — a LIST param
+    (Phase 610), the multi-select chip's selection. Resolved by substitution into the
+    pipeline's ``InParam`` occurrences, never placed in the scalar evaluation env.
+
+    An EMPTY list never lands here: it is :class:`ParamUnbound`, so its filter prunes
+    and the unfiltered table shows."""
+
+    cells: list[Cell]
+    kind: Literal["resolvedList"] = "resolvedList"
+
+
+@dataclass(frozen=True)
 class ParamNonScalar:
     """The param's source resolved to a STRUCTURED value, which has no scalar form.
 
@@ -127,28 +169,70 @@ class ParamNonScalar:
     kind: Literal["nonScalar"] = "nonScalar"
 
 
-type ParamResolution = ParamResolved | ParamUnbound | ParamNonScalar
+type ParamResolution = ParamResolved | ParamResolvedList | ParamUnbound | ParamNonScalar
 
 
 def _non_scalar(name: str) -> ParamNonScalar:
     return ParamNonScalar(f"Transform param '{name}' resolved to a non-scalar value")
 
 
-def _scalar_to_cell(name: str, value: object) -> ParamResolution:
-    """A resolved param source as a cell. JSON null / an absent value IS a scalar
-    (the NULL cell, per the reference ``JVal::Null → Cell::Null``); a structured
-    ``Obj`` / ``Arr`` / host record has no scalar form and resolves loudly."""
+def _scalar_cell(value: object) -> Cell | None:
+    """The scalar cell for a resolved value, or ``None`` when it has no scalar form.
+    JSON null / an absent value IS a scalar (the NULL cell, per the reference
+    ``JVal::Null → Cell::Null``); a structured ``Obj`` / ``Arr`` / host record is not."""
     if value is None:
-        return ParamResolved(NULL)
+        return NULL
     if isinstance(value, bool):
-        return ParamResolved(cell_bool(value))
+        return cell_bool(value)
     if isinstance(value, int):
-        return ParamResolved(cell_int(value))
+        return cell_int(value)
     if isinstance(value, float):
-        return ParamResolved(cell_float(value))
+        return cell_float(value)
     if isinstance(value, str):
-        return ParamResolved(cell_str(value))
-    return _non_scalar(name)
+        return cell_str(value)
+    return None
+
+
+def _list_cells(value: object) -> list[Cell] | None:
+    """Coerce a resolved LIST to cells for a Transform LIST param (Phase 610).
+
+    Accepts BOTH representations the store legitimately holds — a raw Python ``list``
+    (a host that hands the renderer parsed JSON) and a structural ``Arr`` (a value read
+    off the tree, e.g. a binding's carried ``defaultValue``) — for the same reason
+    :func:`_lift_store_value` does. Element coercion is :func:`_scalar_cell`'s, so a list
+    element and a scalar param cannot disagree about what a value means; a non-list, or a
+    list holding a non-scalar item, is ``None`` and stays the loud non-scalar error."""
+    if isinstance(value, Arr):
+        items: list[object] = list(value.items)
+    elif isinstance(value, list):
+        items = list(value)
+    else:
+        return None
+    cells: list[Cell] = []
+    for item in items:
+        cell = _scalar_cell(item)
+        if cell is None:
+            return None
+        cells.append(cell)
+    return cells
+
+
+def _scalar_to_cell(name: str, value: object) -> ParamResolution:
+    """A resolved param source as a param resolution: a scalar cell, a LIST of scalar
+    cells (Phase 610), *unbound*, or the loud non-scalar failure.
+
+    The scalar reading is tried first, exactly as the reference hosts do, so nothing
+    about an existing scalar param changes. An EMPTY list is :class:`ParamUnbound`, not
+    an empty membership set — deselecting everything is the absence of a constraint."""
+    cell = _scalar_cell(value)
+    if cell is not None:
+        return ParamResolved(cell)
+    cells = _list_cells(value)
+    if cells is None:
+        return _non_scalar(name)
+    if not cells:
+        return ParamUnbound()
+    return ParamResolvedList(cells)
 
 
 # A host state store: parameter name → its current scalar value.
@@ -235,6 +319,18 @@ def _expr_param_names(expr: ColExpr) -> set[str]:
         return _expr_param_names(expr.expr)
     if isinstance(expr, ApplyFn):
         return set().union(*(_expr_param_names(x) for x in expr.args)) if expr.args else set()
+    if isinstance(expr, InList):
+        return (
+            _expr_param_names(expr.expr).union(*(_expr_param_names(x) for x in expr.items))
+            if expr.items
+            else _expr_param_names(expr.expr)
+        )
+    if isinstance(expr, InParam):
+        # A LIST param shares the scalar params' namespace: the prune and the reactivity
+        # edge are both derived from this one walk.
+        return _expr_param_names(expr.expr) | {expr.param}
+    if isinstance(expr, IsNull):
+        return _expr_param_names(expr.expr)
     return set()  # Col, Lit
 
 
@@ -256,12 +352,95 @@ def _substitute_expr(expr: ColExpr, env: dict[str, Cell]) -> ColExpr:
         return Cast(expr.type, _substitute_expr(expr.expr, env))
     if isinstance(expr, ApplyFn):
         return ApplyFn(expr.fn, [_substitute_expr(x, env) for x in expr.args])
+    if isinstance(expr, InList):
+        return InList(_substitute_expr(expr.expr, env), [_substitute_expr(x, env) for x in expr.items])
+    if isinstance(expr, InParam):
+        # A scalar env never binds a LIST param — that is `_substitute_list_params_expr`'s
+        # job, and conflating them is what would silently scope a grid by the wrong kind.
+        return InParam(_substitute_expr(expr.expr, env), expr.param)
+    if isinstance(expr, IsNull):
+        return IsNull(_substitute_expr(expr.expr, env))
     return expr  # Col, Lit
 
 
-def _prune_and_substitute(pipeline: list[Transform], env: dict[str, Cell]) -> list[Transform]:
-    """Drop filters referencing an unbound param, then substitute bound params."""
-    bound = set(env)
+def _substitute_list_params_expr(expr: ColExpr, list_env: dict[str, list[Cell]]) -> ColExpr:
+    """Rewrite every ``InParam`` bound in ``list_env`` to the literal ``InList`` form —
+    the Python mirror of the reference ``Transform.substituteListParams`` (Phase 610).
+
+    An UNBOUND ``InParam`` is left intact on purpose: the caller's prune then sees it
+    still naming its own param, which is why one prune covers both param kinds."""
+    if isinstance(expr, InParam):
+        inner = _substitute_list_params_expr(expr.expr, list_env)
+        cells = list_env.get(expr.param)
+        if cells is None:
+            return InParam(inner, expr.param)
+        return InList(inner, [Lit(c) for c in cells])
+    if isinstance(expr, Binary):
+        return Binary(
+            expr.op,
+            _substitute_list_params_expr(expr.left, list_env),
+            _substitute_list_params_expr(expr.right, list_env),
+        )
+    if isinstance(expr, Not):
+        return Not(_substitute_list_params_expr(expr.expr, list_env))
+    if isinstance(expr, Coalesce):
+        return Coalesce([_substitute_list_params_expr(x, list_env) for x in expr.exprs])
+    if isinstance(expr, Case):
+        return Case(
+            [
+                (_substitute_list_params_expr(w, list_env), _substitute_list_params_expr(t, list_env))
+                for w, t in expr.cases
+            ],
+            _substitute_list_params_expr(expr.else_expr, list_env),
+        )
+    if isinstance(expr, Cast):
+        return Cast(expr.type, _substitute_list_params_expr(expr.expr, list_env))
+    if isinstance(expr, ApplyFn):
+        return ApplyFn(expr.fn, [_substitute_list_params_expr(x, list_env) for x in expr.args])
+    if isinstance(expr, InList):
+        return InList(
+            _substitute_list_params_expr(expr.expr, list_env),
+            [_substitute_list_params_expr(x, list_env) for x in expr.items],
+        )
+    if isinstance(expr, IsNull):
+        return IsNull(_substitute_list_params_expr(expr.expr, list_env))
+    return expr  # Col, Lit, Param
+
+
+def substitute_list_params(pipeline: list[Transform], list_env: dict[str, list[Cell]]) -> list[Transform]:
+    """Substitute every bound LIST param through a whole pipeline (Phase 610).
+
+    Only ``filter`` / ``derive`` carry a ``ColExpr``; every other step is returned
+    unchanged. Public because the substitution IS the resolution rule — a host driving
+    a pipeline itself owes the same rewrite before it evaluates."""
+    out: list[Transform] = []
+    for step in pipeline:
+        if isinstance(step, Filter):
+            out.append(Filter(_substitute_list_params_expr(step.pred, list_env)))
+        elif isinstance(step, Derive):
+            out.append(Derive(step.name, _substitute_list_params_expr(step.expr, list_env)))
+        else:
+            out.append(step)
+    return out
+
+
+def _prune_and_substitute(
+    pipeline: list[Transform],
+    env: dict[str, Cell],
+    list_env: dict[str, list[Cell]] | None = None,
+) -> list[Transform]:
+    """Substitute bound LIST params, drop filters referencing an unbound param, then
+    substitute bound scalar params.
+
+    The ORDER is the rule (Phase 610): a substituted ``InParam`` becomes an ``InList``
+    and so names no param at all, while an unbound one survives naming its own and is
+    caught by the prune — one rule, both param kinds. A name bound to the *other* kind
+    counts as bound here, so its surviving hole is NOT pruned and reaches the evaluator's
+    strict ``UNBOUND_PARAM`` rather than being silently dropped."""
+    list_env = list_env or {}
+    if list_env:
+        pipeline = substitute_list_params(pipeline, list_env)
+    bound = set(env) | set(list_env)
     out: list[Transform] = []
     for step in pipeline:
         if isinstance(step, Filter):
@@ -375,6 +554,7 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
         return ComputeErr(EvalError(pipe.error.code, pipe.error.detail))
 
     env: dict[str, Cell] = {}
+    list_env: dict[str, list[Cell]] = {}
     params = transform.fields.get("params")
     if isinstance(params, Arr):
         for entry in params.items:
@@ -386,8 +566,12 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
                         return ComputeErr(EvalError("TYPE_ERROR", resolution.detail))
                     if resolution.kind == "resolved":
                         env[name] = resolution.cell
+                    elif resolution.kind == "resolvedList":
+                        # Phase 610 — a LIST param resolves by SUBSTITUTION, so it never
+                        # enters the scalar env.
+                        list_env[name] = resolution.cells
 
-    effective = _prune_and_substitute(pipe.value, env)
+    effective = _prune_and_substitute(pipe.value, env, list_env)
     result = eval_pipeline(effective, src.value.table)
     if not result.ok:
         return ComputeErr(result.error)

@@ -50,6 +50,8 @@ from .model import (
     EvalError,
     Filter,
     GroupBy,
+    InList,
+    InParam,
     Join,
     Limit,
     Lit,
@@ -421,6 +423,35 @@ def _eval_expr(cols: Schema, row: Row, e: ColExpr) -> Result[Cell, EvalError]:  
     if isinstance(e, Cast):
         r = _eval_expr(cols, row, e.expr)
         return r if not r.ok else _cast_cell(e.type, r.value)
+    if isinstance(e, InList):
+        # SQL three-valued membership: a null subject ⇒ null; any equal item ⇒ true;
+        # no match having seen a null item ⇒ null; else false. An incomparable pair
+        # is a loud type error, never a silent "not a member".
+        rs = _eval_expr(cols, row, e.expr)
+        if not rs.ok:
+            return rs
+        if is_null(rs.value):
+            return Ok(NULL)
+        saw_null = False
+        for item in e.items:
+            ri = _eval_expr(cols, row, item)
+            if not ri.ok:
+                return ri
+            if is_null(ri.value):
+                saw_null = True
+                continue
+            order = _compare_cells(rs.value, ri.value)
+            if order is None:
+                return Err(EvalError("TYPE_ERROR", "in: comparison between incompatible types"))
+            if order == 0:
+                return Ok(cell_bool(True))
+        return Ok(NULL) if saw_null else Ok(cell_bool(False))
+    if isinstance(e, InParam):
+        # A LIST param resolves by SUBSTITUTION before evaluation (the compute layer's
+        # `substitute_list_params` rewrites it to the literal `InList` form). One that
+        # reaches the evaluator is genuinely unbound — the same strictness a scalar
+        # `Param` gets, never a silent "matches nothing".
+        return Err(EvalError(UNBOUND_PARAM, f"unbound parameter '{e.param}'"))
     if isinstance(e, ApplyFn):
         argv: list[Cell] = []
         for a in e.args:

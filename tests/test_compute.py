@@ -24,6 +24,7 @@ from fuaran_py.compute import (
     ComputeOk,
     ParamNonScalar,
     ParamResolved,
+    ParamResolvedList,
     ParamUnbound,
     evaluate_transform,
     evaluate_tree,
@@ -46,6 +47,7 @@ from fuaran_py.dataframe import (
     encode_pipeline,
     encode_source,
 )
+from fuaran_py.dataframe.model import UNBOUND_PARAM
 from fuaran_py.model import Arr, Node, Obj, from_json
 from fuaran_py.runtime import BrowserDeps, FuaranRuntime
 
@@ -248,19 +250,44 @@ def test_field_less_selection_of_a_plain_dict_row_is_a_loud_error() -> None:
 
 
 def test_structured_declared_default_is_a_loud_error() -> None:
-    """A declared default is resolved the same way a written value is."""
+    """A declared default is resolved the same way a written value is.
+
+    Phase 610 moved WHICH loud error this is, not whether there is one. An array is a
+    legitimate LIST-param source now, so the default resolves to a list — bound to a name
+    this pipeline reads as a SCALAR `Param`. That is the kind mismatch, and it reaches the
+    strict `UNBOUND_PARAM` refusal rather than the non-scalar one. Both are loud; only the
+    silent readings (a boxed NULL, or a pruned filter) would be defects."""
     transform = _param_transform(Obj("Filter", {"defaultValue": Arr([1, 2]), "name": "q"}))
     result = evaluate_transform(transform, {})
     assert not result.ok
-    assert result.error.detail == _NON_SCALAR_MESSAGE
+    assert result.error.code == UNBOUND_PARAM
+    assert "p" in result.error.detail
 
 
-def test_resolve_param_binding_is_three_valued() -> None:
-    """Resolved / unbound / non-scalar are distinct outcomes — the whole point of
-    the error channel. A silent `Cell | None` cannot express the third."""
+def test_structured_non_list_declared_default_is_still_the_non_scalar_error() -> None:
+    """The non-scalar channel is unchanged for what has no list reading either — a record
+    in a scalar slot — and for a list holding a structured item (element coercion is the
+    scalar param's own)."""
+    record = _param_transform(Obj("Filter", {"defaultValue": Obj(None, {"a": 1}), "name": "q"}))
+    assert evaluate_transform(record, {}).error.detail == _NON_SCALAR_MESSAGE
+    nested = _param_transform(Obj("Filter", {"defaultValue": Arr([Arr([1])]), "name": "q"}))
+    assert evaluate_transform(nested, {}).error.detail == _NON_SCALAR_MESSAGE
+
+
+def test_resolve_param_binding_is_four_valued() -> None:
+    """Resolved / resolved-list / unbound / non-scalar are distinct outcomes — the whole
+    point of the error channel. A silent `Cell | None` cannot express the last two.
+
+    The EMPTY array moved from non-scalar to UNBOUND at Phase 610, and deliberately: an
+    empty multi-select selection is the absence of a constraint, so its filter prunes and
+    the unfiltered table shows. `tests/test_list_params.py` pins that end to end."""
     assert resolve_param_binding("p", Obj("Static", {"value": "a"}), {}) == ParamResolved(cell_str("a"))
     assert resolve_param_binding("p", Obj("Filter", {"name": "q"}), {}) == ParamUnbound()
-    assert resolve_param_binding("p", Obj("Static", {"value": Arr([])}), {}) == ParamNonScalar(_NON_SCALAR_MESSAGE)
+    assert resolve_param_binding("p", Obj("Static", {"value": Arr([])}), {}) == ParamUnbound()
+    assert resolve_param_binding("p", Obj("Static", {"value": Arr(["a"])}), {}) == ParamResolvedList([cell_str("a")])
+    assert resolve_param_binding("p", Obj("Static", {"value": Obj(None, {})}), {}) == ParamNonScalar(
+        _NON_SCALAR_MESSAGE
+    )
 
 
 def test_absent_and_null_sources_stay_scalar_nulls() -> None:

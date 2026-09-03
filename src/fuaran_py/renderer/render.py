@@ -1022,6 +1022,11 @@ class Renderer:
           poster shows its first frame, which is a working rendering, whereas a
           poster pointing at the refusal URL is a broken image painted over the
           player.
+
+        fuaran#1110 adds three more of the same kind, all of them in
+        :meth:`_media_tracks` and :meth:`_media_transcript`: authored track ORDER
+        is preserved, at most one ``default`` survives per KIND, and a declared
+        transcript renders BESIDE the transport rather than inside it.
         """
         src_value = resolve_binding(fields.get("src"), self.sources)
         src, egress_attrs = sanitize_url_for_egress(
@@ -1037,16 +1042,20 @@ class Renderer:
             shared.append(("controls", ""))
         if fields.get("loop") is True:
             shared.append(("loop", ""))
+        tracks_html = self._media_tracks(fields.get("tracks"))
         if variant == "Audio":
             # `element`, not `void_element`: `<video>` / `<audio>` are NOT void
             # elements. A self-closed `<audio …/>` leaves the parser inside the
             # element and swallows the rest of the document as its fallback
             # content — the one mistake here that produces a page which looks
             # broken everywhere EXCEPT the node that caused it.
-            return element(
-                "audio",
-                [("class", "fuaran-media fuaran-media-audio"), *shared, *semantic_attrs, *egress_attrs],
-                "",
+            return self._media_transcript(
+                element(
+                    "audio",
+                    [("class", "fuaran-media fuaran-media-audio"), *shared, *semantic_attrs, *egress_attrs],
+                    tracks_html,
+                ),
+                fields,
             )
         kind_fields = kind.fields if isinstance(kind, Obj) else {}
         poster_attrs: list[tuple[str, str]] = []
@@ -1060,18 +1069,111 @@ class Renderer:
         autoplay_attrs: list[tuple[str, str]] = (
             [("autoplay", ""), ("muted", "")] if kind_fields.get("autoplay") is True else []
         )
-        return element(
-            "video",
-            [
-                ("class", "fuaran-media fuaran-media-video"),
-                *shared,
-                *poster_attrs,
-                *autoplay_attrs,
-                *semantic_attrs,
-                *egress_attrs,
-            ],
-            "",
+        return self._media_transcript(
+            element(
+                "video",
+                [
+                    ("class", "fuaran-media fuaran-media-video"),
+                    *shared,
+                    *poster_attrs,
+                    *autoplay_attrs,
+                    *semantic_attrs,
+                    *egress_attrs,
+                ],
+                tracks_html,
+            ),
+            fields,
         )
+
+    #: The lower-case HTML token each wire ``TrackKind`` case emits as. The wire
+    #: spells the case; HTML spells the attribute, and the two are deliberately
+    #: not the same string — a renderer emitting the wire spelling would produce
+    #: a `kind` no user agent recognises.
+    _TRACK_KIND_TOKENS = {
+        "Subtitles": "subtitles",
+        "Captions": "captions",
+        "Descriptions": "descriptions",
+        "Chapters": "chapters",
+    }
+
+    def _media_tracks(self, raw: Value | None) -> str:
+        """fuaran#1110 — the ``<track>`` children. Three render obligations live
+        in this one fold, and none of them is anything the bytes can carry:
+
+        * AUTHORED ORDER is preserved. The list is emitted exactly as the wire
+          carries it. This is the OPPOSITE of ``srcSet``, which this renderer
+          sorts ascending by width, and the difference is not an inconsistency: a
+          browser picks ONE candidate from a srcset by an algorithm, while a
+          reader picks a track from a menu the user agent builds in document
+          order. Sorting the first is canonicalisation; sorting the second would
+          be reordering someone else's menu.
+        * ONE ``default`` PER KIND, FIRST WINS. A document electing two default
+          captions tracks is legal bytes — the decoder does not refuse it,
+          because a lenient host would render it anyway and HTML leaves the case
+          undefined — so the host resolves it, and every host resolves it the
+          same way. The later track is still EMITTED; only its claim on the menu
+          is dropped.
+        * A REFUSED SOURCE DROPS THE TRACK. The poster rule rather than the
+          source rule: an element must have a source, but it need not have this
+          track, and a ``<track>`` pointing at the refusal URL is a menu entry
+          that opens onto nothing.
+        """
+        if not isinstance(raw, Arr):
+            return ""
+        claimed: set[str] = set()
+        out: list[str] = []
+        for entry in raw.items:
+            if not isinstance(entry, Obj):
+                continue
+            resolved = resolve_binding(entry.fields.get("src"), self.sources)
+            safe, refusal = sanitize_url_for_egress(
+                self.egress_policy, EgressClass.MEDIA, resolved if isinstance(resolved, str) else ""
+            )
+            if safe == "" or refusal:
+                continue
+            kind = entry.fields.get("kind")
+            token = self._TRACK_KIND_TOKENS.get(kind, "") if isinstance(kind, str) else ""
+            src_lang = entry.fields.get("srcLang")
+            takes_default = entry.fields.get("default") is True and token not in claimed
+            if takes_default:
+                claimed.add(token)
+            attrs: list[tuple[str, str]] = [
+                ("kind", token),
+                ("src", safe),
+                ("srclang", src_lang if isinstance(src_lang, str) else ""),
+                ("label", self._text(entry.fields.get("label"))),
+            ]
+            if takes_default:
+                attrs.append(("default", ""))
+            out.append(void_element("track", attrs))
+        return "".join(out)
+
+    def _media_transcript(self, transport: str, fields: dict[str, Value]) -> str:
+        """fuaran#1110 — the transcript disclosure, rendered BESIDE the transport
+        rather than inside it.
+
+        ``<video>`` and ``<audio>`` admit only source-ish children, so a
+        transcript placed there would be fallback content a browser never shows —
+        which is why a present transcript is the one case where the emission
+        gains a wrapper. Absent, the emission is the bare element it would
+        otherwise be, exactly as an uncaptioned ``Image`` emits no ``<figure>``.
+
+        The ``<details>`` carries the MEDIA's resolved label as its own
+        accessible name, so a reader meeting the disclosure out of context is
+        told which recording it transcribes. The summary text is renderer chrome
+        (the ``Toast`` dismiss precedent); the transcript itself is the
+        document's.
+        """
+        transcript = fields.get("transcript")
+        if transcript is None:
+            return transport
+        disclosure = element(
+            "details",
+            [("class", "fuaran-media-transcript"), ("aria-label", self._text(fields.get("label")))],
+            text_element("summary", [("class", "fuaran-media-transcript-summary")], "Transcript")
+            + text_element("div", [("class", "fuaran-media-transcript-body")], self._text(transcript)),
+        )
+        return element("div", [("class", "fuaran-media-group")], transport + disclosure)
 
     def _list(self, node: Node, fields: dict[str, Value]) -> str:
         raw = fields.get("items")

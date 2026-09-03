@@ -250,3 +250,31 @@ def test_form_field_reports_its_own_id() -> None:
     findings = validate_node(node)
     assert [f.code for f in findings] == ["FUARAN069"]
     assert "FormField(email)" in findings[0].message
+
+
+def test_track_without_label_is_flagged_per_entry() -> None:
+    """FUARAN113 (fuaran#1110) — the per-track sibling of FUARAN108.
+
+    The wire REQUIRES a track's ``label`` member; what no decoder can refuse is
+    the empty value that satisfies the requirement while meaning nothing, and an
+    unlabelled track is offered in the menu as its kind alone.
+
+    Reported per ENTRY and independently of the node-level rule: a node can carry
+    both defects, and a walk that stopped at the first would send an author back
+    for a second pass after fixing it.
+    """
+    wire = (
+        '{"id":"m","kind":{"$type":"Media","kind":{"$type":"Video"},"label":"Studio walkthrough",'
+        '"src":{"$type":"Static","value":"/w.mp4"},"tracks":['
+        '{"kind":"Captions","label":"English captions","src":{"$type":"Static","value":"/a.vtt"},"srcLang":"en"},'
+        '{"kind":"Subtitles","label":" ","src":{"$type":"Static","value":"/b.vtt"},"srcLang":"gd"}]}}'
+    )
+    result = decode_node(wire)
+    assert result.ok, result
+
+    findings = validate_node(result.value)
+    assert [f.code for f in findings] == ["FUARAN113"]
+    # The path carries the ARRAY INDEX, so a document with four tracks names the
+    # one at fault rather than the slot in general.
+    assert findings[0].path == "$.kind.tracks[1].label"
+    assert "at index 1" in findings[0].message

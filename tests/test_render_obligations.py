@@ -61,7 +61,7 @@ from fuaran_py.render_fidelity import (
     unasserted_obligations,
 )
 from fuaran_py.renderer import render_html
-from fuaran_py.ui import encode, fuaran
+from fuaran_py.ui import encode, fuaran, track
 
 # ── Locating the artefact ────────────────────────────────────────────────────
 #
@@ -158,6 +158,119 @@ def check_refused_source_dropped() -> None:
     )
 
     assert 'poster="/walkthrough-poster.jpg"' in allowed, "a local poster still renders"
+
+    # fuaran#1110 widened this claim to the TRACK source, which takes the
+    # poster's disposition rather than the element source's: an element must have
+    # a source, but it need not have this track, and a <track> at the refusal URL
+    # is a menu entry that opens onto nothing.
+    refused_track = render(
+        fuaran.video(
+            "mvt0",
+            src="/walkthrough.mp4",
+            label="Studio walkthrough",
+            tracks=[
+                track.captions(src=REFUSED, src_lang="en", label="English captions"),
+                track.subtitles(src="/walkthrough.gd.vtt", src_lang="gd", label="Gàidhlig"),
+            ],
+        )
+    )
+
+    assert "collector.example" not in refused_track, "a refused track source's destination is never emitted"
+    assert REFUSAL_URL not in refused_track, "the track is DROPPED, not emitted at the refusal URL"
+    assert 'src="/walkthrough.gd.vtt"' in refused_track, (
+        "…while the tracks that pass the floor still are — a refusal drops ONE entry, never the menu"
+    )
+
+
+# ── The Phase 1110 track / transcript obligations ───────────────────────────
+
+
+def _tracked(node_id: str, tracks: list) -> str:
+    return render(fuaran.video(node_id, src="/walkthrough.mp4", label="Studio walkthrough", tracks=tracks))
+
+
+def check_authored_child_order() -> None:
+    # Authored in an order no sort produces: a `gd` subtitles track before an
+    # `en` captions one before an `en` descriptions one. Alphabetical by srclang,
+    # by label, or by kind would all move at least one entry, so any re-sort
+    # shows up here.
+    html = _tracked(
+        "mvt",
+        [
+            track.subtitles(src="/restoration-2.gd.vtt", src_lang="gd", label="Gàidhlig"),
+            track.captions(src="/restoration-2.en.vtt", src_lang="en", label="English captions", default=True),
+            track.descriptions(src="/restoration-2.ad.vtt", src_lang="en", label="Audio description"),
+        ],
+    )
+
+    gd = html.find("/restoration-2.gd.vtt")
+    en = html.find("/restoration-2.en.vtt")
+    ad = html.find("/restoration-2.ad.vtt")
+
+    assert gd > -1, "the first authored track is emitted"
+    assert gd < en, "the authored order is preserved — the gd track precedes the en one"
+    assert en < ad, "…and the whole list, not merely its head"
+
+
+def check_single_default_per_kind() -> None:
+    # Two captions tracks both electing themselves default, plus a subtitles one
+    # that also does. First-wins is PER KIND, so the subtitles election survives
+    # beside the captions one and only the SECOND captions election is dropped.
+    html = _tracked(
+        "mvd",
+        [
+            track.captions(src="/a.en.vtt", src_lang="en", label="English captions", default=True),
+            track.captions(src="/b.en.vtt", src_lang="en", label="English captions (verbose)", default=True),
+            track.subtitles(src="/c.gd.vtt", src_lang="gd", label="Gàidhlig", default=True),
+        ],
+    )
+
+    assert html.count("default=") == 2, (
+        "one default survives per KIND — the captions duplicate loses, the subtitles election does not"
+    )
+    assert "/b.en.vtt" in html, "the losing track is still EMITTED; only its claim on the menu is dropped"
+
+    # The twin without which a renderer that dropped EVERY default would pass.
+    single = _tracked("mvd1", [track.captions(src="/a.en.vtt", src_lang="en", label="English captions", default=True)])
+
+    assert "default=" in single, "a lone election is honoured"
+
+
+def check_transcript_disclosure_named() -> None:
+    with_transcript = render(
+        fuaran.audio(
+            "mat",
+            src="/commentary.mp3",
+            label="Curator commentary",
+            transcript="The harbour was rebuilt twice.",
+        )
+    )
+
+    assert "<details" in with_transcript, "a declared transcript renders as a disclosure"
+    assert "fuaran-media-transcript" in with_transcript, "…carrying the media-scoped class, not the Disclosure kind's"
+    assert "The harbour was rebuilt twice." in with_transcript, (
+        "…and the transcript text itself, which is the document's content"
+    )
+    assert 'aria-label="Curator commentary"' in with_transcript, (
+        "the disclosure carries the media's resolved label as its accessible name"
+    )
+
+    # BESIDE, not inside: a <details> within a media element is fallback content
+    # a browser never shows, so the ordering here is the whole obligation.
+    assert with_transcript.index("<audio") < with_transcript.index("<details"), (
+        "the disclosure sits beside the transport, after it"
+    )
+    assert "</audio>" in with_transcript
+    assert with_transcript.index("</audio>") < with_transcript.index("<details"), (
+        "…and OUTSIDE it — inside, a browser treats it as fallback content and never shows it"
+    )
+
+    # The absent twin: no transcript, no disclosure and no wrapper. Without it a
+    # renderer that always emitted the group would pass everything above.
+    without = render(fuaran.audio("mat0", src="/commentary.mp3", label="Curator commentary"))
+
+    assert "<details" not in without, "no transcript, no disclosure"
+    assert "fuaran-media-group" not in without, "…and no group wrapper either"
 
 
 def check_alt_always_emitted() -> None:
@@ -310,6 +423,10 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "Media/autoplay-muted-pairing": check_autoplay_muted_pairing,
     "Media/no-autoplay-pathway": check_no_autoplay_pathway,
     "Media/refused-source-dropped": check_refused_source_dropped,
+    # fuaran#1110 — the timed-text tracks and the transcript.
+    "Media/authored-child-order": check_authored_child_order,
+    "Media/single-default-per-kind": check_single_default_per_kind,
+    "Media/transcript-disclosure-named": check_transcript_disclosure_named,
     "Image/alt-always-emitted": check_alt_always_emitted,
     "Image/anchor-affordance-on-expandable": check_anchor_affordance_on_expandable,
     "Image/refused-src-no-affordance": check_refused_src_no_affordance,

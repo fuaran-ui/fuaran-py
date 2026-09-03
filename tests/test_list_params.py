@@ -380,3 +380,50 @@ def test_the_fixture_round_trips_byte_identically() -> None:
     node = decode_node(raw)
     assert node.ok, node
     assert encode_node(node.value) == raw
+
+
+# ── the reactivity edge (derived from the same param walk) ───────────────────
+
+
+@corpus_required
+def test_the_chip_to_grid_edge_is_reactive() -> None:
+    """The filter→consumer edge is DERIVED from the pipeline's params, never separately
+    declared — and a list param shares the scalar params' namespace, so the same walk
+    names it. This host recomputes the whole tree on a store write rather than keeping a
+    per-param subscription graph, so the edge cannot go stale for a list param in a way it
+    would not for a scalar one; what this pins is the loop the operator actually sees.
+
+    The last line is Phase 610's acceptance criterion under the reactive loop: deselecting
+    everything comes BACK to the unfiltered table, rather than sticking at the last
+    selection or collapsing to nothing."""
+    from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+
+    headless = BrowserDeps(lambda _id: None, lambda _e, _h: None, lambda _e, _t, _h: lambda: None)
+    runtime = FuaranRuntime(_decode("multiselect-chip-list-param.json"), deps=headless)
+
+    assert runtime.derived["dept-grid"].rows == _ALL_ROWS
+    assert runtime.set_compute_state({"depts": ["eng"]})["dept-grid"].rows == [{"dept": "eng", "amount": 100}]
+    assert runtime.set_compute_state({"depts": ["eng", "ops"]})["dept-grid"].rows == [
+        {"dept": "eng", "amount": 100},
+        {"dept": "ops", "amount": 70},
+    ]
+    assert runtime.set_compute_state({"depts": []})["dept-grid"].rows == _ALL_ROWS
+
+
+@corpus_required
+def test_the_server_renderer_honours_the_rule_end_to_end() -> None:
+    """The rule is not confined to the compute layer: the shipped server-HTML renderer
+    resolves the grid through the same seam, so the rendered table IS the pinned output —
+    all three rows while nothing is selected, the selected subset otherwise."""
+    import re
+
+    from fuaran_py.renderer import render_html
+
+    tree = _decode("multiselect-chip-list-param.json")
+
+    def rendered_depts(sources: dict[str, object]) -> list[str]:
+        return re.findall(r">(eng|sales|ops)<", render_html(tree, sources))
+
+    assert rendered_depts({}) == ["eng", "sales", "ops"]
+    assert rendered_depts({"depts": []}) == ["eng", "sales", "ops"]
+    assert rendered_depts({"depts": ["eng", "ops"]}) == ["eng", "ops"]

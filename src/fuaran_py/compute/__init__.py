@@ -15,11 +15,13 @@ from .evaluate import (
     ParamNonScalar,
     ParamResolution,
     ParamResolved,
+    ParamResolvedList,
     ParamUnbound,
     evaluate_transform,
     evaluate_tree,
     resolve_param_binding,
     rows_of,
+    substitute_list_params,
 )
 
 __all__ = [
@@ -27,11 +29,13 @@ __all__ = [
     "evaluate_transform",
     "resolve_param_binding",
     "rows_of",
+    "substitute_list_params",
     "ComputeOk",
     "ComputeErr",
     "ComputeResult",
     "ComputeState",
     "ParamResolved",
+    "ParamResolvedList",
     "ParamUnbound",
     "ParamNonScalar",
     "ParamResolution",

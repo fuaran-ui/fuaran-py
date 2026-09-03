@@ -406,8 +406,14 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
 
     # ── Layout ───────────────────────────────────────────────────────────────
     @staticmethod
-    def dashboard(id: str, *, children: list[UiNode] | None = None) -> UiNode:  # noqa: A002
-        return _node(id, t.Dashboard(tuple(children or ())), accessibility.dashboard)
+    def dashboard(
+        id: str,  # noqa: A002
+        *,
+        children: list[UiNode] | None = None,
+        heading: t.TextInput | None = None,
+    ) -> UiNode:
+        kind = t.Dashboard(tuple(children or ()), _text(heading) if heading is not None else None)
+        return _node(id, kind, accessibility.dashboard)
 
     @staticmethod
     def stack(
@@ -958,8 +964,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         source: Binding,
         columns: list[t.Column] | None = None,
         editable: bool = False,
+        row_key_field: str | None = None,
     ) -> UiNode:
-        return _node(id, t.DataGrid(source, tuple(columns or ()), editable), accessibility.grid)
+        """``row_key_field`` names the row property that identifies a row — the
+        declarative sibling of the erased ``rowKey`` closure; pass it whenever the
+        columns are ``field``-projected, so a decoded grid can key its rows."""
+        return _node(id, t.DataGrid(source, tuple(columns or ()), editable, row_key_field), accessibility.grid)
 
     # ── Structural ─────────────────────────────────────────────────────────────
     @staticmethod
@@ -1054,6 +1064,11 @@ def encode(n: UiNode) -> str:
 # ``when``) that emits canonical ``Transform`` JSON, plus the Python capability
 # host-registration seam. The wire codec lives in :mod:`fuaran_py.dataframe`.
 from . import capability as capability  # noqa: E402, PLC0414 — append-only re-export at module foot
+
+# fuaran#1160 — the terse, notebook-grade layer OVER this surface (title-first,
+# records-in, ids derived). It composes the constructors defined above, so it is
+# imported here at the module foot rather than at the head.
+from . import quick as quick  # noqa: E402, PLC0414 — append-only re-export at module foot
 from .capability import invoke  # noqa: E402 — the Invoke wire ctor (Binding.Invoke / Action.Invoke)
 from .compute import (  # noqa: E402 — append-only: kept below the existing surface (integration-lane convention)
     AggExpr,
@@ -1099,4 +1114,6 @@ __all__ = [
     "TransformBinding",
     "capability",
     "invoke",
+    # The terse notebook layer (fuaran#1160)
+    "quick",
 ]

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fuaran-py"
-version = "0.0.2"
+version = "0.0.3"
 description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
 requires-python = ">=3.12"

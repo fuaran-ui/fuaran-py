@@ -800,9 +800,12 @@ class Box:
         )
 
 
-def Dashboard(children: tuple[UiNode, ...] = ()) -> Box:  # noqa: N802
-    """Retired ``Dashboard`` — a ``Box`` with ``Auto`` layout + ``Dashboard`` role."""
-    return Box(children=children, layout=AutoLayout(), role="Dashboard")
+def Dashboard(children: tuple[UiNode, ...] = (), heading: TextSource | None = None) -> Box:  # noqa: N802
+    """Retired ``Dashboard`` — a ``Box`` with ``Auto`` layout + ``Dashboard`` role.
+
+    ``heading`` is the same optional Box slot :func:`Card` fills; a titled dashboard
+    is the ordinary shape and needed no new field, only a way to reach this one."""
+    return Box(children=children, layout=AutoLayout(), role="Dashboard", heading=heading)
 
 
 def Stack(  # noqa: N802
@@ -1887,10 +1890,23 @@ AnyColumnKind = ColumnKind | TonedPillColumnKind
 
 @dataclass(frozen=True)
 class Column:
+    """A DataGrid column.
+
+    ``value`` (the closure projection) and ``field`` (the declarative one) are the
+    wire's two sibling optional slots for "which cell does this column show"
+    (``schema/decode.py::_decode_column``). A closure cannot survive the wire, so it
+    erases to ``"<closure>"``; a ``field`` names a row property and survives intact,
+    which is the only spelling a *decoded* grid can actually project from. Naming a
+    ``field`` therefore emits ``field`` and omits the erased ``value`` — the two are
+    alternatives, not a pair (corpus: ``nodes/grid-field-named.json`` vs
+    ``nodes/grid-1.json``).
+    """
+
     label: str
     format: CellFormat = field(default_factory=FormatNone)
     kind: AnyColumnKind = field(default_factory=ColumnKind)
     width: ColumnWidth = field(default_factory=ColumnWidth)
+    field_name: str | None = None
 
     def to_wire(self) -> Value:
         # Phase 460 — `format` / `width` omitted-when-default (`CellFormat.None`
@@ -1898,10 +1914,11 @@ class Column:
         return _obj(
             None,
             {
+                "field": self.field_name,
                 "format": None if isinstance(self.format, FormatNone) else self.format,
                 "kind": self.kind,
                 "label": self.label,
-                "value": CLOSURE,
+                "value": None if self.field_name is not None else CLOSURE,
                 "width": None if self.width.kind == "Auto" else self.width,
             },
         )
@@ -1909,9 +1926,17 @@ class Column:
 
 @dataclass(frozen=True)
 class DataGrid:
+    """A data grid.
+
+    ``rowKey`` / ``rowKeyField`` mirror the column slots above: the closure spelling
+    erases, the declarative one names a row property and survives the wire. Naming a
+    ``row_key_field`` emits ``rowKeyField`` and omits the erased ``rowKey``.
+    """
+
     source: Binding
     columns: tuple[Column, ...] = ()
     editable: bool = False
+    row_key_field: str | None = None
 
     def to_wire(self) -> Obj:
         # 0.2.0 — `editable` omitted-when-false.
@@ -1920,7 +1945,8 @@ class DataGrid:
             {
                 "columns": list(self.columns),
                 "editable": True if self.editable else None,
-                "rowKey": CLOSURE,
+                "rowKey": None if self.row_key_field is not None else CLOSURE,
+                "rowKeyField": self.row_key_field,
                 "source": self.source,
             },
         )

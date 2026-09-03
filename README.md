@@ -16,7 +16,7 @@ without a client runtime.
 
 | Module | Role |
 |---|---|
-| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. See [docs/AUTHORING.md](docs/AUTHORING.md) and [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py). |
+| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. Its terse sibling `fuaran_py.ui.quick` is the notebook shape — title-first, records-in, ids derived. See [docs/AUTHORING.md](docs/AUTHORING.md), [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py) and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py). |
 | `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
 | `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops), plus the [placement helpers](#placement-helpers--fuaran_pyopsplacement) — placed insert / move / nudge and the clone verbs, which emit only those 11 ops. |
 | `fuaran_py.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
@@ -76,6 +76,29 @@ wire = encode(tree)  # canonical JSON
 
 This is the **human** authoring surface; the AI's emission surface is the wire
 format itself, for every host. Full guide: [docs/AUTHORING.md](docs/AUTHORING.md).
+
+### …and terser, from a notebook
+
+`fuaran_py.ui.quick` is a thin layer over those constructors for the case where the
+data arrives as records and the ids do not matter to you: **title-first, records-in,
+ids derived**.
+
+```python
+from fuaran_py.ui import quick
+
+app = quick.dashboard(
+    "Regional revenue",
+    quick.metric_strip(totals),  # {label: value}, pairs, or records
+    quick.chart(rows, x="region", y="revenue", kind="Bar"),
+    quick.grid(rows),  # df.to_dict("records")
+)
+```
+
+Ids are derived from each node's kind and label and hashed, so re-running the same
+cell produces the same ids — and `fuaran_py.ops.diff` between two runs is then a
+short, typed op script a host can *apply* to the rendered page rather than a
+rebuild. See [docs/AUTHORING.md](docs/AUTHORING.md#the-terse-layer-fuaran_pyuiquick--title-first-records-in-ids-derived)
+and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py).
 
 ## Render (optional)
 

@@ -66,19 +66,39 @@ def reference_css() -> str:
     return _REFERENCE_CSS.read_text(encoding="utf-8")
 
 
+# fuaran#1161 — the notebook display protocol. Imported at the module FOOT
+# because `notebook` resolves the stylesheet through `reference_css` above; a
+# head import would reach for it before this module has defined it.
+from .notebook import (  # noqa: E402  — append-only re-export at module foot
+    FUARAN_UI_MIME,
+    NOTEBOOK_OUTPUT_ATTR,
+    UnscopableCss,
+    display_html,
+    mimebundle,
+    scope_css,
+    scoped_reference_css,
+)
+
 __all__ = [
     "DENY_NON_LOCAL_EGRESS",
+    "FUARAN_UI_MIME",
     "HOST_RESERVED_STATE_PREFIX",
+    "NOTEBOOK_OUTPUT_ATTR",
     "PERMISSIVE_EGRESS",
     "EgressClass",
     "EgressPolicy",
     "ExactHost",
     "HostSuffix",
     "Renderer",
+    "UnscopableCss",
     "allow_origin",
     "collect_state_seeds",
+    "display_html",
+    "mimebundle",
     "reference_css",
     "reference_css_path",
     "render_html",
+    "scope_css",
+    "scoped_reference_css",
     "with_state_seeds",
 ]

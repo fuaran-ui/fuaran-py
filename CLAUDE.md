@@ -240,6 +240,43 @@ Three disciplines follow, and the third is the one that decays quietly:
 The README's "Destination policy" section carries the host-facing contract and
 the four declared shape differences from the reference host.
 
+### Notebook display (`fuaran_py.renderer.notebook`)
+
+`UiNode` and `Node` implement `_repr_mimebundle_`, so a tree evaluated as the last
+expression of a notebook cell renders inline. The rich-display protocol is a
+**method name, not an import**, which is the whole reason this fits a
+dependency-light host: nothing was added to the dependency set and no notebook
+library is imported anywhere in `src/`. The bundle is `text/html` (the shipped
+renderer's output, wrapped, with the reference stylesheet inlined once per
+output), `application/vnd.fuaran.ui+json` (the canonical wire, as the **bytes** —
+handing a front end a `dict` to re-serialise would discard the one property this
+host's output is evidence of), and `text/plain` (a one-line summary).
+
+Two disciplines:
+
+- **The HTML is `render_html`'s, byte for byte.** The display path concatenates;
+  it never post-processes, re-escapes or widens. That is what carries the
+  sanitiser and the ambient destination policy — deny-non-local by default — into
+  notebook output rather than re-deciding them, and `tests/test_notebook_display.py`
+  asserts the identity rather than the intent.
+- **The scoper REFUSES what it cannot confine.** The reference stylesheet is
+  written for a whole document (`:root`, `body`, document-level state hooks), so
+  every rule is rewritten to sit under the wrapper and the document-level subjects
+  *become* the wrapper. An at-rule the scoper does not recognise raises
+  `UnscopableCss` instead of being copied through — a quiet pass-through would
+  either leak styling onto the notebook page or reinstate a fetch (`@import`).
+  Since the stylesheet is a byte-copy of the canonical one, a refusal means the
+  canonical sheet gained a construct and the scoper owes it a decision.
+
+`examples/notebook_display.ipynb` is committed **with its recorded outputs** — the
+evidence that a real Jupyter-protocol front end exercised the method — and the
+test reads it back and asserts the recording is genuine (three mime keys; the
+recorded wire decodes and re-encodes byte-identically; the recorded HTML is
+wrapped and script-free). It deliberately does **not** pin the recorded bytes to a
+live render: that would turn every cosmetic renderer change into a notebook
+re-record. Re-record it with `pip install nbclient` into a working venv (never a
+package dependency) and the command in the notebook's own header.
+
 ## Op-stream (hash chain)
 
 `fuaran_py.op_stream` is the Python host of the op-stream **hash-chained provenance

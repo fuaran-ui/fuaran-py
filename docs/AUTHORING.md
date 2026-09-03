@@ -189,6 +189,72 @@ inserts another rather than updating one.
 A worked end-to-end script — authoring, validation, the round trip, and both diffs —
 is [`../examples/quickstart_terse_dashboard.py`](../examples/quickstart_terse_dashboard.py).
 
+## Displaying a tree inline (Jupyter, JupyterLab, VS Code, marimo)
+
+A tree evaluated as the last expression of a cell **renders in place**, with no
+import beyond `fuaran_py`:
+
+```python
+from fuaran_py.ui import quick
+
+quick.dashboard(
+    "Regional revenue",
+    quick.metric_strip(rows, label="region", value="revenue"),
+    quick.grid(rows),
+)
+```
+
+The rich-display protocol is a **method name** (`_repr_mimebundle_`), not an
+IPython import, so this costs the package nothing: `fuaran-py`'s dependency set is
+still empty and no notebook library is imported anywhere in it. Both tree types
+implement it — the authored `UiNode` above and any `Node` you decoded off the wire
+— through one display path, so what a notebook shows and what a server serves
+cannot drift apart.
+
+Three representations go to the front end, and it picks the richest it
+understands:
+
+| Media type | What it is |
+|---|---|
+| `text/html` | the shipped server renderer's output (`fuaran_py.renderer.render_html`), wrapped in a container with the reference stylesheet inlined once per output and rewritten to apply only inside it |
+| `application/vnd.fuaran.ui+json` | the canonical wire JSON, as the bytes `encode_node` produced — a string, not a re-serialised object, so byte-identity survives the trip |
+| `text/plain` | a one-line summary, for a terminal REPL or a diff of a recorded notebook. `repr()` is still the full structural view |
+
+`fuaran_py.renderer.mimebundle(node, …)` is the same thing as a function, if you
+want to hand a bundle to something yourself; `display_html(node, …)` is the HTML
+half alone. Both take the `sources` and `egress_policy` keywords `render_html`
+takes, which is how a notebook declares a wider destination posture — by name,
+exactly as a web host does.
+
+### What is, and is not, interactive
+
+The output is **static and read-only**, deliberately. Being precise about the
+boundary is more useful than the summary:
+
+- **It renders** the full node vocabulary the server renderer supports, styled by
+  the reference stylesheet, so it looks the same inline as it does served.
+- **It resolves** `Binding.Static` values and a data-bound grid's rows at render
+  time; every other binding shows the renderer's em-dash placeholder, because
+  there is no host supplying values.
+- **Nothing happens on click.** A `Button` is inert, a `Toggle` does not toggle,
+  no `Action` reaches your kernel, and the output carries no script.
+- **The wrapper fetches nothing.** The inlined stylesheet has no `url(...)` and no
+  `@import`. A destination the *tree* declares — an `Image` source, an `Embed`
+  frame — goes through the ambient destination policy, which refuses a non-local
+  one unless you named a wider one.
+- **Re-running a cell produces a new output**, not a patch of the one on screen.
+  Patching in place needs a live channel and a client runtime, which is a
+  different problem with different dependencies.
+
+What is cheap today is that re-running an *unchanged* cell yields a byte-identical
+tree, because `quick` derives ids from labels rather than positions — so
+`fuaran_py.ops.diff` across two runs is the short typed op script an in-place patch
+would eventually carry (see [Derived ids](#derived-ids--the-discipline) above).
+
+A worked notebook, committed with its recorded outputs, is
+[`../examples/notebook_display.ipynb`](../examples/notebook_display.ipynb); its
+header carries the one command that re-records it.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

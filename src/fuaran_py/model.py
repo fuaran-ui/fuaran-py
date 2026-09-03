@@ -20,6 +20,7 @@ encoder needs to reproduce byte-identical output (see :mod:`fuaran_py.canonical`
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 type Value = str | int | float | bool | None | Node | Obj | Arr
@@ -47,6 +48,24 @@ class Node:
     id: str
     kind: Obj
     extras: dict[str, Value] = field(default_factory=dict)
+
+    def _repr_mimebundle_(
+        self,
+        include: Iterable[str] | None = None,
+        exclude: Iterable[str] | None = None,
+    ) -> dict[str, str]:
+        """The Jupyter rich-display bundle (fuaran#1161) — HTML, canonical wire, summary.
+
+        The display protocol is a method name rather than an import, so a decoded
+        tree renders inline in a notebook front end with nothing added to this
+        package's dependency set. :mod:`fuaran_py.renderer.notebook` carries the
+        contract, including what is deliberately NOT interactive; the renderer is
+        imported inside the method rather than at module scope because it is the
+        optional tier and depends on this one.
+        """
+        from .renderer.notebook import mimebundle
+
+        return mimebundle(self, include, exclude)
 
 
 def from_json(value: object) -> Value:

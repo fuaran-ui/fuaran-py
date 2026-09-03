@@ -22,6 +22,7 @@ defaults + ARIA injection) live in :mod:`fuaran_py.ui`; this module is the data.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol, runtime_checkable
 
@@ -2246,3 +2247,21 @@ class UiNode:
     def replace(self, **changes: object) -> UiNode:
         """Return a copy with the named traits replaced (e.g. ``n.replace(style=…)``)."""
         return replace(self, **changes)  # type: ignore[arg-type]
+
+    def _repr_mimebundle_(
+        self,
+        include: Iterable[str] | None = None,
+        exclude: Iterable[str] | None = None,
+    ) -> dict[str, str]:
+        """The Jupyter rich-display bundle (fuaran#1161) — HTML, canonical wire, summary.
+
+        An authored tree is the last expression of a notebook cell far more often
+        than a decoded one is, so the display protocol is implemented on both and
+        on the same terms: this one lowers to the structural model first, which is
+        what :func:`~fuaran_py.schema.encode.encode_node` and the renderer already
+        consume — one display path, not a second one that could drift from it.
+        :mod:`fuaran_py.renderer.notebook` carries the contract.
+        """
+        from ..renderer.notebook import mimebundle
+
+        return mimebundle(self.to_wire(), include, exclude)

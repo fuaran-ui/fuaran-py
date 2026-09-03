@@ -49,15 +49,38 @@ def _cases() -> list[str]:
     return sorted(p.name[: -len(".input.json")] for p in _CHART_LOWERING_DIR.glob("*.input.json"))
 
 
+def _text_source(raw: object) -> object | None:
+    """The corpus carries a ``TextSource`` in canonical wire JSON; the lowering
+    takes this host's ``Value`` model. Every arm crosses the lowering unresolved
+    (Phase 1143), so all three decode here; a binding arm no fixture uses raises
+    rather than being invented, exactly as ``valueFormat`` refuses one.
+    """
+    if raw is None or isinstance(raw, str):
+        # The bare string IS the canonical Literal form (WIRE_FORMAT 16).
+        return raw
+    assert isinstance(raw, dict), raw
+    tag = raw.get("$type")
+    if tag == "Literal":
+        return raw["text"]
+    if tag == "Bound":
+        binding = raw["binding"]
+        assert binding.get("$type") == "Static", f"unsupported Bound binding {binding.get('$type')}"
+        return Obj("Bound", {"binding": Obj("Static", {"value": binding["value"]})})
+    if tag == "I18n":
+        return Obj("I18n", {"args": Obj(None, dict(raw.get("args") or {})), "key": raw["key"]})
+    raise AssertionError(f"chart-lowering input: unsupported TextSource {tag}")
+
+
 def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # Phase 876 — `valueFormat` is a WIRE field carried in canonical `Format`
     # JSON; `axisUnitMode` is a harness-only STYLE selector (the chart style is
     # a lowering parameter, never wire), present so the corpus can pin every
     # mode. Both absent on the pre-876 cases.
     #
-    # Phase 878 — `xTitle` / `yTitle` / `subtitle` are WIRE fields carried as
-    # plain strings (the canonical `TextSource.Literal` form), omitted when the
-    # author declared none. Absent on every pre-878 case.
+    # Phase 878 — `xTitle` / `yTitle` / `subtitle` are WIRE fields carried in the
+    # same `TextSource` vocabulary as `title`, omitted when the author declared
+    # none. Absent on every pre-878 case. Phase 1143 — every ARM crosses, so the
+    # corpus spells `Bound` and `I18n` here too and `_text_source` decodes them.
     #
     # Phase 880 — `legendPosition` is a WIRE field carried as the bare enum name
     # (`Top | Right | Bottom | None`). ABSENT means the host default (`Right`),
@@ -76,13 +99,13 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         kind=inp["kind"],
         x_field=inp["xField"],
         y_fields=tuple(inp["yFields"]),
-        title=inp.get("title"),
+        title=_text_source(inp.get("title")),
         stacked=bool(inp.get("stacked", False)),
         value_format=inp.get("valueFormat"),
         axis_unit_mode=inp.get("axisUnitMode", "Words"),
-        x_title=inp.get("xTitle"),
-        y_title=inp.get("yTitle"),
-        subtitle=inp.get("subtitle"),
+        x_title=_text_source(inp.get("xTitle")),
+        y_title=_text_source(inp.get("yTitle")),
+        subtitle=_text_source(inp.get("subtitle")),
         legend_position=inp.get("legendPosition"),
         data_labels=inp.get("dataLabels"),
         x_scale=inp.get("xScale"),

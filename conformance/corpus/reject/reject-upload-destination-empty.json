@@ -1,0 +1,1 @@
+{"id":"up","kind":{"$type":"FileUpload","accept":["video/*"],"destination":"","label":"Upload","multiple":true,"onSelect":"<closure>"}}

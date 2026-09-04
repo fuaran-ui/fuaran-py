@@ -1,0 +1,1 @@
+{"id":"f","kind":{"$type":"Form","fields":[{"id":"score","kind":{"$type":"Rating","max":0},"label":"Score","required":false}],"onSubmit":"<closure>","submitLabel":"Save"}}

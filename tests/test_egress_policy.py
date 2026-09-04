@@ -50,7 +50,16 @@ def test_class_wire_spellings_are_the_camelcase_forms() -> None:
     # `fileRead` is camelCase ON THE WIRE even though the Python name is
     # snake-cased — a marker value that spelled it `file_read` would not match
     # any other host's.
-    assert [c.value for c in ALL_EGRESS_CLASSES] == ["hyperlink", "media", "route", "download", "fileRead"]
+    # fuaran#1111 — `embed` sits beside `media` because both are fetched with no
+    # user act; it is scoped SEPARATELY because what an embed fetches EXECUTES.
+    assert [c.value for c in ALL_EGRESS_CLASSES] == [
+        "hyperlink",
+        "media",
+        "embed",
+        "route",
+        "download",
+        "fileRead",
+    ]
 
 
 @pytest.mark.parametrize("spelling", ["fileRead", "FILEREAD", "  fileread  "])

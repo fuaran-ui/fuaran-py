@@ -64,6 +64,15 @@ class EgressClass(Enum):
     contacted merely by rendering the tree, which is why it is scoped
     separately from :attr:`HYPERLINK` rather than folded in with it."""
 
+    EMBED = "embed"
+    """A third-party DOCUMENT the browser loads into a browsing context with no
+    user act (fuaran#1111). Scoped apart from :attr:`MEDIA` because what is
+    fetched EXECUTES: a media element renders an asset, an ``<iframe>`` runs
+    someone else's page. The class also carries a scheme floor of its own —
+    ``https`` and nothing else, not ``http`` and not a schemeless relative
+    reference, because a same-origin frame is exactly where ``AllowSameOrigin``
+    plus ``AllowScripts`` lets the framed document remove its own sandbox."""
+
     ROUTE = "route"
     """A navigation the tree asks for."""
 
@@ -80,6 +89,7 @@ class EgressClass(Enum):
 ALL_EGRESS_CLASSES: tuple[EgressClass, ...] = (
     EgressClass.HYPERLINK,
     EgressClass.MEDIA,
+    EgressClass.EMBED,
     EgressClass.ROUTE,
     EgressClass.DOWNLOAD,
     EgressClass.FILE_READ,
@@ -473,6 +483,30 @@ def sanitize_url_for_egress(policy: EgressPolicy, cls: EgressClass, url: str) ->
         return (verdict.url, [])
     marker = egress_refusal_marker(verdict)
     return (EGRESS_REFUSAL_URL, [marker] if marker is not None else [])
+
+
+def sanitize_embed_src_for_egress(policy: EgressPolicy, url: str) -> tuple[str | None, list[tuple[str, str]]]:
+    """The `Embed` seam (fuaran#1111), and it differs from
+    :func:`sanitize_url_for_egress` in ONE way that is the whole point: a refusal
+    returns ``None`` rather than the refusal URL.
+
+    An `<img src>` at the refusal URL renders a broken image; an `<iframe src>`
+    at it RENDERS THAT PAGE. So the attribute is omitted entirely and the refusal
+    is recorded beside it — the frame is still emitted, still named and still
+    sandboxed, and it simply has nothing in it.
+
+    The scheme floor runs BEFORE the policy and is not a policy rule: `https`
+    and nothing else. A policy can widen which ORIGINS an embed may reach; it
+    cannot admit a scheme this class refuses.
+    """
+    normalised = _trim_ws(url)
+    if normalised == "" or not _ascii_lower(normalised).startswith("https://"):
+        return (None, [(EGRESS_REFUSAL_ATTRIBUTE, "embed:unsafe-url")])
+    verdict = check_destination(policy, EgressClass.EMBED, normalised)
+    if isinstance(verdict, Allowed):
+        return (verdict.url, [])
+    marker = egress_refusal_marker(verdict)
+    return (None, [marker] if marker is not None else [])
 
 
 # ── Shipped policies ────────────────────────────────────────────────────────

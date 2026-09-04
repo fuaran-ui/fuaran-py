@@ -12,6 +12,7 @@ while typed validation is filled in incrementally. An unrecognised kind is a
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Callable
 from typing import cast
 
@@ -194,6 +195,29 @@ MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
 # without leaving the vocabulary. A fifth kind is an ADDITION later, never a
 # spelling a decoder may guess at today.
 TRACK_KIND = frozenset({"Subtitles", "Captions", "Descriptions", "Chapters"})
+# fuaran#1111 — the sandbox relaxations an `Embed` may request, CLOSED at four.
+# The empty list is TOTAL DENIAL and is the identity, so the shortest embed
+# document is the fully-sandboxed one and every relaxation is named.
+EMBED_PERMISSION = frozenset({"AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"})
+# fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
+# A BARE enum, so an unknown token reports at the member's own path with no
+# `.$type` suffix. There is no display-capture case and there will not be one by
+# widening this: a screen capture reaches every window the reader has open
+# rather than one device behind the picker.
+CAPTURE_SOURCE = frozenset({"Camera", "Microphone"})
+# fuaran#1119 — the modal's modality. `Blocking` is the identity and omits.
+MODALITY_KIND = frozenset({"Blocking", "Popover"})
+# fuaran#1472 — the declared base direction, LOWER-CASE on the wire because that
+# is the spelling the isolation is ultimately expressed in. `auto` is the
+# identity and omits at it; an unrecognised token is REFUSED and never coerced to
+# it, since a document that meant `rtl` and misspelled it would otherwise render
+# as reordered digits with nothing said anywhere.
+TEXT_DIRECTION = frozenset({"auto", "ltr", "rtl"})
+#: fuaran#1130 — the canonical `#rrggbb` form and nothing else. Deliberately
+#: STRICT: a native colour input holds exactly this, so `#fff`, `rebeccapurple`,
+#: `rgb(0 0 0)` and an alpha channel all name a colour the control could never
+#: carry. Case is ACCEPTED and never rewritten.
+_HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
 DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
@@ -291,6 +315,8 @@ KNOWN_KINDS = frozenset(
         "Link",
         "Image",
         "Media",  # fuaran#1076 — the playback surface (Video | Audio)
+        "Embed",  # fuaran#1111 — the sandboxed third-party browsing context
+        "Tree",  # fuaran#1120 — recursive disclosure with tree semantics
         "List",
         "Toast",
         "CodeBlock",
@@ -853,6 +879,38 @@ def _decode_track_entry(value: object, path: str) -> Value:
     return Obj(None, fields)
 
 
+def _decode_upload_destination(value: object, path: str) -> Value:
+    """``FileUploadSpec.destination`` — a NAME, and a name because it must never
+    be an ADDRESS (fuaran#1117).
+
+    The string is an id the host has registered with its own upload sink; it is
+    not a URL, not a path, not a template, and nothing on this member is ever
+    fetched or joined to a base. A wire document comes from an arbitrary emitter,
+    and a URL here would let that emitter choose where a reader's file goes.
+
+    The EMPTY STRING is REFUSED rather than read as absence: it is a name no host
+    registers, so a document carrying it describes an upload that can never
+    stream, and reading it as absence silently turns an upload the author meant
+    to stream into a client-only one — with every visible thing about the control
+    still working.
+
+    An UNREGISTERED non-empty id is NOT a decode refusal, and that division is
+    deliberate: whether an id is registered is a fact about the HOST, not about
+    the document, so a decoder that judged it would make one document's validity
+    depend on who was reading it. The refusal belongs at dispatch.
+    """
+    text = _expect_string(value, path)
+    if text == "":
+        _fail(
+            WRONG_TYPE,
+            path,
+            "destination must be a non-empty host-registered id — the empty string is a name no "
+            "host registers, so it describes an upload that can never stream (WIRE_FORMAT §3.6.20)",
+            "non-empty string (a host-registered destination id)",
+        )
+    return text
+
+
 def _decode_tracks(value: object, path: str) -> object:
     """``MediaSpec.tracks`` — the MISSING-LIST-FIELD decode class again, on the
     ``Image.srcSet`` rule exactly (see :func:`_decode_srcset` for why absent,
@@ -868,6 +926,91 @@ def _decode_tracks(value: object, path: str) -> object:
     if not items:
         return _DROP
     return Arr([_decode_track_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_permissions(value: object, path: str) -> object:
+    """``EmbedSpec.permissions`` — the MISSING-LIST-FIELD class once more, and
+    here the empty list carries a second meaning worth naming: it is TOTAL
+    DENIAL.
+
+    Absent MEANS the empty list, an empty array drops back to absence, and a
+    present ``null`` is refused, because absence already has a spelling. The
+    order is the DOCUMENT'S and is carried verbatim — a JSON array is ordered
+    data, and re-sorting it here would make this decoder's re-encode differ from
+    the bytes it read. Emitting the tokens in a canonical order is the
+    RENDERER's obligation, not the codec's.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_enum(item, f"{path}[{i}]", EMBED_PERMISSION, "permission") for i, item in enumerate(items)])
+
+
+# ── Tree items (fuaran#1120) ────────────────────────────────────────────────
+#
+# §21.5 — ``TreeItem`` is a THIRD recursive axis, arriving exactly the way
+# ``TreeOp.Batch`` did. A tree's rows nest inside ONE node, so the node bound
+# cannot see them however deep they go, and at roughly two JSON levels per row
+# the syntactic bound is not reached either — the same two false comforts, at a
+# new slot. The FIGURE is ``MAX_NODE_DEPTH``, reused rather than a sixth limit
+# minted: these frames cost what the node decoder's frames cost.
+_item_depth = 0
+
+
+def _decode_tree_item(value: object, path: str) -> Value:
+    """One row of a ``Tree``.
+
+    ``id`` and ``label`` are required; ``children`` omits at the EMPTY LIST and
+    ``icon`` when absent, so a leaf carries two keys and nothing else — which is
+    most of a real hierarchy, and a host emitting ``"children":[]`` on a leaf
+    produces different bytes for most of a file listing.
+
+    ``id`` is required because it is what the two State slots NAME. Row ids must
+    be unique within one tree, but that is an EMIT-side obligation rather than a
+    decode refusal: duplicate detection is a whole-tree property, a decoder
+    streaming a document is not required to carry the id set, and there is no
+    error code for it.
+
+    The nested walker is THIS SAME FUNCTION, deliberately — the corpus's third
+    reject vector sits one level DOWN precisely because a host whose child walker
+    is looser than its root walker passes the other two.
+    """
+    global _item_depth
+    if _item_depth >= MAX_NODE_DEPTH:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"tree-item nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
+        )
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "children" in obj:
+        items = _expect_array(obj["children"], f"{path}.children")
+        if items:
+            _item_depth += 1
+            try:
+                fields["children"] = Arr([_decode_tree_item(c, f"{path}.children[{i}]") for i, c in enumerate(items)])
+            finally:
+                _item_depth -= 1
+    if "icon" in obj:
+        fields["icon"] = _expect_string(obj["icon"], f"{path}.icon")
+    fields["id"] = _expect_string(_require(obj, "id", path), f"{path}.id")
+    fields["label"] = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    known = frozenset({"children", "icon", "id", "label"})
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj(None, fields)
+
+
+def _decode_tree_items(value: object, path: str) -> Value:
+    """A ``Tree``'s root row list. Required and never dropped — a tree with no
+    rows is still a tree, where an absent ``items`` is a document that never said
+    what it holds."""
+    global _item_depth
+    items = _expect_array(value, path)
+    _item_depth = 0
+    return Arr([_decode_tree_item(item, f"{path}[{i}]") for i, item in enumerate(items)])
 
 
 def _decode_media_kind(value: object, path: str) -> Value:
@@ -1181,6 +1324,8 @@ ACTION_CASES = frozenset(
         "SetState",
         "Notify",
         "WriteToClipboard",
+        # fuaran#1124 — the format's first PAYLOAD-FREE action case.
+        "Print",
         "ReadFileBody",
         "Call",
         "AiTool",
@@ -1204,6 +1349,39 @@ def _decode_action(value: object, path: str) -> Value:
                 obj = {**obj, "route": obj[a]}
                 del obj[a]
                 break
+    elif tag == "Print":
+        # fuaran#1124 — the ONE action arm that is STRICT about unrecognised
+        # members, and the asymmetry is deliberate: everywhere else in this
+        # format an unknown member is one the reading host has not learned yet,
+        # and dropping it is the forward-compatible answer. Here there is
+        # nothing to learn, and a host that accepted
+        # `{"$type":"Print","pageRange":"1-3"}` and printed everything would
+        # leave the emitter believing it had constrained a printing it had not,
+        # with no error anywhere saying otherwise.
+        for key in obj:
+            if key != "$type":
+                _fail(
+                    WRONG_TYPE,
+                    f"{path}.{key}",
+                    f"Action.Print takes NO payload — '{key}' is not a member of it. Page size, "
+                    "margins, orientation, sheet range and copies belong to the host's page setup "
+                    "or to the dialogue the reader is looking at (WIRE_FORMAT §3.6.14)",
+                    "an object carrying only $type",
+                )
+        return Obj("Print", {})
+    elif tag == "WriteToClipboard":
+        # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
+        # bare JSON string IS `Literal`'s canonical form, so every document
+        # written before the widening decodes exactly as it did and the explicit
+        # `Literal` envelope normalises down to it here as at every other text
+        # slot. A `text` that is neither a string nor a `$type`-tagged
+        # `TextSource` is WRONG_TYPE and is never coerced: a host that read the
+        # widening as "this member is now open" would put a JSON literal on the
+        # reader's clipboard, and a clipboard is a channel the reader later
+        # pastes somewhere with authority.
+        text = _decode_text_source(_require(obj, "text", path), f"{path}.text")
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "text")}
+        return Obj("WriteToClipboard", {**rest, "text": text})
     elif tag == "Dispatch" and "msg" in obj:
         # 0.2.0 — the `msg` closure sentinel is off the wire (no decoder ever
         # read it); a pre-0.2.0 input normalises to the bare `{"$type":"Dispatch"}`.
@@ -1715,6 +1893,64 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("tracks", False, _decode_tracks),
         ("transcript", False, _decode_text_source),
     ],
+    # fuaran#1111 — the sandboxed third-party embed. A NEW kind rather than a
+    # `Mount` variant: `Mount` composes a COOPERATING guest (a scope id, a
+    # declared channel, a capability list, a host-side loader) and a third-party
+    # page has none of those. It is equally not a `Media` variant — `Media`
+    # fetches an asset and DISPLAYS it, this fetches a document and lets it
+    # EXECUTE.
+    #
+    # Nothing here inspects the `src` STRING: the `embed` egress class admits
+    # `https` and nothing else, and that is a RENDER-time obligation, as every
+    # §19-class rule is. A document naming a URL the floor refuses is still a
+    # valid wire document.
+    "Embed": [
+        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
+        ("permissions", False, _decode_permissions),
+        ("src", True, _decode_binding_string),
+        # REQUIRED, on `MediaSpec.label`'s argument one kind over: a frame is a
+        # focus container a reader tabs INTO, so it is never decorative, and an
+        # unnamed one is announced as "frame" and nothing more.
+        ("title", True, _decode_text_source),
+    ],
+    # fuaran#1120 — the hierarchy, and the format's first SELF-REFERENTIAL
+    # shape. This kind carries NO `expandable` and NO `selectable` boolean, and
+    # none is coming: a behaviour the reader drives is declared as a named State
+    # key the host both writes and reads, and a flag with no key behind it is a
+    # decorative control writing state nothing reads.
+    #
+    # A tree naming NO `expandedStateKey` renders FULLY EXPANDED, which is the
+    # grid-behaviour rule read straight across: an initial presentation without a
+    # reader-driven affordance is a legitimate shape, and it is the only reading
+    # under which such a tree shows its content at all.
+    "Tree": [
+        ("expandedStateKey", False, _decode_string),
+        ("items", True, _decode_tree_items),
+        ("onSelect", False, _decode_string),
+        ("selectionStateKey", False, _decode_string),
+    ],
+    # fuaran#1115 / #1116 / #1117 — the upload control had NO typed schema at
+    # all, so every member below reached the structural pass-through and each of
+    # the four reject vectors decoded happily. The three ingress routes and the
+    # one egress declaration are typed here; the remaining fields (`label`,
+    # `onSelect`, `disabled`, …) keep the structural preservation they had.
+    "FileUpload": [
+        # The two gestures, both OMITTING at `false`. A present member of any
+        # other type is WRONG_TYPE and is never coerced — the slot decides
+        # whether a whole ingress route EXISTS, so a lenient truthiness read
+        # would open a drop target on `"no"` and on `"false"`.
+        ("acceptPaste", False, _omit_default_bool(False)),
+        ("dropTarget", False, _omit_default_bool(False)),
+        # fuaran#1116 — OPTIONAL, not omit-at-default, and the distinction is
+        # real: "say nothing" is a state of its own, because an upload naming no
+        # device asks for the ordinary file browser, which is not one of the two
+        # devices wearing a default. A present value outside the set is
+        # UNKNOWN_DU_CASE at the member's own path — a BARE enum, so no `.$type`
+        # suffix — and must NOT fall back to either device.
+        ("capture", False, _enum_decoder(CAPTURE_SOURCE, "capture")),
+        # fuaran#1117 — the streamed destination.
+        ("destination", False, _decode_upload_destination),
+    ],
     "List": [
         ("items", True, _decode_text_source_array),
         ("ordered", True, _decode_bool),
@@ -1774,6 +2010,13 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("onDismiss", False, _decode_action),
         ("open", True, _decode_binding_bool),
         ("heading", False, _decode_text_source, ("title",)),
+        # fuaran#1119 — the modality. `Blocking` is the identity and omits at it,
+        # so every modal written before this member is byte-identical; an
+        # unrecognised token is REFUSED rather than read as the default, because
+        # a document that meant `Popover` and misspelled it would otherwise trap
+        # focus and claim the page behind it inert.
+        ("modality", False, _omit_default_enum(MODALITY_KIND, {}, "Blocking", "modality")),
+        ("anchor", False, _decode_string),
     ],
     "ScrollArea": [
         ("children", True, _decode_children),
@@ -1923,6 +2166,17 @@ def _decode_box(obj: dict, path: str) -> Obj:
         fields["heading"] = _decode_text_source(heading_raw, f"{path}.heading")
     fields["layout"] = layout
     fields["role"] = role
+    # fuaran#1473 — the two paged-medium declarations, both omitted at `False`.
+    # ABSENT is the only spelling of "not declared", so there is no third value;
+    # a present member of the wrong JSON kind is REFUSED, never coerced, because
+    # a document that meant `true` and wrote `"true"` would otherwise render with
+    # its declaration silently dropped — exactly the split block the member
+    # exists to prevent. Pinned on BOTH decoder arms the vocabulary reaches
+    # (here and `DataGrid`'s) because they are separate branches and a vector on
+    # one proves nothing about the other.
+    for member in ("keepTogether", "breakBefore"):
+        if member in obj and _expect_bool(obj[member], f"{path}.{member}"):
+            fields[member] = True
     return Obj("Box", fields)
 
 
@@ -1952,7 +2206,28 @@ def _decode_switch(obj: dict, path: str) -> Obj:
             fields["on"] = selector
     else:
         fields["stateKey"] = _decode_string(_require(obj, "stateKey", path), f"{path}.stateKey")
-    known = frozenset({"$type", "cases", "default", "on", "stateKey"})
+    # fuaran#1122 — the timed advance: a POSITIVE INTEGER count of milliseconds.
+    # Non-positive and FRACTIONAL are both WRONG_TYPE and neither is
+    # canonicalised. `0` is what an emitter reaches for to mean "off" and the
+    # language already HAS a spelling for off — an absent key — so rewriting a
+    # zero to absence would make two document shapes mean one thing and tell the
+    # emitter nothing about its misreading, while decoding it to a live
+    # zero-millisecond timer would be a re-render loop. A fraction is refused for
+    # a separate reason worth stating: the slot is an integer count, and a
+    # decoder truncating where another rounded would leave two hosts disagreeing
+    # about a document neither refused.
+    if "autoAdvanceMs" in obj:
+        raw_ms = obj["autoAdvanceMs"]
+        if isinstance(raw_ms, bool) or not isinstance(raw_ms, int) or raw_ms < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.autoAdvanceMs",
+                "autoAdvanceMs must be a positive whole number of milliseconds — an absent key is "
+                "how a switch says it does not advance (WIRE_FORMAT §3.3)",
+                "JSON number (positive integer milliseconds)",
+            )
+        fields["autoAdvanceMs"] = raw_ms
+    known = frozenset({"$type", "cases", "default", "on", "stateKey", "autoAdvanceMs"})
     for key, raw in obj.items():
         if key not in known:
             fields[key] = from_json(raw)
@@ -2360,7 +2635,35 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     # grid's runtime sorts by. Typed as a string; encode-omitted when absent.
     if "sortStateKey" in obj:
         fields["sortStateKey"] = _expect_string(obj["sortStateKey"], f"{path}.sortStateKey")
-    _grid_known = frozenset({"$type", "source", "data", "rows", "columns", "editable", "sortStateKey"})
+    # fuaran#1123 — the two ends of ONE shared transfer key. A present member of
+    # any type other than string is WRONG_TYPE and is never coerced: the slot
+    # names a STATE KEY, so an ordinal or a boolean names no key, and a grid
+    # identified by position could not be paired with by any other grid.
+    for transfer in ("transferOutKey", "transferInKey"):
+        if transfer in obj:
+            fields[transfer] = _expect_string(obj[transfer], f"{path}.{transfer}")
+    # fuaran#1125 — the export declaration, and fuaran#1473's grid pair. All
+    # three omit at `False` and all three refuse a present non-boolean, on
+    # `editable`'s terms.
+    for flag in ("exportable", "keepRowsTogether", "repeatHeader"):
+        if flag in obj and _expect_bool(obj[flag], f"{path}.{flag}"):
+            fields[flag] = True
+    _grid_known = frozenset(
+        {
+            "$type",
+            "source",
+            "data",
+            "rows",
+            "columns",
+            "editable",
+            "sortStateKey",
+            "transferOutKey",
+            "transferInKey",
+            "exportable",
+            "keepRowsTogether",
+            "repeatHeader",
+        }
+    )
     for key, raw in obj.items():
         if key not in _grid_known:
             fields[key] = from_json(raw)
@@ -2404,6 +2707,12 @@ FORM_FIELD_KIND_CASES = frozenset(
         "Range",
         "Date",
         "DateRange",
+        # fuaran#1113 — the typeahead field; #1121 the multi-token one; #1130 the
+        # score and the swatch.
+        "Combobox",
+        "Tokens",
+        "Rating",
+        "Color",
     }
 )
 
@@ -2416,6 +2725,14 @@ _AUTO_CHOICE: tuple[Value, ...] = (None,)
 _AUTO_RANGE: tuple[Value, ...] = (Obj(None, {"max": 0, "min": 0}), Obj(None, {"max": 0.0, "min": 0.0}))
 # 0.7.0 — the DateRange placeholder is the ISO-empty pair at both ends.
 _AUTO_DATE_RANGE: tuple[Value, ...] = (Obj(None, {"from": "", "to": ""}),)
+# fuaran#1121 — a token field's placeholder is the EMPTY LIST: the list is
+# ordered and the order is the reader's, so an auto-bound field starts with no
+# chips rather than with a placeholder one.
+_AUTO_TOKENS: tuple[Value, ...] = (Arr([]),)
+# fuaran#1130 — the unset swatch. `#000000` is what a native colour input
+# substitutes when handed nothing, and it is the one `#rrggbb` form the control
+# can hold.
+_AUTO_COLOR: tuple[Value, ...] = ("#000000",)
 
 
 def _is_auto_value(decoded: Value, auto: tuple[str, str] | None, placeholders: tuple[Value, ...]) -> bool:
@@ -2573,6 +2890,112 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
         bound("min", _decode_string)
         bound("max", _decode_string)
         bound("step", _decode_number)
+    elif tag == "Combobox":
+        # fuaran#1113 — the wire shape is `Choice`'s (same option source, same
+        # value slot, same handler contract) plus `allowFreeText`, which OMITS at
+        # `false`, so the shortest combobox document is the CONSTRAINED one. A
+        # present member of any other type is WRONG_TYPE and is never coerced:
+        # the slot decides whether values outside the option set are admitted, so
+        # a lenient truthiness read would widen the field on `"no"`.
+        fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")
+        if "allowFreeText" in obj and _expect_bool(obj["allowFreeText"], f"{path}.allowFreeText"):
+            fields["allowFreeText"] = True
+        value_slot(_decode_binding_string_opt, _AUTO_CHOICE)
+    elif tag == "Tokens":
+        # fuaran#1121 — `allowFreeText` OMITS AT TRUE here, the OPPOSITE polarity
+        # to `Combobox`'s, and this is the one thing about the case a host is
+        # most likely to get wrong. The two differ because their SETS differ:
+        # `Combobox.options` is REQUIRED so "constrained" is its resting state,
+        # where `suggestions` is optional so a token box with nothing to suggest
+        # is the commonest shape rather than a degenerate one. The default
+        # follows the required-ness of the set — one rule, not two habits.
+        allow_free_text = True
+        if "allowFreeText" in obj:
+            allow_free_text = _expect_bool(obj["allowFreeText"], f"{path}.allowFreeText")
+            if not allow_free_text:
+                fields["allowFreeText"] = False
+        if "suggestions" in obj:
+            fields["suggestions"] = _decode_binding_select_options(obj["suggestions"], f"{path}.suggestions")
+        # THE ONE DECODE REFUSAL, and it is a CROSS-MEMBER one: a closed field
+        # with no suggestion source admits nothing typed and offers nothing to
+        # pick, so the document names a control that CANNOT EXIST rather than one
+        # with a bad value in it. Under the polarity above it is reachable only
+        # DELIBERATELY, which is what makes refusing it right rather than hostile.
+        #
+        # Two neighbouring rules are deliberately NOT refusals: DUPLICATES in the
+        # value list, and MEMBERSHIP of a token in the suggestion set. Both are
+        # properties of a VALUE, and a bound value is invisible to a decoder — a
+        # rule enforced only on literals would be two rules wearing one name.
+        if not allow_free_text and "suggestions" not in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.allowFreeText",
+                "allowFreeText: false with no 'suggestions' names a control that cannot exist — it "
+                "admits nothing typed and offers nothing to pick, so no gesture could put a token "
+                "in it. Declare a suggestion source, or leave allowFreeText absent (it defaults to "
+                "true on Tokens) (WIRE_FORMAT §3.6.19)",
+                "a suggestion source alongside allowFreeText:false",
+            )
+        value_slot(_decode_binding_string_list, _AUTO_TOKENS)
+    elif tag == "Rating":
+        # fuaran#1130 — `max` is the case's only REQUIRED member: it is the
+        # scale, it is what the control announces as `aria-valuemax`, and a
+        # rating with no declared ceiling is not a scale. A `max` below 1 is
+        # REFUSED, not CLAMPED — a scale with no positions has nothing to draw,
+        # nothing to announce and no keystroke that could change anything, so the
+        # document names a control that cannot exist.
+        raw_max = _require(obj, "max", path)
+        if isinstance(raw_max, bool) or not isinstance(raw_max, int) or raw_max < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.max",
+                "Rating max must be an integer scale of 1 or more — a scale with no positions has "
+                "nothing to draw and no keystroke that could change anything (WIRE_FORMAT §3.6.17)",
+                "JSON number (integer scale of 1 or more)",
+            )
+        fields["max"] = cast(Value, raw_max)
+        # Omits at `false`, and the polarity is load-bearing: the SHORTEST rating
+        # document is the WHOLE-STAR one. It governs ENTRY, never DISPLAY — the
+        # granularity of a keystroke and of a pointer commit — and a host must
+        # NOT quantise a resolved value to it.
+        if "allowHalf" in obj and _expect_bool(obj["allowHalf"], f"{path}.allowHalf"):
+            fields["allowHalf"] = True
+        # A FLOAT even where nothing can type a fraction, and that is normative
+        # rather than incidental: the commonest rating a reader sees is an
+        # AVERAGE arriving through a `Query` binding, and an integer slot could
+        # not carry it. The VALUE's bounds are deliberately not checked here — a
+        # bound value is invisible to a decoder, so the rule lives at the two
+        # places the value becomes visible (an authoring check over a literal,
+        # and the server-side re-check on submission).
+        value_slot(_decode_binding_float, _AUTO_NUMBER)
+    elif tag == "Color":
+        # fuaran#1130 — `#rrggbb` and NOTHING ELSE: six hexadecimal digits after
+        # a `#`, either case. That is the one form a native colour input can hold
+        # or return, so it is the wire form too rather than a wider colour syntax
+        # the control would silently narrow. CASE IS PRESERVED, never normalised
+        # — a codec that lower-cased it would fail the round-trip this corpus
+        # exists to pin, and browsers normalise at the DOM, which is their
+        # business and not the wire's.
+        #
+        # Only the `Static` case is judged here, and the split is RECORDED rather
+        # than hidden: a State / Query / Selection binding carries its text from
+        # outside the document, where a decoder cannot see it.
+        if "value" in obj:
+            decoded = _decode_binding(obj["value"], f"{path}.value")
+            if isinstance(decoded, Obj) and decoded.tag == "Static":
+                literal = decoded.fields.get("value")
+                if not isinstance(literal, str) or _HEX_COLOUR.fullmatch(literal) is None:
+                    _fail(
+                        WRONG_TYPE,
+                        f"{path}.value",
+                        "a Color value literal must be #rrggbb — six hexadecimal digits after a #, "
+                        "either case. That is the one form a native colour input can hold, so a "
+                        "shorthand, a named colour or an alpha channel names a colour this control "
+                        "could never carry (WIRE_FORMAT §3.6.17)",
+                        "#rrggbb hex colour literal",
+                    )
+            if not _is_auto_value(decoded, auto, _AUTO_COLOR):
+                fields["value"] = decoded
     else:  # Range (0.2.0 — absorbed the retired FilterKind.RangeFilter)
         if "value" in obj:
             decoded = _decode_range_pair_value(obj["value"], f"{path}.value")
@@ -2582,7 +3005,22 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
         bound("max", _decode_number)
         bound("step", _decode_number)
 
-    known = {"$type", "value", "options", "orientation", "rows", "variant", "min", "max", "step", handler_key}
+    known = {
+        "$type",
+        "value",
+        "options",
+        "orientation",
+        "rows",
+        "variant",
+        "min",
+        "max",
+        "step",
+        # fuaran#1113 / #1121 / #1130 — the members the four new controls add.
+        "allowFreeText",
+        "suggestions",
+        "allowHalf",
+        handler_key,
+    }
     for key, raw in obj.items():
         if key not in known:
             fields[key] = from_json(raw)
@@ -2821,6 +3259,15 @@ def _decode_style(value: object, path: str) -> Obj:
         vo = _enum(obj["voice"], f"{path}.voice", FONT_VOICE, "voice")
         if vo != "Default":
             fields["voice"] = vo
+    # fuaran#1472 — the DECLARED base direction, and the only member of this
+    # record that is not presentational. `emphasis`, `role`, `tone`, `voice` and
+    # `weight` are statements a host may ignore and still render a document that
+    # says the same thing; this one is a CORRECTNESS statement, so a host that
+    # drops it renders a document that says something else.
+    if "direction" in obj:
+        d = _enum(obj["direction"], f"{path}.direction", TEXT_DIRECTION, "direction")
+        if d != "auto":
+            fields["direction"] = d
     return Obj(None, fields)
 
 
@@ -2940,6 +3387,13 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
             extras["style"] = style
     if "accessibility" in obj:
         extras["accessibility"] = _decode_accessibility(obj["accessibility"], f"{path}.accessibility")
+    # fuaran#1112 — the node-level tooltip TRAIT, not a field of any kind. A hint
+    # is uniform across kinds, so it lives on the envelope beside `style` and
+    # `accessibility` rather than being repeated per spec. It is a full
+    # `TextSource` (the §16 bare string is the shorthand), so a non-string,
+    # non-`$type`-tagged value is WRONG_TYPE and is never carried through.
+    if "tooltip" in obj:
+        extras["tooltip"] = _decode_text_source(obj["tooltip"], f"{path}.tooltip")
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

@@ -1,0 +1,1 @@
+{"id":"form-tokens-freetext","kind":{"$type":"Form","fields":[{"id":"labels","kind":{"$type":"Tokens"},"label":"Labels","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

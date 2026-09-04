@@ -1,0 +1,1 @@
+{"id":"tree-selection-1","kind":{"$type":"Tree","items":[{"id":"harbour","label":"Harbour"},{"id":"quay","label":"Quay"}],"onSelect":"<closure>","selectionStateKey":"selectedRow"}}

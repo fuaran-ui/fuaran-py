@@ -1,0 +1,1 @@
+{"id":"button-print","kind":{"$type":"Button","label":"Print this invoice","onClick":{"$type":"Chain","ops":[{"$type":"Print"},{"$type":"Notify","channel":"printed","payload":"invoice"}]},"variant":"Secondary"}}

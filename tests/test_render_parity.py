@@ -41,6 +41,15 @@ _REFERENCE_RENDERER_SOURCES = (
     ("Fuaran.UI.Renderer.Core", "Theme.fs"),
     # Phase 525 — the Drawing SVG class vocabulary (fuaran-drawing*) lives here.
     ("Fuaran.UI.Renderer.Core", "DrawingSvg.fs"),
+    # Phase 207 — the per-kind class/id BUILDER vocabulary. The composition
+    # prefixes that used to sit inline in the two `Render.fs` files
+    # (`fuaran-custom-`, `fuaran-badge-`, …) are now spelled only in this module,
+    # so a source list without it extracts an oracle missing every prefix — which
+    # is what the non-triviality guard below caught.
+    ("Fuaran.UI.Renderer.Core", "Css.fs"),
+    # fuaran#1130 — the rating control's own class family (`fuaran-rating-hit`,
+    # the star fill classes) is spelled in its own client-tier module.
+    ("Fuaran.UI.Renderer", "RatingControl.fs"),
 )
 _REFERENCE_RENDERER_FILES = (
     []

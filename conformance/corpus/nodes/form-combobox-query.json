@@ -1,0 +1,1 @@
+{"id":"form-combobox-query","kind":{"$type":"Form","fields":[{"id":"city","kind":{"$type":"Combobox","options":{"$type":"Query","dependsOn":["country"],"name":"cities"}},"label":"City","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Search"}}

@@ -1,0 +1,1 @@
+{"id":"upload-paste-1","kind":{"$type":"FileUpload","accept":["image/*"],"acceptPaste":true,"label":"Paste an image","multiple":false,"onSelect":"<closure>"}}

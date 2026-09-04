@@ -1,0 +1,1 @@
+{"id":"form-color","kind":{"$type":"Form","fields":[{"id":"brand","kind":{"$type":"Color","onChange":"<closure>","value":{"$type":"Static","value":"#FFAA00"}},"label":"Brand colour","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

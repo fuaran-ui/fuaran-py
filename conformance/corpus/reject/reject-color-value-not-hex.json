@@ -1,0 +1,1 @@
+{"id":"f","kind":{"$type":"Form","fields":[{"id":"brand","kind":{"$type":"Color","value":{"$type":"Static","value":"rebeccapurple"}},"label":"Brand","required":false}],"onSubmit":"<closure>","submitLabel":"Save"}}

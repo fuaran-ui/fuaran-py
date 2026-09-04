@@ -14,6 +14,7 @@
     "DataGrid",
     "Disclosure",
     "Drawing",
+    "Embed",
     "ErrorBoundary",
     "Fact",
     "FileUpload",
@@ -44,20 +45,25 @@
     "SummaryList",
     "Switch",
     "Tabs",
-    "Toast"
+    "Toast",
+    "Tree"
   ],
   "formFieldKinds": [
     "Checkbox",
     "Choice",
+    "Color",
+    "Combobox",
     "Date",
     "DateRange",
     "Number",
     "Range",
     "RangedNumber",
+    "Rating",
     "SegmentedChoice",
     "Text",
     "TextArea",
-    "Toggle"
+    "Toggle",
+    "Tokens"
   ],
   "ops": [
     "Batch",
@@ -539,6 +545,14 @@
       "inputFile": "lenient/lenient-022-lvr-emphasis-normal.json",
       "expectedFile": "lenient/lenient-022-lvr-emphasis-normal.expected.json",
       "description": "0.2.2 — 'Normal' coerces to false, which is the omitted-when-false canonical form"
+    },
+    {
+      "id": "lenient-1126-clipboard-literal-envelope",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1126-clipboard-literal-envelope.json",
+      "expectedFile": "lenient/lenient-1126-clipboard-literal-envelope.expected.json",
+      "description": "Phase 1126 — the clipboard payload is a TextSource, so §16's transparent-Literal rule reaches it: the explicit {\"$type\":\"Literal\",\"text\":…} envelope normalises to the bare string, which is also the pre-1126 spelling and still the canonical one"
     },
     {
       "id": "lenient-460-alias-emphasis-muted",
@@ -1117,12 +1131,36 @@
       "description": "ErrorBoundary (Markdown child + Callout fallback)"
     },
     {
+      "id": "box-break-before-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/box-break-before-1.json",
+      "expectedFile": "nodes/box-break-before-1.json",
+      "description": "Layout/Box (Phase 1473 breakBefore, the only new member)"
+    },
+    {
+      "id": "box-keep-together-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/box-keep-together-1.json",
+      "expectedFile": "nodes/box-keep-together-1.json",
+      "description": "Layout/Box (Phase 1473 keepTogether, the only new member)"
+    },
+    {
       "id": "btn-1",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/btn-1.json",
       "expectedFile": "nodes/btn-1.json",
       "description": "Input/Button"
+    },
+    {
+      "id": "btn-copy-bound",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/btn-copy-bound.json",
+      "expectedFile": "nodes/btn-copy-bound.json",
+      "description": "Phase 1126 — Input/Button whose Action.WriteToClipboard carries a BOUND payload (a TextSource, not a bare string), resolved at dispatch time"
     },
     {
       "id": "btn-copy-link",
@@ -1155,6 +1193,14 @@
       "inputFile": "nodes/btn-read-workbook.json",
       "expectedFile": "nodes/btn-read-workbook.json",
       "description": "Input/Button (Action.ReadFileBody base64)"
+    },
+    {
+      "id": "button-print",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/button-print.json",
+      "expectedFile": "nodes/button-print.json",
+      "description": "Input/Button (Phase 1124 — Action.Print: the payload-free action, inside a Chain)"
     },
     {
       "id": "button-setstate-valuefrom",
@@ -1365,6 +1411,30 @@
       "description": "Display/Drawing (Phase 883 — tipped shapes, incl. hostile text, Bound tip and explicit empty)"
     },
     {
+      "id": "embed-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/embed-1.json",
+      "expectedFile": "nodes/embed-1.json",
+      "description": "Display/Embed (Phase 1111 — the minimum: no ratio, no permissions, total denial)"
+    },
+    {
+      "id": "embed-aspect-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/embed-aspect-1.json",
+      "expectedFile": "nodes/embed-aspect-1.json",
+      "description": "Display/Embed (Phase 1111 — a declared aspect ratio, sharing Image's enum)"
+    },
+    {
+      "id": "embed-permissions-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/embed-permissions-1.json",
+      "expectedFile": "nodes/embed-permissions-1.json",
+      "description": "Display/Embed (Phase 1111 — one permission, the one that rides `allow` not `sandbox`)"
+    },
+    {
       "id": "empty-state-card",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1413,6 +1483,14 @@
       "description": "Input/Filters (declarative — omitted onChange + typed range bounds)"
     },
     {
+      "id": "filters-rating-colour",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-rating-colour.json",
+      "expectedFile": "nodes/filters-rating-colour.json",
+      "description": "Input/Filters (Phase 1130 — Rating + Color chips, declarative and auto-bound)"
+    },
+    {
       "id": "filters-segmented",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1421,12 +1499,52 @@
       "description": "Input/Filters (SegmentedFilter horizontal)"
     },
     {
+      "id": "filters-tokens",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-tokens.json",
+      "expectedFile": "nodes/filters-tokens.json",
+      "description": "Input/Filters (Phase 1121 — Tokens chip, constrained and auto-bound)"
+    },
+    {
       "id": "form-1",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/form-1.json",
       "expectedFile": "nodes/form-1.json",
       "description": "Input/Form (all fields)"
+    },
+    {
+      "id": "form-color",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-color.json",
+      "expectedFile": "nodes/form-color.json",
+      "description": "Input/Form (Phase 1130 — Color: upper-case hex, preserved not normalised)"
+    },
+    {
+      "id": "form-combobox-freetext",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-combobox-freetext.json",
+      "expectedFile": "nodes/form-combobox-freetext.json",
+      "description": "Input/Form (Phase 1113 — Combobox: allowFreeText, value outside the option set)"
+    },
+    {
+      "id": "form-combobox-query",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-combobox-query.json",
+      "expectedFile": "nodes/form-combobox-query.json",
+      "description": "Input/Form (Phase 1113 — Combobox: Query-bound option source, declarative, auto-bound value)"
+    },
+    {
+      "id": "form-combobox-static",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-combobox-static.json",
+      "expectedFile": "nodes/form-combobox-static.json",
+      "description": "Input/Form (Phase 1113 — Combobox: static options, allowFreeText omitted)"
     },
     {
       "id": "form-date",
@@ -1493,6 +1611,22 @@
       "description": "Input/Form (RangedNumber — all/min-only/no bounds)"
     },
     {
+      "id": "form-rating",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-rating.json",
+      "expectedFile": "nodes/form-rating.json",
+      "description": "Input/Form (Phase 1130 — Rating: whole stars, allowHalf omitted, static value)"
+    },
+    {
+      "id": "form-rating-halves",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-rating-halves.json",
+      "expectedFile": "nodes/form-rating-halves.json",
+      "description": "Input/Form (Phase 1130 — Rating: allowHalf entry + a bound average on a ten-scale, value auto-bound)"
+    },
+    {
       "id": "form-segmented",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1507,6 +1641,30 @@
       "inputFile": "nodes/form-toggle.json",
       "expectedFile": "nodes/form-toggle.json",
       "description": "Input/Form (Phase 766 — the Toggle switch affordance beside a Checkbox)"
+    },
+    {
+      "id": "form-tokens-freetext",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-tokens-freetext.json",
+      "expectedFile": "nodes/form-tokens-freetext.json",
+      "description": "Input/Form (Phase 1121 — Tokens: the shortest spelling, allowFreeText omitted (true), value auto-bound)"
+    },
+    {
+      "id": "form-tokens-query",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-tokens-query.json",
+      "expectedFile": "nodes/form-tokens-query.json",
+      "description": "Input/Form (Phase 1121 — Tokens: Query-bound suggestion source, declarative, value auto-bound)"
+    },
+    {
+      "id": "form-tokens-suggested",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-tokens-suggested.json",
+      "expectedFile": "nodes/form-tokens-suggested.json",
+      "description": "Input/Form (Phase 1121 — Tokens: allowFreeText false over a static suggestion source, tokens in reader order)"
     },
     {
       "id": "format-bindings",
@@ -1741,12 +1899,28 @@
       "description": "Visualisation/Grid (Phase 663/665 — editable State-sourced grid, typed rows on the wire)"
     },
     {
+      "id": "grid-exportable-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-exportable-1.json",
+      "expectedFile": "nodes/grid-exportable-1.json",
+      "description": "Visualisation/Grid (Phase 1125 exportable, the only new member)"
+    },
+    {
       "id": "grid-field-named",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/grid-field-named.json",
       "expectedFile": "nodes/grid-field-named.json",
       "description": "Visualisation/Grid (Phase 425 — field-named columns + RowKeyField, closure-free)"
+    },
+    {
+      "id": "grid-keep-rows-together-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-keep-rows-together-1.json",
+      "expectedFile": "nodes/grid-keep-rows-together-1.json",
+      "description": "Visualisation/Grid (Phase 1473 keepRowsTogether, the only new member)"
     },
     {
       "id": "grid-paged",
@@ -1771,6 +1945,14 @@
       "inputFile": "nodes/grid-reorderable.json",
       "expectedFile": "nodes/grid-reorderable.json",
       "description": "Visualisation/Grid (Phase 934 — declarative row reorder: omit-when-false flag; edits and reorders share one destination)"
+    },
+    {
+      "id": "grid-repeat-header-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-repeat-header-1.json",
+      "expectedFile": "nodes/grid-repeat-header-1.json",
+      "description": "Visualisation/Grid (Phase 1473 repeatHeader, the only new member)"
     },
     {
       "id": "grid-sort-state-key",
@@ -1883,6 +2065,14 @@
       "inputFile": "nodes/limit-node-depth-at-max.json",
       "expectedFile": "nodes/limit-node-depth-at-max.json",
       "description": "§21 max node depth — a tree at EXACTLY the limit (24 levels). Rule 1: every conformant host MUST decode this; refusing it is non-conformance, not conservatism"
+    },
+    {
+      "id": "limit-tree-item-depth-at-max",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/limit-tree-item-depth-at-max.json",
+      "expectedFile": "nodes/limit-tree-item-depth-at-max.json",
+      "description": "§21.5 the tree-item axis — a tree nesting rows at EXACTLY the limit (24 levels) inside ONE node. Rule 1: every conformant host MUST decode this. Its past-the-bound twin is `reject-limit-tree-item-depth`"
     },
     {
       "id": "link-1",
@@ -2157,6 +2347,22 @@
       "description": "Binding/Now (Phase 765 — the host-furnished instant: a text slot + a Transform param feeding dateDiffDays)"
     },
     {
+      "id": "popover-anchored-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/popover-anchored-1.json",
+      "expectedFile": "nodes/popover-anchored-1.json",
+      "description": "Layout/Modal (Phase 1119 — Popover modality, anchored, state-bound open)"
+    },
+    {
+      "id": "popover-open-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/popover-open-1.json",
+      "expectedFile": "nodes/popover-open-1.json",
+      "description": "Layout/Modal (Phase 1119 — Popover, statically open: the SSR floor)"
+    },
+    {
       "id": "progress-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2253,6 +2459,22 @@
       "description": "Layout/Stepper"
     },
     {
+      "id": "style-direction-isolated-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/style-direction-isolated-1.json",
+      "expectedFile": "nodes/style-direction-isolated-1.json",
+      "description": "Layout/Box (Phase 1472 an Ltr value isolated inside Rtl prose)"
+    },
+    {
+      "id": "style-direction-ltr-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/style-direction-ltr-1.json",
+      "expectedFile": "nodes/style-direction-ltr-1.json",
+      "description": "Display/Markdown (Phase 1472 Direction=Ltr, the only style member)"
+    },
+    {
       "id": "style-role-voice-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2275,6 +2497,14 @@
       "inputFile": "nodes/switch-1.json",
       "expectedFile": "nodes/switch-1.json",
       "description": "Switch (view state → details/summary cases + info default)"
+    },
+    {
+      "id": "switch-carousel-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-carousel-1.json",
+      "expectedFile": "nodes/switch-carousel-1.json",
+      "description": "Meta/Switch (Phase 1122 — an auto-advancing carousel: `autoAdvanceMs` over an index key)"
     },
     {
       "id": "switch-on-selection",
@@ -2325,12 +2555,108 @@
       "description": "Display/Toast (Success tone, open)"
     },
     {
+      "id": "tooltip-button-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tooltip-button-1.json",
+      "expectedFile": "nodes/tooltip-button-1.json",
+      "description": "Tooltip (Phase 1112 — the trait on a forwarding interactive kind; the description rides the button)"
+    },
+    {
+      "id": "tooltip-icon-button-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tooltip-icon-button-1.json",
+      "expectedFile": "nodes/tooltip-icon-button-1.json",
+      "description": "Tooltip (Phase 1112 — the icon-only button: accessibility.label NAMES, tooltip DESCRIBES, describedBy merges)"
+    },
+    {
+      "id": "tooltip-metric-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tooltip-metric-1.json",
+      "expectedFile": "nodes/tooltip-metric-1.json",
+      "description": "Tooltip (Phase 1112 — the trait on a display kind, I18n hint; description and focus stop on the wrapper)"
+    },
+    {
+      "id": "transfer-board",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/transfer-board.json",
+      "expectedFile": "nodes/transfer-board.json",
+      "description": "Layout/Box (Phase 1123 — cross-container transfer: two two-way columns and a one-way archive on one shared key)"
+    },
+    {
+      "id": "tree-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tree-1.json",
+      "expectedFile": "nodes/tree-1.json",
+      "description": "Display/Tree (Phase 1120 — two levels, no State key: static and fully expanded)"
+    },
+    {
+      "id": "tree-expanded-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tree-expanded-1.json",
+      "expectedFile": "nodes/tree-expanded-1.json",
+      "description": "Display/Tree (Phase 1120 — three levels, the expansion key named; the key IS the affordance)"
+    },
+    {
+      "id": "tree-selection-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/tree-selection-1.json",
+      "expectedFile": "nodes/tree-selection-1.json",
+      "description": "Display/Tree (Phase 1120 — the selection key AND the handler, both declared)"
+    },
+    {
       "id": "upload-1",
       "kind": "node-round-trip",
       "decoder": "node",
       "inputFile": "nodes/upload-1.json",
       "expectedFile": "nodes/upload-1.json",
       "description": "Input/FileUpload"
+    },
+    {
+      "id": "upload-capture-camera-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-capture-camera-1.json",
+      "expectedFile": "nodes/upload-capture-camera-1.json",
+      "description": "Input/FileUpload (Phase 1116 — camera capture, image/* filtered)"
+    },
+    {
+      "id": "upload-capture-microphone-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-capture-microphone-1.json",
+      "expectedFile": "nodes/upload-capture-microphone-1.json",
+      "description": "Input/FileUpload (Phase 1116 — microphone capture, audio/* filtered)"
+    },
+    {
+      "id": "upload-destination-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-destination-1.json",
+      "expectedFile": "nodes/upload-destination-1.json",
+      "description": "Input/FileUpload (Phase 1117 — streamed to a registered destination)"
+    },
+    {
+      "id": "upload-drop-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-drop-1.json",
+      "expectedFile": "nodes/upload-drop-1.json",
+      "description": "Input/FileUpload (Phase 1115 — drop target; acceptPaste OMITTED)"
+    },
+    {
+      "id": "upload-paste-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-paste-1.json",
+      "expectedFile": "nodes/upload-paste-1.json",
+      "description": "Input/FileUpload (Phase 1115 — paste ingestion, image/* filtered; dropTarget OMITTED)"
     },
     {
       "id": "op-batch",
@@ -2509,6 +2835,14 @@
       "description": "UpdateStyle (Phase 147 Role=Eyebrow + Voice=Structural)"
     },
     {
+      "id": "op-updatestyle (phase 1472 direction=ltr, the only style member)",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
+      "expectedFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
+      "description": "UpdateStyle (Phase 1472 Direction=Ltr, the only style member)"
+    },
+    {
       "id": "reject-a11y-hidden-nonbool",
       "kind": "reject",
       "decoder": "node",
@@ -2561,6 +2895,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.accessibility.role",
       "description": "accessibility.role not a JSON string — the slot is open to any role NAME, not to any value (Phase 955)"
+    },
+    {
+      "id": "reject-action-print-with-payload",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-action-print-with-payload.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.pageRange",
+      "description": "Print carrying a member — the payload-free action takes none; page range, size, margins and copies are the host's page setup and the reader's dialogue, so a member here is refused rather than dropped (Phase 1124)"
     },
     {
       "id": "reject-binding-float-bool",
@@ -2617,6 +2960,24 @@
       "description": "Masonry cols 0 — refused: a column count names how many columns the children fill, so a non-positive one describes a layout no renderer can realise. Refused rather than canonicalised to `Auto`, unlike a column-less `Grid`: that leniency works because `Auto` already means the browser's own choice, and masonry has no such case for the rewrite to land on"
     },
     {
+      "id": "reject-color-value-not-hex",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-color-value-not-hex.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.value",
+      "description": "a Color `value` of `\"rebeccapurple\"` — refused rather than coerced. `#rrggbb` is the one shape a native colour input can hold, so a literal outside it names a colour this control could never carry, and a host that narrowed it would show a colour the document did not choose. Only the STATIC case is judged, because it is the only text a decoder has: a bound value is re-checked by the pre-emit validator for an author and by the server-side submission floor for a client, which is one rule checked wherever the value becomes visible"
+    },
+    {
+      "id": "reject-combobox-allowfreetext-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-combobox-allowfreetext-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.allowFreeText",
+      "description": "a Combobox `allowFreeText` of `\"yes\"` — refused rather than coerced. The slot decides whether values OUTSIDE the option set are admitted, so a lenient truthiness read is a constraint silently relaxed by a string: `\"yes\"`, `\"no\"` and `\"false\"` are all non-empty, and a host that coerced them would widen the field on two of the three. It also omits at `false`, so absence already spells the safe answer and a wrong-typed present value can only mean the emitter meant something it did not say"
+    },
+    {
       "id": "reject-daterange-unordered",
       "kind": "reject",
       "decoder": "node",
@@ -2624,6 +2985,33 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.value",
       "description": "DateRange literal pair with start after end — the ordered-pair rule (Phase 725)"
+    },
+    {
+      "id": "reject-embed-missing-title",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-embed-missing-title.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.title",
+      "description": "Embed with no `title` — refused. The accessible name is mandatory because a browsing context has no decorative case, and there is no value to default to that would not be a fabricated description of someone else's page"
+    },
+    {
+      "id": "reject-embed-permission-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-embed-permission-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.permissions[0]",
+      "description": "an Embed permission of `true` — refused rather than coerced. A host that read a bare boolean as a granted permission would have to invent which one it names, and every answer is a relaxation the document never spelled"
+    },
+    {
+      "id": "reject-embed-unknown-permission",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-embed-unknown-permission.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.permissions[0]",
+      "description": "EmbedPermission 'allow-top-navigation' — refused. The set is closed at four, and top-level navigation is excluded by design rather than reserved; the path carries the array index and no `.$type`, because the slot holds bare enum strings"
     },
     {
       "id": "reject-emptynodeid",
@@ -2752,6 +3140,15 @@
       "description": "§21.5 the op axis — 25 nested TreeOp.Batch. Counted separately from the node axis; the syntactic bound only LOOKS like cover for it"
     },
     {
+      "id": "reject-limit-tree-item-depth",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-tree-item-depth.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.items[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0]",
+      "description": "§21.5 the tree-item axis — 25 nested TreeItem rows inside ONE node. Counted separately from the node axis, which cannot see it at all (the whole hierarchy is one node) and from the syntactic bound, which at ~50 levels is nowhere near reached. The `TreeOp.Batch` lesson on a third axis"
+    },
+    {
       "id": "reject-media-autoplay-nonbool",
       "kind": "reject",
       "decoder": "node",
@@ -2876,6 +3273,24 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.stateKey",
       "description": "Switch missing stateKey"
+    },
+    {
+      "id": "reject-modal-modality-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-modal-modality-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.modality",
+      "description": "a Modal `modality` of `3` — a separate decoder arm from the unknown-string vector above, and vectored separately for that reason. An ordinal is the shape a host generating from an enum's index is likeliest to emit, and reading one would make the wire's meaning depend on a declaration order the wire never carries"
+    },
+    {
+      "id": "reject-modal-modality-unknown",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-modal-modality-unknown.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.modality",
+      "description": "a Modal `modality` of `\"Sheet\"` — outside the closed pair `Modal | Popover`. A sheet, a drawer and a menu are all PRESENTATIONS of one of the two modalities rather than a third one, so the answer to this document is not to widen the enum but to say which of the two it meant. The path is the bare slot, per §6 and the Phase 1073 ruling: a bare enum carries no discriminator on the wire, so there is no `.$type` to name"
     },
     {
       "id": "reject-nearmiss-a11y-aria-hidden",
@@ -3076,6 +3491,33 @@
       "description": "UpdateProp missing path"
     },
     {
+      "id": "reject-op-updatestyle-direction-nonstring",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updatestyle-direction-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.style.direction",
+      "description": "UpdateStyle style.direction not a JSON string (Phase 1472)"
+    },
+    {
+      "id": "reject-op-updatestyle-direction-unknown",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updatestyle-direction-unknown.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.style.direction",
+      "description": "UpdateStyle style.direction outside the closed set — the op arm's twin of the node vector above (Phase 1472)"
+    },
+    {
+      "id": "reject-rating-max-zero",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-rating-max-zero.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.max",
+      "description": "a Rating `max` of `0` — refused rather than clamped. This is not a control with a bad number in it: a scale with no positions has nothing to draw, no `aria-valuemax` to announce and no keystroke that could change anything, so the document names a control that cannot exist. Note the asymmetry this vector pins: the SCALE is refused here and the VALUE is not, because a bound value is invisible to a decoder and a rule enforced only on literals would be two rules wearing one name"
+    },
+    {
       "id": "reject-setstate-value-and-valuefrom",
       "kind": "reject",
       "decoder": "node",
@@ -3083,6 +3525,69 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.onClick.valueFrom",
       "description": "SetState carrying BOTH 'value' and 'valueFrom' — exactly one is allowed; the didactic names both fields and how each is used (Phase 818)"
+    },
+    {
+      "id": "reject-style-direction-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-style-direction-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.style.direction",
+      "description": "style.direction not a JSON string (Phase 1472)"
+    },
+    {
+      "id": "reject-style-direction-unknown",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-style-direction-unknown.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.style.direction",
+      "description": "style.direction outside the closed set — the message names auto | ltr | rtl, and the near miss is the upper-case spelling (Phase 1472)"
+    },
+    {
+      "id": "reject-switch-autoadvance-fractional",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-autoadvance-fractional.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.autoAdvanceMs",
+      "description": "Switch autoAdvanceMs is fractional — the slot is an integer count of milliseconds, and a decoder truncating where another rounded would leave two hosts disagreeing about a document neither refused (Phase 1122)"
+    },
+    {
+      "id": "reject-switch-autoadvance-negative",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-autoadvance-negative.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.autoAdvanceMs",
+      "description": "Switch autoAdvanceMs is negative — an interval names how long to wait, so a negative one describes a schedule no renderer can realise (Phase 1122)"
+    },
+    {
+      "id": "reject-switch-autoadvance-zero",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-autoadvance-zero.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.autoAdvanceMs",
+      "description": "Switch autoAdvanceMs is 0 — refused, never canonicalised to absence. An absent key is already the only spelling of \"does not advance\", so accepting a zero would make two shapes mean one thing and hide the emitter's misreading of the slot (Phase 1122)"
+    },
+    {
+      "id": "reject-tokens-closed-without-suggestions",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tokens-closed-without-suggestions.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.allowFreeText",
+      "description": "a Tokens field admitting no free text and declaring NO suggestion source — refused. No gesture could ever put a token into it: this is not a control with a bad value in it but a document naming a control that cannot exist, the same line `Rating`'s `max` of zero is refused on. Note the polarity that makes the refusal fair rather than hostile: `allowFreeText` omits at TRUE on this case (unlike `Combobox`, whose option source is required), so the shortest document `{\"$type\":\"Tokens\"}` is the plain open token box and passes — only an emitter that wrote `false` and then omitted the suggestions lands here. Note also what is NOT refused anywhere: duplicate tokens and membership of a token in the suggestion set are properties of the VALUE, invisible to a decoder whenever the slot is bound, and are held by the pre-emit validator and the server-side submission floor instead"
+    },
+    {
+      "id": "reject-tokens-value-not-list",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tokens-value-not-list.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.value",
+      "description": "a Tokens `value` carrying a bare STRING where the slot is a `Binding<string list>` — refused rather than lifted into a one-element list. The lift is the tempting coercion and it is exactly wrong: a document saying `\"urgent\"` where the wire says a list has a misunderstanding of the slot, and silently agreeing with it would let an emitter ship a token field that can only ever hold one token while every host round-tripped it perfectly"
     },
     {
       "id": "reject-tonedpill-unknown-tone",
@@ -3094,6 +3599,42 @@
       "description": "TonedPill tone-map value outside ToneVariant — the message names the seven legal tones (Phase 750)"
     },
     {
+      "id": "reject-tooltip-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tooltip-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.tooltip",
+      "description": "a node `tooltip` of `42` — refused rather than stringified. A bare STRING at this slot is the canonical encoding of a literal hint (TextSource's transparent case), so a number is one lenient `toString` away from minting hint text out of a JSON type — which no downstream check could ever catch"
+    },
+    {
+      "id": "reject-tree-item-missing-id",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tree-item-missing-id.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.items[0].id",
+      "description": "a Tree row with no `id` — refused. Both State keys address rows BY id, so an id-less row can never be expanded, selected or restored; a synthesised positional id would move the reader's open branches the moment a sibling was inserted"
+    },
+    {
+      "id": "reject-tree-item-missing-label",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tree-item-missing-label.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.items[0].label",
+      "description": "a Tree row with no `label` — refused. A row's label is the only thing a reader walking the hierarchy has, and there is no value to default to that would not be an invented description of somebody's content"
+    },
+    {
+      "id": "reject-tree-nested-item-missing-id",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-tree-nested-item-missing-id.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.items[0].children[0].id",
+      "description": "a NESTED Tree row with no `id` — refused, and the path names the row inside the hierarchy. A host whose child walker is looser than its root walker accepts this while passing every top-level case"
+    },
+    {
       "id": "reject-unknown-binding",
       "kind": "reject",
       "decoder": "node",
@@ -3101,6 +3642,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.value.$type",
       "description": "Binding $type 'Bogus'"
+    },
+    {
+      "id": "reject-unknown-capture-source",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-unknown-capture-source.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.capture",
+      "description": "a FileUpload `capture` of `\"Screen\"` — outside the closed pair `Camera | Microphone`. The HTML capture attribute cannot ask for a display at all, and a screen capture is a standing grant reaching every window the reader has open rather than a third device behind the same picker permission, so it is refused exactly like a name nobody has proposed: a later admission would be an ADDITION, never a re-meaning of shipped bytes"
     },
     {
       "id": "reject-unknown-drawing-curve-command",
@@ -3193,6 +3743,33 @@
       "description": "TrendPolarity value 'Neutral' — RESERVED, not admitted (§3.6.1 clause 5); refused exactly like a name nobody has proposed, so a later admission is an ADDITION rather than a re-meaning of shipped bytes"
     },
     {
+      "id": "reject-upload-acceptpaste-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-acceptpaste-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.acceptPaste",
+      "description": "a FileUpload `acceptPaste` of `1` — the second gesture slot, refused on the same reasoning and vectored separately because it is a separate decoder arm. A number is the shape a truthiness coercion is likeliest to admit, which is why this vector carries one where its `dropTarget` twin carries a string"
+    },
+    {
+      "id": "reject-upload-destination-empty",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-destination-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.destination",
+      "description": "a FileUpload `destination` of `\"\"` — refused rather than read as absence. The member names a host-registered destination and the empty string names none, so the document describes an upload that can never stream; reading it as \"no destination\" would silently turn a streaming upload into a client-only one, which is the one failure mode with no visible symptom"
+    },
+    {
+      "id": "reject-upload-droptarget-nonbool",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-droptarget-nonbool.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.dropTarget",
+      "description": "a FileUpload `dropTarget` of `\"true\"` — refused rather than coerced. The slot decides whether a whole INGRESS ROUTE exists, and it omits at `false`, so absence already spells the plain picker: a present wrong-typed value can only mean the emitter meant something it did not say. A lenient truthiness read would open a drop target on `\"no\"` and `\"false\"` alike, and the reader would find out by dropping a file into a control that never listened for it"
+    },
+    {
       "id": "reject-wrongnodekind-sparkler",
       "kind": "reject",
       "decoder": "node",
@@ -3211,6 +3788,15 @@
       "description": "Top-level kind 'Widget' is not a recognised node kind"
     },
     {
+      "id": "reject-wrongtype-box-break-before",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-box-break-before.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.breakBefore",
+      "description": "Box breakBefore is the NUMBER 1, not a boolean — the truthy-integer spelling a JSON emitter reaches for, refused for the same reason as its sibling (Phase 1473)"
+    },
+    {
       "id": "reject-wrongtype-box-children",
       "kind": "reject",
       "decoder": "node",
@@ -3218,6 +3804,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.children",
       "description": "Box children is object not array"
+    },
+    {
+      "id": "reject-wrongtype-box-keep-together",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-box-keep-together.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.keepTogether",
+      "description": "Box keepTogether is the STRING \"true\", not a boolean — the container arm of the print-break pair. Refused, never coerced: absence is the only spelling of \"not declared\" (Phase 1473)"
+    },
+    {
+      "id": "reject-wrongtype-clipboard-payload",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-clipboard-payload.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.text",
+      "description": "Action.WriteToClipboard's payload is a TextSource, so it is a string (the Literal shorthand) or a $type-tagged object — never a number. The refusal matters more here than at an ordinary text slot: the slot WIDENED in 1126 from a bare string, and a host that read the widening as \"anything goes\" would put a JSON literal on the reader's clipboard rather than refusing the document (Phase 1126)"
     },
     {
       "id": "reject-wrongtype-discriminator",
@@ -3238,6 +3842,33 @@
       "description": "bound-grid defaultSort column -1 — the same non-negative bound the staticRows spelling carries, same record, same message (Phase 861)"
     },
     {
+      "id": "reject-wrongtype-grid-exportable",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-exportable.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.exportable",
+      "description": "DataGrid exportable is the STRING \"true\", not a boolean — the shape a stringly-typed emitter produces. Refused, never coerced: coerced to false it would silently withdraw a declared affordance, coerced to true it would grow one the document never asked for (Phase 1125)"
+    },
+    {
+      "id": "reject-wrongtype-grid-exportable-number",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-exportable-number.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.exportable",
+      "description": "DataGrid exportable is the NUMBER 1 — the truthy-integer spelling, pinned separately because a decoder can reject one non-boolean shape and accept another (Phase 1125)"
+    },
+    {
+      "id": "reject-wrongtype-grid-keep-rows-together",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-keep-rows-together.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.keepRowsTogether",
+      "description": "DataGrid keepRowsTogether is a string — the GRID arm of the print-break pair, a decoder branch of its own that a container-arm vector says nothing about (Phase 1473)"
+    },
+    {
       "id": "reject-wrongtype-grid-page-size-zero",
       "kind": "reject",
       "decoder": "node",
@@ -3245,6 +3876,33 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.pageSize",
       "description": "grid pageSize 0 — a page of no rows names no page; the schema says the same with minimum:1 (Phase 862)"
+    },
+    {
+      "id": "reject-wrongtype-grid-repeat-header",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-repeat-header.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.repeatHeader",
+      "description": "DataGrid repeatHeader is an object, not a boolean — the fourth flag, read by its own call and so pinned on its own (Phase 1473)"
+    },
+    {
+      "id": "reject-wrongtype-grid-transfer-in-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-transfer-in-key.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.transferInKey",
+      "description": "DataGrid transferInKey is a number — the slot names the shared State key a transfer travels on, so it is a key name and never an ordinal; a grid identified by position could not be paired with by any other grid (Phase 1123)"
+    },
+    {
+      "id": "reject-wrongtype-grid-transfer-out-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-wrongtype-grid-transfer-out-key.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.transferOutKey",
+      "description": "DataGrid transferOutKey is a boolean — the releasing side names a KEY, never declares a flag; there is deliberately no boolean spelling of \"this grid may release rows\", because a release with no key names no counterpart and would be an affordance with nowhere to go (Phase 1123)"
     },
     {
       "id": "reject-wrongtype-heading-level",

@@ -1,0 +1,1 @@
+{"id":"upload-capture-microphone-1","kind":{"$type":"FileUpload","accept":["audio/*"],"capture":"Microphone","label":"Record a voice note","multiple":false,"onSelect":"<closure>"}}

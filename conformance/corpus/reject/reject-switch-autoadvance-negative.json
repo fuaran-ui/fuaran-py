@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Switch","autoAdvanceMs":-1000,"cases":[],"default":{"id":"d","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"d"}}},"stateKey":"slide"}}

@@ -152,10 +152,32 @@ def test_the_output_carries_no_script_and_no_inline_handler() -> None:
 def test_the_inlined_stylesheet_fetches_nothing() -> None:
     css = scoped_reference_css()
     assert "@import" not in css
-    # No `url(...)` at all, so no font, image or cursor is fetched when the cell
-    # renders — which is what makes the output safe to open offline and unable to
-    # phone home from a notebook someone else executed.
-    assert "url(" not in css.replace(" ", "")
+    # NO FETCHING `url(...)`, so no font, image or cursor leaves the machine when
+    # the cell renders — which is what makes the output safe to open offline and
+    # unable to phone home from a notebook someone else executed.
+    #
+    # A `data:` URI is exempt and the exemption is the CLAIM read literally
+    # rather than a hole in it: the bytes are already in the stylesheet, so
+    # nothing is requested, nothing is resolved against a network and there is
+    # nowhere for a request to go. fuaran#1130's star glyph is an inline SVG on
+    # exactly those terms, and an assertion that refused it would be measuring
+    # the SPELLING of a value rather than whether the document reaches out.
+    #
+    # Every OTHER scheme still fails here, `http(s)`, a bare relative path and a
+    # protocol-relative `//host` included — which is the half that matters.
+    #
+    # The quote is stripped BEFORE the scheme test rather than skipped inside
+    # one pattern: an optional-quote group followed by a negative lookahead
+    # backtracks past the quote when the lookahead fails, so `url("data:…")`
+    # matches as if it were unquoted. Two steps, and it cannot.
+    fetching = [
+        raw
+        for raw in (v.strip().strip("\"'") for v in re.findall(r"url\(([^)]*)\)", css))
+        if not raw.startswith("data:")
+    ]
+    assert not fetching, (
+        f"the inlined stylesheet fetches something: {fetching} — only a self-contained data: URI is admitted here"
+    )
 
 
 def test_a_non_local_destination_is_denied_by_the_ambient_default() -> None:

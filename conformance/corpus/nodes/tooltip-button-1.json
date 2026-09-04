@@ -1,0 +1,1 @@
+{"id":"tooltip-button-1","kind":{"$type":"Button","label":"Rebuild index","onClick":{"$type":"Notify","channel":"rebuild","payload":{}},"variant":"Secondary"},"tooltip":"Re-reads every document; takes about a minute on this corpus."}

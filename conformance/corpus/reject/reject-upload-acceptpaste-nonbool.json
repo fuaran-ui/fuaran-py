@@ -1,0 +1,1 @@
+{"id":"up","kind":{"$type":"FileUpload","accept":["image/*"],"acceptPaste":1,"label":"Upload","multiple":false,"onSelect":"<closure>"}}

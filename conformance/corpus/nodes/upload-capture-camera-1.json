@@ -1,0 +1,1 @@
+{"id":"upload-capture-camera-1","kind":{"$type":"FileUpload","accept":["image/*"],"capture":"Camera","label":"Photograph the receipt","multiple":false,"onSelect":"<closure>"}}

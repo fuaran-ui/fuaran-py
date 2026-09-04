@@ -1,0 +1,1 @@
+{"id":"upload-destination-1","kind":{"$type":"FileUpload","accept":["video/*"],"destination":"session-recordings","label":"Upload your recordings","multiple":true,"onSelect":"<closure>"}}

@@ -1,0 +1,1 @@
+{"id":"popover-open-1","kind":{"$type":"Modal","anchor":"help-trigger","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":"Updated hourly."}}],"dismissable":true,"modality":"Popover","open":{"$type":"Static","value":true}}}

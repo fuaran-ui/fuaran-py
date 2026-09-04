@@ -432,10 +432,50 @@ class Notify:
 
 @dataclass(frozen=True)
 class WriteToClipboard:
-    text: str
+    """``Action.WriteToClipboard`` — the payload is a ``TextSource`` (fuaran#1126).
+
+    A bare string is still accepted and still encodes to the same bytes, because
+    ``TextSource.Literal``'s canonical form IS the bare JSON string: the widening
+    is source-breaking for construction sites and WIRE-NEUTRAL. What is new is
+    that a BOUND payload can reach the clipboard — a figure in the grid in front
+    of the reader, a link the session holds — and not only a literal the author
+    typed at authoring time.
+
+    Resolution happens at DISPATCH time on a host that has one, so what is
+    copied is what the reader was looking at; resolving at decode time would
+    freeze the value at the moment the document arrived, which for the shapes
+    this widening exists for is the wrong value.
+    """
+
+    text: TextSource
 
     def to_wire(self) -> Value:
-        return Obj("WriteToClipboard", {"text": self.text})
+        # `_obj`, not a bare `Obj`: the payload is a typed `TextSource` now, so it
+        # has to be LOWERED. A `Literal` lowers to the bare JSON string, which is
+        # what keeps this arm's bytes identical to the ones it emitted before the
+        # widening.
+        return _obj("WriteToClipboard", {"text": self.text})
+
+
+@dataclass(frozen=True)
+class Print:
+    """``Action.Print`` — open the reader's own print dialogue (fuaran#1124).
+
+    The format's first PAYLOAD-FREE action case, and the emptiness is the
+    specification rather than an omission in it: printing has parameters — page
+    size, margins, orientation, sheet range, copies, which printer — and every
+    one of them belongs either to the host's page setup or to the dialogue the
+    reader is looking at when the action fires.
+
+    It names no target either: it prints the PAGE, never a subtree of it,
+    because a subtree is something the host already holds and can select for
+    itself. Which subtrees stay whole on paper is a separate and independent
+    statement (``Box.keep_together`` / ``.break_before`` and the grid's pair),
+    because a printed page must be correct with no action having fired at all.
+    """
+
+    def to_wire(self) -> Value:
+        return Obj("Print", {})
 
 
 FileReadEncoding = Literal["Text", "Base64", "DataUrl"]
@@ -452,7 +492,7 @@ class ReadFileBody:
         return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
 
 
-Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | ReadFileBody
+Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | Print | ReadFileBody
 
 
 # ── CellFormat (WIRE_FORMAT.md §3.3) ────────────────────────────────────────
@@ -577,6 +617,14 @@ class SemanticStyle:
     weight: Weight = "Standard"
     role: StyleRole | None = None
     voice: FontVoice | None = None
+    #: fuaran#1472 — the DECLARED base direction of this node's own run, and the
+    #: only member of this record that is not presentational. The others are
+    #: statements a host may ignore and still render a document that says the
+    #: same thing; this one is a CORRECTNESS statement, because a value declared
+    #: `ltr` inside right-to-left prose is reordered by the Unicode
+    #: bidirectional algorithm unless the run is isolated, and the reader then
+    #: reads its digits back in the wrong order. `auto` is the identity.
+    direction: TextDirection = "auto"
 
     def is_default(self) -> bool:
         return (
@@ -585,6 +633,7 @@ class SemanticStyle:
             and self.weight == "Standard"
             and (self.role is None or self.role == "None")
             and (self.voice is None or self.voice == "Default")
+            and self.direction == "auto"
         )
 
     def to_wire(self) -> Value:
@@ -592,6 +641,7 @@ class SemanticStyle:
         return _obj(
             None,
             {
+                "direction": None if self.direction == "auto" else self.direction,
                 "emphasis": None if self.emphasis == "Normal" else self.emphasis,
                 "role": None if self.role == "None" else self.role,
                 "tone": None if self.tone == "Default" else self.tone,
@@ -788,13 +838,25 @@ class Box:
     layout: BoxLayout = field(default_factory=FlexLayout)
     role: BoxRole = "Group"
     heading: TextSource | None = None
+    #: fuaran#1473 — this container and its whole subtree stay on ONE page when
+    #: the rendering is PAGED. It declares the one fact a host cannot recover
+    #: from a rendering: a formatter laying out pages sees boxes, and nothing in
+    #: the rendering carries back that the three lines of a totals block are ONE
+    #: THING that reads wrong when halved.
+    keep_together: bool = False
+    #: fuaran#1473 — this container starts at the top of a fresh page. There is
+    #: deliberately no break-AFTER twin anywhere: a break after this container is
+    #: a break before the next one.
+    break_before: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
             "Box",
             {
+                "breakBefore": True if self.break_before else None,
                 "children": list(self.children),
                 "heading": self.heading,
+                "keepTogether": True if self.keep_together else None,
                 "layout": self.layout.to_wire(),
                 "role": self.role,
             },
@@ -920,14 +982,25 @@ class Modal:
     dismissable: bool = False
     on_dismiss: Action = field(default_factory=Chain)
     heading: TextSource | None = None
+    #: fuaran#1119 — `Blocking` is the identity and omits at it, so every modal
+    #: written before this member is byte-identical. The two differ in ONE claim
+    #: a host makes: a blocking surface asserts the page behind it is inert, an
+    #: anchored one does not, because the page behind it genuinely is not.
+    modality: ModalityKind = "Blocking"
+    #: fuaran#1119 — the node the anchored surface is positioned against. Where
+    #: it sits, which way it flips at a viewport edge and how far off it stands
+    #: are the RENDERER's, not the document's.
+    anchor: str | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
             "Modal",
             {
+                "anchor": self.anchor,
                 "children": list(self.children),
                 "dismissable": self.dismissable,
                 "heading": self.heading,
+                "modality": None if self.modality == "Blocking" else self.modality,
                 "onDismiss": self.on_dismiss,
                 "open": self.open,
             },
@@ -1251,6 +1324,138 @@ MediaKind = Video | Audio
 #: conformant host could honour without leaving the vocabulary.
 TrackKind = Literal["Subtitles", "Captions", "Descriptions", "Chapters"]
 
+#: fuaran#1111 — the sandbox relaxations an `Embed` may request. The EMPTY list
+#: is total denial and is the identity, so the shortest embed document is the
+#: fully-sandboxed one and every relaxation is something a caller names.
+EmbedPermission = Literal["AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"]
+
+#: fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
+#: There is no display-capture case and there will not be one by widening this:
+#: a screen capture reaches every window the reader has open rather than one
+#: device behind the picker, so it is a different class of thing.
+CaptureSource = Literal["Camera", "Microphone"]
+
+#: fuaran#1119 — the modal's modality. The two differ in ONE claim: a blocking
+#: surface asserts the page behind it is inert; an anchored one does not.
+ModalityKind = Literal["Blocking", "Popover"]
+
+#: fuaran#1472 — the declared base direction, LOWER-CASE because that is the
+#: spelling the isolation is ultimately expressed in. `auto` is the identity.
+TextDirection = Literal["auto", "ltr", "rtl"]
+
+
+@dataclass(frozen=True)
+class Embed:
+    """fuaran#1111 — a third-party document rendered inside a maximally-sandboxed
+    browsing context.
+
+    A NEW kind rather than a `Mount` variant: `Mount` composes a COOPERATING
+    guest — a scope id, a declared message channel, a capability request list, a
+    host-side loader — and a third-party page has none of those, so widening
+    `Mount` to admit an uncooperative third party would weaken every guarantee it
+    makes. It is equally not a `Media` variant: `Media` fetches an asset and
+    DISPLAYS it, this fetches a document and lets it EXECUTE.
+    """
+
+    src: Binding
+    #: The frame's accessible name, emitted as `title`. Mandatory, on
+    #: `Media.label`'s argument one kind over: a frame is a focus container a
+    #: reader tabs INTO, so it is never decorative, and an unnamed one is
+    #: announced as "frame" and nothing more.
+    title: TextSource
+    #: The box the frame reserves. REUSES the image aspect vocabulary rather than
+    #: a parallel enum with identical cases — a ratio is a ratio, and the wire
+    #: carries bare strings, so the type name reaches no document.
+    aspect_ratio: ImageAspect = "Natural"
+    #: The relaxations, in the ORDER the document names them. A JSON array is
+    #: ordered data and this record carries it verbatim; emitting the tokens in a
+    #: canonical order is the RENDERER's obligation, not the codec's.
+    permissions: tuple[EmbedPermission, ...] = ()
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Embed",
+            {
+                "aspectRatio": None if self.aspect_ratio == "Natural" else self.aspect_ratio,
+                "permissions": list(self.permissions) if self.permissions else None,
+                "src": self.src,
+                "title": self.title,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class TreeItem:
+    """fuaran#1120 — one row of a `Tree`, and the format's first SELF-REFERENTIAL
+    shape: `children` is a list of the same record.
+
+    `children` omits at the EMPTY LIST and `icon` when absent, so a leaf carries
+    two keys and nothing else — which is most of a real hierarchy, and a host
+    emitting `"children":[]` on a leaf produces different bytes for most of a
+    file listing.
+
+    `id` is required because it is what the two State slots NAME. `label` is a
+    `TextSource` because it is content — authored, translated, bindable. Row ids
+    must be unique within one tree, but that is an EMIT-side obligation rather
+    than a decode refusal: duplicate detection is a whole-tree property, and a
+    repeat makes both State slots ambiguous.
+    """
+
+    id: str
+    label: TextSource
+    children: tuple[TreeItem, ...] = ()
+    icon: str | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            None,
+            {
+                "children": list(self.children) if self.children else None,
+                "icon": self.icon,
+                "id": self.id,
+                "label": self.label,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class Tree:
+    """fuaran#1120 — a hierarchy of ROWS and, optionally, the names of the two
+    State slots through which a reader opens rows and selects one.
+
+    This kind carries NO `expandable` and NO `selectable` boolean, and none is
+    coming: a behaviour the reader drives is declared as a named State key the
+    host both writes and reads, and a flag with no key behind it is a decorative
+    control writing state nothing reads.
+
+    A tree naming no `expanded_state_key` renders FULLY EXPANDED — the same
+    reading that lets a grid honour a declared initial order while offering no
+    interactive sorting, and the only reading under which such a tree shows its
+    content at all. A tree naming no `selection_state_key` does not select, and
+    emits no `aria-selected`.
+    """
+
+    items: tuple[TreeItem, ...] = ()
+    #: Names a State slot holding a JSON ARRAY OF ROW IDS. An array rather than a
+    #: map of booleans, because the question a host asks is set membership, and a
+    #: set has one spelling where a map has two for "closed".
+    expanded_state_key: str | None = None
+    #: Names a State slot holding a bare ROW-ID STRING.
+    selection_state_key: str | None = None
+    #: Emitted only when present (rule 4); the value is the closure sentinel.
+    on_select: bool = False
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Tree",
+            {
+                "expandedStateKey": self.expanded_state_key,
+                "items": list(self.items),
+                "onSelect": CLOSURE if self.on_select else None,
+                "selectionStateKey": self.selection_state_key,
+            },
+        )
+
 
 @dataclass(frozen=True)
 class TrackEntry:
@@ -1452,13 +1657,42 @@ class FileUpload:
     accept: tuple[str, ...] = ()
     multiple: bool = False
     disabled: Binding | None = None
+    #: fuaran#1115 — the control renders a DROP ZONE. This names an INGRESS
+    #: ROUTE, not a gesture: the drag-over, the drop and the visible drop state
+    #: are the renderer's affordance, and a dropped file resolves through the
+    #: same selection path a picked one does. The zone is ADDITIONAL — the picker
+    #: and its label are always emitted, because there is no keyboard equivalent
+    #: of a drag.
+    drop_target: bool = False
+    #: fuaran#1115 — a paste carrying files, on the focused control, resolves
+    #: through the same selection path. It admits no clipboard-READING
+    #: capability: what a host attaches is a `paste` listener, which fires only
+    #: on the reader's own paste and carries only what the reader pasted.
+    accept_paste: bool = False
+    #: fuaran#1116 — WHICH of the reader's own recording devices the platform
+    #: opens in place of the file browser. OPTIONAL rather than
+    #: omit-at-default: "say nothing" is a state of its own, because an upload
+    #: naming no device asks for the ordinary picker, which is not one of the two
+    #: devices wearing a default.
+    capture: CaptureSource | None = None
+    #: fuaran#1117 — the host-registered destination selected files stream to. A
+    #: NAME and never an ADDRESS: it is an id the host has registered with its
+    #: own upload sink, and nothing on this member is ever fetched, joined to a
+    #: base, or otherwise turned into a URL. A wire document comes from an
+    #: arbitrary emitter, and a URL here would let that emitter choose where a
+    #: reader's file goes.
+    destination: str | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
             "FileUpload",
             {
                 "accept": list(self.accept),
+                "acceptPaste": True if self.accept_paste else None,
+                "capture": self.capture,
+                "destination": self.destination,
                 "disabled": self.disabled,
+                "dropTarget": True if self.drop_target else None,
                 "label": self.label,
                 "multiple": self.multiple,
                 "onSelect": CLOSURE,
@@ -1692,6 +1926,138 @@ class SegmentedChoice:
         )
 
 
+@dataclass(frozen=True)
+class ComboboxField:
+    """fuaran#1113 — the typeahead / autocomplete control.
+
+    `Choice` is a bounded menu the reader scans; this is a searchable one it
+    FILTERS, which is what makes a two-hundred-option source usable rather than
+    merely valid. The option source is an ordinary binding, so a `Query`-bound
+    one IS the asynchronous suggestion feed.
+
+    `allow_free_text` omits at `False`, which makes the shortest document the
+    CONSTRAINED one — the opposite polarity to `Tokens`, because that case's
+    suggestion source is optional and this one's is required.
+    """
+
+    options: Binding
+    value: Binding
+    allow_free_text: bool = False
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Combobox",
+            {
+                "allowFreeText": True if self.allow_free_text else None,
+                "onChange": CLOSURE,
+                "options": _lower(self.options),
+                "value": _lower(self.value),
+            },
+        )
+
+
+@dataclass(frozen=True)
+class TokensField:
+    """fuaran#1121 — SEVERAL values accumulated as removable chips, over a
+    suggestion set that may be open, searchable, asynchronous, or absent entirely.
+
+    THE TRIANGLE, which is the line an emitter has to hold: a CLOSED set small
+    enough to scan is a `Select` with `multiple`; ONE value from a large or
+    asynchronous set is a `Combobox`; SEVERAL values over a set that is open, or
+    that the document does not enumerate at all, is this. A `Combobox` PER ITEM
+    is not a smaller version of this control — it is N single-value fields with N
+    ids, no gesture that removes the third entry, and a submission shaped like
+    `tag1`, `tag2`, `tag3` rather than one list.
+
+    The value list is ORDERED and the order is the READER'S: chips appear where
+    they were added, and a host must not sort or de-duplicate it.
+
+    `allow_free_text` omits at TRUE here — the OPPOSITE polarity to `Combobox`'s,
+    and the thing about this case a host is most likely to get wrong. The default
+    follows the required-ness of the SET, which is one rule rather than two
+    habits: `Combobox.options` is required so "constrained" is its resting state,
+    where `suggestions` is optional so "open" is this one's.
+    """
+
+    value: Binding
+    allow_free_text: bool = True
+    #: An ABSENT source and an EMPTY one are different facts: absent means the
+    #: control has no candidate set at all, resolved-empty means it has one that
+    #: is currently empty — which is also every asynchronous source's first frame.
+    suggestions: Binding | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Tokens",
+            {
+                "allowFreeText": None if self.allow_free_text else False,
+                "onChange": CLOSURE,
+                "suggestions": None if self.suggestions is None else _lower(self.suggestions),
+                "value": _lower(self.value),
+            },
+        )
+
+
+@dataclass(frozen=True)
+class RatingField:
+    """fuaran#1130 — a SUBJECTIVE SCORE on a small ordinal scale.
+
+    The line an emitter has to hold is one sentence: a rating is a judgement a
+    person GIVES, a `RangedNumber` is a measurement they REPORT. Both carry a
+    floating-point value and a ceiling, which is exactly why the sentence is
+    written down rather than left to be inferred from the shapes.
+
+    `max` is the case's only REQUIRED member and must be at least 1: a scale with
+    no positions has nothing to draw, nothing to announce and no keystroke that
+    could change anything.
+
+    The value is a FLOAT even where nothing can type a fraction, and that is
+    normative: the commonest rating a reader sees is an AVERAGE arriving through
+    a `Query` binding, and an integer slot could not carry it.
+
+    `allow_half` governs ENTRY, never DISPLAY — it is the granularity of a
+    keystroke and of a pointer commit, and a host must not quantise a resolved
+    value to it.
+    """
+
+    max: int
+    value: Binding
+    allow_half: bool = False
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Rating",
+            {
+                "allowHalf": True if self.allow_half else None,
+                "max": self.max,
+                "onChange": CLOSURE,
+                "value": _lower(self.value),
+            },
+        )
+
+
+@dataclass(frozen=True)
+class ColorField:
+    """fuaran#1130 — the platform's own colour picker.
+
+    Note what it is NOT: a CONTROL, and not a `rule.format`. A format constrains
+    the text a reader types into a text box, where this is a swatch that opens the
+    operating system's colour picker, which no format on a `Text` field can
+    produce.
+
+    The value is `#rrggbb` and nothing else — six hexadecimal digits after a `#`,
+    either case. That is the one form a native colour input can hold or return, so
+    it is the wire form too rather than a wider colour syntax the control would
+    silently narrow. CASE IS PRESERVED, never normalised: browsers normalise at
+    the DOM, which is their business and not the wire's.
+    """
+
+    value: Binding
+
+    def to_wire(self) -> Value:
+        return _obj("Color", {"onChange": CLOSURE, "value": _lower(self.value)})
+
+
 FormFieldKind = (
     TextField
     | NumberField
@@ -1703,6 +2069,10 @@ FormFieldKind = (
     | DateRangeField
     | ChoiceField
     | SegmentedChoice
+    | ComboboxField
+    | TokensField
+    | RatingField
+    | ColorField
 )
 
 
@@ -1938,17 +2308,45 @@ class DataGrid:
     columns: tuple[Column, ...] = ()
     editable: bool = False
     row_key_field: str | None = None
+    #: fuaran#1123 — the two sides of ONE shared State key, and between them they
+    #: say exactly one thing: THESE GRIDS EXCHANGE ROWS. A grid declaring
+    #: `transfer_out_key` K may RELEASE rows onto K; one declaring
+    #: `transfer_in_key` K ACCEPTS rows arriving on it; one declaring both with
+    #: one K does each. TWO members and not one symmetric key, because the
+    #: one-way ends are ordinary — an archive column that accepts and never
+    #: releases, a Done column that releases nothing back.
+    transfer_out_key: str | None = None
+    transfer_in_key: str | None = None
+    #: fuaran#1125 — this grid's rows are the reader's to take, and the boolean is
+    #: the WHOLE declaration: not the file format, not the file name, not the
+    #: control, not the gesture, and not which rows. It is the grid-behaviour
+    #: rule reached by a node that writes NOTHING — every other member of that
+    #: family names a State key because the behaviour it declares writes
+    #: something the grid reads back, and an export writes nothing.
+    exportable: bool = False
+    #: fuaran#1473 — no row of this grid is split across a page boundary. It
+    #: applies to the grid's ROWS, not to the grid as a whole.
+    keep_rows_together: bool = False
+    #: fuaran#1473 — the column headers repeat at the top of every page the grid
+    #: continues onto.
+    repeat_header: bool = False
 
     def to_wire(self) -> Obj:
-        # 0.2.0 — `editable` omitted-when-false.
+        # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 join it on
+        # exactly those terms, and the two transfer keys ride only when declared.
         return _obj(
             "DataGrid",
             {
                 "columns": list(self.columns),
                 "editable": True if self.editable else None,
+                "exportable": True if self.exportable else None,
+                "keepRowsTogether": True if self.keep_rows_together else None,
+                "repeatHeader": True if self.repeat_header else None,
                 "rowKey": None if self.row_key_field is not None else CLOSURE,
                 "rowKeyField": self.row_key_field,
                 "source": self.source,
+                "transferInKey": self.transfer_in_key,
+                "transferOutKey": self.transfer_out_key,
             },
         )
 
@@ -2027,6 +2425,15 @@ class Switch:
     cases: tuple[SwitchCase, ...]
     default: UiNode
     on: Binding | None = None
+    #: fuaran#1122 — advance to the next case every this-many milliseconds. It
+    #: declares the one fact a host cannot recover from the tree: every other
+    #: half of a carousel is already composable (the stage is a `Box`, the panels
+    #: the `cases`, the position the bound key, the arrows ordinary controls
+    #: writing it), and nothing in any arrangement of those says a TIMER exists.
+    #: A DURATION, never a flag — "advances" with no interval is not renderable,
+    #: and two hosts inventing different periods is exactly the divergence the
+    #: corpus exists to prevent.
+    auto_advance_ms: int | None = None
 
     def __post_init__(self) -> None:
         if (self.state_key is None) == (self.on is None):
@@ -2037,6 +2444,8 @@ class Switch:
             "cases": list(self.cases),
             "default": self.default,
         }
+        if self.auto_advance_ms is not None:
+            fields["autoAdvanceMs"] = self.auto_advance_ms
         selector = self.on
         if selector is None:
             fields["stateKey"] = self.state_key

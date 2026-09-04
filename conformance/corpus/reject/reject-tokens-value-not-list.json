@@ -1,0 +1,1 @@
+{"id":"f","kind":{"$type":"Form","fields":[{"id":"labels","kind":{"$type":"Tokens","value":{"$type":"Static","value":"urgent"}},"label":"Labels","required":false}],"onSubmit":"<closure>","submitLabel":"Save"}}

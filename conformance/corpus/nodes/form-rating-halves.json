@@ -1,0 +1,1 @@
+{"id":"form-rating-halves","kind":{"$type":"Form","fields":[{"id":"stars","kind":{"$type":"Rating","allowHalf":true,"max":5,"value":{"$type":"Static","value":3.5}},"label":"Your rating","required":false},{"id":"average","kind":{"$type":"Rating","max":10},"label":"Average rating","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

@@ -1,0 +1,1 @@
+{"id":"upload-drop-1","kind":{"$type":"FileUpload","accept":[".csv","text/csv"],"dropTarget":true,"label":"Drop a spreadsheet","multiple":true,"onSelect":"<closure>"}}

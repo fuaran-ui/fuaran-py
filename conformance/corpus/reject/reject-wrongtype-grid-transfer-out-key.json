@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"DataGrid","columns":[{"field":"card","format":{"$type":"None"},"kind":{"$type":"Text"},"label":"Card","width":{"$type":"Auto"}}],"rowKeyField":"card","source":{"$type":"State","key":"todo"},"transferOutKey":true}}

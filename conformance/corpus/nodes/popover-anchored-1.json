@@ -1,0 +1,1 @@
+{"id":"popover-anchored-1","kind":{"$type":"Modal","anchor":"swatch","children":[{"id":"markdown-1","kind":{"$type":"Markdown","text":"Updated hourly."}}],"dismissable":true,"heading":"Choose a colour","modality":"Popover","open":{"$type":"State","defaultValue":false,"key":"swatchOpen"}}}

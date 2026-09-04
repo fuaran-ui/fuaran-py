@@ -61,6 +61,8 @@ from fuaran_py.render_fidelity import (
     unasserted_obligations,
 )
 from fuaran_py.renderer import render_html
+from fuaran_py.renderer.egress import DENY_NON_LOCAL_EGRESS, PERMISSIVE_EGRESS, EgressPolicy
+from fuaran_py.schema import types as t
 from fuaran_py.ui import encode, fuaran, track
 
 # ── Locating the artefact ────────────────────────────────────────────────────
@@ -85,15 +87,20 @@ def load() -> RenderFidelityManifest:
     return parse_manifest(json.loads(ARTIFACT.read_text(encoding="utf-8")))
 
 
-def render(node: object) -> str:
+def render(node: object, egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS) -> str:
     """Author → canonical wire → decode → HTML.
 
     The renderer consumes a decoded structural tree, so this is the host's real
     render path rather than a shortcut around it.
+
+    ``egress_policy`` defaults to the host's own deny-by-default, which is what
+    the three "refused" obligations are asserted under. A checker that needs the
+    ALLOWED twin — the half without which a renderer that dropped everything
+    would pass — names the permissive policy explicitly.
     """
     decoded = decode_node(encode(node))  # type: ignore[arg-type]
     assert decoded.ok, getattr(decoded, "error", decoded)
-    return render_html(decoded.value)
+    return render_html(decoded.value, egress_policy=egress_policy)
 
 
 #: A destination that is safe by the scheme floor and entirely undeclared, so the
@@ -418,6 +425,157 @@ def check_unregistered_custom_labelled() -> None:
 #: The registry: which (kind, claim) pairs this host asserts, and how. Keyed by
 #: the claim's WIRE token, because the enumeration it is matched against comes
 #: from the artefact.
+# ── The Phase 1111 embed obligations ────────────────────────────────────────
+
+
+def check_embed_accessible_name_always() -> None:
+    named = render(fuaran.embed("em", src="https://example.com/x", title="Quarterly figures"))
+
+    assert 'title="Quarterly figures"' in named, "the frame carries its accessible name"
+
+    # The EMPTY case is the one that matters. A frame is a focus container a
+    # reader tabs INTO, so it is never decorative — unlike an image, which can
+    # honestly say so with an empty `alt`. The attribute is emitted whatever it
+    # resolves to, and a stated empty is not the same claim as an absent one.
+    empty = render(fuaran.embed("em2", src="https://example.com/x", title=""))
+
+    assert 'title=""' in empty, "an empty title is still EMITTED, never dropped"
+
+
+def check_embed_sandbox_always_exactly_declared() -> None:
+    none_granted = render(fuaran.embed("es", src="https://example.com/x", title="Figures"))
+
+    # EMPTY and PRESENT. Omitting it on a permissionless embed produces the same
+    # markup as an UNSANDBOXED frame — the one mistake here that grants
+    # everything while looking like it grants nothing.
+    assert 'sandbox=""' in none_granted, "the sandbox attribute is emitted even when nothing is granted"
+
+    # Authored OUT of declaration order and with a duplicate, so this pins the
+    # ORDER and the DE-DUPLICATION rather than the token set: two documents
+    # naming the same set must produce identical markup whatever order they
+    # authored.
+    some = render(
+        fuaran.embed(
+            "es2",
+            src="https://example.com/x",
+            title="Figures",
+            permissions=["AllowForms", "AllowScripts", "AllowScripts"],
+        )
+    )
+
+    assert 'sandbox="allow-scripts allow-forms"' in some, "tokens ride in DECLARATION order, de-duplicated"
+    assert "allow-same-origin" not in some, (
+        "…and never a token the document did not name — AllowSameOrigin plus AllowScripts "
+        "is how a framed page removes its own sandbox"
+    )
+
+    # Fullscreen is a PERMISSIONS-POLICY directive and rides `allow`, not
+    # `sandbox`. Emitting it as a sandbox token would grant nothing while looking
+    # like it granted something.
+    fullscreen = render(
+        fuaran.embed("es3", src="https://example.com/x", title="Figures", permissions=["AllowFullscreen"])
+    )
+
+    assert 'allow="fullscreen"' in fullscreen, "fullscreen is a permissions-policy directive"
+    assert 'sandbox=""' in fullscreen, "…and is NOT a sandbox token"
+
+
+def check_refused_embed_source_omitted() -> None:
+    # `http` — the embed class admits `https` and nothing else, because a
+    # same-origin frame is where a sandbox can be removed from the inside.
+    refused = render(fuaran.embed("er", src="http://example.com/x", title="Figures"))
+
+    assert "src=" not in refused, (
+        "the source attribute is OMITTED ENTIRELY rather than pointed at the refusal URL — "
+        "an <img> at that URL shows a broken image, but an <iframe> at it RENDERS THAT PAGE"
+    )
+    assert "data-fuaran-egress-refused" in refused, "…while the refusal is still RECORDED"
+    assert 'title="Figures"' in refused, "and the frame is still emitted, named and sandboxed"
+
+    # The twin. Without it a renderer that dropped the whole node — or refused
+    # every scheme — would satisfy the assertions above by a worse bug.
+    allowed = render(
+        fuaran.embed("ea", src="https://example.com/x", title="Figures"),
+        egress_policy=PERMISSIVE_EGRESS,
+    )
+
+    assert 'src="https://example.com/x"' in allowed, "a source the floor admits still rides"
+
+
+# ── The Phase 1115 / 1116 / 1117 upload obligation ──────────────────────────
+
+
+def check_picker_always_present() -> None:
+    # A DECLARED INGRESS GESTURE IS ADDITIONAL. Whatever the document declares —
+    # a drop zone, a paste route, a capture device, a streamed destination — the
+    # file picker and its label are emitted, so the keyboard-accessible route
+    # survives and a no-script host renders a working upload. There is no
+    # keyboard equivalent of a drag, so a control that swapped the picker for a
+    # drop zone would have removed the only route some readers have.
+    variants: dict[str, dict[str, object]] = {
+        "up-plain": {},
+        "up-drop": {"drop_target": True},
+        "up-paste": {"accept_paste": True},
+        "up-both": {"drop_target": True, "accept_paste": True},
+        "up-capture": {"capture": "Camera"},
+        "up-dest": {"destination": "session-recordings"},
+    }
+    for node_id, extra in variants.items():
+        html = render(fuaran.file_upload(node_id, label="Upload", **extra))  # type: ignore[arg-type]
+        assert 'type="file"' in html, f"{node_id}: the file input is emitted"
+        assert "fuaran-file-upload-label" in html, f"{node_id}: and its label with it"
+
+    # fuaran#1116's own half: the keyword names a camera FACING, and the DEVICE
+    # NAME is not a keyword and is non-conforming markup.
+    camera = render(fuaran.file_upload("upc", label="Photograph the receipt", capture="Camera"))
+
+    assert 'capture="environment"' in camera, "Camera projects to the rear-facing keyword"
+    assert "Camera" not in camera.split("capture=")[1][:20], "…never the wire spelling, which is not a keyword"
+
+
+# ── The Phase 1119 modality obligation ──────────────────────────────────────
+
+
+def check_aria_modal_only_when_blocking() -> None:
+    blocking = render(fuaran.modal("md", heading="Confirm", open=True))
+
+    assert 'role="dialog"' in blocking, "the blocking surface is a dialog"
+    assert 'aria-modal="true"' in blocking, "…and claims the page behind it is INERT"
+
+    popover = render(fuaran.modal("mp", heading="Details", open=True, modality="Popover"))
+
+    # The claim is about INERTNESS, and a non-blocking anchored surface leaves
+    # the page genuinely available. A host emitting `aria-modal` here tells
+    # assistive technology the rest of the page is unreachable when it is not.
+    assert 'role="dialog"' in popover, "the anchored surface still carries the dialog role"
+    assert "aria-modal" not in popover, "…but never the inertness claim"
+
+
+# ── The Phase 1120 tree obligation ──────────────────────────────────────────
+
+
+def check_tree_accessible_name_always() -> None:
+    html = render(
+        fuaran.tree(
+            "tr",
+            items=[
+                t.TreeItem("goods", t.LiteralText("Goods"), (t.TreeItem("cocoa", t.LiteralText("Cocoa")),)),
+                t.TreeItem("ledger", t.LiteralText("Ledger")),
+            ],
+        )
+    )
+
+    # STATED rather than computed. A `treeitem` OWNS its child group, so a name
+    # derived from contents reads the whole branch out as the row's own name —
+    # "Goods Cocoa" for the parent here. Asserting the parent's name is exactly
+    # its own visible label is what catches that.
+    assert 'aria-label="Goods"' in html, "the parent row is named by its OWN label, not its subtree"
+    assert 'aria-label="Ledger"' in html, "a leaf row is named too — every instance, never only some"
+    assert '<span class="fuaran-tree-label">Goods</span>' in html, (
+        "…and the stated name is byte-identical to the visible label, so 'label in name' holds"
+    )
+
+
 CHECKERS: Mapping[str, Callable[[], None]] = {
     "Media/accessible-name-always": check_accessible_name_always,
     "Media/autoplay-muted-pairing": check_autoplay_muted_pairing,
@@ -433,6 +591,16 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "Image/figure-caption-outside-link": check_figure_caption_outside_link,
     "Image/srcset-ascending-by-width": check_srcset_ascending_by_width,
     "Custom/unregistered-custom-labelled": check_unregistered_custom_labelled,
+    # fuaran#1128 — the platform-baseline wave's own obligations. Each arrived
+    # here as a claim with no checker on the day the manifest declared it, which
+    # is the fuaran#1109 mechanism working as designed: a newly declared
+    # obligation turns this suite RED rather than sitting in a paragraph.
+    "Embed/accessible-name-always": check_embed_accessible_name_always,
+    "Embed/sandbox-always-exactly-declared": check_embed_sandbox_always_exactly_declared,
+    "Embed/refused-embed-source-omitted": check_refused_embed_source_omitted,
+    "FileUpload/picker-always-present": check_picker_always_present,
+    "Modal/aria-modal-only-when-blocking": check_aria_modal_only_when_blocking,
+    "Tree/accessible-name-always": check_tree_accessible_name_always,
 }
 
 #: Obligations this host declares it does NOT check, each with a reason.

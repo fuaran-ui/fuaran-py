@@ -1,0 +1,1 @@
+{"id":"btn-copy","kind":{"$type":"Button","label":"Copy","onClick":{"$type":"WriteToClipboard","text":{"$type":"Literal","text":"https://example.com/s/1"}},"variant":"Primary"}}

@@ -1,0 +1,1 @@
+{"id":"tooltip-metric-1","kind":{"$type":"Metric","label":"Median latency","trendPolarity":"LowerIsBetter","value":{"$type":"Static","value":128}},"tooltip":{"$type":"I18n","args":{},"key":"metric.latency.hint"}}

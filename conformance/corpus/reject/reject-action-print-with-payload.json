@@ -1,0 +1,1 @@
+{"id":"b-print","kind":{"$type":"Button","label":{"$type":"Literal","text":"Print"},"onClick":{"$type":"Print","pageRange":"1-3"},"variant":"Primary"}}

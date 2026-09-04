@@ -1,0 +1,1 @@
+{"id":"btn-copy-bound","kind":{"$type":"Button","label":"Copy the current share link","onClick":{"$type":"WriteToClipboard","text":{"$type":"Bound","binding":{"$type":"State","key":"shareUrl"}}},"variant":"Secondary"}}

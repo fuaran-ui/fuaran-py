@@ -1,0 +1,1 @@
+{"id":"grid-keep-rows-together-1","kind":{"$type":"DataGrid","columns":[{"field":"note","kind":{"$type":"Text"},"label":"Note"}],"keepRowsTogether":true,"rowKeyField":"note","source":{"$type":"Query","name":"notes"}}}

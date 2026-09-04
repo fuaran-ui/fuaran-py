@@ -1,0 +1,1 @@
+{"id":"up","kind":{"$type":"FileUpload","accept":[".csv"],"dropTarget":"true","label":"Upload","multiple":false,"onSelect":"<closure>"}}

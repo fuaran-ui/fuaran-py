@@ -164,8 +164,29 @@ class action:  # noqa: N801 — namespace object
         return t.Notify(channel, payload)
 
     @staticmethod
-    def write_to_clipboard(text: str) -> Action:
-        return t.WriteToClipboard(text)
+    def print() -> Action:  # noqa: A003 — the wire case name
+        """``Action.Print`` — open the reader's own print dialogue (fuaran#1124).
+
+        It takes NOTHING, and the emptiness is the specification rather than an
+        omission in it: every printing parameter belongs either to the host's page
+        setup or to the dialogue the reader is looking at. Which subtrees stay
+        whole on paper is a separate, independent statement — ``keep_together`` /
+        ``break_before`` on a box and the grid's pair — because a printed page
+        must be correct with no action having fired at all.
+        """
+        return t.Print()
+
+    @staticmethod
+    def write_to_clipboard(text: t.TextInput) -> Action:
+        """``Action.WriteToClipboard`` — the payload is a ``TextSource`` (fuaran#1126).
+
+        A bare string is still accepted and still encodes to the same bytes,
+        because ``Literal``'s canonical form IS the bare JSON string. What is new
+        is that a BOUND payload can reach the clipboard — a figure in the grid in
+        front of the reader, a link the session holds — resolved at DISPATCH time,
+        so what is copied is what the reader was looking at.
+        """
+        return t.WriteToClipboard(_text(text))
 
     @staticmethod
     def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text") -> Action:
@@ -537,7 +558,18 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         dismissable: bool = False,
         on_dismiss: Action | None = None,
         heading: t.TextInput | None = None,
+        modality: t.ModalityKind = "Blocking",
+        anchor: str | None = None,
     ) -> UiNode:
+        """A modal surface, in one of TWO modalities (fuaran#1119).
+
+        `Blocking` is the default and the identity: it asserts the page behind it
+        is INERT, and a host emits `aria-modal` to say so. `Popover` is the
+        NON-BLOCKING anchored surface, and it carries the dialog role WITHOUT
+        that claim — the page behind it is genuinely still available, and a host
+        that claimed otherwise would tell assistive technology the rest of the
+        page is unreachable when it is not.
+        """
         op = t.Static(open) if isinstance(open, bool) else open
         kind = t.Modal(
             tuple(children or ()),
@@ -545,6 +577,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             dismissable,
             on_dismiss if on_dismiss is not None else t.Chain(),
             _text(heading) if heading is not None else None,
+            modality,
+            anchor,
         )
         return _node(id, kind, accessibility.modal)
 
@@ -675,6 +709,63 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
                 src_set=tuple(t.SrcSetEntry(_str_binding(s), w) for s, w in src_set),
                 expandable=expandable,
             ),
+            accessibility.none,
+        )
+
+    @staticmethod
+    def embed(
+        id: str,  # noqa: A002
+        *,
+        src: t.StringInput,
+        title: t.TextInput,
+        aspect_ratio: t.ImageAspect = "Natural",
+        permissions: Sequence[t.EmbedPermission] = (),
+    ) -> UiNode:
+        """A third-party document in a maximally-sandboxed browsing context
+        (fuaran#1111).
+
+        `permissions` defaults to the EMPTY list, which is TOTAL DENIAL: the
+        shortest call is the fully-sandboxed one and every relaxation is
+        something a caller names. `title` is required — a frame is a focus
+        container a reader tabs INTO, so it is never decorative.
+
+        The source must be `https`: the embed egress class refuses every other
+        scheme and every relative reference at RENDER time, because a same-origin
+        frame is exactly where `AllowSameOrigin` plus `AllowScripts` lets the
+        framed document remove its own sandbox.
+        """
+        return _node(
+            id,
+            t.Embed(_str_binding(src), _text(title), aspect_ratio, tuple(permissions)),
+            accessibility.none,
+        )
+
+    @staticmethod
+    def tree(
+        id: str,  # noqa: A002
+        *,
+        items: Sequence[t.TreeItem] = (),
+        expanded_state_key: str | None = None,
+        selection_state_key: str | None = None,
+        on_select: bool = False,
+    ) -> UiNode:
+        """A hierarchy of rows with TREE semantics (fuaran#1120).
+
+        The property the kind exists for is ONE TAB STOP: exactly one visible row
+        is in the sequential focus order and the arrow keys move within the
+        widget. No `List` + `Disclosure` composition has it — a composition of
+        independently focusable containers is N tab stops, and no arrangement of
+        them produces one.
+
+        There is no `expandable` and no `selectable` flag: a behaviour the reader
+        drives is declared as a named State key the host both writes and reads.
+        Naming no `expanded_state_key` renders the tree FULLY EXPANDED, which is
+        an initial presentation without a reader-driven affordance — a legitimate
+        shape, and the only reading under which such a tree shows its content.
+        """
+        return _node(
+            id,
+            t.Tree(tuple(items), expanded_state_key, selection_state_key, on_select),
             accessibility.none,
         )
 
@@ -898,8 +989,35 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         accept: list[str] | None = None,
         multiple: bool = False,
         disabled: Binding | None = None,
+        drop_target: bool = False,
+        accept_paste: bool = False,
+        capture: t.CaptureSource | None = None,
+        destination: str | None = None,
     ) -> UiNode:
-        kind = t.FileUpload(_text(label), tuple(accept or ()), multiple, disabled)
+        """The upload control, and its FOUR optional declarations.
+
+        The first three are INGRESS ROUTES and each is ADDITIONAL: the picker and
+        its label are emitted whatever is declared, because there is no keyboard
+        equivalent of a drag and a control that replaced the picker would remove
+        the only route some readers have. `capture` is the one that PRODUCES a
+        file rather than moving one that already exists; it and `accept` are ONE
+        statement, and nothing synthesises either from the other.
+
+        `destination` is the fourth and the only one about what happens AFTER the
+        selection: a NAME the host has registered with its own upload sink, never
+        an address. Absent is the pre-1117 control — the selection reaches the
+        handler and nothing leaves the client.
+        """
+        kind = t.FileUpload(
+            _text(label),
+            tuple(accept or ()),
+            multiple,
+            disabled,
+            drop_target,
+            accept_paste,
+            capture,
+            destination,
+        )
         return _node(id, kind, accessibility.file_upload)
 
     @staticmethod

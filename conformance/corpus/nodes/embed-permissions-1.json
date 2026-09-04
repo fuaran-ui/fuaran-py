@@ -1,0 +1,1 @@
+{"id":"embed-permissions-1","kind":{"$type":"Embed","permissions":["AllowFullscreen"],"src":{"$type":"Static","value":"https://player.example/embed/harbour"},"title":"Harbour restoration, part two"}}

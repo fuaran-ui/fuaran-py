@@ -1,0 +1,1 @@
+{"id":"grid-repeat-header-1","kind":{"$type":"DataGrid","columns":[{"field":"line","kind":{"$type":"Text"},"label":"Line"}],"repeatHeader":true,"rowKeyField":"line","source":{"$type":"Query","name":"lines"}}}

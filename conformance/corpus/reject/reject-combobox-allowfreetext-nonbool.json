@@ -1,0 +1,1 @@
+{"id":"f","kind":{"$type":"Form","fields":[{"id":"country","kind":{"$type":"Combobox","allowFreeText":"yes","options":{"$type":"Static","value":[{"label":"France","value":"fra"}]}},"label":"Country","required":false}],"onSubmit":"<closure>","submitLabel":"Save"}}

@@ -1,0 +1,1 @@
+{"id":"filters-tokens","kind":{"$type":"Filters","items":[{"kind":{"$type":"Tokens","allowFreeText":false,"suggestions":{"$type":"Static","value":[{"label":"Urgent","value":"urgent"},{"label":"Blocked","value":"blocked"}]}},"label":"Labels","name":"labels"}]}}

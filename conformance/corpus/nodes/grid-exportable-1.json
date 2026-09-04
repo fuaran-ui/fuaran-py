@@ -1,0 +1,1 @@
+{"id":"grid-exportable-1","kind":{"$type":"DataGrid","columns":[{"field":"reference","kind":{"$type":"Text"},"label":"Reference"},{"field":"amount","format":{"$type":"Currency","code":"GBP"},"kind":{"$type":"Numeric"},"label":"Amount"}],"exportable":true,"rowKeyField":"reference","source":{"$type":"Query","name":"settlements"}}}

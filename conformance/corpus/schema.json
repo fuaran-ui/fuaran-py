@@ -89,6 +89,15 @@
         "SixteenNine"
       ]
     },
+    "EmbedPermission": {
+      "type": "string",
+      "enum": [
+        "AllowScripts",
+        "AllowSameOrigin",
+        "AllowForms",
+        "AllowFullscreen"
+      ]
+    },
     "ImageLoading": {
       "type": "string",
       "enum": [
@@ -102,6 +111,20 @@
         "Vertical",
         "Horizontal",
         "Both"
+      ]
+    },
+    "ModalityKind": {
+      "type": "string",
+      "enum": [
+        "Modal",
+        "Popover"
+      ]
+    },
+    "CaptureSource": {
+      "type": "string",
+      "enum": [
+        "Camera",
+        "Microphone"
       ]
     },
     "DateVariant": {
@@ -189,6 +212,14 @@
         "Default",
         "Display",
         "Structural"
+      ]
+    },
+    "TextDirection": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "ltr",
+        "rtl"
       ]
     },
     "ChartKind": {
@@ -3310,7 +3341,7 @@
               "const": "WriteToClipboard"
             },
             "text": {
-              "type": "string"
+              "$ref": "#/$defs/TextSource"
             }
           },
           "required": [
@@ -3362,6 +3393,18 @@
             "args",
             "capabilityId"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Print"
+            }
+          },
+          "required": [
+            "$type"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -4102,6 +4145,94 @@
             "$type",
             "variant"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Combobox"
+            },
+            "allowFreeText": {
+              "type": "boolean"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "options": {
+              "$ref": "#/$defs/Binding_list_SelectOption"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding_str"
+            }
+          },
+          "required": [
+            "$type",
+            "options"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Rating"
+            },
+            "allowHalf": {
+              "type": "boolean"
+            },
+            "max": {
+              "type": "integer"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding_float"
+            }
+          },
+          "required": [
+            "$type",
+            "max"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Color"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding_str"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Tokens"
+            },
+            "allowFreeText": {
+              "type": "boolean"
+            },
+            "onChange": {
+              "const": "<closure>"
+            },
+            "suggestions": {
+              "$ref": "#/$defs/Binding_list_SelectOption"
+            },
+            "value": {
+              "$ref": "#/$defs/Binding_list_str"
+            }
+          },
+          "required": [
+            "$type"
+          ]
         }
       ]
     },
@@ -4583,6 +4714,77 @@
             "$type"
           ]
         }
+      ]
+    },
+    "EmbedSpec": {
+      "type": "object",
+      "properties": {
+        "aspectRatio": {
+          "$ref": "#/$defs/ImageAspect"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EmbedPermission"
+          }
+        },
+        "src": {
+          "$ref": "#/$defs/Binding_str"
+        },
+        "title": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "src",
+        "title"
+      ]
+    },
+    "TreeItem": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TreeItem"
+          }
+        },
+        "icon": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ]
+    },
+    "TreeSpec": {
+      "type": "object",
+      "properties": {
+        "expandedStateKey": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TreeItem"
+          }
+        },
+        "onSelect": {
+          "const": "<closure>"
+        },
+        "selectionStateKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
       ]
     },
     "ListSpec": {
@@ -5795,6 +5997,42 @@
               "type": "object",
               "properties": {
                 "$type": {
+                  "const": "Embed"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmbedSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Tree"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/TreeSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
                   "const": "List"
                 }
               },
@@ -6139,6 +6377,19 @@
         },
         "disabled": {
           "$ref": "#/$defs/Binding_bool"
+        },
+        "dropTarget": {
+          "type": "boolean"
+        },
+        "acceptPaste": {
+          "type": "boolean"
+        },
+        "capture": {
+          "$ref": "#/$defs/CaptureSource"
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -6316,6 +6567,21 @@
           "type": "string"
         },
         "reorderable": {
+          "type": "boolean"
+        },
+        "transferInKey": {
+          "type": "string"
+        },
+        "transferOutKey": {
+          "type": "string"
+        },
+        "keepRowsTogether": {
+          "type": "boolean"
+        },
+        "repeatHeader": {
+          "type": "boolean"
+        },
+        "exportable": {
           "type": "boolean"
         },
         "defaultSort": {
@@ -6674,6 +6940,12 @@
             "Dashboard",
             "Separator"
           ]
+        },
+        "keepTogether": {
+          "type": "boolean"
+        },
+        "breakBefore": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -6975,6 +7247,12 @@
         },
         "heading": {
           "$ref": "#/$defs/TextSource"
+        },
+        "modality": {
+          "$ref": "#/$defs/ModalityKind"
+        },
+        "anchor": {
+          "type": "string"
         }
       },
       "required": [
@@ -7662,6 +7940,10 @@
                 },
                 "on": {
                   "$ref": "#/$defs/Binding_str"
+                },
+                "autoAdvanceMs": {
+                  "type": "integer",
+                  "minimum": 1
                 }
               },
               "required": [
@@ -7804,6 +8086,9 @@
         },
         "voice": {
           "$ref": "#/$defs/FontVoice"
+        },
+        "direction": {
+          "$ref": "#/$defs/TextDirection"
         }
       }
     },
@@ -7962,6 +8247,9 @@
         },
         "accessibility": {
           "$ref": "#/$defs/Accessibility"
+        },
+        "tooltip": {
+          "$ref": "#/$defs/TextSource"
         }
       },
       "required": [

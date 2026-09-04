@@ -49,7 +49,13 @@ from .bindings import (
     resolve_scalar_number,
     resolve_source,
 )
-from .egress import DENY_NON_LOCAL_EGRESS, EgressClass, EgressPolicy, sanitize_url_for_egress
+from .egress import (
+    DENY_NON_LOCAL_EGRESS,
+    EgressClass,
+    EgressPolicy,
+    sanitize_embed_src_for_egress,
+    sanitize_url_for_egress,
+)
 from .html import element, escape_text, text_element, void_element
 from .seeds import with_state_seeds
 from .theme import node_class_name, trend_sentiment
@@ -628,12 +634,25 @@ class Renderer:
                 )
             )
         parts.append(element("div", [("class", "fuaran-modal-body")], self._children_html(fields)))
-        dialog = element(
-            "div",
-            [("class", "fuaran-modal-dialog"), ("role", "dialog"), ("aria-modal", "true")],
-            "".join(parts),
-        )
-        overlay_attrs: list[tuple[str, str]] = [("class", "fuaran-modal-overlay")]
+        # fuaran#1119 — `aria-modal` is the INERTNESS claim, and it is emitted for
+        # the BLOCKING modality alone. A non-blocking anchored surface carries the
+        # dialog role WITHOUT it, because the page behind it is genuinely still
+        # available; a host emitting it there tells assistive technology the rest
+        # of the page is unreachable when it is not.
+        blocking = fields.get("modality") != "Popover"
+        dialog_attrs: list[tuple[str, str]] = [
+            ("class", "fuaran-modal-dialog" if blocking else "fuaran-modal-dialog fuaran-popover"),
+            ("role", "dialog"),
+        ]
+        if blocking:
+            dialog_attrs.append(("aria-modal", "true"))
+        anchor = fields.get("anchor")
+        if isinstance(anchor, str):
+            dialog_attrs.append(("data-fuaran-anchor", anchor))
+        dialog = element("div", dialog_attrs, "".join(parts))
+        overlay_attrs: list[tuple[str, str]] = [
+            ("class", "fuaran-modal-overlay" if blocking else "fuaran-modal-overlay fuaran-popover-overlay")
+        ]
         if not is_open:
             overlay_attrs.append(("hidden", ""))
         return element("div", overlay_attrs, dialog)
@@ -993,6 +1012,179 @@ class Renderer:
             [("class", "fuaran-image-figure")],
             img + text_element("figcaption", [("class", "fuaran-image-figure-caption")], self._text(caption)),
         )
+
+    #: fuaran#1111 — the wire permission → sandbox-token map, in DECLARATION
+    #: order. `AllowFullscreen` is deliberately absent: fullscreen is a
+    #: permissions-policy directive and rides `allow`, not `sandbox`, and
+    #: emitting it as a sandbox token would grant nothing while looking like it
+    #: granted something.
+    _SANDBOX_TOKENS = (
+        ("AllowScripts", "allow-scripts"),
+        ("AllowSameOrigin", "allow-same-origin"),
+        ("AllowForms", "allow-forms"),
+    )
+
+    #: fuaran#1111 — the reserved-box classes. `Natural` emits none, so an embed
+    #: that declares no ratio is byte-identical to what it would have been.
+    _EMBED_ASPECT_CLASS = {
+        "Square": " fuaran-embed-aspect-square",
+        "FourThree": " fuaran-embed-aspect-four-three",
+        "ThreeTwo": " fuaran-embed-aspect-three-two",
+        "SixteenNine": " fuaran-embed-aspect-sixteen-nine",
+    }
+
+    def _embed(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
+        """fuaran#1111 — the sandboxed third-party browsing context.
+
+        Four contract points, and each is a claim the bytes cannot carry:
+
+        * The ACCESSIBLE NAME is emitted ALWAYS, the empty string included. A
+          frame is a focus container a reader tabs INTO, so it is never
+          decorative, and an unnamed one is announced as "frame" and nothing more.
+        * `sandbox` is emitted ALWAYS and EMPTY when nothing is granted. Omitting
+          it on a permissionless embed produces the same markup as an
+          UNSANDBOXED frame — the one mistake here that grants everything while
+          looking like it grants nothing.
+        * The tokens ride in the vocabulary's DECLARATION order, de-duplicated,
+          so two documents naming the same set produce identical markup whatever
+          order they authored.
+        * A REFUSED SOURCE OMITS THE ATTRIBUTE ENTIRELY rather than pointing the
+          browsing context at the refusal URL — an iframe at that URL renders
+          that page. The refusal is still RECORDED, and the frame is still
+          emitted, named and sandboxed.
+        """
+        resolved = resolve_binding(fields.get("src"), self.sources)
+        safe, refusal = sanitize_embed_src_for_egress(self.egress_policy, resolved if isinstance(resolved, str) else "")
+        declared: list[str] = []
+        permissions = fields.get("permissions")
+        granted = {str(pterm) for pterm in permissions.items} if isinstance(permissions, Arr) else set()
+        for wire, token in Renderer._SANDBOX_TOKENS:
+            if wire in granted:
+                declared.append(token)
+        aspect = fields.get("aspectRatio")
+        aspect_class = Renderer._EMBED_ASPECT_CLASS.get(aspect, "") if isinstance(aspect, str) else ""
+        attrs: list[tuple[str, str]] = [
+            ("class", "fuaran-embed" + aspect_class),
+            ("title", self._text(fields.get("title"))),
+            ("sandbox", " ".join(declared)),
+            ("loading", "lazy"),
+            ("referrerpolicy", "strict-origin-when-cross-origin"),
+        ]
+        if safe is not None:
+            attrs.append(("src", safe))
+        if "AllowFullscreen" in granted:
+            attrs.append(("allow", "fullscreen"))
+        attrs.extend(semantic_attrs)
+        attrs.extend(refusal)
+        # `element`, not `void_element`: `<iframe>` is NOT a void element, and a
+        # self-closed one leaves the parser inside it — the `<video>` trap one
+        # kind over.
+        return element("iframe", attrs, "")
+
+    def _tree(self, node: Node, fields: dict[str, Value]) -> str:
+        """fuaran#1120 — the tree, and its floor is NORMATIVE rather than a
+        degraded approximation: nested lists carrying the full ARIA tree
+        vocabulary, `aria-expanded` reflecting the statically-resolvable expanded
+        state, and exactly ONE row carrying `tabindex="0"`.
+
+        No script participates at any point, so what a reader with JavaScript off
+        gets is a complete, navigable, correctly-announced hierarchy that simply
+        does not toggle. Movement is an interactive host's ADDITION over this
+        identical DOM, never a precondition for the document being readable.
+
+        Three decisions are worth stating because a host would round-trip the
+        bytes perfectly having got each of them wrong:
+
+        * The ACCESSIBLE NAME IS STATED, not computed from contents. A
+          `treeitem` OWNS its child group, so a name derived from its subtree
+          reads the whole branch out as the row's own name.
+        * `aria-expanded` is emitted ONLY on a row that HAS children. On a leaf
+          it asserts a collapsed subtree that does not exist, and assistive
+          technology announces such a row as CLOSED — a reader told there is more
+          when there is not.
+        * `aria-selected` appears only where a selection key is NAMED. Emitting
+          `false` on every row of a tree that never selects declares a selectable
+          widget with nothing selected, rather than a tree that does not select.
+        """
+        expanded_key = fields.get("expandedStateKey")
+        key_named = isinstance(expanded_key, str)
+        expanded = self._tree_expanded_ids(expanded_key)
+        selection_key = fields.get("selectionStateKey")
+        selected = self._tree_selected_id(selection_key)
+        items = fields.get("items")
+        roots = items.items if isinstance(items, Arr) else []
+        focusable = _focusable_tree_item(key_named, expanded, selected, roots)
+
+        def render_items(level: int, rows: Sequence[Value]) -> str:
+            out: list[str] = []
+            set_size = len(rows)
+            for index, row in enumerate(rows):
+                if not isinstance(row, Obj):
+                    continue
+                row_id = row.fields.get("id")
+                row_id = row_id if isinstance(row_id, str) else ""
+                children = row.fields.get("children")
+                child_rows = children.items if isinstance(children, Arr) else []
+                is_open = _tree_item_expanded(key_named, expanded, row_id, bool(child_rows))
+                label = self._text(row.fields.get("label"))
+                attrs: list[tuple[str, str]] = [
+                    ("class", "fuaran-tree-item"),
+                    ("role", "treeitem"),
+                    ("aria-label", label),
+                    ("aria-level", str(level)),
+                    ("aria-setsize", str(set_size)),
+                    ("aria-posinset", str(index + 1)),
+                    ("data-fuaran-tree-item", row_id),
+                    ("tabindex", "0" if row_id == focusable else "-1"),
+                ]
+                if child_rows:
+                    attrs.append(("aria-expanded", "true" if is_open else "false"))
+                if isinstance(selection_key, str):
+                    attrs.append(("aria-selected", "true" if row_id == selected else "false"))
+                body = text_element("span", [("class", "fuaran-tree-label")], label)
+                if is_open:
+                    body += element(
+                        "ul",
+                        [("class", "fuaran-tree-group"), ("role", "group")],
+                        render_items(level + 1, child_rows),
+                    )
+                out.append(element("li", attrs, body))
+            return "".join(out)
+
+        return element(
+            "ul",
+            [("class", "fuaran-tree"), ("role", "tree")],
+            render_items(1, roots),
+        )
+
+    def _tree_expanded_ids(self, key: Value | None) -> frozenset[str]:
+        """The rows a tree currently has OPEN, read off the named State key.
+
+        The fixed shape is a JSON ARRAY OF ROW IDS. Every non-conforming shape
+        reads as the EMPTY SET rather than as an error: a key holding a number, an
+        object, or an array with non-string members is a HOST'S state slot, not a
+        wire document, so there is nothing here to refuse and refusing would blank
+        a tree over a value the reader never authored. Non-string members are
+        dropped individually for the same reason — `["a", 3, "b"]` still says two
+        true things.
+        """
+        if not isinstance(key, str):
+            return frozenset()
+        raw = self.sources.get(key) if self.sources else None
+        if isinstance(raw, Arr):
+            return frozenset(v for v in raw.items if isinstance(v, str))
+        if isinstance(raw, list):
+            return frozenset(v for v in raw if isinstance(v, str))
+        return frozenset()
+
+    def _tree_selected_id(self, key: Value | None) -> str | None:
+        """The SELECTED row, read off the named State key. The fixed shape is a
+        bare row-id STRING, so `None` covers both an unset key and a key holding
+        anything else, on the expansion slot's reasoning."""
+        if not isinstance(key, str):
+            return None
+        raw = self.sources.get(key) if self.sources else None
+        return raw if isinstance(raw, str) and raw != "" else None
 
     def _media(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         """fuaran#1076 — the media transport. Deterministic, script-free markup: a
@@ -1579,10 +1771,56 @@ class Renderer:
         # nested filter specs best-effort (rare in the baseline corpus).
         return element("div", [("class", "fuaran-filters")], "")
 
+    #: fuaran#1116 — the HTML `capture` keywords. They name a camera FACING, so
+    #: the projection is `Camera` → `environment` and `Microphone` → `user`: both
+    #: are conforming keywords, the facing constrains only a camera, and a host
+    #: MUST NOT emit the device name itself, which is not a keyword and is
+    #: non-conforming markup.
+    _CAPTURE_KEYWORD = {"Camera": "environment", "Microphone": "user"}
+
     def _file_upload(self, node: Node, fields: dict[str, Value]) -> str:
+        """The upload control, and the one obligation every variant of it shares:
+        THE PICKER IS ALWAYS EMITTED.
+
+        A declared ingress gesture is ADDITIONAL. Whatever the document says —
+        drop target, paste, capture device, streamed destination — the file input
+        and its label are emitted, so the keyboard-accessible route survives and
+        a no-script host renders a working upload. There is no keyboard
+        equivalent of a drag, so a control that replaced the picker with a drop
+        zone would have removed the only route some readers have.
+
+        The three routes DEGRADE differently here, and each says so:
+
+        * `capture` FULLY HOLDS — it needs no listener, the user agent reads it
+          off the markup, and a zero-JS document opens the camera exactly as a
+          hydrated one does. `accept` is emitted exactly as declared and is never
+          synthesised from the device: that would put a filter in the document's
+          mouth that nobody wrote.
+        * `dropTarget` / `acceptPaste` need an event listener and no CSS observes
+          a drag, so this tier records the DECLARATION and draws no zone.
+        * `destination` needs a listener AND a sink, so this tier records only
+          THAT one was declared and never WHICH — the id is the host's registry
+          key and a static document is readable by anyone.
+        """
         label = element("span", [("class", "fuaran-file-upload-label")], escape_text(self._text(fields.get("label"))))
-        control = void_element("input", [("class", "fuaran-file-upload-control"), ("type", "file")])
-        return element("label", [("class", "fuaran-file-upload")], label + control)
+        control_attrs: list[tuple[str, str]] = [("class", "fuaran-file-upload-control"), ("type", "file")]
+        accept = fields.get("accept")
+        if isinstance(accept, Arr) and accept.items:
+            control_attrs.append(("accept", ",".join(str(a) for a in accept.items)))
+        if fields.get("multiple") is True:
+            control_attrs.append(("multiple", ""))
+        capture = fields.get("capture")
+        if isinstance(capture, str):
+            control_attrs.append(("capture", Renderer._CAPTURE_KEYWORD[capture]))
+        control = void_element("input", control_attrs)
+        label_attrs: list[tuple[str, str]] = [("class", "fuaran-file-upload")]
+        if fields.get("dropTarget") is True:
+            label_attrs.append(("data-fuaran-upload-drop", "declared"))
+        if fields.get("acceptPaste") is True:
+            label_attrs.append(("data-fuaran-upload-paste", "declared"))
+        if isinstance(fields.get("destination"), str):
+            label_attrs.append(("data-fuaran-upload-destination", "declared"))
+        return element("label", label_attrs, label + control)
 
     # ── visualisations ───────────────────────────────────────────────────────
 
@@ -1965,6 +2203,59 @@ _IMAGE_ASPECT_CLASS = {
     "SixteenNine": " fuaran-image-aspect-sixteen-nine",
 }
 
+
+def _tree_item_expanded(key_named: bool, expanded: frozenset[str], row_id: str, has_children: bool) -> bool:
+    """Is this row's SUBTREE shown? (fuaran#1120)
+
+    A tree naming NO expansion key renders FULLY EXPANDED, and that is the
+    grid-behaviour rule read straight across rather than a special case: a grid
+    with no sort state key still honours its declared order, because an initial
+    presentation without interactive re-ordering is a legitimate shape. The same
+    sentence with "expansion" in it gives a static, fully-visible hierarchy —
+    which is what a document that never asked for a toggle means, and the only
+    reading under which such a tree shows its content at all.
+    """
+    return has_children and (not key_named or row_id in expanded)
+
+
+def _visible_tree_items(key_named: bool, expanded: frozenset[str], rows: Sequence[Value]) -> list[str]:
+    """Every row a reader can currently SEE, in document order: the roots, and the
+    descendants of every open row."""
+    out: list[str] = []
+    for row in rows:
+        if not isinstance(row, Obj):
+            continue
+        row_id = row.fields.get("id")
+        row_id = row_id if isinstance(row_id, str) else ""
+        out.append(row_id)
+        children = row.fields.get("children")
+        child_rows = children.items if isinstance(children, Arr) else []
+        if _tree_item_expanded(key_named, expanded, row_id, bool(child_rows)):
+            out.extend(_visible_tree_items(key_named, expanded, child_rows))
+    return out
+
+
+def _focusable_tree_item(
+    key_named: bool, expanded: frozenset[str], selected: str | None, rows: Sequence[Value]
+) -> str | None:
+    """Which row carries ``tabindex="0"`` (fuaran#1120).
+
+    The WAI-ARIA tree pattern is ONE tab stop, not one per row, so exactly one
+    visible row is in the sequential focus order and the arrow keys move within
+    the widget. That is the property no ``List`` + ``Disclosure`` composition has,
+    and it is computed off STATE alone so a server rendering and a client's first
+    frame put it on the same row.
+
+    The SELECTED row wins when it is visible; otherwise the FIRST visible row
+    does. A selection scrolled out of view by its parent being closed is not a
+    focus target — tabbing into the widget must land somewhere the reader can see.
+    """
+    visible = _visible_tree_items(key_named, expanded, rows)
+    if selected is not None and selected in visible:
+        return selected
+    return visible[0] if visible else None
+
+
 _KindHandler = Callable[["Renderer", Node, dict[str, Value]], str]
 
 _DISPATCH: dict[str, _KindHandler] = {
@@ -1990,6 +2281,8 @@ _DISPATCH: dict[str, _KindHandler] = {
     "Link": Renderer._link,
     "Image": Renderer._image,
     "Media": Renderer._media,
+    "Embed": Renderer._embed,
+    "Tree": Renderer._tree,
     "List": Renderer._list,
     "Toast": Renderer._toast,
     "CodeBlock": Renderer._code_block,

@@ -1,0 +1,1 @@
+{"id":"filters-rating-colour","kind":{"$type":"Filters","items":[{"kind":{"$type":"Rating","max":5},"label":"At least","name":"stars"},{"kind":{"$type":"Color"},"label":"Colour","name":"swatch"}]}}

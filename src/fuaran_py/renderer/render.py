@@ -1834,6 +1834,39 @@ class Renderer:
         return element("form", [("class", "fuaran-form")], field_html + submit)
 
     def _form_field(self, field: Obj) -> str:
+        """A UNIFORM floor over the whole control vocabulary — deliberately.
+
+        Every ``FormFieldKind`` renders as the same generic ``<input>`` carrying
+        the field class, the field address and whatever HTML constraint
+        attributes the field's ``rule`` projects to. No control kind gets bespoke
+        markup: not ``Choice`` (which wants a ``<select>``), not ``TextArea``
+        (``<textarea>``), not ``Checkbox`` (``type="checkbox"``), and not
+        ``Combobox`` (``<input list>`` + ``<datalist>``). The single kind-aware
+        branch in the whole path is a NEGATIVE one, in ``_field_rule_attrs``:
+        ``<textarea>`` has no ``pattern`` attribute, so none is emitted for it.
+
+        **``Combobox`` is exempt from a per-control SSR floor here, and the
+        exemption is the uniformity above rather than an oversight** (fuaran#1128).
+        The generated render-fidelity manifest declares NO obligation row for any
+        control kind — ``Form``'s own row carries an empty ``obligations`` list and
+        an empty ``fixtures`` list, and the string "Combobox" does not appear in
+        the artefact at all — so nothing executable is being declined. Giving
+        ``Combobox`` alone a native floor would make it the one control in fifteen
+        with bespoke markup while ``Choice``, ``TextArea`` and ``Checkbox`` — each
+        with a strictly stronger native-HTML case — stayed generic text inputs.
+        That trades a coherent tier for a locally better one control, which is the
+        wrong unit of work: the floor this host owes is the WHOLE control
+        vocabulary, taken as one phase, not the control that happened to arrive
+        most recently.
+
+        Two constraints for whoever takes that phase, recorded because they were
+        settled elsewhere and are easy to lose. A datalist-backed floor emits
+        ``<input list>`` + ``<datalist>`` and **must not** emit
+        ``role="combobox"`` / ``aria-expanded``: a static ``aria-expanded="false"``
+        replaces the user agent's own correct semantics with a claim inert markup
+        cannot keep. And ``allowFreeText=false`` is not enforceable server-side —
+        record it as a data attribute if at all, never as a claim the markup keeps.
+        """
         field_id = field.fields.get("id")
         field_id = field_id if isinstance(field_id, str) else ""
         label = element(

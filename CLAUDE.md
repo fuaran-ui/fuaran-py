@@ -188,6 +188,38 @@ rows** — the completeness posture; the declared boundary (a closure-projected
 column, which cannot survive the wire) is written up in the README's
 "Bound-grid rendering" section.
 
+### The Form control floor is UNIFORM — and `Combobox` is exempt (fuaran#1128)
+
+`_form_field` renders **every** `FormFieldKind` as the same generic `<input>`:
+the field class, the field address, and whatever HTML constraint attributes the
+field's `rule` projects to. No control kind carries bespoke markup — not `Choice`
+(which wants a `<select>`), not `TextArea` (`<textarea>`), not `Checkbox`
+(`type="checkbox"`). The one kind-aware branch in the path is a *negative* one:
+`<textarea>` has no `pattern` attribute, so none is emitted for it.
+
+**`Combobox` therefore gets no per-control SSR floor here, deliberately.** Two
+sibling hosts (`fuaran-go`, `fuaran-rs`) shipped one as `<input list>` +
+`<datalist>` during the 1128 wave; this host declines it, and the reason is the
+uniformity above rather than an oversight:
+
+- **Nothing executable is being declined.** The generated render-fidelity
+  manifest declares no obligation row for any control kind — `Form`'s own row
+  carries an empty `obligations` list and an empty `fixtures` list, and the string
+  `Combobox` does not appear in the artefact at all. (Check the artefact, not this
+  sentence: `render-fidelity.json` is generated and this claim is a snapshot.)
+- **A Combobox-only floor would be an orphaned optimisation.** It would make one
+  control in fifteen bespoke while `Choice`, `TextArea` and `Checkbox` — each with
+  a strictly stronger native-HTML case — stayed generic text inputs. The floor this
+  host owes is the WHOLE control vocabulary as one phase; the sibling hosts' change
+  was coherent *there* because their renderers already branch per control.
+
+Two constraints for whoever takes that phase, settled on the sibling hosts and
+recorded here so they are not re-derived: a datalist-backed floor **must not**
+emit `role="combobox"` / `aria-expanded` (a static `aria-expanded="false"`
+replaces the user agent's own correct semantics with a claim inert markup cannot
+keep — `fuaran-rs`'s checker asserts their absence), and `allowFreeText=false` is
+not enforceable server-side, so it is at most a data attribute and never a claim.
+
 Two disciplines keep it honest:
 
 - **Reference-CSS byte-copy.** `src/fuaran_py/renderer/content/fuaran-reference.css`

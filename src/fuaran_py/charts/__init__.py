@@ -234,8 +234,24 @@ half the ticks."""
 
 
 def _r2(x: float) -> float:
-    """Round-half-up to 2 dp — the single deterministic rule every host reproduces."""
-    return math.floor(x * 100.0 + 0.5) / 100.0
+    """Round-half-up to 2 dp — the single deterministic rule every host reproduces.
+
+    The reference spells it ``floor (x * 100.0 + 0.5) / 100.0``, where ``floor``
+    is TOTAL on floats: a non-finite passes through unchanged and the division
+    carries it out. Python's :func:`math.floor` is not — it returns an ``int``
+    and *raises* on ``nan`` (``ValueError``) and on ``±inf`` (``OverflowError``)
+    — so the non-finite branch below is what makes this function the same
+    function, not a defensive extra. It is reached by the ``Sparkline`` lowering,
+    whose series may carry the §5/§7 non-finite sentinels and which propagates
+    them through the geometry rather than filtering them (``sparkline-lowering/
+    nonfinite-sentinel``). The scaled value is what is tested, not ``x``, because
+    a finite ``x`` above ~1e306 overflows in the multiply and the reference
+    yields ``inf`` there too.
+    """
+    scaled = x * 100.0 + 0.5
+    if not math.isfinite(scaled):
+        return scaled / 100.0
+    return math.floor(scaled) / 100.0
 
 
 # ── Deterministic text metrics (Phase 879) ───────────────────────────────────
@@ -2725,3 +2741,107 @@ def _pie_shapes(  # noqa: PLR0914
 def lower_node(node_id: str, spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Node:
     """Lower + wrap the ``Drawing`` kind in a node envelope (id + kind)."""
     return Node(id=node_id, kind=lower(spec, rows))
+
+
+# ═══ Sparkline → Drawing lowering (Phase 1099) ═══════════════════════════════
+#
+#  The Python leg of the cross-host parity phase over the reference host's
+#  ``sparkline-lowering/*`` goldens. What this host replaces is not an algorithm
+#  but a PLACEHOLDER: its `Sparkline` arm emitted an em-dash and never read the
+#  series at all, so there was nothing to de-duplicate here and the goldens are
+#  the whole specification. Every constant below is read off them.
+#
+#  WHAT THIS IS NOT. It is not a chart. There is no ``ChartSpec``, so no axes,
+#  ticks, gridlines, legend, palette, display unit or scale negotiation — and no
+#  §4j provenance stamp, which is minted over the canonical wire encoding of a
+#  ``ChartSpec`` and which a `Sparkline` has none to hash. It gains the shared
+#  GEOMETRY builder, not the provenance record; a consumer that needs a stamped
+#  trend line authors a ``Chart``.
+#
+#  THE GEOMETRY. Over a series of ``n`` values with ``min`` / ``max``: a 100×30
+#  viewBox, ``x = i/(n-1)·100`` (a lone point centred at 50), ``y = 30 −
+#  (v−min)/range·28 − 1`` (one unit of inset at each edge so a peak is not
+#  clipped by the stroke), and ``range = max − min`` except below the ``1e-9``
+#  flat guard, where it is ``1.0`` — a constant series sits on its own line
+#  rather than dividing by zero. Both coordinates round through the SAME
+#  round-half-up-to-2-dp rule (:func:`_r2`) the chart lowering uses. Chrome is
+#  one ``Polyline``, ``currentColor`` at stroke-width 1.5, no fill: the mark inks
+#  from the surface's own ``color``, so the container still drives it. No title
+#  and no description — a sparkline has no spec to summarise, so it carries no
+#  accessible name of its own.
+#
+#  NON-FINITE VALUES ARE NOT SPECIAL-CASED. They propagate through the
+#  arithmetic, reach the wire as the canonical ``"NaN"`` / ``"Infinity"`` /
+#  ``"-Infinity"`` string sentinels and render as ``0`` through the drawing
+#  builder's number form — which is what every other geometry-bearing kind
+#  already does with them. That is the input class where a hand-copied path
+#  drifts first, so the ``nonfinite-sentinel`` golden pins it and a divergence
+#  becomes a failing test rather than an argument. It is also why :func:`_r2`
+#  had to become total.
+#
+#  THE `try` FORM IS THE ONLY ONE. An empty (or unresolved) series has nothing
+#  to draw, and the renderer's declared fallback — the ``fuaran-sparkline-empty``
+#  em-dash element — is a HOST element rather than a ``Shape``, so the lowering
+#  cannot express it and must not pretend to by emitting an empty canvas. The
+#  ``empty`` golden is the JSON literal ``null``, which is exactly that fact.
+
+#: The sparkline canvas — 100 × 30 user units, the viewBox every host emits.
+_SPARKLINE_WIDTH = 100.0
+_SPARKLINE_HEIGHT = 30.0
+
+#: The sparkline stroke width. Corpus-pinned by ``sparkline-lowering/*``.
+SPARKLINE_STROKE_WIDTH = 1.5
+
+#: The vertical inset kept at each edge, so a peak or trough is not clipped by
+#: the stroke's own width, and the plotted height that leaves.
+_SPARKLINE_INSET = 1.0
+_SPARKLINE_PLOT_HEIGHT = 28.0
+
+#: The flat-series guard: a range below this is treated as 1.0.
+_SPARKLINE_FLAT_EPSILON = 1e-9
+
+
+def try_lower_sparkline(series: Sequence[float] | None) -> Obj | None:
+    """Lower a resolved ``Sparkline`` series to the canonical ``Drawing`` kind
+    every conformant host reproduces byte-for-byte — or ``None`` when there is
+    nothing to draw, which is the caller's cue to render its declared fallback
+    element.
+
+    ``None`` and the empty series take the same branch: an absent series and an
+    empty one mean the same thing to a reader, and the guard belongs here at the
+    shared seam rather than repeated in each renderer arm.
+    """
+    if not series:
+        return None
+    values = [float(v) for v in series]
+    n = len(values)
+    min_v = min(values)
+    max_v = max(values)
+    # `inf - -inf` is `inf` and `nan < eps` is False, so a sentinel-bearing
+    # series takes the ordinary branch and the non-finites propagate — which is
+    # what the `nonfinite-sentinel` golden pins.
+    span = max_v - min_v
+    value_range = 1.0 if span < _SPARKLINE_FLAT_EPSILON else span
+    points = [
+        (
+            _r2(50.0 if n <= 1 else i / (n - 1) * _SPARKLINE_WIDTH),
+            _r2(_SPARKLINE_HEIGHT - (v - min_v) / value_range * _SPARKLINE_PLOT_HEIGHT - _SPARKLINE_INSET),
+        )
+        for i, v in enumerate(values)
+    ]
+    return Obj(
+        "Drawing",
+        {
+            "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _SPARKLINE_WIDTH, "height": _SPARKLINE_HEIGHT}),
+            "shapes": Arr([_polyline(points, _style_stroke("currentColor", SPARKLINE_STROKE_WIDTH))]),
+            "style": Obj(None, {}),
+        },
+    )
+
+
+def try_lower_sparkline_node(node_id: str, series: Sequence[float] | None) -> Node | None:
+    """Lower + wrap the ``Drawing`` kind in a node envelope (id + kind), or
+    ``None`` when there is nothing to draw — the :func:`lower_node` shape for the
+    sparkline seam."""
+    kind = try_lower_sparkline(series)
+    return None if kind is None else Node(id=node_id, kind=kind)

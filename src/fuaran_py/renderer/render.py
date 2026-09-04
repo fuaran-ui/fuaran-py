@@ -813,6 +813,27 @@ class Renderer:
         return element("span", attrs, "")
 
     def _sparkline(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 1099 — the em-dash placeholder is retired for a RESOLVED series.
+        # This host drew nothing at all before: two lines that emitted an em-dash
+        # and never read `source`. It now lowers the series through the shared
+        # `Sparkline` geometry builder and renders it with the SAME
+        # `_drawing_svg` the `Drawing` arm uses, so the picture is the corpus's
+        # rather than this host's, byte for byte.
+        #
+        # The `fuaran-sparkline` class stays on the CONTAINER — that is where the
+        # sizing and the inherited `color` the `currentColor` stroke inks from
+        # live, so the render-fidelity hook survives the change.
+        #
+        # The em-dash branch survives for the UNRESOLVED or EMPTY series only: a
+        # readable, deterministic stand-in rather than a blank, exactly as
+        # before. This is a deliberate SSR BEHAVIOUR change and the README's
+        # lowering-coverage section moves with it.
+        from ..charts import try_lower_sparkline_node
+
+        series = _float_series(resolve_binding(fields.get("source"), self.sources))
+        drawing = try_lower_sparkline_node(node.id, series) if series is not None else None
+        if drawing is not None and isinstance(drawing.kind, Obj):
+            return element("div", [("class", "fuaran-sparkline")], self._drawing_svg(drawing.kind.fields))
         return text_element("div", [("class", "fuaran-sparkline fuaran-sparkline-empty")], _EM_DASH)
 
     def _label_value_row(self, node: Node, fields: dict[str, Value]) -> str:
@@ -1675,6 +1696,19 @@ class Renderer:
         return f' aria-label="{_draw_escape(composed)}"'
 
     def _drawing(self, node: Node, fields: dict[str, Value]) -> str:
+        return element("div", [], self._drawing_svg(fields))
+
+    def _drawing_svg(self, fields: dict[str, Value]) -> str:
+        """The shared SVG builder — the `<svg class="fuaran-drawing">` element for
+        a ``Drawing`` kind's fields, without the wrapping element.
+
+        Split out of :meth:`_drawing` by Phase 1099 so a lowered kind can carry
+        its OWN hook element (the `Sparkline` arm's ``fuaran-sparkline``
+        container, where the sizing and the inherited ``color`` live) around the
+        same bytes, exactly as the reference host's renderers call
+        ``DrawingSvg.render`` beside a per-arm wrapper. The two callers must stay
+        the only ones: this is the geometry builder, not a second renderer.
+        """
         vb = fields.get("viewBox")
         vb_fields = vb.fields if isinstance(vb, Obj) else {}
         view_box = " ".join(_draw_num(vb_fields.get(k, 0)) for k in ("minX", "minY", "width", "height"))
@@ -2158,6 +2192,28 @@ class Renderer:
             ],
             f"[fuaran:custom {module_id}.{component_id}]",
         )
+
+
+def _float_series(value: object) -> list[float] | None:
+    """A resolved ``Sparkline`` source as a float series, or ``None``.
+
+    The decoder types this slot (a ``Binding<float seq>``, non-finites arriving
+    as the §5/§7 quoted sentinels and leaving as floats), so a *decoded* tree
+    cannot reach here with a foreign element. A host-supplied ``sources`` value
+    can, and that is exactly the "source does not resolve to a series" case the
+    render-fidelity fallback declares — so it takes the em-dash branch rather
+    than a partial picture. ``bool`` is an ``int`` subclass and is refused for
+    the same reason the decoder refuses it in a numeric slot.
+    """
+    if not isinstance(value, (Arr, list, tuple)):
+        return None
+    items = value.items if isinstance(value, Arr) else list(value)
+    out: list[float] = []
+    for item in items:
+        if isinstance(item, bool) or not isinstance(item, (int, float)):
+            return None
+        out.append(float(item))
+    return out
 
 
 def _seq_len(value: object) -> int:

@@ -324,6 +324,49 @@ client-hydration placeholder. Data-bearing shapes carry a derivation-based
 suite certifies **every** golden pair byte-for-byte, including canonical-float
 formatting of pie arc control points and stacked cumulative sums.
 
+### Sparkline lowering coverage
+
+A `Sparkline` whose `source` resolves to a series is **drawn**, server-side, as
+first-party inline SVG — byte-identical to the shared `sparkline-lowering/*`
+goldens the reference implementation generates. Before this it was a placeholder:
+this renderer emitted an em-dash and never read the series at all. The geometry
+comes from `fuaran_py.charts.try_lower_sparkline`, which produces a canonical
+`Drawing` kind, and the markup from the same builder the `Drawing` node uses — so
+there is no second sparkline renderer to drift.
+
+This is a deliberate change in what the server emits:
+
+| Resolved `source` | Rendered |
+|---|---|
+| a non-empty series | `<div class="fuaran-sparkline">` wrapping the lowered `fuaran-drawing` SVG — a 100 × 30 canvas, one `currentColor` polyline at stroke-width 1.5 |
+| an empty series | the `fuaran-sparkline fuaran-sparkline-empty` em-dash element, as before |
+| a source that does not resolve to a series (an unbound `Query`, a foreign host value) | the same em-dash element |
+
+Three properties are worth stating because each is a contract rather than an
+accident, and each is pinned by a golden:
+
+**The geometry is the corpus's.** Over `n` values with `min` / `max`:
+`x = i/(n-1)·100` (a lone point centred at 50), `y = 30 − (v−min)/range·28 − 1`,
+with `range = max − min` except below a `1e-9` flat guard where it is `1.0`, so a
+constant series sits on its own line instead of dividing by zero. Both
+coordinates round half-up to 2 dp. There is no title and no description: a
+sparkline has no spec to summarise, so it carries no accessible name of its own.
+
+**Non-finite values are not filtered.** The `"NaN"` / `"Infinity"` /
+`"-Infinity"` sentinels a series may carry propagate through that arithmetic and
+reach the canvas as `0` through the drawing builder's number form — the same
+thing every other geometry-bearing kind does with them. That is the input class
+where a hand-written copy drifts first, so it has its own golden.
+
+**Nothing to draw is not an empty canvas.** The em-dash fallback is a *host*
+element rather than a drawing shape, so the lowering cannot express it and
+returns nothing at all; the `empty` golden is the JSON literal `null`, which is
+that fact. The renderer's fallback branch is what supplies the element.
+
+The `Sparkline` row of the corpus's `render-fidelity.json` reads `"class":
+"none"` accordingly — the parity-checked fallback is the whole render, as it has
+been for `Drawing`.
+
 ## Run (interactive, optional)
 
 Under **Pyodide** (CPython-on-WASM), `fuaran_py.runtime` adds the live loop the F#

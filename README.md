@@ -37,6 +37,28 @@ pip install -e ".[dev]"   # editable + dev tooling (pytest / mypy / ruff)
 Requires CPython **3.12+**. The runtime codec has **no third-party dependencies** —
 it uses only the standard library.
 
+## Start here
+
+[`examples/getting_started.py`](examples/getting_started.py) is a six-lesson tour of
+what this language is for, and it runs:
+
+```bash
+python examples/getting_started.py            # the whole tour
+python examples/getting_started.py replay     # just one lesson
+```
+
+| | Lesson | What it shows |
+|---|---|---|
+| 1 | `authoring` | A user interface is a **value** — build it, encode it, render it to HTML. |
+| 2 | `ops` | **Edit the tree, don't regenerate it.** A typed, addressed edit that fails by name. |
+| 3 | `replay` | A **hash-chained** session replays exactly, time-travels, and detects tampering — with the same hashes the other hosts compute. |
+| 4 | `safety` | **Default-deny by shape.** Malformed emissions are refused because there is no code case to strip. |
+| 5 | `operations` | **Declared operations** dispatch by structural search, with no model and no network. |
+| 6 | `ai` | Bring your own key: prompt → wire JSON → strict decode → render. |
+
+Five of the six need no key, no network and no browser. Only `ai` calls a provider,
+and only when you set `ANTHROPIC_API_KEY` (or pass `--key`).
+
 ## Use
 
 ```python

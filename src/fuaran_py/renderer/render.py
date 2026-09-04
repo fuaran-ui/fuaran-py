@@ -381,21 +381,68 @@ class Renderer:
     # ── the node wrapper ─────────────────────────────────────────────────────
 
     def render_node(self, node: Node) -> str:
+        class_name = node_class_name(node)
+
+        # fuaran#1112 — the node-level tooltip trait. An EMPTY resolved hint emits
+        # nothing at all: a declared hint that says nothing is markup that reveals
+        # an empty box on hover, and the wrapper class / focus stop / describedby
+        # would then advertise a description that is not there. The renderer
+        # simply does not draw it — the validator is where the declaration is
+        # reported. Parity-locked with both reference renderers.
+        raw_tooltip = node.extras.get("tooltip")
+        tooltip_text: str | None = None
+        if raw_tooltip is not None:
+            resolved = self._text(raw_tooltip)
+            if resolved.strip() != "":
+                tooltip_text = resolved
+        if tooltip_text is not None:
+            class_name += " fuaran-has-tooltip"
+
         attrs: list[tuple[str, str]] = [
             ("id", node.id),
             ("data-fuaran-node-id", node.id),
-            ("class", node_class_name(node)),
+            ("class", class_name),
         ]
         # Route the projection: a kind whose body IS the node's semantic element
         # takes the a11y attributes onto that element; every other kind carries
         # them on the wrapper, as before. The wrapper keeps the node's address
         # (`data-fuaran-node-id`) either way.
         semantic_attrs: list[tuple[str, str]] = []
+        wrapper_attrs: list[tuple[str, str]] = []
         if node.kind.tag in _SEMANTIC_ELEMENT_TAGS:
             semantic_attrs = self._a11y_attrs(node)
         else:
-            attrs.extend(self._a11y_attrs(node))
-        return element("div", attrs, self.render_kind(node, semantic_attrs))
+            wrapper_attrs = self._a11y_attrs(node)
+
+        # fuaran#1112 — route the hint's description and, where the wrapper is the
+        # described element, its focus stop. The two travel together by
+        # construction: see `_tooltip_rides_semantic_element`.
+        if tooltip_text is not None:
+            hint_id = _tooltip_hint_id(node.id)
+            if _tooltip_rides_semantic_element(node.kind.tag):
+                semantic_attrs = _with_tooltip_described_by(hint_id, semantic_attrs)
+            else:
+                wrapper_attrs = _with_tooltip_described_by(hint_id, wrapper_attrs)
+                wrapper_attrs.append(("tabindex", "0"))
+
+        attrs.extend(wrapper_attrs)
+        body = self.render_kind(node, semantic_attrs)
+
+        # The hint element itself — a sibling of the body INSIDE the wrapper,
+        # which is what makes it hoverable: the pointer moving from the node onto
+        # the hint never leaves the wrapper, so the `:hover` that revealed it
+        # still holds (WCAG 1.4.13). Placed after the body so the reading order is
+        # thing-then-description.
+        hint = (
+            ""
+            if tooltip_text is None
+            else text_element(
+                "span",
+                [("id", _tooltip_hint_id(node.id)), ("class", "fuaran-tooltip"), ("role", "tooltip")],
+                tooltip_text,
+            )
+        )
+        return element("div", attrs, body + hint)
 
     # ── kind dispatch ─────────────────────────────────────────────────────────
 
@@ -2246,7 +2293,74 @@ def _seq_len(value: object) -> int:
 #: caption or expansion wrapper is present — the projection stays on the ``<img>``
 #: the attributes describe, which is what the wrapper is wrapped AROUND, and is
 #: byte-parity with the reference server renderer.
-_SEMANTIC_ELEMENT_TAGS = frozenset({"Link", "Button", "Image", "Media"})
+#: ``Embed`` (fuaran#1111) satisfies the same three: the ``<iframe>`` IS the body
+#: root, a frame carries native interactive semantics (it is a focus container a
+#: reader tabs into), and nothing else competes for the name. A node-level
+#: ``Accessibility.Label`` overrides the spec's own ``title`` on ``Media``'s
+#: precedence, which is what a node-level slot is for.
+_SEMANTIC_ELEMENT_TAGS = frozenset({"Link", "Button", "Image", "Media", "Embed"})
+
+# ── The node-level tooltip trait (fuaran#1112) ───────────────────────────────
+#
+# A tooltip is a DESCRIPTION of the node, revealed by the reference stylesheet's
+# own hover / focus affordance and announced through ``aria-describedby``. Two
+# placement questions follow from one principle, and getting either wrong makes
+# the hint reach nobody:
+#
+#  1. THE ELEMENT THAT CARRIES ``aria-describedby`` MUST BE THE ELEMENT THAT
+#     TAKES FOCUS. A description on a wrapper the keyboard never lands on is
+#     announced on no interaction at all; a description on a control while the
+#     wrapper is the focus stop is the same failure with the parts swapped.
+#  2. A node whose body is not a focus stop therefore needs one —
+#     ``tabindex="0"`` on the wrapper — or the hint is pointer-only (WCAG 2.1.1).
+#
+# So the two decisions are ONE decision, and both reference renderers take it the
+# same way: where the projection forwards to a semantic element that takes focus
+# NATIVELY, the description rides that element and the wrapper stays untouched;
+# everywhere else the description rides the wrapper and the wrapper takes the stop.
+#
+# ``Image`` is the case that shows why this is not simply membership of
+# ``_SEMANTIC_ELEMENT_TAGS``: it forwards, and ``<img>`` takes no focus, so an
+# image with a hint needs the wrapper stop AND the wrapper description — the
+# pair, or neither.
+_TOOLTIP_FOCUSABLE_TAGS = frozenset({"Button", "Link", "Media", "Embed"})
+
+
+def _tooltip_hint_id(node_id: str) -> str:
+    """The DOM id of the hint element a node's tooltip renders as.
+
+    Derived from the node id so every host, and any consumer reading the emitted
+    markup, computes the same string without a second identifier on the wire.
+    """
+    return node_id + "-tooltip"
+
+
+def _tooltip_rides_semantic_element(tag: str | None) -> bool:
+    """Does the hint's ``aria-describedby`` ride the kind's own semantic element?
+
+    True exactly when the projection forwards AND the forwarded-to element is a
+    native focus stop. A narrow allow-list rather than an exhaustive match,
+    deliberately: the DEFAULT answer (describe the wrapper, and give the wrapper a
+    focus stop) is always reachable and correct, at worst one redundant tab stop
+    on a node the author chose to annotate. The opposite default silently loses
+    the keyboard route altogether, which nothing downstream would report.
+    """
+    return tag in _SEMANTIC_ELEMENT_TAGS and tag in _TOOLTIP_FOCUSABLE_TAGS
+
+
+def _with_tooltip_described_by(hint_id: str, attrs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Merge a tooltip's hint id into an attribute list's ``aria-describedby``.
+
+    Appended, never substituted: ``aria-describedby`` is an ID LIST, and a node
+    that declares ``accessibility.describedBy`` AND carries a hint has said two
+    different things a reader is owed both of. Overwriting would silently drop
+    whichever the renderer happened to apply second.
+    """
+    for index, (key, value) in enumerate(attrs):
+        if key == "aria-describedby":
+            return [*attrs[:index], (key, value + " " + hint_id), *attrs[index + 1 :]]
+    return [*attrs, ("aria-describedby", hint_id)]
+
 
 #: fuaran#1077 — the presentation tokens' class mappings. Absent from each map is
 #: ``Natural``, which emits NO class on either axis, so a pre-phase image's class

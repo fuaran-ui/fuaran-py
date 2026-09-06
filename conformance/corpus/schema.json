@@ -293,6 +293,15 @@
         "Year"
       ]
     },
+    "TimeGrain": {
+      "type": "string",
+      "enum": [
+        "Second",
+        "Minute",
+        "Hour",
+        "Day"
+      ]
+    },
     "DurationUnit": {
       "type": "string",
       "enum": [
@@ -508,6 +517,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -810,6 +822,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -1059,6 +1074,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -1317,6 +1335,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -1566,6 +1587,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -1835,6 +1859,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -2104,6 +2131,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -2417,6 +2447,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -2686,6 +2719,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -2944,6 +2980,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -3202,6 +3241,9 @@
           "properties": {
             "$type": {
               "const": "Now"
+            },
+            "grain": {
+              "$ref": "#/$defs/TimeGrain"
             }
           },
           "required": [
@@ -4041,6 +4083,20 @@
             "$type",
             "style",
             "unit"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Since"
+            },
+            "unit": {
+              "$ref": "#/$defs/RelativeTimeUnit"
+            }
+          },
+          "required": [
+            "$type"
           ]
         }
       ]

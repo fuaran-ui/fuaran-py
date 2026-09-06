@@ -5,6 +5,13 @@ sequence through the apply engine (:func:`apply_to`), and the write path that
 applies one op then persists a hash-chained record on success
 (:func:`apply_and_persist`).
 
+**Recorded refusals are not replayed.** A record whose ``result_envelope`` is a
+``Failure`` describes an op that was refused and therefore never touched the
+tree, so :func:`apply_to` and :func:`replay_stream` skip it by default and a
+chain carrying one replays cleanly. ``include_refused=True`` folds every record
+regardless — the literal reading, for an audit rebuild or a host whose refusals
+are advisory.
+
 Replay does **not** verify the hash chain — use
 :func:`~fuaran_py.op_stream.hash_chain.verify_chain` for that. The two concerns
 are orthogonal: replay drives the apply engine; chain verification proves the
@@ -47,6 +54,7 @@ from .types import (
     OpStreamSink,
     ReplayError,
     StaleHead,
+    Success,
 )
 
 
@@ -75,12 +83,30 @@ class ReplayErr:
 type ReplayResult = ReplayOk | ReplayErr
 
 
-def apply_to(initial_tree: Node, records: list[OpRecord]) -> ReplayResult:
-    """Apply every record to ``initial_tree`` in order, returning the final tree
+def apply_to(initial_tree: Node, records: list[OpRecord], *, include_refused: bool = False) -> ReplayResult:
+    """Apply the records to ``initial_tree`` in order, returning the final tree
     or the first apply failure (:class:`ApplyFailed` with the offending record's
-    sequence)."""
+    sequence).
+
+    **A record whose ``result_envelope`` is not :class:`~fuaran_py.op_stream.types.Success`
+    is SKIPPED by default.** The envelope exists so a host can record a denial —
+    an op that was refused and therefore never touched the tree — and folding one
+    replays an edit the stream itself says did not happen. Worse, it fails on the
+    record that says it failed: the refused op is by construction the one the tree
+    cannot take, so a chain holding a single refusal used to be unreplayable, and
+    every host that records denials had to rediscover the accepted-only filter for
+    itself.
+
+    ``include_refused=True`` asks for the literal fold over every record. That is
+    the pre-selector behaviour, and it is a real requirement — an audit rebuild
+    that wants to see exactly where a refused op would have landed, or a host
+    whose ``Failure`` records are advisory rather than final — so it is a named
+    keyword rather than an assumption either way.
+    """
     tree = initial_tree
     for record in records:
+        if not include_refused and not isinstance(record.result_envelope, Success):
+            continue
         result = apply(record.op, tree)
         if isinstance(result, ApplyErr):
             return ReplayErr(ApplyFailed(record.sequence, result.error))
@@ -95,15 +121,20 @@ def replay_stream(
     initial_tree: Node,
     from_sequence: int = 1,
     to_sequence: int | None = None,
+    *,
+    include_refused: bool = False,
 ) -> ReplayResult:
     """Read records for ``stream_id`` in ``[from_sequence, to_sequence]`` from
     ``sink`` and fold them through the apply engine starting at ``initial_tree``.
     Resume from a checkpoint by passing its snapshot as ``initial_tree`` and
     ``checkpoint.sequence + 1`` as ``from_sequence``; ``to_sequence`` defaults to
-    the sink's ``latest_sequence``."""
+    the sink's ``latest_sequence``.
+
+    ``include_refused`` is :func:`apply_to`'s, unchanged: recorded refusals are
+    skipped by default, and folding them is asked for by name."""
     up_to = to_sequence if to_sequence is not None else sink.latest_sequence(stream_id)
     records = sink.replay(stream_id, from_sequence, up_to)
-    return apply_to(initial_tree, records)
+    return apply_to(initial_tree, records, include_refused=include_refused)
 
 
 class SinkAppendError(RuntimeError):

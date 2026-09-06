@@ -578,6 +578,26 @@ self-describing) and this host reproduces the committed golden hashes in the sha
 certify against. The module is stdlib-only (`hashlib.sha256`); a genuinely
 I/O-backed sink is a follow-up implementing the same `OpStreamSink` protocol.
 
+### Replay skips recorded refusals
+
+A record's `result_envelope` is `Success` or `Failure`, and a `Failure` record is
+the point of the field: it says an op was **refused**, and therefore never touched
+the tree. So `apply_to` and `replay_stream` fold only the successes by default, and
+a chain carrying a refusal replays cleanly:
+
+```python
+from fuaran_py.op_stream import replay_stream
+
+replay_stream(sink, "doc-1", tree)  # accepted records only
+replay_stream(sink, "doc-1", tree, include_refused=True)  # the literal fold
+```
+
+Folding every record is still reachable, by name. It is what an audit rebuild
+wants — where would the refused op have landed? — and what a host whose `Failure`
+records are advisory rather than final wants. It is not a sensible default: the
+refused op is by construction the one the tree could not take, so the literal fold
+fails on the very record that says it failed.
+
 ### Compare-and-append — the concurrent-writer write path
 
 `OpStreamSink.append` alone only supports a **proposal**: a caller reads

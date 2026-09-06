@@ -27,6 +27,7 @@ from fuaran_py.op_stream import (
     GENESIS_PREVIOUS_HASH,
     AgentActor,
     Appended,
+    ApplyFailed,
     Failure,
     HashMismatch,
     HumanActor,
@@ -40,6 +41,7 @@ from fuaran_py.op_stream import (
     StaleHead,
     Success,
     apply_and_persist,
+    apply_to,
     compute_hash,
     encode_stream_entry,
     format_version,
@@ -257,6 +259,78 @@ def test_replay_reproduces_the_final_tree() -> None:
     replayed = replay_stream(sink, "s", tree)
     assert replayed.ok
     assert replayed.value == applied.value
+
+
+def _record(sequence: int, op: Obj, envelope: OpResultEnvelope) -> OpRecord:
+    """A record for the replay legs below. Replay never verifies the chain (that
+    is :func:`verify_chain`'s job), so the hashes here are placeholders and the
+    ``result_envelope`` is the only field under test."""
+    return OpRecord(
+        stream_id="s",
+        sequence=sequence,
+        previous_hash=GENESIS_PREVIOUS_HASH,
+        hash=f"h{sequence}",
+        op=op,
+        actor=HumanActor("u"),
+        timestamp_unix_seconds=1700000000,
+        result_envelope=envelope,
+    )
+
+
+def _chain_with_a_refusal() -> list[OpRecord]:
+    """Two applied ops with a RECORDED REFUSAL between them.
+
+    The middle record is what a host that records denials actually writes: the
+    op was refused, so it never touched the tree, and its ``Failure`` envelope
+    says so. Replaying it would remove a node that is already gone.
+    """
+    return [
+        _record(1, Obj("RemoveNode", {"target": "leaf"}), Success()),
+        _record(2, Obj("RemoveNode", {"target": "leaf"}), Failure("E_CONFLICT", "refused")),
+        _record(3, Obj("RemoveNode", {"target": "leaf2"}), Success()),
+    ]
+
+
+def test_replay_skips_recorded_refusals_by_default() -> None:
+    """A chain carrying a ``Failure`` record replays cleanly.
+
+    The envelope is part of the type contract precisely so a denial can be
+    recorded, so a replay that folds one is folding an edit the stream says
+    never happened — and it fails on the record that says it failed.
+    """
+    tree = _two_child_card()
+    result = apply_to(tree, _chain_with_a_refusal())
+    assert result.ok, result
+
+    only_successes = apply_to(
+        tree,
+        [r for r in _chain_with_a_refusal() if isinstance(r.result_envelope, Success)],
+    )
+    assert only_successes.ok
+    assert result.value == only_successes.value
+
+
+def test_replay_folds_every_record_when_the_caller_asks() -> None:
+    """``include_refused=True`` is the explicit selector for a caller that wants
+    the literal fold — an audit rebuild, or a host whose refusals are advisory
+    rather than final. It restores the pre-selector behaviour exactly, which is
+    why the refused op here fails at its own sequence."""
+    result = apply_to(_two_child_card(), _chain_with_a_refusal(), include_refused=True)
+    assert not result.ok
+    assert isinstance(result.error, ApplyFailed)
+    assert result.error.sequence == 2
+
+
+def test_replay_stream_threads_the_selector_through() -> None:
+    """The sink-reading entry point takes the same keyword — the skip is not a
+    property of the in-memory list form alone."""
+    sink = InMemorySink()
+    for record in _chain_with_a_refusal():
+        sink.append(record)
+    tree = _two_child_card()
+
+    assert replay_stream(sink, "s", tree).ok
+    assert not replay_stream(sink, "s", tree, include_refused=True).ok
 
 
 def test_sink_rejects_duplicate_sequence() -> None:

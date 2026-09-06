@@ -2924,6 +2924,24 @@
       "description": "Binding<float> bare scalar is a MIS-CASED sentinel (\"nan\") — §7's three tokens are exact, and a case-folding host would accept a document no encoder emits (Phase 1064)"
     },
     {
+      "id": "reject-binding-floatseq-sentinel-case",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-binding-floatseq-sentinel-case.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source",
+      "description": "Binding<float seq> ELEMENT is a MIS-CASED sentinel (\"nan\") — the sequence twin of reject-binding-float-sentinel-case: §7's three tokens are exact at an element too, so a host that routes elements through a looser reader than its scalar slots is caught (Phase 1099)"
+    },
+    {
+      "id": "reject-spark-element-nonnumeric",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-spark-element-nonnumeric.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source",
+      "description": "A Sparkline series element of \"lots\" — a typed float SEQUENCE slot types its ELEMENTS, not just the binding. spark-nonfinite-sentinel proves the §7 sentinels are accepted, which an entirely untyped slot also does by never reading an element, so this is the vector that separates the two (Phase 1099)"
+    },
+    {
       "id": "reject-binding-float-string",
       "kind": "reject",
       "decoder": "node",

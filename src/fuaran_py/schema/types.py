@@ -429,10 +429,29 @@ class Dispatch:
 
 @dataclass(frozen=True)
 class Navigate:
-    route: str
+    """``Action.Navigate`` — fuaran#1536: the route is a ``TextSource``, not a
+    bare string, so a tree can name a destination it computes from what the
+    reader is looking at ("open the selected order"). ``target`` names the
+    browsing context and is omitted at ``"Self"``.
+
+    A plain ``str`` is accepted for ``route`` and carried as the bare JSON
+    string, which IS ``TextSource.Literal``'s canonical form — so a caller
+    written before the widening keeps working and its bytes do not move.
+
+    ``target`` is a closed two-member vocabulary (``"Self"`` | ``"Blank"``)
+    where ``LinkSpec.target`` is a free string: ``_parent`` and ``_top`` are
+    frame-busting gestures a hosted tree must not be able to ask for. A
+    ``"Blank"`` target is opened with ``noopener,noreferrer`` by the renderer.
+    """
+
+    route: Value
+    target: str = "Self"
 
     def to_wire(self) -> Value:
-        return Obj("Navigate", {"route": self.route})
+        fields: dict[str, Value] = {"route": self.route}
+        if self.target != "Self":
+            fields["target"] = self.target
+        return Obj("Navigate", fields)
 
 
 @dataclass(frozen=True)

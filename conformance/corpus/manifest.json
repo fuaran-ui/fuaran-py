@@ -835,6 +835,14 @@
       "description": "Phase 719 — the compact authoring twin of `master-detail-preselected`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
     },
     {
+      "id": "lenient-navigate-target-self",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-navigate-target-self.json",
+      "expectedFile": "lenient/lenient-navigate-target-self.expected.json",
+      "description": "Phase 1536 — an explicit `target: \"Self\"` normalises away; `Self` is omitted at default, so the canonical form carries no `target` member at all"
+    },
+    {
       "id": "lenient-null-static-options",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1121,6 +1129,22 @@
       "inputFile": "nodes/a11y-wrapper-state-bound.json",
       "expectedFile": "nodes/a11y-wrapper-state-bound.json",
       "description": "Accessibility (Phase 955 — State-bound label + hidden, mixed-case custom role doc-pageFooter, off)"
+    },
+    {
+      "id": "action-navigate-bound",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-navigate-bound.json",
+      "expectedFile": "nodes/action-navigate-bound.json",
+      "description": "Phase 1536 — Input/Button whose Action.Navigate carries a BOUND route (a TextSource over the grid's selection), resolved at dispatch time and gated on the resolved value"
+    },
+    {
+      "id": "action-navigate-target",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-navigate-target.json",
+      "expectedFile": "nodes/action-navigate-target.json",
+      "description": "Phase 1536 — Input/Button whose Action.Navigate names a Blank target (opened with noopener,noreferrer); `Self` is omitted, so this is the only shape that puts `target` on the wire"
     },
     {
       "id": "badge-1",
@@ -3591,6 +3615,15 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.modality",
       "description": "a Modal `modality` of `\"Sheet\"` — outside the closed pair `Modal | Popover`. A sheet, a drawer and a menu are all PRESENTATIONS of one of the two modalities rather than a third one, so the answer to this document is not to widen the enum but to say which of the two it meant. The path is the bare slot, per §6 and the Phase 1073 ruling: a bare enum carries no discriminator on the wire, so there is no `.$type` to name"
+    },
+    {
+      "id": "reject-navigate-target-invalid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-navigate-target-invalid.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.onClick.target",
+      "description": "Action.Navigate's target is the closed enum Self | Blank, not HTML's target attribute. `_blank` is refused rather than aliased: the vocabulary it comes from also contains `_parent` and `_top`, which are frame-busting gestures a hosted tree must not be able to ask for, so accepting any of it would teach an emitter the wrong vocabulary (Phase 1536)"
     },
     {
       "id": "reject-nearmiss-a11y-aria-hidden",

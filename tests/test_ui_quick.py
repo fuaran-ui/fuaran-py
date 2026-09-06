@@ -149,6 +149,48 @@ def test_metric_strip_refuses_a_half_named_record_projection() -> None:
         quick.metric_strip(ROWS, label="region")
 
 
+# ── The display-string value parse ───────────────────────────────────────────
+#
+# `metric(value=...)` accepts a display string as a prototyping convenience:
+# decoration is stripped and the remainder parsed. A string the strip leaves
+# unparseable used to become `0.0` — a KPI tile reading zero where the author
+# wrote something the parser could not read, with nothing said anywhere.
+
+
+@pytest.mark.parametrize(
+    ("display", "expected"),
+    [
+        ("1,234", 1234.0),
+        ("12.5%", 12.5),
+        # The magnitude suffix is DROPPED, not applied — pinned because it is
+        # surprising, and because the refusal below must not be read as having
+        # made this shape stricter than it is.
+        ("$3.4M", 3.4),
+        ("£42k", 42.0),
+        ("-7", -7.0),
+        ("4.2e3", 4200.0),
+    ],
+)
+def test_a_display_string_the_parser_accepts_keeps_working(display: str, expected: float) -> None:
+    node = quick.metric("Revenue", display)
+    assert node.kind.value.value == expected  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("display", ["n/a", "—", "", "pending", "2026-09-06", "1-2"])
+def test_an_unparseable_display_string_is_refused_rather_than_zero(display: str) -> None:
+    """The refusal names the input and the shapes that would have worked.
+
+    A message that only said "not a number" would leave the author guessing which
+    of their string the parser objected to — and the answer is never obvious,
+    because the parser strips before it reads.
+    """
+    with pytest.raises(ValueError) as raised:
+        quick.metric("Revenue", display)
+    message = str(raised.value)
+    assert repr(display) in message
+    assert "1,234" in message
+
+
 # ── 2. The derived-id discipline ──────────────────────────────────────────────
 
 

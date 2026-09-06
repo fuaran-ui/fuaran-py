@@ -14,7 +14,7 @@ token-saving ergonomic), while the server stays stateless.
 
 Run it::
 
-    pip install -r requirements.txt          # fastapi + uvicorn + fuaran-py
+    pip install "fuaran-py[live-host]"        # the host + fastapi + uvicorn
     export FUARAN_ENDPOINT=https://<your-endpoint>/generate
     export FUARAN_ACCESS_TOKEN=...            # server-side only
     export FUARAN_PROVIDER_KEY=...            # the BYOK key, server-side only

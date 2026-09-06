@@ -38,6 +38,19 @@ dependencies = []   # dependency-light: the codec uses only the Python standard 
 # rewrite the gate must not be able to do so between two runs of it. Adopting the
 # next minor is the same deliberate act: reformat, then move both bounds.
 dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.16,<0.17", "jsonschema>=4.23", "hypothesis>=6.100"]
+# What `samples/fastapi-host/` needs to RUN and to be TESTED — an ASGI framework, a server to run
+# it under, and the HTTP client FastAPI's own test client is built on.
+#
+# It is an extra rather than a `requirements.txt` beside the sample for one reason: a sample whose
+# dependencies are declared somewhere the test suite does not read is a sample CI never runs. That
+# was this repo's own state — `tests/test_fastapi_host.py` skipped on every CI run, for a year, in
+# a job that reported green. With the extra, `pip install "fuaran-py[live-host]"` both starts the
+# server and turns the smoke test from skipped into gated, and the matrix row that installs `dev`
+# alone still proves the suite skips cleanly when FastAPI is absent — the other half of the claim.
+#
+# The name matches the companion distribution's extra of the same shape, deliberately: two
+# packages naming the same thing differently is a question every reader has to answer twice.
+live-host = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"

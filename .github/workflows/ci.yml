@@ -57,6 +57,15 @@ jobs:
         # 3.12 is the declared floor (pyproject requires-python); 3.13 stays as the
         # workspace's own interpreter. Both must pass, or the floor is a claim.
         python-version: ['3.12', '3.13']
+        # The `live-host` extra carries what `samples/fastapi-host/` needs to be
+        # TESTED. Both rows are needed and they prove different things: with the
+        # extra, `tests/test_fastapi_host.py` gates — the sample's credential
+        # containment is asserted rather than assumed; without it, the suite is
+        # proven to skip CLEANLY, which is what lets `fuaran-py` claim to be
+        # dependency-light. Before this axis existed only the second arrangement
+        # ever ran, so the sample's tests skipped on every run in a green job.
+        extras: ['dev', 'dev,live-host']
+    name: "Test (py${{ matrix.python-version }}, ${{ matrix.extras }})"
     defaults:
       run:
         working-directory: fuaran-py
@@ -85,7 +94,7 @@ jobs:
       - name: Install
         run: |
           python -m pip install --upgrade pip
-          python -m pip install ".[dev]"
+          python -m pip install ".[${{ matrix.extras }}]"
 
       - name: Lint (ruff check)
         run: python -m ruff check .
@@ -118,8 +127,11 @@ jobs:
           echo "    skips and fails in any checkout that HAS sibling hosts but no"
           echo "    reference host. It passes here because this job is genuinely a"
           echo "    single-host checkout — the one shape in which skipping is honest."
-          echo "  - the FastAPI sample-host tests skip because fastapi is a sample-only"
-          echo "    dependency and is not in the [dev] extra this job installs."
+          echo "  - the FastAPI sample-host tests, on the rows that install [dev] ALONE."
+          echo "    fastapi is a sample-only dependency, so the skip there is honest and is"
+          echo "    itself the evidence that this package is dependency-light. The [dev,live-host]"
+          echo "    rows install it and those tests GATE — read the matrix row name to know"
+          echo "    which arrangement this run is."
           {
             echo "### Conformance quarantine (excluded from the blocking gate)"
             echo

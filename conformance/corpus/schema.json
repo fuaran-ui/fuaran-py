@@ -8738,18 +8738,46 @@
                 "cases": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "properties": {
-                      "child": {
-                        "$ref": "#/$defs/Node"
+                    "allOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "child": {
+                            "$ref": "#/$defs/Node"
+                          },
+                          "match": {
+                            "type": "string"
+                          },
+                          "when": {
+                            "$ref": "#/$defs/Binding_bool"
+                          }
+                        },
+                        "required": [
+                          "child"
+                        ]
                       },
-                      "match": {
-                        "type": "string"
+                      {
+                        "anyOf": [
+                          {
+                            "required": [
+                              "match"
+                            ]
+                          },
+                          {
+                            "required": [
+                              "when"
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "not": {
+                          "required": [
+                            "match",
+                            "when"
+                          ]
+                        }
                       }
-                    },
-                    "required": [
-                      "child",
-                      "match"
                     ]
                   }
                 },
@@ -9071,6 +9099,9 @@
         },
         "tooltip": {
           "$ref": "#/$defs/TextSource"
+        },
+        "visible": {
+          "$ref": "#/$defs/Binding_bool"
         }
       },
       "required": [

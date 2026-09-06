@@ -63,10 +63,13 @@ from ..model import Arr, Node, Obj, Value
 from .bindings import (
     BindingSources,
     format_number,
+    is_node_visible,
     render_text,
     resolve_binding,
     resolve_scalar_number,
+    resolve_scalar_text,
     resolve_source,
+    select_switch_case,
 )
 from .egress import (
     DENY_NON_LOCAL_EGRESS,
@@ -427,6 +430,11 @@ class _MarkdownRenderer:
         """
         if depth > MAX_NODE_DEPTH:
             return [f"*[subtree omitted: nesting exceeds the wire limit MaxDepth = {MAX_NODE_DEPTH}]*"]
+        # fuaran#1535 — conditional presence, honoured here for the reason this
+        # projection exists at all: a document that omits a node on the page and
+        # prints it here is not a projection of the page.
+        if not is_node_visible(node.extras.get("visible"), self.sources):
+            return []
         handler = _DISPATCH.get(node.kind.tag or "")
         if handler is None:
             return [f"*[fuaran:unprojected kind '{escape_inline(node.kind.tag or '')}']*"]
@@ -477,14 +485,18 @@ class _MarkdownRenderer:
         current: object | None = None
         if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
             current = self.sources[state_key]
-        value_str = "" if current is None else str(current)
+        elif "on" in fields:
+            # fuaran#1535 — the Phase-768 ``on`` form, resolved through the SCALAR
+            # path exactly as the HTML renderer does, so this projection picks the
+            # same branch the page shows.
+            current = resolve_scalar_text(fields["on"], self.sources)
+        value_str = None if current is None else str(current)
         cases = fields.get("cases")
-        if isinstance(cases, Arr):
-            for case in cases.items:
-                if isinstance(case, Obj) and case.fields.get("match") == value_str:
-                    child = _as_node(case.fields.get("child"))
-                    if child is not None:
-                        return self.render(child, depth + 1, level)
+        # fuaran#1535 — the one shared case-selection definition, so a predicate
+        # case selects here too and this projection cannot drift from the page.
+        child = _as_node(select_switch_case(cases, value_str, self.sources))
+        if child is not None:
+            return self.render(child, depth + 1, level)
         default = _as_node(fields.get("default"))
         return self.render(default, depth + 1, level) if default is not None else []
 

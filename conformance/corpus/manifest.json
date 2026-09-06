@@ -2419,6 +2419,14 @@
       "description": "Layout/Box (Phase 610 — multi-select chip + DataGrid scoped by a list-valued in/param)"
     },
     {
+      "id": "node-visible",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/node-visible.json",
+      "expectedFile": "nodes/node-visible.json",
+      "description": "Node envelope (Phase 1535 — visible: removal from flow, three predicate spellings, beside an aria-hidden sibling)"
+    },
+    {
       "id": "now-environment-binding",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2601,6 +2609,30 @@
       "inputFile": "nodes/switch-on-selection.json",
       "expectedFile": "nodes/switch-on-selection.json",
       "description": "Meta/Switch (Phase 768 — the selector widened: `on` takes a Selection, the branch follows the clicked row)"
+    },
+    {
+      "id": "switch-on-transform-scalar",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-on-transform-scalar.json",
+      "expectedFile": "nodes/switch-on-transform-scalar.json",
+      "description": "Meta/Switch (Phase 1535 — a computed selector: a Transform yielding one cell, read through the scalar path)"
+    },
+    {
+      "id": "switch-predicate",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-predicate.json",
+      "expectedFile": "nodes/switch-predicate.json",
+      "description": "Meta/Switch (Phase 1535 — predicate cases: a State bool and an Expr, MIXED with a match case in one ordered list)"
+    },
+    {
+      "id": "switch-predicate-only",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-predicate-only.json",
+      "expectedFile": "nodes/switch-predicate-only.json",
+      "description": "Meta/Switch (Phase 1535 — selected entirely by predicate: no selector, nothing to write)"
     },
     {
       "id": "table-1",
@@ -3856,6 +3888,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.autoAdvanceMs",
       "description": "Switch autoAdvanceMs is 0 — refused, never canonicalised to absence. An absent key is already the only spelling of \"does not advance\", so accepting a zero would make two shapes mean one thing and hide the emitter's misreading of the slot (Phase 1122)"
+    },
+    {
+      "id": "reject-switch-case-match-and-when",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-case-match-and-when.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.cases[0].when",
+      "description": "a Switch case carrying both `match` and `when` — the two ways of selecting a case, in one case. `match` compares the switch's `on` selector against a literal; `when` evaluates a Binding<bool> and consults no selector at all. Refused rather than resolved by precedence: a precedence rule would need specifying, agreeing on five hosts and remembering, for a document nobody meant to write (Phase 1535)"
+    },
+    {
+      "id": "reject-switch-case-neither",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-case-neither.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.cases[0].match",
+      "description": "a Switch case carrying neither `match` nor `when` — no condition, so no rendering could be right. Refused at decode rather than skipped silently at render: skipping it renders the `default` and reports nothing, which is the exact class of silence this phase's finding was filed about. The message names both fields, so the author is told which two spellings exist (Phase 1535)"
     },
     {
       "id": "reject-tokens-closed-without-suggestions",

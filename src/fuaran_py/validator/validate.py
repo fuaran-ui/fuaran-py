@@ -140,8 +140,41 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
     if isinstance(cases, Arr):
         seen: set[str] = set()
         reported: set[str] = set()
-        for case in cases.items:
+        for index, case in enumerate(cases.items):
             if isinstance(case, Obj):
+                # fuaran#1535 — FUARAN142: a case selects on a string ``match``
+                # XOR a ``when`` predicate. The PRE-EMIT twin of the decoder's
+                # own refusal, and it exists for the reason every pre-emit shape
+                # rule does: a tree authored in Python never passes through the
+                # decoder, so without it the one shape the wire refuses is
+                # reachable by construction.
+                has_match = "match" in case.fields
+                has_when = "when" in case.fields
+                if has_match and has_when:
+                    findings.append(
+                        Finding(
+                            "FUARAN142",
+                            f"{path}.cases[{index}]",
+                            "switch case carries both 'match' and 'when' — exactly one selects a "
+                            "case; 'match' compares the switch's `on` selector against a literal, "
+                            "'when' evaluates a Binding<bool> and needs no selector",
+                        )
+                    )
+                elif not has_match and not has_when:
+                    findings.append(
+                        Finding(
+                            "FUARAN142",
+                            f"{path}.cases[{index}]",
+                            "switch case carries neither 'match' nor 'when' — a case that names no "
+                            "condition can never be selected; give it a literal 'match' against the "
+                            "switch's `on` selector, or a 'when' Binding<bool> predicate",
+                        )
+                    )
+                # FUARAN082 is over the MATCH cases only (fuaran#1535). Two
+                # predicate cases are not duplicates of each other: ``when``
+                # carries a binding, two bindings equal today may resolve
+                # differently tomorrow, and structural equality of two predicates
+                # is not the question this rule asks.
                 match = case.fields.get("match")
                 if isinstance(match, str):
                     if match in seen and match not in reported:

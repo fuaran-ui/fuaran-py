@@ -43,11 +43,15 @@ from . import markdown
 from .bindings import (
     BindingSources,
     format_number,
+    is_node_visible,
     render_text,
     resolve_binding,
     resolve_display_string,
+    resolve_scalar_bool,
     resolve_scalar_number,
+    resolve_scalar_text,
     resolve_source,
+    select_switch_case,
 )
 from .egress import (
     DENY_NON_LOCAL_EGRESS,
@@ -374,13 +378,33 @@ class Renderer:
         # it resolves TRUE. False and unresolved both emit NOTHING —
         # ``aria-hidden`` is not a tri-state, and emitting "false" on an
         # unresolved binding would be a claim the tree never made.
-        if resolve_binding(a11y.fields.get("hidden"), self.sources) is True:
+        #
+        # fuaran#1535 — through the SCALAR resolver. ``resolve_binding``'s
+        # ``Transform`` arm is row-shaped, so a pipeline yielding the 1x1 bool
+        # cell an author obviously meant here ("hide it when the grid is empty")
+        # could never resolve. ``resolve_scalar_bool`` reads the lone cell
+        # through the same seam every other scalar slot uses, and every other
+        # binding case resolves exactly as before.
+        if resolve_scalar_bool(a11y.fields.get("hidden"), self.sources) is True:
             out.append(("aria-hidden", "true"))
         return out
 
     # ── the node wrapper ─────────────────────────────────────────────────────
 
     def render_node(self, node: Node) -> str:
+        # fuaran#1535 — CONDITIONAL PRESENCE, before anything else is computed. A
+        # resolved ``False`` on the envelope's ``visible`` predicate emits
+        # NOTHING: no element, no placeholder, no ``aria-hidden``, nothing in the
+        # layout and nothing in the accessibility tree. An absent, unresolved or
+        # errored predicate RENDERS — a missing source silently hiding content is
+        # the one failure a reader cannot see, cannot report and cannot work
+        # around.
+        #
+        # The guard sits on this one method rather than at every call site that
+        # produces a child, so a kind added tomorrow inherits it without anyone
+        # remembering to.
+        if not is_node_visible(node.extras.get("visible"), self.sources):
+            return ""
         class_name = node_class_name(node)
 
         # fuaran#1112 — the node-level tooltip trait. An EMPTY resolved hint emits
@@ -2298,14 +2322,22 @@ class Renderer:
         current: object | None = None
         if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
             current = self.sources[state_key]
-        value_str = "" if current is None else str(current)
+        elif "on" in fields:
+            # fuaran#1535 — the Phase-768 ``on`` form, which this renderer read
+            # ``stateKey``-only until now: a Selection / Filter / Query / Now
+            # selector resolved to nothing here, so every such switch rendered its
+            # default. Resolved through the SCALAR path, so a ``Transform`` or an
+            # ``Expr`` yielding one cell reaches it too — the wire-neutral half of
+            # this phase.
+            current = resolve_scalar_text(fields["on"], self.sources)
+        value_str = None if current is None else str(current)
 
-        if isinstance(cases, Arr):
-            for case in cases.items:
-                if isinstance(case, Obj) and case.fields.get("match") == value_str:
-                    child = _as_node(case.fields.get("child"))
-                    if child is not None:
-                        return self.render_node(child)
+        # fuaran#1535 — first-match-wins over BOTH kinds of case, through the one
+        # shared definition, so every rendering surface in this package selects
+        # identically.
+        child = _as_node(select_switch_case(cases, value_str, self.sources))
+        if child is not None:
+            return self.render_node(child)
         return self.render_node(default) if default is not None else ""
 
     def _fragment_decl(self, node: Node, fields: dict[str, Value]) -> str:

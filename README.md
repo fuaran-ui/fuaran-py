@@ -644,10 +644,28 @@ the ops applied + the surface-version echo), `AccessDenied` (the token was
 rejected at the edge, before your BYOK key was touched), or `TurnFailed` (a
 recoverable stage-tagged envelope; for the `apply` stage its message carries the
 hint the next prompt can re-emit against). The client never raises for an
-endpoint-level outcome; transport errors surface as a `TurnFailed` with a
-`NETWORK` code. `Produced.decode_tree()` / `AppliedOp.decode()` hand back typed
-values through the same codec the corpus certifies — you never parse raw model
-output by hand.
+endpoint-level outcome. `Produced.decode_tree()` / `AppliedOp.decode()` hand
+back typed values through the same codec the corpus certifies — you never parse
+raw model output by hand.
+
+`generate_detailed(...)` returns the same result plus what the deployment
+reported: `ops_applied` (a count — the endpoint returns how much changed, not
+the op list), `provider` (which allowlisted provider it chose), `served_model`
+(what the provider's own reply said actually answered; `None` means
+**unreported**, deliberately not the model the deployment asked for), and the
+grounding `snapshot` state.
+
+### Failures the CLIENT reports, as distinct from the endpoint's
+
+`RecoverableError.code` carries the endpoint's own code whenever there is one
+(`ACCESS_DENIED`, `APPLY_REJECTED`, `SECRETS_IN_BODY`, `MISSING_PROVIDER_KEY`,
+…). Three codes are this client's own, on `ClientCode`:
+
+| Code | Means |
+|---|---|
+| `NETWORK` | the call did not complete — the transport raised, or `timeout=` elapsed. The message is FIXED: an exception string can quote a URL, a header, or a proxy's internal hostname, and this result is routinely rendered into a page. The detail belongs in your log. |
+| `MALFORMED_RESPONSE` | a 200 with no usable tree. Not a success — accepting it would leave the session holding `""` and silently repairing nothing on every later turn. |
+| `INSECURE_ENDPOINT` | the endpoint is plaintext `http://` and not loopback, so both credentials would travel in the clear. Refused before the request is built. Loopback and a relative same-origin path are admitted; `allow_insecure_endpoint=True` is the written-down opt-out. |
 
 The session holds the current tree between turns, so each subsequent prompt is
 a **repair** against it (a cheap diff) rather than a from-scratch regeneration
@@ -659,13 +677,20 @@ the first turn is already a repair.
 
 Two credentials cross the wire, and they are not the same kind of secret:
 
-- the **access token** — the paid credential for the endpoint. Sent in the
-  request body and (by default) as an `Authorization: Bearer` header.
-- the **BYOK provider key** — your own LLM-provider API key. Sent in the
-  request body only, **never in a header**; the endpoint uses it in memory for
-  the one call and never stores, logs, or meters it. The client mirrors that
-  posture: the key appears in no header, no error envelope, and no `repr` —
-  a logged client object cannot leak it.
+- the **access token** — the paid credential for the endpoint. Sent as
+  `Authorization: Bearer <token>`.
+- the **BYOK provider key** — your own LLM-provider API key. Sent as
+  `X-Fuaran-Provider-Key`; the endpoint uses it in memory for the one call and
+  never stores, logs, or meters it.
+
+**Both travel as HEADERS, and neither is ever in the request body.** A body is
+the thing most likely to be logged wholesale by an intermediary; a header is the
+thing most likely to be redacted by one. The endpoint enforces it: a body
+carrying `ByokKey` or `AccessToken` is refused `400 SECRETS_IN_BODY` and the
+value is not read — so if you get that code, treat the key you just sent as
+exposed and rotate it. `to_wire_body` has no credential parameter at all, so
+this client cannot produce such a body. The key also appears in no error
+envelope and no `repr`: a logged client object cannot leak it.
 
 Pick the placement by who can see the calling environment:
 

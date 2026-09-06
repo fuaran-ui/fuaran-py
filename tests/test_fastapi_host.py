@@ -40,11 +40,16 @@ _SAMPLE_APP = Path(__file__).resolve().parents[1] / "samples" / "fastapi-host" /
 
 def _load_sample_module() -> object:
     # The sample's module-level `app = create_app()` fails fast if FUARAN_ENDPOINT
-    # is unset (correct for `uvicorn app:app`); give it a placeholder so the module
-    # imports. The test drives its own app via create_app(client=<mock>).
+    # is unset or no authorisation arm is chosen (both correct for
+    # `uvicorn app:app`); give it a placeholder and the anonymous arm so the
+    # module imports. The test drives its own app via create_app(client=<mock>).
     import os
 
     os.environ.setdefault("FUARAN_ENDPOINT", "https://placeholder.invalid/generate")
+    # The route is fail-closed on authorisation, so module import (which builds
+    # `app = create_app()` for `uvicorn app:app`) refuses without an arm. Naming
+    # the anonymous one here is the opt-in the sample requires of any host.
+    os.environ.setdefault("FUARAN_SAMPLE_ANONYMOUS", "1")
     spec = importlib.util.spec_from_file_location("fuaran_fastapi_sample", _SAMPLE_APP)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -64,13 +69,36 @@ class _MockTransport:
     def __call__(self, url: str, headers: Mapping[str, str], body: bytes) -> tuple[int, str]:
         parsed = json.loads(body.decode("utf-8"))
         self.requests.append({"headers": dict(headers), "body": parsed})
-        prompt = str(parsed.get("Prompt", ""))
+        prompt = str(parsed.get("prompt", ""))
         if "deny me" in prompt:
-            return 401, json.dumps({"Reason": "token expired"})
+            return 401, json.dumps({"error": {"code": "ACCESS_DENIED", "message": "token expired"}})
         if "break me" in prompt:
-            return 422, json.dumps({"Error": {"Stage": "apply", "Code": "APPLY_REJECTED", "Message": "no node"}})
-        tree = REPAIRED_TREE if parsed.get("CurrentTreeJson") is not None else FIRST_TREE
-        return 200, json.dumps({"TreeJson": tree, "Ops": [], "Version": "1.2.0"})
+            return 422, json.dumps(
+                {"error": {"stage": "apply", "code": "APPLY_REJECTED", "message": "no node"}}
+            )
+        if "undecodable" in prompt:
+            # A 200 whose tree the host cannot decode. It is a canonical-looking
+            # object, so the SDK admits it; the HOST is what must refuse.
+            return 200, json.dumps(
+                {
+                    "version": "1.6.0",
+                    "tree": {"id": "x", "kind": {"$type": "NotAKindThatExists"}},
+                    "opsApplied": 0,
+                    "provider": "mock",
+                    "snapshot": {"state": "mock"},
+                }
+            )
+        tree = REPAIRED_TREE if parsed.get("currentTree") is not None else FIRST_TREE
+        return 200, json.dumps(
+            {
+                "version": "1.6.0",
+                "tree": json.loads(tree),
+                "opsApplied": 0,
+                "provider": "openai",
+                "servedModel": "gpt-4o-2024-11-20",
+                "snapshot": {"state": "warm"},
+            }
+        )
 
 
 @pytest.fixture()
@@ -87,7 +115,13 @@ def client(transport: _MockTransport) -> Iterator[TestClient]:
         provider_key=PROVIDER_KEY,
         transport=transport,
     )
-    app = module.create_app(client=sdk_client)  # type: ignore[attr-defined]
+    # The route is fail-closed on authorisation; the smoke drives the ANONYMOUS
+    # arm explicitly, which is the point of naming it rather than defaulting to
+    # it. `test_spend_guards.py` drives the secret arm.
+    app = module.create_app(  # type: ignore[attr-defined]
+        client=sdk_client,
+        policy=module.Policy(expected_secret=None, rate_limiter=module.RateLimiter()),  # type: ignore[attr-defined]
+    )
     with TestClient(app) as test_client:
         yield test_client
 
@@ -99,7 +133,10 @@ def test_completes_a_turn_and_renders(client: TestClient) -> None:
     assert data["status"] == "produced"
     assert data["tree"] == FIRST_TREE
     assert data["html"]  # server-rendered markup is present
-    assert data["version"] == "1.2.0"
+    assert data["version"] == "1.6.0"
+    # The deployment facts survive the proxy hop rather than being dropped at it.
+    assert data["provider"] == "openai"
+    assert data["servedModel"] == "gpt-4o-2024-11-20"
 
 
 def test_turn_loop_carries_the_tree_as_a_repair(client: TestClient, transport: _MockTransport) -> None:
@@ -108,7 +145,7 @@ def test_turn_loop_carries_the_tree_as_a_repair(client: TestClient, transport: _
     assert resp.status_code == 200
     assert resp.json()["tree"] == REPAIRED_TREE
     # the server forwarded the held tree as the current tree (a repair, not a regen)
-    assert transport.requests[-1]["body"]["CurrentTreeJson"] == FIRST_TREE  # type: ignore[index]
+    assert transport.requests[-1]["body"]["currentTree"] == FIRST_TREE  # type: ignore[index]
 
 
 def test_access_denied_maps_to_401(client: TestClient) -> None:
@@ -135,6 +172,22 @@ def test_credentials_never_reach_the_client(client: TestClient, transport: _Mock
     # sanity: the index page carries no credential either
     index = client.get("/")
     assert ACCESS_TOKEN not in index.text and PROVIDER_KEY not in index.text
-    # and the secrets WERE injected server-side (proving the proxy hop, not a no-op)
-    server_side = json.dumps(transport.requests)
-    assert PROVIDER_KEY in server_side, "the BYOK key should reach the endpoint from the server"
+    # and the secrets WERE injected server-side (proving the proxy hop, not a
+    # no-op) — as HEADERS, never in a body the endpoint would refuse.
+    for request in transport.requests:
+        headers = request["headers"]
+        assert headers["x-fuaran-provider-key"] == PROVIDER_KEY  # type: ignore[index]
+        assert headers["authorization"] == f"Bearer {ACCESS_TOKEN}"  # type: ignore[index]
+        assert PROVIDER_KEY not in json.dumps(request["body"])
+        assert ACCESS_TOKEN not in json.dumps(request["body"])
+
+
+def test_a_tree_the_host_cannot_decode_is_a_failure_not_an_empty_panel(client: TestClient) -> None:
+    # Red before: the host replied 200 with `html: ""`, which the page rendered
+    # as an empty panel and the caller recorded as a successful turn — while
+    # still holding the undecodable tree, so every later repair built on it.
+    resp = client.post("/generate", json={"prompt": "undecodable please"})
+    assert resp.status_code == 502
+    body = resp.json()
+    assert body["status"] == "refused"
+    assert body["error"]["code"] == "MALFORMED_TREE"

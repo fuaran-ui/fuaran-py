@@ -9,7 +9,7 @@ It wraps the [`fuaran_py.client`](../../src/fuaran_py/client/) SDK: the `/genera
 route calls `FuaranClient.generate` server-side, decodes the returned canonical
 wire tree, renders it to HTML with `fuaran_py.renderer.render_html`, and returns
 the tree + its markup. The turn loop runs client-side — the page holds the current
-tree's JSON and posts it back as `currentTreeJson`, so each prompt is a cheap
+tree's JSON and posts it back as `current_tree_json`, so each prompt is a cheap
 *repair* while the server stays stateless.
 
 ## Why server-proxied?
@@ -24,6 +24,34 @@ they must never reach the browser. The SDK supports both placements
   server holds the secrets and calls the endpoint. The key never leaves the
   server process, and this page carries no credential field at all.
 
+## This route is not an open spend endpoint — read this before you copy it
+
+**It holds your BYOK key and answers whoever can reach it.** A proxy route like
+this one is, by construction, permission to spend your provider budget: anything
+that can POST to it can generate, at whatever rate it likes, for as long as it
+likes. Three guards stand between the two, all of them in
+[`app.py`](app.py) rather than in this file, because a sample is copied before
+it is read:
+
+| Guard | What it bounds | How to change it |
+|---|---|---|
+| **Authorisation** — fail-closed | who may call at all | `FUARAN_SAMPLE_SECRET` (callers present it as `X-Sample-Secret`), or `FUARAN_SAMPLE_ANONYMOUS=1` to serve everyone. **The app refuses to start with neither.** |
+| **Prompt-length cap** — 4000 chars | the input-token bill, which is the one cost dimension a caller controls directly | `Policy(max_prompt_length=…)` |
+| **Per-caller rate limit** — 30 turns / minute | how fast a single caller can spend | `Policy(rate_limiter=RateLimiter(…))` |
+
+None of the three is a substitute for a real gateway, and two of them are
+deliberately crude. The shared secret is a placeholder with the right SHAPE, so
+replacing it with your app's real authentication is a one-line change and
+forgetting to replace it is not silent. The rate limiter is per-PROCESS, so two
+instances allow twice the traffic — a fact worth knowing rather than a defect
+worth hiding; a real deployment wants a shared store. The caller key is the
+remote address, which is the weakest useful choice: behind a proxy every caller
+shares one, so key on whatever you already authenticate.
+
+**What they buy is that a copy of this file cannot become an unauthenticated,
+unbounded spend endpoint by omission — only by deliberate opt-out.** Every
+refusal happens BEFORE the endpoint is called, so none of them costs a token.
+
 ## Run it
 
 ```bash
@@ -31,10 +59,13 @@ pip install -r requirements.txt          # fastapi + uvicorn + fuaran-py
 export FUARAN_ENDPOINT=https://<your-endpoint>/generate
 export FUARAN_ACCESS_TOKEN=...            # server-side only
 export FUARAN_PROVIDER_KEY=...            # the BYOK key, server-side only
+export FUARAN_SAMPLE_SECRET=...           # who may call this route
+#   …or, deliberately: export FUARAN_SAMPLE_ANONYMOUS=1
 uvicorn app:app --port 14140
 ```
 
-Open <http://127.0.0.1:14140/>, type a prompt (e.g. *a metric card showing
+Open <http://127.0.0.1:14140/>, put the shared secret in the secret box (leave it
+empty on the anonymous arm), type a prompt (e.g. *a metric card showing
 revenue*), and the server-rendered tree appears. A second prompt (*rename the
 metric to ARR*) repairs the held tree.
 
@@ -44,17 +75,33 @@ metric to ARR*) repairs the held tree.
 ## The proxy hop (the whole point)
 
 ```
-browser ──POST /generate {prompt, currentTreeJson}──▶ FastAPI (this host)
+browser ──POST /generate {prompt, current_tree_json}──▶ FastAPI (this host)
+                                                         │  authorise, cap, rate-limit
                                                          │  holds token + BYOK key
                                                          ▼
-                                        FuaranClient.generate(...) ──▶ Fuaran endpoint
-                                                         │
-   {status, tree, html, version}  ◀─────────────────────┘   (no credential in the reply)
+                                    FuaranClient.generate_detailed(...) ──▶ Fuaran endpoint
+                                                         │   (secrets as HEADERS,
+                                                         │    never in the body)
+   {status, tree, html, version,   ◀─────────────────────┘   (no credential in the reply)
+    provider, servedModel}
 ```
 
-The response body is `{status, tree, html, version}` on success — never the token
-or the key. `app.py`'s `/generate` handler maps the SDK's three-way `TurnResult`
-(`Produced` → 200, `AccessDenied` → 401, `TurnFailed` → 422).
+The response body is `{status, tree, html, version, provider, servedModel}` on
+success — never the token or the key. `servedModel` is what the provider's own
+reply said actually answered; `null` means **unreported**, deliberately not the
+model the deployment asked for.
+
+`app.py`'s `/generate` handler maps the SDK's three-way `TurnResult` (`Produced`
+→ 200, `AccessDenied` → 401, `TurnFailed` → 422), and adds two refusals of its
+own, both in the endpoint's own `{"error": {"code", "message"}}` envelope so the
+page decodes one contract either way:
+
+- its **guard** refusals — `ACCESS_DENIED` (401), `BAD_REQUEST` /
+  `PROMPT_TOO_LONG` (400), `RATE_LIMITED` (429);
+- **`MALFORMED_TREE` (502)** — the endpoint produced a tree this host could not
+  decode. That used to be a 200 with `html: ""`, which the page rendered as an
+  empty panel and the caller recorded as a successful turn — while still holding
+  the undecodable tree, so every later repair built on it.
 
 ## Equivalent Django view
 

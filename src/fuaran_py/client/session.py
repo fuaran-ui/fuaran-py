@@ -39,6 +39,7 @@ class FuaranSession:
         access_token: str | None = None,
         disable_corpus_read: bool | None = None,
         contribute_corpus: bool | None = None,
+        interaction_id: str | None = None,
     ) -> TurnResult:
         """Run the next turn.
 
@@ -54,6 +55,7 @@ class FuaranSession:
             access_token=access_token,
             disable_corpus_read=disable_corpus_read,
             contribute_corpus=contribute_corpus,
+            interaction_id=interaction_id,
         )
         if isinstance(result, Produced):
             self._current_tree_json = result.tree_json

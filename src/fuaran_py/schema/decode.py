@@ -289,6 +289,12 @@ LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render stra
 DURATION_UNIT = frozenset({"Seconds", "Minutes", "Hours"})
 DURATION_STYLE = frozenset({"Compact", "Clock", "Long"})
 RELATIVE_TIME_UNIT = frozenset({"Second", "Minute", "Hour", "Day", "Week", "Month", "Year"})
+# Phase 1533 — the resolution a ``Binding.Now`` declares for the host-furnished
+# instant. A strict SUBSET of RELATIVE_TIME_UNIT: ``Week`` / ``Month`` / ``Year``
+# are refused rather than quietly accepted, because this is a truncation of a
+# calendar instant and those three have no truncation every host agrees on
+# (which weekday starts a week; which calendar).
+TIME_GRAIN = frozenset({"Second", "Minute", "Hour", "Day"})
 ICON_SIZE = frozenset({"Small", "Medium", "Large"})  # Phase 821 — the Icon display kind
 # fuaran#867 — `Metric.trendPolarity`: which direction of movement is an
 # improvement. `Neutral` is RESERVED and deliberately NOT a case — that is the
@@ -1177,9 +1183,17 @@ def _normalise_binding_obj(
         fields["key"] = key
         return Obj("State", fields)
     if tag == "Now":
-        # The host-furnished current instant (ISO-8601 UTC). The wire form is
-        # `{"$type":"Now"}` — no fields: the clock lives in the HOST, resolved
-        # once per render pass, never on the wire.
+        # The host-furnished current INSTANT is never on the wire: the clock
+        # lives in the HOST, resolved once per render pass. Phase 1533 — the
+        # declared ``grain`` is the one wire field, optional, absent meaning
+        # ``Second``, so a grain-less ``Now`` is still the bare
+        # ``{"$type":"Now"}``. Present-but-unreadable is a REFUSAL rather than a
+        # silent fallback to the default: a document that names a grain the host
+        # cannot honour must not be rendered at a neighbouring resolution in
+        # silence.
+        if "grain" in obj:
+            grain = _enum(obj["grain"], f"{path}.grain", TIME_GRAIN, "TimeGrain")
+            return Obj("Now", {"grain": grain})
         return Obj("Now", {})
     if tag == "Transform":
         return _decode_transform_binding(obj, path)

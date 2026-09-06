@@ -1,0 +1,1 @@
+{"id":"action-navigate-bound","kind":{"$type":"Button","label":"Open the selected order","onClick":{"$type":"Navigate","route":{"$type":"Bound","binding":{"$type":"Selection","field":"id","nodeId":"orders-grid"}}},"variant":"Secondary"}}

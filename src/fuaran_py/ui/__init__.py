@@ -172,8 +172,13 @@ class action:  # noqa: N801 — namespace object
         return t.Dispatch(msg)
 
     @staticmethod
-    def navigate(route: str) -> Action:
-        return t.Navigate(route)
+    def navigate(route: str, target: str = "Self") -> Action:
+        """Navigate to ``route``. fuaran#1536 — ``route`` may be any
+        ``TextSource`` (a bare string is the ``Literal`` shorthand and its
+        canonical form), and ``target`` names the browsing context: ``"Self"``
+        (the default, omitted on the wire) or ``"Blank"``, which every renderer
+        opens with ``noopener,noreferrer``."""
+        return t.Navigate(route, target)
 
     @staticmethod
     def set_state(key: str, value: t.Value) -> Action:

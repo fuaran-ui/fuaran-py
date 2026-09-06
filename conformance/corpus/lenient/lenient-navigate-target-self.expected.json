@@ -1,0 +1,1 @@
+{"id":"len-nav-self","kind":{"$type":"Button","label":"Home","onClick":{"$type":"Navigate","route":"/"},"variant":"Primary"}}

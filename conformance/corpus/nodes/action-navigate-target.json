@@ -1,0 +1,1 @@
+{"id":"action-navigate-target","kind":{"$type":"Button","label":"Read the documentation","onClick":{"$type":"Navigate","route":"/docs/orders","target":"Blank"},"variant":"Secondary"}}

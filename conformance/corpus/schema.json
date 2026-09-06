@@ -120,6 +120,13 @@
         "Popover"
       ]
     },
+    "NavigateTarget": {
+      "type": "string",
+      "enum": [
+        "Self",
+        "Blank"
+      ]
+    },
     "CaptureSource": {
       "type": "string",
       "enum": [
@@ -3898,7 +3905,10 @@
               "const": "Navigate"
             },
             "route": {
-              "type": "string"
+              "$ref": "#/$defs/TextSource"
+            },
+            "target": {
+              "$ref": "#/$defs/NavigateTarget"
             }
           },
           "required": [

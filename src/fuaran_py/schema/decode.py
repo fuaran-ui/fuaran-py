@@ -266,6 +266,13 @@ EMBED_PERMISSION = frozenset({"AllowScripts", "AllowSameOrigin", "AllowForms", "
 CAPTURE_SOURCE = frozenset({"Camera", "Microphone"})
 # fuaran#1119 — the modal's modality. `Blocking` is the identity and omits.
 MODALITY_KIND = frozenset({"Blocking", "Popover"})
+# fuaran#1536 — which browsing context an `Action.Navigate` lands in. A BARE
+# enum; `Self` is the identity and omits. Two cases and NO lenient spelling:
+# HTML's `_self` / `_blank` / `_parent` / `_top` are not accepted as aliases,
+# because two of them are frame-busting gestures a hosted tree must not be able
+# to ask for and accepting the two harmless ones would teach an emitter that the
+# HTML vocabulary is the one in force here.
+NAVIGATE_TARGET = frozenset({"Self", "Blank"})
 # fuaran#1472 — the declared base direction, LOWER-CASE on the wire because that
 # is the spelling the isolation is ultimately expressed in. `auto` is the
 # identity and omits at it; an unrecognised token is REFUSED and never coerced to
@@ -1632,6 +1639,25 @@ def _decode_action(value: object, path: str) -> Value:
                     "an object carrying only $type",
                 )
         return Obj("Print", {})
+    elif tag == "Navigate":
+        # fuaran#1536 — the route is a `TextSource`, not a bare string, so a tree
+        # can name a destination it computes from what the reader is looking at.
+        # The bare JSON string IS `Literal`'s canonical form, so every document
+        # written before the widening decodes exactly as it did — including one
+        # using an alias, since the aliases above are resolved before this point,
+        # keeping exactly one canonical field a router can be reached through.
+        #
+        # `target` is omitted at `Self`, so absence is the pre-1536 behaviour. An
+        # unrecognised token is UNKNOWN_DU_CASE at the member's own path and is
+        # never coerced to one of the two.
+        route = _decode_text_source(_require(obj, "route", path), f"{path}.route")
+        decoded: dict[str, Value] = {"route": route}
+        if "target" in obj:
+            target = _enum_aliased(obj["target"], f"{path}.target", NAVIGATE_TARGET, {}, "NavigateTarget")
+            if target != "Self":
+                decoded["target"] = target
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "route", "target")}
+        return Obj("Navigate", {**rest, **decoded})
     elif tag == "WriteToClipboard":
         # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
         # bare JSON string IS `Literal`'s canonical form, so every document

@@ -632,7 +632,7 @@ rejected append, or a detected gap in the stream) now reaches
 it rather than staying silent; pass `on_sink_error=None` to opt back into silence
 deliberately.
 
-This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is
+This host declares no stability policy yet (pre-1.0), so the change is
 recorded here rather than in a `STABILITY.md` it does not have.
 
 ## Generate (client for the hosted endpoint, optional)
@@ -742,7 +742,7 @@ only: a construction site that leaves a dead key on an op still reaches the wire
 conformant decoder — including this one — now refuses it. Whether the encoder should
 filter to the schema is an open question, recorded here rather than implied closed.
 
-This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is recorded
+This host declares no stability policy yet (pre-1.0), so the change is recorded
 here rather than in a `STABILITY.md` it does not have.
 
 ## Placement helpers — `fuaran_py.ops.placement`

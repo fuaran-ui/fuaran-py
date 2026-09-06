@@ -578,6 +578,26 @@ self-describing) and this host reproduces the committed golden hashes in the sha
 certify against. The module is stdlib-only (`hashlib.sha256`); a genuinely
 I/O-backed sink is a follow-up implementing the same `OpStreamSink` protocol.
 
+### Replay skips recorded refusals
+
+A record's `result_envelope` is `Success` or `Failure`, and a `Failure` record is
+the point of the field: it says an op was **refused**, and therefore never touched
+the tree. So `apply_to` and `replay_stream` fold only the successes by default, and
+a chain carrying a refusal replays cleanly:
+
+```python
+from fuaran_py.op_stream import replay_stream
+
+replay_stream(sink, "doc-1", tree)  # accepted records only
+replay_stream(sink, "doc-1", tree, include_refused=True)  # the literal fold
+```
+
+Folding every record is still reachable, by name. It is what an audit rebuild
+wants — where would the refused op have landed? — and what a host whose `Failure`
+records are advisory rather than final wants. It is not a sensible default: the
+refused op is by construction the one the tree could not take, so the literal fold
+fails on the very record that says it failed.
+
 ### Compare-and-append — the concurrent-writer write path
 
 `OpStreamSink.append` alone only supports a **proposal**: a caller reads
@@ -612,7 +632,7 @@ rejected append, or a detected gap in the stream) now reaches
 it rather than staying silent; pass `on_sink_error=None` to opt back into silence
 deliberately.
 
-This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is
+This host declares no stability policy yet (pre-1.0), so the change is
 recorded here rather than in a `STABILITY.md` it does not have.
 
 ## Generate (client for the hosted endpoint, optional)
@@ -747,7 +767,7 @@ only: a construction site that leaves a dead key on an op still reaches the wire
 conformant decoder — including this one — now refuses it. Whether the encoder should
 filter to the schema is an open question, recorded here rather than implied closed.
 
-This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is recorded
+This host declares no stability policy yet (pre-1.0), so the change is recorded
 here rather than in a `STABILITY.md` it does not have.
 
 ## Placement helpers — `fuaran_py.ops.placement`

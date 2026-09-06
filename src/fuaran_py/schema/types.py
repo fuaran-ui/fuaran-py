@@ -2205,11 +2205,61 @@ SegmentedFilter = SegmentedChoice
 FilterKind = FormFieldKind
 
 
+def _chip_parameter(kind: FilterKind) -> str | None:
+    """The parameter a filter chip's control actually writes, or ``None``.
+
+    ``State(key)`` names its slot and ``Filter(name)`` is the binding a decoder
+    would have synthesised from the chip's own name, so both name a parameter in
+    the same sense. Every other binding — ``Static`` above all — names none, and
+    a chip carrying one is left entirely alone.
+    """
+    value = getattr(kind, "value", None)
+    if isinstance(value, State):
+        return value.key
+    if isinstance(value, Filter):
+        return value.name
+    return None
+
+
 @dataclass(frozen=True)
 class FilterSpec:
-    name: str
+    """One filter chip: a parameter name, a label, and the control that writes it.
+
+    **``name`` must agree with the parameter the control binds.** A reference
+    decoder auto-binds ``Filter(<name>)`` only where the control carries no
+    ``value``, so on a chip whose control declares its own binding the name
+    reaches nothing but the element id — and a name set apart from the bound
+    parameter used to render, filter nothing, and say nothing. A disagreement is
+    refused here, at the point the author wrote it, with both names in the
+    message: which of the two is the mistake is the author's call.
+
+    ``name=None`` DERIVES it from the binding. That is this surface's spelling of
+    "omitted": ``name`` is the first positional field and reordering the record to
+    give it a default would silently reinterpret every existing positional call as
+    passing a label.
+    """
+
+    name: str | None
     label: TextSource
     kind: FilterKind
+
+    def __post_init__(self) -> None:
+        bound = _chip_parameter(self.kind)
+        if self.name is None:
+            if bound is None:
+                raise ValueError(
+                    "filter chip has no name and nothing to derive one from: its control binds no "
+                    "parameter (a State or Filter binding names one; Static does not). Name the "
+                    "chip explicitly, or bind its control to the parameter it filters."
+                )
+            object.__setattr__(self, "name", bound)
+        elif bound is not None and bound != self.name:
+            raise ValueError(
+                f"filter chip is named {self.name!r} but its control binds the parameter "
+                f"{bound!r}. A chip's name reaches nothing but the element id once the control "
+                "declares its own binding, so the two must agree — rename the chip, rebind the "
+                "control, or pass name=None to derive the name from the binding."
+            )
 
     def to_wire(self) -> Value:
         return Obj(None, {"kind": _lower(self.kind), "label": _lower(self.label), "name": self.name})

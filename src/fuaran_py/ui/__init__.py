@@ -65,20 +65,48 @@ def _str_binding(value: t.StringInput) -> Binding:
     return t.Static(value) if isinstance(value, str) else value
 
 
+#: The characters the display-string parse keeps; everything else is decoration.
+_METRIC_NUMERIC_CHARS = "0123456789.eE+-"
+
+#: What ``metric(value=…)`` accepts, enumerated for the refusal message below —
+#: the author cannot infer it, because the parse STRIPS before it reads.
+_METRIC_VALUE_SHAPES = (
+    "a number (42, 42.5, -7, 4.2e3); a Binding for a value the host resolves; "
+    "or a display string whose decoration strips away to one of those "
+    "('1,234' → 1234, '12.5%' → 12.5, '£42k' → 42, '$3.4M' → 3.4 — note a "
+    "magnitude suffix is DROPPED, not applied)"
+)
+
+
 def _metric_value(value: str | t.NumberInput) -> Binding:
     """KPI value coercion: a number → ``Static``; a display string is leniently
     parsed (non-numeric characters stripped) into a ``Static`` — a convenience for
-    prototypes like ``value="£42k"``; pass a number or a binding for precision."""
+    prototypes like ``value="£42k"``; pass a number or a binding for precision.
+
+    **A display string the strip leaves unparseable is REFUSED**, with the input
+    and :data:`_METRIC_VALUE_SHAPES` in the message. It used to become ``0.0``:
+    ``"n/a"`` strips to the empty string, ``"2026-09-06"`` strips to itself and
+    still does not parse, and either way the tile rendered a confident zero the
+    author never wrote. A KPI reading 0 is not a visibly-missing value — it is a
+    number, and it is the one number a reader will act on.
+
+    The refusal covers every unparseable strip, not only the digit-free case that
+    was reported: they are one branch, and narrowing it would leave the docstring
+    obliged to list a date as an accepted shape.
+    """
     if isinstance(value, bool):  # guard: bool is an int subclass
         return t.Static(value)
     if isinstance(value, (int, float)):
         return t.Static(value)
     if isinstance(value, str):
-        cleaned = "".join(c for c in value if c in "0123456789.eE+-")
+        cleaned = "".join(c for c in value if c in _METRIC_NUMERIC_CHARS)
         try:
             parsed = float(cleaned)
         except ValueError:
-            parsed = 0.0
+            raise ValueError(
+                f"metric value {value!r} is not a number: stripping decoration leaves "
+                f"{cleaned!r}, which does not parse. Accepted: {_METRIC_VALUE_SHAPES}."
+            ) from None
         return t.Static(parsed)
     return value
 

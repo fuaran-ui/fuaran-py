@@ -63,7 +63,12 @@ transliteration of F#:
 - A bare number where a `Binding` is expected becomes a `Static`
   (`1234.5` → `{"$type":"Static","value":1234.5}`).
 - A KPI `value` accepts a number, a `Binding`, or a display string that is
-  leniently parsed (`value="£42k"` → `Static(42.0)`).
+  leniently parsed (`value="£42k"` → `Static(42.0)`; `"1,234"` → `1234.0`,
+  `"12.5%"` → `12.5`, `"$3.4M"` → `3.4` — a magnitude suffix is dropped, not
+  applied). A display string the strip leaves unparseable — `"n/a"`, `"—"`, a
+  date — **raises `ValueError`** naming the input and these shapes; it does not
+  become `0.0`, because a tile reading zero is a number a reader will act on
+  rather than a visibly missing value.
 - `snake_case` field names map to the wire's `camelCase` automatically
   (`trend_format` → `trendFormat`, `x_field` → `xField`).
 

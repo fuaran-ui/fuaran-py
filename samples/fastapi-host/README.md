@@ -55,7 +55,7 @@ refusal happens BEFORE the endpoint is called, so none of them costs a token.
 ## Run it
 
 ```bash
-pip install -r requirements.txt          # fastapi + uvicorn + fuaran-py
+pip install "fuaran-py[live-host]"        # the host + fastapi + uvicorn
 export FUARAN_ENDPOINT=https://<your-endpoint>/generate
 export FUARAN_ACCESS_TOKEN=...            # server-side only
 export FUARAN_PROVIDER_KEY=...            # the BYOK key, server-side only
@@ -159,5 +159,10 @@ the tree, post it back as `current_tree_json`) is the same as in `app.py`.
 host with FastAPI's `TestClient` and a **mock transport** (no real endpoint):
 it completes a turn, carries the tree across a second (repair) turn, maps
 access-denied → 401 and turn-failed → 422, and asserts the server-held access
-token + BYOK key never appear in any response body. It skips when `fastapi` is
-not installed (`fuaran-py` itself stays dependency-light).
+token + BYOK key never appear in any response body.
+
+It runs wherever the `live-host` extra is installed and skips — with that named
+reason — where it is not, because `fuaran-py` itself stays dependency-light. CI
+runs both arrangements: one matrix row installs the extra so these assertions
+gate, and one installs `dev` alone so the skip is proven clean rather than
+assumed.

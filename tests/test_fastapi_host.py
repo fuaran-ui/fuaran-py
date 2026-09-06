@@ -6,8 +6,10 @@ transport** (no real endpoint): a turn completes, the tree carries across a seco
 load-bearing assertion — the server-held access token + BYOK key never appear in
 any response the browser receives.
 
-Skips when ``fastapi`` is not installed (``fuaran-py`` itself stays
-standard-library-only; FastAPI is a sample-only dependency).
+Skips when the ``live-host`` extra is not installed (``fuaran-py`` itself stays
+standard-library-only; FastAPI is a sample-only dependency). CI runs one matrix row
+WITH the extra so these assertions gate, and one without it so the skip is proven
+clean — for a year it only ever ran the second, and reported green.
 """
 
 from __future__ import annotations
@@ -20,8 +22,9 @@ from pathlib import Path
 
 import pytest
 
-fastapi = pytest.importorskip("fastapi", reason="fastapi (sample dependency) is required for this smoke test")
-pytest.importorskip("httpx", reason="httpx is required by fastapi.testclient")
+_EXTRA = 'install the sample extra: pip install "fuaran-py[live-host]"'
+fastapi = pytest.importorskip("fastapi", reason=f"fastapi (sample dependency) is absent — {_EXTRA}")
+pytest.importorskip("httpx", reason=f"httpx (needed by fastapi.testclient) is absent — {_EXTRA}")
 
 from fastapi.testclient import TestClient  # noqa: E402
 

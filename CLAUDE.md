@@ -58,7 +58,10 @@ fuaran-py/
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
 │   ├── ai_tools/         # AI-tools introspection: emittable-surface catalog + value-space + tool schemas + tree introspection + default-deny dispatch gate (Phase 237)
 │   ├── conformance/      # corpus round-trip smoke harness + certification bridge + the cross-host fuzz-sample exchange (Phase 236)
-│   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239)
+│   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239),
+│   │                     #   plus the two STATIC projections of the same tree (Phase 1176):
+│   │                     #   document.py (markdown) + email.py (email-safe digest), over the
+│   │                     #   shared disposition vocabulary in projection.py
 │   ├── style_observer/   # computed-style observer: pure flag tier + InMemory + Pyodide live read-back
 │   └── theme_manifest/   # DTCG-compatible theme contract (tokens + role bindings + invariants)
 ├── tests/                # pytest: number form, full-corpus round-trip + reject, validator
@@ -308,6 +311,63 @@ wrapped and script-free). It deliberately does **not** pin the recorded bytes to
 live render: that would turn every cosmetic renderer change into a notebook
 re-record. Re-record it with `pip install nbclient` into a working venv (never a
 package dependency) and the command in the notebook's own header.
+
+### The two static projections (`document.py` / `email.py`, Phase 1176)
+
+`render_markdown` and `render_email` / `render_email_document` are the other two things a
+decoded tree can be: a crawlable markdown document and an email-safe digest. Both are pure
+functions of the tree and its resolved bindings, both resolve text and figures through the
+same `bindings` functions `render_html` uses, and both are byte-stable across runs.
+
+**The scope table is the contract, and it is checked rather than asserted.** Each projection
+declares one row per canonical wire kind — `rendered` / `structural` / `openLive` / `omitted`,
+the four dispositions in `renderer/projection.py` — with the reasoning in the row, not in a
+comment beside it. `tests/test_projections.py` measures completeness against the corpus's
+`render-fidelity.json` and asserts every `behavioural` kind is `openLive` in both, DERIVED from
+that manifest. So:
+
+- **A new `NodeKind` owes both scope tables a row in the same change** that adds it to the
+  codec, exactly as it owes the class vocabulary a renderer arm. The suite reddens otherwise —
+  it does not fall through to a default.
+- **A kind the manifest newly marks `behavioural` must move to `openLive` in both.** That
+  derivation is what stops a dead control reaching an inbox, and it is the reason neither table
+  restates the interactive set.
+
+**The digest is a DESIGN port of the reference host's projection, not a byte port**, and the
+distinction is load-bearing: the reference's golden corpus lives inside its own test project
+rather than in the shared conformance corpus, so there is no cross-host gate for this surface
+in either direction and no claim of one is made. What is kept in step deliberately: the four
+dispositions, the scope rows and their reasoning, the fidelity-manifest derivation, the inline
+style vocabulary's literal values, the option defaults, and the hostile-construct lint's codes
+and tokens. **A change to the reference's scope line or lint set is a change here too** — the
+same forward-coupling posture the class vocabulary keeps, minus the corpus that would enforce
+it, so it is a discipline rather than a gate and is written down here for that reason.
+
+**The markdown projection has no reference.** No language tier carries one; what they carry is
+§14's opposite direction (GFM → HTML, for the `Markdown` node's own body). It is written to be
+the thing a second host ports.
+
+Three disciplines:
+
+- **`MarkdownOptions.charts` is a choice the caller makes, never a silent default fixed later.**
+  §14 escapes raw HTML by construction, so `"svg"` (the picture) is right for a reader that
+  passes HTML through and `"table"` (the resolved rows) is right for §14 itself. Do not
+  "improve" one into a fallback for the other — a document that looks fine in one pipeline and
+  prints tag soup in another is exactly what the two modes exist to prevent.
+- **Escaping is position-aware in exactly one place, and it was wrong first.** The narrow
+  inline set is paid for by `_LEADING_SPECIALS` at block starts; the first draft assumed no
+  resolved string ever lands at a block start, which is true of a paragraph and FALSE of a
+  container — a list item's content and a blockquote's content are each a fresh block, so `- `
+  and `> ` are openers rather than protection. `test_no_resolved_text_lands_at_block_start`
+  found it by pushing hostile text through this host's own §14 renderer rather than by reading
+  the markdown. Keep that falsifier; asserting about markdown by eye is how this class hides.
+- **Both projections consult the ambient destination policy**, and neither emits the
+  `data-fuaran-egress-refused` marker the page carries — `data-*` does not survive most mail
+  clients' sanitisers and markdown has no spelling for it. The refusal itself is never dropped.
+
+`renderer/render.py` exposes three geometry seams for these — `bare_drawing_svg`, `chart_svg`,
+`sparkline_svg` — so a projection reaches the SAME lowering the page uses rather than a second
+one. They hand out geometry, never markup decisions.
 
 ## Op-stream (hash chain)
 

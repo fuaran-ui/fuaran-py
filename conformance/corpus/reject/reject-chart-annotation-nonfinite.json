@@ -1,0 +1,1 @@
+{"id":"c1","kind":{"$type":"Chart","annotations":[{"$type":"ReferenceLine","value":"NaN"}],"kind":"Bar","source":{"$type":"Static","value":[]},"stacked":false,"xField":"quarter","yFields":["revenue"]}}

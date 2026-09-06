@@ -7021,6 +7021,12 @@
         "xScale": {
           "$ref": "#/$defs/ChartXScale"
         },
+        "annotations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChartAnnotation"
+          }
+        },
         "onPointClick": {
           "const": "<closure>"
         }
@@ -7030,6 +7036,140 @@
         "source",
         "xField",
         "yFields"
+      ]
+    },
+    "ChartAnnotation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReferenceLine"
+            },
+            "value": {
+              "type": "number"
+            },
+            "label": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "EventMarker"
+            },
+            "at": {
+              "$ref": "#/$defs/ChartAnnotationX"
+            },
+            "label": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "at"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "RangeBand"
+            },
+            "range": {
+              "$ref": "#/$defs/ChartAnnotationRange"
+            },
+            "label": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "range"
+          ]
+        }
+      ]
+    },
+    "ChartAnnotationRange": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ValueRange"
+            },
+            "from": {
+              "type": "number"
+            },
+            "to": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "$type",
+            "from",
+            "to"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "XRange"
+            },
+            "from": {
+              "$ref": "#/$defs/ChartAnnotationX"
+            },
+            "to": {
+              "$ref": "#/$defs/ChartAnnotationX"
+            }
+          },
+          "required": [
+            "$type",
+            "from",
+            "to"
+          ]
+        }
+      ]
+    },
+    "ChartAnnotationX": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Category"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Date"
+            },
+            "iso": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "iso"
+          ]
+        }
       ]
     },
     "MapMarker": {

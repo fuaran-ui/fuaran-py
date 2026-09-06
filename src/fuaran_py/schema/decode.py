@@ -2670,6 +2670,162 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     return Obj("DataGrid", fields)
 
 
+_CHART_ANNOTATION_CASES = frozenset({"ReferenceLine", "EventMarker", "RangeBand"})
+_CHART_ANNOTATION_X_CASES = frozenset({"Category", "Date"})
+_CHART_ANNOTATION_RANGE_CASES = frozenset({"ValueRange", "XRange"})
+
+
+def _is_canonical_iso_day(text: str) -> bool:
+    """``True`` when ``text`` is a canonical ISO-8601 date the temporal axis can
+    place — ``YYYY-MM-DD``, optionally followed by ``T…`` whose time-of-day is
+    discarded.
+
+    STRICT by shape AND by calendar: four digits, two, two, both hyphens, a month
+    in 1–12 and a day the month actually has. A locale spelling (``15/01/2026``)
+    and a bare year are both refused — admitting either would be the
+    string-sniffing the temporal axis exists to avoid.
+    """
+    if len(text) < 10 or text[4] != "-" or text[7] != "-":
+        return False
+    if len(text) > 10 and text[10] != "T":
+        return False
+    y_s, m_s, d_s = text[0:4], text[5:7], text[8:10]
+    if not (y_s.isdigit() and m_s.isdigit() and d_s.isdigit()):
+        return False
+    # ``str.isdigit`` admits non-ASCII digits; the canonical form is ASCII only.
+    if not all(c in "0123456789" for c in y_s + m_s + d_s):
+        return False
+    y, m, d = int(y_s), int(m_s), int(d_s)
+    if not 1 <= m <= 12:
+        return False
+    if m == 2:
+        last = 29 if (y % 4 == 0 and y % 100 != 0) or y % 400 == 0 else 28
+    elif m in (4, 6, 9, 11):
+        last = 30
+    else:
+        last = 31
+    return 1 <= d <= last
+
+
+def _check_chart_annotation_x(raw: object, path: str) -> str | None:
+    """An annotation's X ADDRESS (Phase 1491, §4l "The three addressing forms").
+
+    THE DATE MUST BE A DATE, and this refusal is the twin of ``ReferenceLine``'s
+    finite-value narrowing rather than a new posture. The lowering's calendar is
+    deliberately TOTAL — an unparseable x CELL reads as 1970-01-01, because a
+    non-date COLUMN is loud upstream and refusing per-cell would be worse. An
+    annotation has no column to be loud about: the string is authored directly.
+    And because §4l rule 3 has a temporal address ENTER the axis extent before the
+    ticks are chosen, a typo does not misplace one marker — it drags the domain
+    back to the epoch and rescales the whole picture.
+
+    Returns the canonical ISO string for a ``Date`` address (so the pair rule can
+    compare two of them), or ``None`` for a ``Category`` one.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_X_CASES)
+    if tag == "Category":
+        _expect_string(_require(o, "key", path), f"{path}.key")
+        return None
+    iso = _expect_string(_require(o, "iso", path), f"{path}.iso")
+    if not _is_canonical_iso_day(iso):
+        _fail(
+            WRONG_TYPE,
+            f"{path}.iso",
+            "expected a canonical ISO-8601 date (YYYY-MM-DD, optionally followed by a time) naming a "
+            "real calendar day — an event marker's date is the address it is drawn at, and an "
+            "unreadable one would place the marker at 1970-01-01 and drag the axis back with it",
+        )
+    return iso
+
+
+def _check_chart_annotation_range(raw: object, path: str) -> None:
+    """A range band's PAIR (Phase 1492, §4l). The case carries the AXIS as well as
+    the pair, so a value axis addressed by category keys is not a document this
+    decoder has to refuse — it is one no encoder can write.
+
+    TWO REFUSALS, and they are the pair rules the WIRE can decide by itself. A
+    non-finite endpoint is ``ReferenceLine``'s narrowing at two slots instead of
+    one, for its reason exactly. An UNORDERED pair is refused at the pair's own
+    slot — the defect is the pair's, not either end's — rather than silently
+    swapped: a band written backwards is a mistake about the author's own data.
+
+    A CATEGORY pair's order is NOT decided here: the order of two band keys is the
+    ROWS' order, a cross-reference rather than a local property of the address.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_RANGE_CASES)
+    if tag == "ValueRange":
+        lo = _decode_number(_require(o, "from", path), f"{path}.from")
+        hi = _decode_number(_require(o, "to", path), f"{path}.to")
+        for slot, v in (("from", lo), ("to", hi)):
+            if not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+                _fail(
+                    WRONG_TYPE,
+                    f"{path}.{slot}",
+                    "expected a FINITE JSON number — a range band's end names a place on the value "
+                    "axis, and NaN / Infinity names none; give the value in the axis's own units, or "
+                    "drop the annotation",
+                )
+        if float(lo) > float(hi):  # type: ignore[arg-type]
+            _fail(
+                WRONG_TYPE,
+                path,
+                "expected an ORDERED pair — a range band runs from its lower value to its upper one, "
+                "and this pair runs backwards; swapping the ends silently would draw a band the "
+                "author did not describe",
+            )
+        return
+    a = _check_chart_annotation_x(_require(o, "from", path), f"{path}.from")
+    b = _check_chart_annotation_x(_require(o, "to", path), f"{path}.to")
+    # Both dates are already known canonical and calendar-valid, and a canonical
+    # ``YYYY-MM-DD`` sorts lexicographically exactly as it sorts chronologically —
+    # so no calendar arithmetic is needed to decide the order at this boundary.
+    if a is not None and b is not None and a > b:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "expected an ORDERED pair — a range band runs from its earlier date to its later one, and "
+            "this pair runs backwards; swapping the ends silently would draw a band the author did "
+            "not describe",
+        )
+
+
+def _check_chart_annotation(raw: object, path: str) -> None:
+    """A chart's data-addressed annotation (Phase 1490, §4l). One closed
+    ``$type``-discriminated union.
+
+    THE REFERENCE LINE'S VALUE MUST BE FINITE, and that is a slot-specific
+    NARROWING of §7 rather than a disagreement with it. §7 admits the quoted
+    sentinels at every float slot and ``_decode_number`` reads them — the widening
+    is deliberate and stays. But a reference line addresses a place on the VALUE
+    AXIS, and a non-finite value names no such place: it would enter the domain
+    computation and put every gridline, tick and mark at a NaN coordinate. The
+    picture is not merely wrong at the annotation, it is wrong everywhere.
+
+    The annotation itself passes through STRUCTURALLY (this function only checks),
+    so a conformant document round-trips byte-for-byte as it always did.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_CASES)
+    if "label" in o:
+        _decode_text_source(o["label"], f"{path}.label")
+    if tag == "ReferenceLine":
+        v = _decode_number(_require(o, "value", path), f"{path}.value")
+        if not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+            _fail(
+                WRONG_TYPE,
+                f"{path}.value",
+                "expected a FINITE JSON number — a reference line names a place on the value axis, "
+                "and NaN / Infinity names none; give the value in the axis's own units, or drop the "
+                "annotation",
+            )
+    elif tag == "EventMarker":
+        _check_chart_annotation_x(_require(o, "at", path), f"{path}.at")
+    else:
+        _check_chart_annotation_range(_require(o, "range", path), f"{path}.range")
+
+
 def _decode_chart(obj: dict, path: str) -> Obj:
     """Chart (ChartSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` (opaque-erased
     rows). ``title`` is a real canonical field here (NOT the `heading` alias).
@@ -2678,6 +2834,15 @@ def _decode_chart(obj: dict, path: str) -> Obj:
     src_raw, src_present = _alias_get(obj, "source", ("data",))
     if src_present:
         fields["source"] = _decode_grid_source(src_raw, f"{path}.source")
+    # Phase 1490 — ``annotations`` (§4l): the data-addressed attachments. Carried
+    # structurally like every other pass-through field, so a conformant document
+    # round-trips byte-for-byte; CHECKED here because three of its rules cannot be
+    # recovered downstream (a non-finite address poisons the whole domain, an
+    # unparseable date drags the axis to the epoch, and an unordered pair draws a
+    # band the author did not describe).
+    if "annotations" in obj:
+        for i, item in enumerate(_expect_array(obj["annotations"], f"{path}.annotations")):
+            _check_chart_annotation(item, f"{path}.annotations[{i}]")
     _chart_known = frozenset({"$type", "source", "data"})
     for key, raw in obj.items():
         if key not in _chart_known:

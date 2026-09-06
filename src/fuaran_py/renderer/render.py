@@ -2208,6 +2208,18 @@ class Renderer:
         x_scale_src = fields.get("xScale")
         x_scale = x_scale_src if isinstance(x_scale_src, str) else None
 
+        # Phase 1490/1491/1492 — the data-addressed annotations (§4l). Semantic
+        # through and through: WHERE in the data a threshold, an episode or a
+        # shock sits is the author's meaning, and the lowering owns every pixel
+        # that draws it. Each annotation's LABEL crosses UNRESOLVED, whichever arm
+        # it carries, on the Phase 1143 text contract — the lowering's fit gate is
+        # confined to the literal arm precisely so it never measures text it
+        # cannot know. Absent stays absent, so a pre-1490 tree lowers unchanged.
+        annotations_src = fields.get("annotations")
+        annotations = (
+            [a for a in annotations_src.items if isinstance(a, Obj)] if isinstance(annotations_src, Arr) else None
+        )
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -2222,6 +2234,7 @@ class Renderer:
             legend_position=legend_position,
             data_labels=data_labels,
             x_scale=x_scale,
+            annotations=annotations,
         )
         return lower_node(node.id, spec, rows)
 

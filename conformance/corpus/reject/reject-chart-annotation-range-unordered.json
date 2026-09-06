@@ -1,0 +1,1 @@
+{"id":"c1","kind":{"$type":"Chart","annotations":[{"$type":"RangeBand","range":{"$type":"ValueRange","from":260,"to":200}}],"kind":"Bar","source":{"$type":"Static","value":[]},"stacked":false,"xField":"quarter","yFields":["revenue"]}}

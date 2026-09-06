@@ -1,0 +1,1 @@
+{"id":"c1","kind":{"$type":"Chart","annotations":[{"$type":"EventMarker","at":{"$type":"Date","iso":"2026-13-05"}}],"kind":"Line","source":{"$type":"Static","value":[]},"stacked":false,"xField":"day","xScale":"Temporal","yFields":["sessions"]}}

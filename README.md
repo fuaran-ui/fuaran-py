@@ -344,6 +344,32 @@ client-hydration placeholder. Data-bearing shapes carry a derivation-based
 suite certifies **every** golden pair byte-for-byte, including canonical-float
 formatting of pie arc control points and stacked cumulative sums.
 
+**Data-addressed annotations** are lowered too — `ChartSpec.annotations` carries a
+closed union of a horizontal `ReferenceLine` at a value, a vertical `EventMarker`
+at an x address (a category key or an ISO-8601 date), and a shaded `RangeBand`
+over a pair on either axis. An annotation names a place in the *data's*
+coordinates and, optionally, a label; it carries no geometry and no style, so it
+survives a data change, a theme flip and a resize. Three rules the lowering
+applies, each pinned by the shared goldens: an address **participates in the
+domain it addresses** before the axis is nice-d (a target above every bar still
+draws, and the axis moves to say so); the **draw order is part of the lowering**
+— bands behind everything including the grid, lines and markers in front of the
+series, every label last, because in inline SVG z-order *is* emission order; and
+a label is **fit-gated and suppressed, never clipped**, with the gate asked only
+of the literal arm since the text behind a bound or i18n arm is not known at
+lowering time. A suppressed label never suppresses its annotation. `Pie` is
+neutralised for all three members — a polar arm has neither axis for an address
+to name.
+
+The codec carries the slot **structurally and checked**: a conformant document
+round-trips byte-for-byte, while three refusals still bite at the wire boundary —
+a non-finite reference-line value or value-band end, an unparseable event date,
+and an unordered value or date pair. Each is refused rather than normalised for
+one reason: an address participates in the domain it addresses, so a non-finite
+one would take every gridline, tick and mark to NaN and a typo'd date would drag
+the axis back to the epoch. Two category keys order only through the rows, so
+that pair's order is the authoring path's question rather than the wire's.
+
 ### Sparkline lowering coverage
 
 A `Sparkline` whose `source` resolves to a series is **drawn**, server-side, as

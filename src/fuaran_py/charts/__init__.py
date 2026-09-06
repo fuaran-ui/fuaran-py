@@ -212,6 +212,50 @@ _DATA_LABEL_END_OFFSET_X = 6.0
 # the text off the line it belongs to.
 _DATA_LABEL_END_NUDGE_Y = 5.0
 
+# ── Annotation ink + geometry (Phase 1490/1491/1492 — §4l) ───────────────────
+#
+# §4l's "never geometry, never style" prohibition has two halves with two owners,
+# and this is the second: an annotation carries an ADDRESS and a LABEL, and every
+# pixel and every drop of ink it draws with comes from here. That is what makes a
+# data-addressed annotation survive a theme flip and a restyle where a placed
+# overlay does not.
+#
+# The LABEL constants are named for the FAMILY, not for the reference line: all
+# three members label under exactly the same rule (carried text source, fit-gated,
+# suppressed on no-fit), so one set serves them all and a later member adds only
+# its own INK. The four match their Phase-881 data-label counterparts by VALUE
+# rather than by reference — an annotation label and a data label are the same
+# size of thing in the same space.
+
+# Stroke width of a reference line. Between the grid's and the series': an
+# annotation is more than chrome and less than data.
+_REFERENCE_STROKE_WIDTH = 1.5
+# Per-role opacity for a reference line's ink. Well above ``_GRID_OPACITY`` — a
+# threshold a reader is meant to see — and below ``_AXIS_OPACITY``, because it is
+# not a boundary of the space.
+_REFERENCE_OPACITY = 0.55
+# Phase 1491 — the event marker's ink, matching the reference line's by VALUE
+# rather than by reference: the two are the same weight of statement across the
+# two axes, but a host that wanted to distinguish them must be able to without
+# moving the horizontal one.
+_EVENT_STROKE_WIDTH = 1.5
+_EVENT_OPACITY = 0.55
+# Phase 1492 — the range band's FILL opacity. The LOWEST in the module, below
+# ``_GRID_OPACITY``, and that is the point rather than timidity: every other role
+# inks a hairline or a glyph, this one inks an AREA. A band is a tint of the
+# surface saying "this region", not a fill saying "this value".
+_BAND_OPACITY = 0.08
+# Font size of an annotation's label — one step below the tick size.
+_ANNOTATION_LABEL_FONT_SIZE = 12.0
+# Inset from the plot's LEFT edge to an annotation label's left edge. Left, not
+# right: the right edge is where the series-endpoint labels live.
+_ANNOTATION_LABEL_OFFSET_X = 6.0
+# Rise from an annotation's line to its label's baseline.
+_ANNOTATION_LABEL_NUDGE_Y = 5.0
+# Clearance an annotation label must keep from the edge of its budget. Feeds the
+# fit gate only; a label that cannot hold it is SUPPRESSED.
+_ANNOTATION_LABEL_PADDING = 2.0
+
 X_SCALES = ("Category", "Temporal")
 """What a chart's x column MEANS (Phase 882) — discrete ``Category`` bands or
 ``Temporal`` dates on a continuous day-scale. A WIRE vocabulary
@@ -1228,6 +1272,15 @@ class ChartSpec:
     # other value there is, and the pre-emit validator grounds it against the
     # column type where the schema is statically known (FUARAN097).
     x_scale: str | None = None
+    # Phase 1490/1491/1492 — the data-addressed annotations (§4l): reference
+    # lines, event markers and range bands, one closed union carried as its
+    # canonical wire mapping (``{"$type": "ReferenceLine", "value": 140}``). A
+    # WIRE field, and semantic through and through: WHERE in the data a threshold
+    # or an episode sits is the author's meaning; the stroke weights, opacities
+    # and label offsets that draw it are the host's, above.
+    #
+    # Absent (and empty) draws nothing, so a pre-1490 chart lowers byte-for-byte.
+    annotations: Sequence[Obj] | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -1386,10 +1439,83 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             out.append(acc)
         return out
 
+    # Hoisted here (Phase 1490): the annotation slots below are neutralised on
+    # the polar arm, so the answer is needed before the value domain rather than
+    # after it.
+    is_pie = spec.kind == "Pie"
+
+    # ── Data-addressed annotations (Phase 1490 — §4l) ────────────────────────
+    #
+    # The reference lines, in DOCUMENT ORDER, which is what ``<n>`` in the mark id
+    # ``annotation|reference|<n>`` indexes. The index is per CASE, so a later
+    # member of a different case never renumbers one of these.
+    #
+    # PIE IS EXCLUDED, and neutralised rather than half-applied: the polar arm has
+    # no value axis, so a value-axis address names nothing there.
+    #
+    # A NON-FINITE VALUE IS DROPPED HERE, and the lowering stays TOTAL. It cannot
+    # arrive from the wire (the decoder refuses it) and it is refused pre-emit on
+    # the authoring path, so this filter is the third gate and not the first: what
+    # it buys is that a lowering handed one anyway draws the chart it can rather
+    # than taking the nice-domain, every gridline and every mark to NaN.
+    declared = list(spec.annotations or ())
+
+    reference_lines: list[tuple[float, Value]] = []
+    if not is_pie:
+        for ann in declared:
+            if ann.tag != "ReferenceLine":
+                continue
+            raw = ann.fields.get("value")
+            if not isinstance(raw, (int, float)) or isinstance(raw, bool) or not math.isfinite(float(raw)):
+                continue
+            reference_lines.append((float(raw), ann.fields.get("label")))
+
+    # ── Range bands (Phase 1492 — §4l) ───────────────────────────────────────
+    #
+    # The band subsequence in DOCUMENT ORDER, carrying its per-case index —
+    # ``<n>`` in ``annotation|band|<n>`` — because the two arms are resolved in
+    # two different places and a band's identity must not depend on which. A value
+    # band's ends must join the value domain HERE, before the axis is nice-d; an x
+    # band's addresses cannot be resolved until the axis form is known, further
+    # down. Numbering once, over the whole case, is what keeps the two halves from
+    # inventing two orderings of one list.
+    range_bands_declared: list[tuple[int, Obj, Value]] = []
+    if not is_pie:
+        for i, band_ann in enumerate(x for x in declared if x.tag == "RangeBand"):
+            rng_raw = band_ann.fields.get("range")
+            if isinstance(rng_raw, Obj):
+                range_bands_declared.append((i, rng_raw, band_ann.fields.get("label")))
+
+    # The VALUE-axis bands, as ``(index, lo, hi, label)`` in the axis's own units.
+    # ``lo``/``hi`` are the pair NORMALISED, not the pair as authored: an unordered
+    # pair is refused at the wire boundary and pre-emit, so what reaches here
+    # backwards came through a construction site neither gate sits on — and the
+    # lowering's job at that point is to stay TOTAL and draw the region the author
+    # named. A non-finite end drops the WHOLE band rather than half of it: half a
+    # band is not a smaller claim, it is a different one.
+    value_bands: list[tuple[int, float, float, Value]] = []
+    for i, rng, lbl in range_bands_declared:
+        if rng.tag != "ValueRange":
+            continue
+        a_raw, b_raw = rng.fields.get("from"), rng.fields.get("to")
+        if not isinstance(a_raw, (int, float)) or isinstance(a_raw, bool) or not math.isfinite(float(a_raw)):
+            continue
+        if not isinstance(b_raw, (int, float)) or isinstance(b_raw, bool) or not math.isfinite(float(b_raw)):
+            continue
+        value_bands.append((i, min(float(a_raw), float(b_raw)), max(float(a_raw), float(b_raw)), lbl))
+
     if stacked:
-        all_values = [v for i in range(n) for v in cums_for(i)] or [0.0]
+        series_values = [v for i in range(n) for v in cums_for(i)]
     else:
-        all_values = [v for s in series for v in s] or [0.0]
+        series_values = [v for s in series for v in s]
+    # §4l rule 3 — AN ADDRESS PARTICIPATES IN THE DOMAIN IT ADDRESSES, on the same
+    # terms the series data does, and BEFORE the axis is nice-d. A threshold above
+    # every bar is still drawn, and the axis says so; clamping the line to the
+    # data's own domain would draw a line at a value that is not the value
+    # declared. A value band's BOTH ends join on exactly the same rule.
+    all_values = (
+        series_values + [v for v, _ in reference_lines] + [v for _, lo, hi, _ in value_bands for v in (lo, hi)]
+    ) or [0.0]
     data_min = min(all_values)
     data_max = max(all_values)
     # Bars + lines share a zero-anchored domain — deterministic + honest for
@@ -1481,6 +1607,84 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # be derived from the other.
     day_values = [_day_of(c) for c in categories] if is_temporal else []
 
+    # ── Event markers (Phase 1491 — §4l) ─────────────────────────────────────
+    #
+    # The vertical half of the annotation family, in DOCUMENT ORDER within its own
+    # case — which is what ``<n>`` in the mark id ``annotation|event|<n>`` indexes,
+    # and why a reference line landing between two of these never renumbers them.
+    #
+    # ONE FORM PER CHART, which is what lets the resolved address be a single int.
+    # §4l rule 1 admits a ``Category`` key on a BAND axis and a ``Date`` under a
+    # TEMPORAL one, and those two axes are mutually exclusive — so every marker
+    # this lowering admits carries the chart's one form, and the int is a BAND
+    # INDEX under ``band_x`` and a DAY NUMBER under ``is_temporal``.
+    #
+    # PIE IS NEUTRALISED and Scatter's numeric x admits neither form: a polar arm
+    # has no x axis at all, and a continuous NUMERIC x has neither bands to name
+    # nor a calendar to name a day in.
+    #
+    # THE DROPS HERE ARE THE THIRD GATE, not the first — a mismatched form, an
+    # unparseable date and an ungrounded key are all refused upstream. A DUPLICATED
+    # key resolves to the FIRST matching band, deterministically.
+    band_x = not is_temporal and not is_scatter and not is_pie
+
+    def _resolve_annotation_x(at: Value) -> int | None:
+        if not isinstance(at, Obj):
+            return None
+        if at.tag == "Category" and band_x:
+            key = at.fields.get("key")
+            if not isinstance(key, str):
+                return None
+            return categories.index(key) if key in categories else None
+        if at.tag == "Date" and is_temporal:
+            iso = at.fields.get("iso")
+            return _try_parse_day(iso) if isinstance(iso, str) else None
+        return None
+
+    event_markers: list[tuple[int, Value]] = []
+    for ann in declared:
+        if ann.tag != "EventMarker":
+            continue
+        at_i = _resolve_annotation_x(ann.fields.get("at"))
+        if at_i is not None:
+            event_markers.append((at_i, ann.fields.get("label")))
+
+    # The X-AXIS bands (Phase 1492), as ``(index, from, to, label)`` with the two
+    # addresses RESOLVED to the chart's one form, exactly as ``event_markers``
+    # resolves its single address and for the same reason.
+    #
+    # BOTH ENDS MUST BE THE SAME FORM. A ``Category`` paired with a ``Date`` is a
+    # mismatch the validator refuses; here it simply yields no band, because half a
+    # pair addresses no interval. The pair is NORMALISED, on ``value_bands``'
+    # argument.
+    x_bands: list[tuple[int, int, int, Value]] = []
+    for i, rng, lbl in range_bands_declared:
+        if rng.tag != "XRange":
+            continue
+        a_i = _resolve_annotation_x(rng.fields.get("from"))
+        b_i = _resolve_annotation_x(rng.fields.get("to"))
+        if a_i is not None and b_i is not None:
+            x_bands.append((i, min(a_i, b_i), max(a_i, b_i), lbl))
+
+    # §4l rule 3 on the X axis — A TEMPORAL ADDRESS ENTERS THE EXTENT, before the
+    # ticks are chosen, on the same terms the row dates do. A launch marked a month
+    # after the last datum is still drawn, and the axis says so; a recession band
+    # whose end lies past the last datum would otherwise be silently truncated at
+    # the plot's right edge, which reads as the recession ENDING there.
+    #
+    # A CATEGORY ADDRESS WIDENS NOTHING, and the asymmetry is §4l's rather than an
+    # inconsistency: a band axis's domain IS the set of keys in the rows, so a key
+    # outside it is not a wider axis but an ungrounded reference.
+    #
+    # This does NOT reopen §4h's no-nicing rule: the marker's day joins the data
+    # whose extent the domain is, and the domain is still not snapped outward to a
+    # calendar boundary.
+    domain_days = (
+        day_values + [at for at, _ in event_markers] + [d for _, lo_i, hi_i, _ in x_bands for d in (lo_i, hi_i)]
+        if is_temporal
+        else []
+    )
+
     # The x axis is CONTINUOUS (Phase 903's split) on exactly two arms: the
     # Scatter arm's numeric x and a temporal x. Everything keyed off this — tick
     # marks AT the value, vertical gridlines, marks placed by value rather than
@@ -1500,7 +1704,10 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # the axis's granularity.
     temporal_step: _TemporalStep | None = None
     if is_temporal:
-        temporal_lo, temporal_hi = _temporal_domain(day_values)
+        # ``domain_days``, not ``day_values`` — the extent the ticks are chosen
+        # for includes any annotation's own date (§4l rule 3), so a rung is picked
+        # for the axis the reader will actually see.
+        temporal_lo, temporal_hi = _temporal_domain(domain_days)
         temporal_step = _choose_temporal_step(int(_TARGET_TICK_COUNT) + 1, temporal_lo, temporal_hi)
 
     if temporal_step is not None:
@@ -2408,6 +2615,222 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         elif spec.kind in ("Line", "Area"):
             push_endpoint_labels(lambda j: series[j][n - 1])
 
+    # ── Annotations (Phase 1490 — §4l) — the marks, then the labels ──────────
+    #
+    # TWO lists, not one, because §4l's draw order separates them: the lines sit
+    # in front of the series (rung 3) and EVERY annotation label is last, above
+    # all marks (rung 4). Within each rung the tie is document order inside the
+    # case, which is the same order ``<n>`` counts in — so the mark id and the
+    # paint order are read off one list and cannot disagree.
+    #
+    # The order is stated in the design doc, pinned by the goldens, and left to no
+    # stylesheet on purpose: in inline SVG z-order IS emission order, so a host
+    # that painted these in a different sequence would still produce a valid
+    # document showing a different picture, and no schema or validator could see it.
+    reference_style = _style_stroke_ink(_REFERENCE_OPACITY, _REFERENCE_STROKE_WIDTH)
+
+    # ``Quiet`` — the vocabulary's own word for subordinate text, and the only
+    # label in this lowering that takes it (the visible title is ``Loud``, every
+    # other label ``Normal``). An annotation label NAMES a line the picture has
+    # already drawn, so it should not compete with the values and the axis names
+    # that carry the data; it is also what makes an annotation label identifiable
+    # in a lowered drawing at all, since a ``Start``-anchored muted 12px label is
+    # otherwise exactly what a Phase-881 endpoint data label is.
+    annotation_label_style = _text_style(_LABEL_OPACITY, "Start", _ANNOTATION_LABEL_FONT_SIZE, "Quiet")
+
+    def annotation_label_shapes_for(
+        x: float, baseline: float, max_width: float, max_height: float, t: Value
+    ) -> list[Value]:
+        """An annotation label, under Phase 881's rule and the Phase 1143 text
+        contract at once. ``text_fits_box`` is the single predicate and a no-fit is
+        a SUPPRESSION — never a clip, never an overlap, never a nudge onto a mark —
+        but it can only be asked of a ``Literal`` (a bare string here): the text
+        behind a ``Bound`` or an ``I18n`` arm is not known at lowering time, and
+        measuring text that is not the text drawn is silently wrong. So a
+        non-literal label is admitted on PRESENCE and may overrun, which is the
+        same honest boundary the text contract draws for truncation. A suppressed
+        label never suppresses its annotation: the line still draws."""
+        literal = _literal_text_of(t)
+        fits = (
+            True
+            if literal is None
+            else text_fits_box(_ANNOTATION_LABEL_FONT_SIZE, _TEXT_LINE_HEIGHT_FACTOR, max_width, max_height, literal)
+        )
+        return [_label(_r2(x), _r2(baseline), t, annotation_label_style)] if fits else []
+
+    # Phase 642 identity: ``annotation|<case>|<n>``, with ``<n>`` the
+    # document-order index within this case. NOT the value itself — a float has no
+    # canonical string form the wire defines, and an ordinal is unique by
+    # construction and moved by no data change.
+    reference_line_shapes: list[Value] = [
+        _line(
+            _r2(plot_x0),
+            y_scale(v),
+            _r2(plot_x1),
+            y_scale(v),
+            _with_mark(reference_style, f"annotation|reference|{i}"),
+        )
+        for i, (v, _) in enumerate(reference_lines)
+    ]
+
+    # The range bands as PLOT RECTANGLES — ``(index, x0, y0, x1, y1, label)``,
+    # ordered by the per-case index both arms were numbered with, so the paint
+    # order and the ``annotation|band|<n>`` ids agree by construction rather than
+    # by the arms happening to be appended the right way round.
+    #
+    # EACH BAND SPANS THE OTHER AXIS IN FULL, because the band's claim is about ONE
+    # axis: a tolerance band that stopped short of the plot's edge would be
+    # asserting something about x it was never given.
+    #
+    # THE X ARM TAKES PHASE 903'S BOUNDARIES, not its centres — which is where the
+    # band differs from the event marker drawn from the same address. A marker is a
+    # POSITION and a band is an EXTENT, so "Q2 to Q3" runs from Q2's band START to
+    # Q3's band END. On a continuous temporal axis a date IS a position, so the
+    # band runs between the two mapped days and there are no boundaries to take.
+    range_band_rects: list[tuple[int, float, float, float, float, Value]] = [
+        (i, _r2(plot_x0), y_scale(hi), _r2(plot_x1), y_scale(lo), lbl) for i, lo, hi, lbl in value_bands
+    ] + [
+        (
+            i,
+            x_scale(float(a)) if is_temporal else boundary_x(a),
+            _r2(plot_y0),
+            x_scale(float(b)) if is_temporal else boundary_x(b + 1),
+            _r2(plot_y1),
+            lbl,
+        )
+        for i, a, b, lbl in x_bands
+    ]
+    range_band_rects.sort(key=lambda t: t[0])
+
+    # The band's ink: ``currentColor`` as a FILL at ``_BAND_OPACITY``, with no
+    # stroke. §4l's prohibition is what makes this one line: the wire carries no
+    # colour, no opacity and no edge, so there is nothing here to read off the
+    # annotation.
+    band_style = _style_fill_opacity(_INK, _BAND_OPACITY)
+
+    range_band_shapes: list[Value] = [
+        _rectangle(
+            x0,
+            y0,
+            _r2(x1 - x0),
+            _r2(y1 - y0),
+            # No corner radius. A band is a region of the SPACE, and a rounded
+            # region would read as an object drawn on the chart rather than as
+            # part of its ground.
+            None,
+            _with_mark(band_style, f"annotation|band|{i}"),
+        )
+        for i, x0, y0, x1, y1, _ in range_band_rects
+    ]
+
+    event_style = _style_stroke_ink(_EVENT_OPACITY, _EVENT_STROKE_WIDTH)
+
+    def event_marker_x(i: int) -> float:
+        """The x an event marker's line stands at (Phase 1491). PHASE 903'S SPLIT,
+        applied to an address rather than to a datum: a BAND axis has no positions,
+        only extents, so the marker sits at the band's CENTRE — the same place the
+        band's own label sits. A CONTINUOUS axis has positions, so the marker sits
+        at the mapped value."""
+        at = event_markers[i][0]
+        return x_scale(float(at)) if is_temporal else centre_x(at)
+
+    event_marker_shapes: list[Value] = [
+        _line(
+            event_marker_x(i),
+            _r2(plot_y0),
+            event_marker_x(i),
+            _r2(plot_y1),
+            _with_mark(event_style, f"annotation|event|{i}"),
+        )
+        for i in range(len(event_markers))
+    ]
+
+    # The x each event marker's label must not reach — Phase 881's rule applied
+    # ALONG X, which is where this member earns its own phase.
+    #
+    # Markers close together are the normal case (five shocks in a decade land
+    # within a few pixels of each other), and the rule is: never overlapped, never
+    # nudged across another marker, SUPPRESSED on no fit. So a label's width budget
+    # runs to its NEIGHBOUR's line rather than to the plot edge, and the neighbour
+    # is the successor in ``(x, document index)`` order — total and stable, so the
+    # goldens pin one answer.
+    #
+    # Two markers on ONE position are legitimate (§4l says so explicitly, which is
+    # why identity is an ordinal rather than the address). They fall out of the
+    # same rule rather than needing one of their own: the earlier gets a budget of
+    # zero and is suppressed, the later runs to the next distinct position.
+    event_marker_xs = [event_marker_x(i) for i in range(len(event_markers))]
+    event_label_right = [plot_x1] * len(event_marker_xs)
+    _event_order = sorted(range(len(event_marker_xs)), key=lambda i: (event_marker_xs[i], i))
+    for _r in range(len(_event_order) - 1):
+        event_label_right[_event_order[_r]] = event_marker_xs[_event_order[_r + 1]]
+
+    annotation_label_shapes: list[Value] = []
+    for v, lbl in reference_lines:
+        if lbl is None:
+            continue
+        baseline = y_scale(v) - _ANNOTATION_LABEL_NUDGE_Y
+        x = plot_x0 + _ANNOTATION_LABEL_OFFSET_X
+        annotation_label_shapes += annotation_label_shapes_for(
+            x,
+            baseline,
+            # The width budget runs to the PLOT's right edge: beyond it lies the
+            # legend column or the right margin, and a label that ran into either
+            # is the collision the gate exists to refuse.
+            max(0.0, plot_x1 - x - _ANNOTATION_LABEL_PADDING),
+            max(0.0, baseline - plot_y0 - _ANNOTATION_LABEL_PADDING),
+            lbl,
+        )
+    # Phase 1491 — the event markers' labels, after the reference lines' and in
+    # document order within their own case. Both families are rung 4, so this is a
+    # tie inside a rung; ordering by case keeps every pre-1491 golden
+    # byte-identical, and §4l's tiebreak is honoured inside each run.
+    for i, (_, lbl) in enumerate(event_markers):
+        if lbl is None:
+            continue
+        # AT THE TOP OF THE PLOT, beside the line. Top rather than beside the mark
+        # it names, because a vertical marker names no single datum — it names the
+        # whole column of the picture — and the top is the one place on that column
+        # no series occupies by construction.
+        x = event_marker_x(i) + _ANNOTATION_LABEL_OFFSET_X
+        baseline = plot_y0 + _ANNOTATION_LABEL_FONT_SIZE + _ANNOTATION_LABEL_NUDGE_Y
+        annotation_label_shapes += annotation_label_shapes_for(
+            x,
+            baseline,
+            max(0.0, event_label_right[i] - x - _ANNOTATION_LABEL_PADDING),
+            # The vertical budget is the plot's own height: one line always fits
+            # it, which is the honest statement — markers collide along X, and that
+            # is the axis the gate is really measuring.
+            max(0.0, plot_y1 - plot_y0 - _ANNOTATION_LABEL_PADDING),
+            lbl,
+        )
+    # Phase 1492 — the range bands' labels, after the other two cases'. All three
+    # are rung 4, so the case order here is a tie inside a rung and is chosen to
+    # keep every pre-1492 golden byte-identical.
+    for _, bx0, by0, bx1, by1, lbl in range_band_rects:
+        if lbl is None:
+            continue
+        # INSIDE THE BAND'S TOP EDGE, which is one rule serving both arms rather
+        # than two placements: the top-left corner of the band's own rectangle is
+        # the one point every band has, whichever axis it spans, and it is where a
+        # reader looks for the name of a region. Inside and not above, deliberately
+        # — a label ABOVE a value band would sit over the series, and a label above
+        # an x band would leave the plot entirely.
+        x = bx0 + _ANNOTATION_LABEL_OFFSET_X
+        baseline = by0 + _ANNOTATION_LABEL_FONT_SIZE + _ANNOTATION_LABEL_NUDGE_Y
+        annotation_label_shapes += annotation_label_shapes_for(
+            x,
+            baseline,
+            # BOTH BUDGETS ARE THE BAND'S OWN, not the plot's, and that is what
+            # makes this member's gate bite where the other two's do not. A narrow
+            # x band is the ordinary case — a fortnight on a decade axis — and its
+            # name will not fit inside it. Suppressed, per Phase 881, and the band
+            # still draws.
+            max(0.0, bx1 - x - _ANNOTATION_LABEL_PADDING),
+            max(0.0, by1 - by0 - _ANNOTATION_LABEL_PADDING),
+            lbl,
+        )
+
     # ── Legend (Phase 880) — one entry list, four placements ──
     #
     # COLUMN (``Right``, the shipped default): one row per entry, each a swatch
@@ -2545,7 +2968,17 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         )
     else:
         shapes = (
-            gridlines
+            # Phase 1492 (§4l rung 1) — the RANGE BANDS, first of everything:
+            # behind the series, and behind the grid and axes with it. In inline
+            # SVG z-order IS emission order, so a host that emitted a band after
+            # its series would draw a tinted rectangle OVER the data: a valid
+            # document, a different picture, and nothing in a schema or a
+            # validator could see it. Before the GRID too, not merely before the
+            # series — a gridline is chrome for reading positions off the plot,
+            # and chrome a band covered would go missing exactly where the band
+            # drew attention.
+            range_band_shapes
+            + gridlines
             + x_gridlines
             + zero_line
             + axes
@@ -2557,9 +2990,22 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             # Phase 881 — the values sit ON the series, so they are painted
             # straight after it and before the legend.
             + data_label_shapes
+            # Phase 1490 (§4l rung 3) — reference lines in FRONT of the series. A
+            # threshold drawn under the bars it measures is a threshold the reader
+            # cannot check the bars against.
+            + reference_line_shapes
+            # Phase 1491 (§4l rung 3, beside the reference lines) — the event
+            # markers, also in FRONT of the series.
+            + event_marker_shapes
             + legend
             + title_shapes
             + subtitle_shapes
+            # Phase 1490 (§4l rung 4) — every annotation label LAST, above all
+            # marks. Last literally, and not merely after the series: the label is
+            # the only part of an annotation that carries authored words, and a
+            # rung that put it under the legend column would suppress it on
+            # exactly the charts that are busiest.
+            + annotation_label_shapes
         )
 
     # ── The accessible summary (Phase 921) ───────────────────────────────────

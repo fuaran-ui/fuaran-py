@@ -71,6 +71,43 @@ def _text_source(raw: object) -> object | None:
     raise AssertionError(f"chart-lowering input: unsupported TextSource {tag}")
 
 
+def _annotation_x(raw: dict) -> Obj:
+    """The corpus carries an annotation's x address in canonical wire JSON; the
+    lowering takes this host's ``Value`` model."""
+    tag = raw.get("$type")
+    if tag == "Category":
+        return Obj("Category", {"key": raw["key"]})
+    if tag == "Date":
+        return Obj("Date", {"iso": raw["iso"]})
+    raise AssertionError(f"chart-lowering input: unsupported ChartAnnotationX {tag}")
+
+
+def _annotation_range(raw: dict) -> Obj:
+    tag = raw.get("$type")
+    if tag == "ValueRange":
+        return Obj("ValueRange", {"from": raw["from"], "to": raw["to"]})
+    if tag == "XRange":
+        return Obj("XRange", {"from": _annotation_x(raw["from"]), "to": _annotation_x(raw["to"])})
+    raise AssertionError(f"chart-lowering input: unsupported ChartAnnotationRange {tag}")
+
+
+def _annotation(raw: dict) -> Obj:
+    fields: dict = {}
+    if "label" in raw:
+        fields["label"] = _text_source(raw["label"])
+    tag = raw.get("$type")
+    if tag == "ReferenceLine":
+        fields["value"] = raw["value"]
+        return Obj("ReferenceLine", fields)
+    if tag == "EventMarker":
+        fields["at"] = _annotation_x(raw["at"])
+        return Obj("EventMarker", fields)
+    if tag == "RangeBand":
+        fields["range"] = _annotation_range(raw["range"])
+        return Obj("RangeBand", fields)
+    raise AssertionError(f"chart-lowering input: unsupported ChartAnnotation {tag}")
+
+
 def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
     # Phase 876 — `valueFormat` is a WIRE field carried in canonical `Format`
     # JSON; `axisUnitMode` is a harness-only STYLE selector (the chart style is
@@ -109,6 +146,12 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         legend_position=inp.get("legendPosition"),
         data_labels=inp.get("dataLabels"),
         x_scale=inp.get("xScale"),
+        # Phase 1490/1491/1492 — `annotations` is a WIRE field carried in
+        # canonical `$type` JSON, omitted when the author declared none (so every
+        # pre-1490 case AND every pre-1490 golden is unchanged). Every label
+        # crosses UNRESOLVED, whichever arm it carries — the Phase 1143 text
+        # contract at a new slot.
+        annotations=([_annotation(a) for a in inp["annotations"]] if inp.get("annotations") is not None else None),
     )
     return spec, list(inp["data"])
 

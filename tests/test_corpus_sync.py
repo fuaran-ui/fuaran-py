@@ -14,6 +14,7 @@ of the suite reads.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -73,3 +74,46 @@ def test_snapshot_family_bytes_identical(name: str) -> None:
         assert snap.read_bytes() == path.read_bytes(), (
             f"{name}/{rel.as_posix()} snapshot drifted from the authority; run: python conformance/sync_corpus.py"
         )
+
+
+# ── the families this host does not run, named rather than silently absent ───
+
+
+_COVERED_FAMILIES = (
+    "node-round-trip",
+    "op-round-trip",
+    "reject",
+    "lenient-accept",
+    "envelope-round-trip",
+    "envelope-reject",
+    "elicitation-round-trip",
+    "elicitation-reject",
+    "elicitation-answer-accept",
+    "elicitation-answer-reject",
+)
+
+
+@authority_present
+def test_corpus_families_beyond_the_floor_are_named(capsys: pytest.CaptureFixture[str]) -> None:
+    """Print, by name and count, every corpus family this host does not run.
+
+    A declared lag and a silent omission are indistinguishable from a green
+    suite, and only one of them is honest. The contract-card family is a
+    deliberate lag on this host, as it is on the Go and Rust hosts — but a
+    reader has no way to tell that from a suite that simply never mentions it.
+    This test always passes; its output is the declaration, and the assertion
+    below only guards against the list of covered families going stale in the
+    other direction (a family named as covered that the corpus no longer holds).
+    """
+    manifest = json.loads((AUTHORITY_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    present: dict[str, int] = {}
+    for fixture in manifest["fixtures"]:
+        present[fixture["kind"]] = present.get(fixture["kind"], 0) + 1
+
+    with capsys.disabled():
+        for kind in sorted(present):
+            if kind not in _COVERED_FAMILIES:
+                print(f"skipped family (declared lag, not covered by this host): {kind} x {present[kind]}")
+
+    stale = [k for k in _COVERED_FAMILIES if k not in present]
+    assert not stale, f"named as covered but absent from the corpus: {stale}"

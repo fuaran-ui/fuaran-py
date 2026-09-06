@@ -28,6 +28,7 @@ from __future__ import annotations
 import json
 from typing import cast
 
+from ..shapeguard import check_shape, load_bounded
 from .contract import (
     TURN_STAGES,
     AccessDenied,
@@ -118,9 +119,13 @@ def _parse_json(text: str) -> dict[str, object] | None:
     200-shaped nothing."""
     if text.strip() == "":
         return None
-    try:
-        value = json.loads(text)
-    except ValueError:
+    # §20.1 — a server reply is wire bytes reaching this host through an entry
+    # point of its own, so it is parsed under the same §20 rows and §21 bounds
+    # as every other. A hostile or over-deep body answers ``None`` here rather
+    # than escaping as a throw, which is the shape this function already
+    # promises its caller.
+    value, error = load_bounded(text)
+    if error is not None or check_shape(value) is not None:
         return None
     return _as_dict(value)
 

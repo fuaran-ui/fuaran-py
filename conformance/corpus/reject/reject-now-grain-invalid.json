@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Fact","label":"As of","value":{"$type":"Bound","binding":{"$type":"Now","grain":"Week"}}}}

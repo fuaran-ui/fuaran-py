@@ -10,6 +10,7 @@ reusing the node / kind / binding / style / state decoders from
 from __future__ import annotations
 
 from collections.abc import Callable
+from contextvars import ContextVar
 
 from ..limits import MAX_NODE_DEPTH
 from ..model import Arr, Obj, Value
@@ -143,29 +144,31 @@ OP_SCHEMAS: dict[str, list[tuple[str, bool, OpFieldDecoder]]] = {
 # and the syntactic bound only LOOKS like adequate cover for it. On the
 # reference host, 2.6 KB of nested Batches killed the process with every
 # node-side guard already in place. Same ceiling, its own counter.
-_op_depth = 0
+#
+# A ``ContextVar`` rather than a module global, for the reason recorded beside
+# ``_walk_depth``: a threaded host decodes concurrently in one process, and a
+# shared counter is then read and written by walks that know nothing of each
+# other.
+_op_depth: ContextVar[int] = ContextVar("fuaran_op_depth", default=0)
 
 
 def _reset_op_walk() -> None:
-    global _op_depth
-    _op_depth = 0
+    _op_depth.set(0)
 
 
 def _decode_op_value(value: object, path: str) -> Obj:
-    global _op_depth
-
-    if _op_depth >= MAX_NODE_DEPTH:
+    if _op_depth.get() >= MAX_NODE_DEPTH:
         _fail(
             LIMIT_EXCEEDED,
             path,
             f"op nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
         )
 
-    _op_depth += 1
+    token = _op_depth.set(_op_depth.get() + 1)
     try:
         return _decode_op_value_inner(value, path)
     finally:
-        _op_depth -= 1
+        _op_depth.reset(token)
 
 
 # RETIRED positional slots, one per op (fuaran#687, closing the window fuaran#681 opened).

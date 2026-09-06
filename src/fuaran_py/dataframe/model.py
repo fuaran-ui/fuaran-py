@@ -363,7 +363,7 @@ Transform = Filter | Project | Derive | GroupBy | Join | Window | Pivot | Unpivo
 
 # ── Error envelopes ──────────────────────────────────────────────────────────
 #
-# Two closed, additive envelopes — the codec's six-code ``ColumnError`` (a wire-shape
+# Two closed, additive envelopes — the codec's seven-code ``ColumnError`` (a wire-shape
 # violation) and the evaluator's ``EvalError`` (a pipeline-semantic failure). Both
 # *name* the failure; a closed-set failure enumerates the alternatives.
 
@@ -374,6 +374,10 @@ MALFORMED_SHAPE = "MALFORMED_SHAPE"
 UNKNOWN_TYPE = "UNKNOWN_TYPE"
 TYPE_MISMATCH = "TYPE_MISMATCH"
 LENGTH_MISMATCH = "LENGTH_MISMATCH"
+#: A §21 resource bound, kept distinct from ``NOT_JSON`` because §21.2 rule 2
+#: forbids reporting a limit breach as a syntax error: the two send the author
+#: to repair different things.
+LIMIT_EXCEEDED = "LIMIT_EXCEEDED"
 
 
 @dataclass(frozen=True)

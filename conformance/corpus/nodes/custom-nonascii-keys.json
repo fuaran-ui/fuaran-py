@@ -1,0 +1,1 @@
+{"id":"custom-nonascii-keys","kind":{"$type":"Custom","componentId":"trend-card","moduleId":"analytics","props":{"z":"ascii","𝄞":"astral (U+1D11E, a surrogate pair)","":"private use (U+E000, one code unit)"}}}

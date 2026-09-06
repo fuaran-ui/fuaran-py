@@ -1303,6 +1303,36 @@ def _decode_single_node(value: object, path: str) -> Value:
     return _decode_node_value(value, path)
 
 
+def _decode_fragment_args(value: object, path: str) -> Value:
+    """A ``FragmentArg`` map (``Mount.inputs`` / ``FragmentRef.args``).
+
+    Every case but one is a scalar and passes through structurally, WITHOUT
+    null-strictness — these positions legitimately carry §5 obj-erased opaque
+    seams. The exception is ``SlotArg``, whose ``tree`` is a whole ``Node``: it
+    routes through the node decoder so a node passed as a fragment argument is a
+    node in the decoded tree rather than an untagged generic object.
+
+    An arg the wire calls ``SlotArg`` but that carries no ``tree`` is left
+    structural rather than refused. This decoder exists to route a node it can
+    see; inventing a requiredness rule for a case the corpus schema governs is a
+    different change with a different blast radius.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for name, raw in obj.items():
+        if isinstance(raw, dict) and raw.get("$type") == "SlotArg" and isinstance(raw.get("tree"), dict):
+            arg: dict[str, Value] = {}
+            for key, inner in raw.items():
+                if key == "tree":
+                    arg["tree"] = _decode_node_value(inner, f"{path}.{name}.tree")
+                elif key != "$type":
+                    arg[key] = from_json(inner)
+            fields[name] = Obj("SlotArg", arg)
+        else:
+            fields[name] = from_json(raw)
+    return Obj(None, fields)
+
+
 def _decode_text_source_array(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
     return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
@@ -2024,6 +2054,45 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("maxHeight", False, _decode_int),
         ("maxWidth", False, _decode_int),
     ],
+    # ── The rest of the child-bearing vocabulary ─────────────────────────────
+    #
+    # Every kind below carries node-valued positions that reached the structural
+    # pass-through, so their children decoded as untagged generic objects: they
+    # round-tripped byte-exactly and were invisible to `walk_nodes` / `find_node`
+    # / `inspect_tree`, and `validate_node` did not descend into them — a
+    # duplicate id inside a `Disclosure` produced no `FUARAN-DUP-ID`.
+    #
+    # These entries are DELIBERATELY MINIMAL, on the Tabs/Stepper precedent
+    # below: they type the node positions and nothing else, leaving every other
+    # key to the structural preservation it already had. `children` is required
+    # here because the corpus schema requires it on all five, matching the
+    # Modal / ScrollArea / Box entries that already did.
+    "Disclosure": [
+        ("children", True, _decode_children),
+    ],
+    "SplitPanel": [
+        ("children", True, _decode_children),
+    ],
+    "SummaryList": [
+        ("children", True, _decode_children),
+    ],
+    # ErrorBoundary's `child` / `fallback` and FragmentDecl's `body` are single
+    # nodes rather than lists. The corpus schema models no spec for either kind,
+    # so there is no oracle for their requiredness and none is asserted: the
+    # fields are optional, and the only change is that a node in one of these
+    # positions decodes as a node.
+    "ErrorBoundary": [
+        ("child", False, _decode_single_node),
+        ("fallback", False, _decode_single_node),
+    ],
+    "FragmentDecl": [
+        ("body", False, _decode_single_node),
+    ],
+    # A `SlotArg` fragment argument carries a whole node tree (`FragmentArg`,
+    # corpus schema) — the same class of hidden node, one level further in.
+    "FragmentRef": [
+        ("args", False, _decode_fragment_args),
+    ],
     # Tabs / Stepper carry the language's only two ``Binding<int>`` slots, and
     # had no typed schema at all — so the whole kind reached the structural
     # pass-through and `activeIndex: true` decoded happily. These entries are
@@ -2033,11 +2102,16 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # blast radius is the slot this phase is about. Requiredness follows the
     # reference host: `activeIndex` is optional (`tryField`), `activeStep`
     # required (`requireField`).
+    # `children` was added to both after the audit above: minimal is not the same
+    # as blind, and leaving a node-valued position structural is the one omission
+    # that costs more than it saves.
     "Tabs": [
         ("activeIndex", False, _decode_binding_int),
+        ("children", True, _decode_children),
     ],
     "Stepper": [
         ("activeStep", True, _decode_binding_int),
+        ("children", True, _decode_children),
     ],
     # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
     # field schema, because it re-nests `layout` and role-validates.
@@ -2066,15 +2140,16 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # is one-of `stateKey` / `on` with the Phase 768 collapse rule.
     # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
     # capabilities + the onBubble closure sentinel are always present on the
-    # canonical wire; inputs (a FragmentArg map, additive) passes through
-    # structurally WITHOUT null-strictness (it embeds whole node trees whose
-    # Binding.Static values are §5 opaque seams).
+    # canonical wire; inputs is a FragmentArg map (additive) whose non-node cases
+    # pass through structurally WITHOUT null-strictness — it embeds whole node
+    # trees whose Binding.Static values are §5 opaque seams — while a `SlotArg`'s
+    # `tree` routes through the node decoder like any other node position.
     "Mount": [
         ("scopeId", True, _decode_string),
         ("channel", True, _decode_guest_channel),
         ("capabilities", True, _decode_json_value),
         ("onBubble", True, _decode_string),
-        ("inputs", False, _decode_json_passthrough),
+        ("inputs", False, _decode_fragment_args),
     ],
 }
 

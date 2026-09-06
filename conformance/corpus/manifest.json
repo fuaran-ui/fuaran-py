@@ -1699,6 +1699,14 @@
       "description": "Binding.Format (number/currency/percent/date/relativeTime across locales)"
     },
     {
+      "id": "format-since",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/format-since.json",
+      "expectedFile": "nodes/format-since.json",
+      "description": "Binding.Format (Phase 1533 — Since: the instant-reading twin of RelativeTime, declared unit and auto)"
+    },
+    {
       "id": "frag-decl-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2369,6 +2377,14 @@
       "inputFile": "nodes/now-environment-binding.json",
       "expectedFile": "nodes/now-environment-binding.json",
       "description": "Binding/Now (Phase 765 — the host-furnished instant: a text slot + a Transform param feeding dateDiffDays)"
+    },
+    {
+      "id": "now-grain",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/now-grain.json",
+      "expectedFile": "nodes/now-grain.json",
+      "description": "Binding/Now (Phase 1533 — the declared grain: minute/hour/day text slots + a Day-grain Transform param)"
     },
     {
       "id": "popover-anchored-1",
@@ -3423,6 +3439,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.sortable",
       "description": "grid-level 'sortable' — the staticRows spelling reached for on the bound path, where sortability is sortStateKey + per-column narrowing (Phase 863)"
+    },
+    {
+      "id": "reject-now-grain-invalid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-now-grain-invalid.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.value.binding.grain",
+      "description": "Binding.Now's grain is Second | Minute | Hour | Day — `Week` is a RelativeTimeUnit member and not a TimeGrain one. The two vocabularies are deliberately different sizes: a grain truncates a calendar instant, and a week, a month and a year have no truncation every host agrees on. A host that accepted this and rendered at day grain would be answering a question the document did not ask (Phase 1533)"
     },
     {
       "id": "reject-null-action-aitool-args",

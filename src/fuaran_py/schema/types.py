@@ -189,18 +189,29 @@ class Selection:
         return _obj("Selection", {"defaultValue": self.default_value, "field": self.field, "nodeId": self.node_id})
 
 
+TimeGrain = Literal["Second", "Minute", "Hour", "Day"]
+
+
 @dataclass(frozen=True)
 class Now:
     """``Binding.Now`` — the host-furnished current instant (ISO-8601 UTC).
 
-    Tag-only on the wire (``{"$type":"Now"}``): the clock lives in the HOST,
-    resolved once per render pass, never on the wire — which is what keeps a
-    tree a pure value and lets a replayed op-stream reproduce its original
-    render. The typed ``project`` accessor is a closure, off the wire.
+    The INSTANT is never on the wire: the clock lives in the HOST, resolved once
+    per render pass — which is what keeps a tree a pure value and lets a replayed
+    op-stream reproduce its original render. The typed ``project`` accessor is a
+    closure, off the wire.
+
+    Phase 1533 — ``grain`` is the one thing the wire DOES carry, and only when it
+    is not the ``Second`` default, so a grain-less ``Now`` is still the bare
+    ``{"$type":"Now"}``. It declares the RESOLUTION the document wants: the host
+    truncates its instant before the projection sees it, so a ``Day``-grain
+    ``Now`` is the ``YYYY-MM-DD`` a day-difference verb accepts.
     """
 
+    grain: TimeGrain | None = None
+
     def to_wire(self) -> Value:
-        return Obj("Now", {})
+        return _obj("Now", {"grain": self.grain})
 
 
 # ── Locale-aware Format DU + LocaleSource (WIRE_FORMAT.md §3.3, Phase 102) ───
@@ -267,7 +278,26 @@ class FmtDuration:
         return Obj("Duration", {"style": self.style, "unit": self.unit})
 
 
-Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime | FmtDuration
+@dataclass(frozen=True)
+class FmtSince:
+    """``Format.Since`` (Phase 1533) — the INSTANT-reading twin of ``RelativeTime``.
+
+    ``RelativeTime``'s source is a signed COUNT of its unit, already computed by
+    whoever produced it; this one's source is an instant in whole Unix-epoch
+    seconds (``Date``'s convention) and the count is the delta the HOST takes
+    against its own furnished instant.
+
+    ``unit`` absent is NOT a default — it is the auto-selection request, resolved
+    from the fixed threshold ladder in WIRE_FORMAT.md 4b.
+    """
+
+    unit: RelativeTimeUnit | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Since", {"unit": self.unit})
+
+
+Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime | FmtDuration | FmtSince
 
 
 @dataclass(frozen=True)

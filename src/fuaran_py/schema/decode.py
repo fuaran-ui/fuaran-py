@@ -16,7 +16,7 @@ import re
 from collections.abc import Callable
 from typing import cast
 
-from ..limits import MAX_NODE_DEPTH, MAX_NODES
+from ..limits import MAX_EXPR_NODES, MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value, from_json
 from ..result import (
     EMPTY_NODE_ID,
@@ -285,6 +285,7 @@ BINDING_CASES = frozenset(
         "Format",
         "Data",
         "Transform",
+        "Expr",
         "Invoke",
     }
 )
@@ -1130,7 +1131,158 @@ def _normalise_binding_obj(
         return Obj("Now", {})
     if tag == "Transform":
         return _decode_transform_binding(obj, path)
+    if tag == "Expr":
+        return _decode_expr_binding(obj, path)
     return from_json(obj)
+
+
+def _expr_walk(expr: object, seen: list[str], counter: list[int]) -> bool:
+    """Walk one decoded ``ColExpr`` value, collecting its ``param`` names and
+    counting its nodes. Returns True when a ``col`` reference is present.
+
+    One traversal answers both questions the ``Expr`` case asks of an
+    expression, and it stops as soon as either verdict is settled - a hostile
+    expression is exactly the input that must not be walked to the end.
+    """
+    counter[0] += 1
+    if counter[0] > MAX_EXPR_NODES:
+        return False
+    if not isinstance(expr, Obj):
+        return False
+    tag = expr.tag
+    if tag == "col":
+        return True
+    if tag == "param":
+        name = expr.fields.get("name")
+        if isinstance(name, str) and name not in seen:
+            seen.append(name)
+        return False
+    saw_col = False
+    for key in ("expr", "left", "right", "else"):
+        child = expr.fields.get(key)
+        if child is not None and _expr_walk(child, seen, counter):
+            saw_col = True
+    for key in ("exprs", "args", "items"):
+        children = expr.fields.get(key)
+        if isinstance(children, Arr):
+            for child in children.items:
+                if _expr_walk(child, seen, counter):
+                    saw_col = True
+    cases = expr.fields.get("cases")
+    if isinstance(cases, Arr):
+        for branch in cases.items:
+            if isinstance(branch, Obj):
+                for key in ("when", "then"):
+                    child = branch.fields.get(key)
+                    if child is not None and _expr_walk(child, seen, counter):
+                        saw_col = True
+    if tag == "in":
+        # The `in`/`param` spelling names a LIST param in a `param` MEMBER
+        # rather than in a nested `param` node, so the walk above cannot see it.
+        param = expr.fields.get("param")
+        if isinstance(param, str) and param not in seen:
+            seen.append(param)
+    return saw_col
+
+
+def _decode_expr_binding(obj: dict[str, object], path: str) -> Value:
+    """Phase 1534 - ``Binding.Expr``: one ``ColExpr`` evaluated against its params
+    alone (WIRE_FORMAT §3.3.2).
+
+    ``expr`` rounds through the typed expression codec, so a lenient spelling
+    re-encodes canonical exactly as a pipeline step does. Three refusals follow,
+    all of them here because each wants a $-rooted path and a code:
+
+    1. a ``col`` reference - an ``Expr`` has no row, so ``col`` names nothing.
+       The remedy is a different BINDING, not a different spelling, and the
+       message says so.
+    2. a ``param`` this binding's own ``params`` does not bind. Decidable
+       statically here where it is NOT for ``Transform``, whose unbound filter
+       params are pruned under the deliberate "unset chip => no constraint"
+       leniency; an ``Expr`` has no step to prune, so an unbound param is only
+       ever an error.
+    3. an expression over ``MAX_EXPR_NODES`` - ``LIMIT_EXCEEDED``, so a
+       pathological expression is refused identically on every host instead of
+       being a budget each host's evaluator discovers differently.
+    """
+    from ..dataframe.codec import decode_expr, encode_expr_value
+
+    expr_raw = _require(obj, "expr", path)
+    expr_result = decode_expr(expr_raw)
+    if not expr_result.ok:
+        _fail(WRONG_TYPE, f"{path}.expr", f"{expr_result.error.code}: {expr_result.error.detail}")
+        raise AssertionError("unreachable")
+    expr = encode_expr_value(expr_result.value)
+
+    names: list[str] = []
+    counter = [0]
+    saw_col = _expr_walk(expr, names, counter)
+    if saw_col:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.expr",
+            "a `col` reference is not admitted inside an Expr binding - an Expr evaluates against its "
+            "params alone and has no row for a column name to read. Use `Binding.Transform`, whose "
+            "source supplies the frame, and put the column expression in a `derive` step",
+            "a ColExpr over `param` / `lit` / operators only (no `col`)",
+        )
+    if counter[0] > MAX_EXPR_NODES:
+        _fail(
+            LIMIT_EXCEEDED,
+            f"{path}.expr",
+            f"expression exceeds the maximum of {MAX_EXPR_NODES} expression nodes (WIRE_FORMAT 21)",
+            f"at most {MAX_EXPR_NODES} ColExpr nodes in one Expr binding",
+        )
+
+    fields: dict[str, Value] = {"expr": expr}
+    bound: set[str] = set()
+    if "params" in obj:
+        entries = _decode_expr_params(obj["params"], path)
+        for entry in entries:
+            assert isinstance(entry, Obj)
+            name = entry.fields.get("name")
+            if isinstance(name, str):
+                bound.add(name)
+        if entries:
+            fields["params"] = Arr(entries)
+
+    missing = [n for n in names if n not in bound]
+    if missing:
+        listed = ", ".join(f"'{n}'" for n in missing)
+        _fail(
+            WRONG_TYPE,
+            f"{path}.expr",
+            f"the expression reads param(s) {listed} that this binding's `params` does not bind - an "
+            "Expr has no rows and no filter to prune, so an unbound param has no value to take; add a "
+            "params entry naming each, or drop the reference",
+            '{"$type":"Expr","expr":{...},"params":[{"name":"<name>","from":<Binding>}]}',
+        )
+    return Obj("Expr", fields)
+
+
+def _decode_expr_params(raw_params: object, path: str) -> list[Value]:
+    """Phase 1534 - the optional ``params`` slot, shared by ``Transform`` (Phase
+    424, where it started) and ``Expr``. The §3.6 name->binding MAP coercion
+    rides along, so the leniency an author gets on one case they get on the
+    other."""
+    entries: list[Value] = []
+    if isinstance(raw_params, dict):
+        # Map form - a name-keyed set, coerced to the canonical array in key
+        # order (deterministic: F# Map.toList is key-sorted).
+        for name in sorted(raw_params):
+            binding = _decode_binding(raw_params[name], f"{path}.params.{name}.from")
+            entries.append(Obj(None, {"from": binding, "name": name}))
+        return entries
+    arr = _expect_array(raw_params, f"{path}.params")
+    for i, el in enumerate(arr):
+        el_obj = _expect_object(el, f"{path}.params[{i}]")
+        name = _expect_string(_require(el_obj, "name", f"{path}.params[{i}]"), f"{path}.params[{i}].name")
+        from_raw, from_present = _alias_get(el_obj, "from", ("value",))
+        if not from_present:
+            _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
+        binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
+        entries.append(Obj(None, {"from": binding, "name": name}))
+    return entries
 
 
 def _normalise_transform_source(raw: object) -> object:

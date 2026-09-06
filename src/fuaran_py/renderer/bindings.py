@@ -73,6 +73,14 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
     if isinstance(binding, Obj):
         if binding.tag == "Static":
             return binding.fields.get("value")
+        if binding.tag == "Expr":
+            # Phase 1534 - the scalar expression in a slot with no coercion. A
+            # null result is ABSENCE (``None``), which is what this function's
+            # unresolved branch already means; a failed evaluation is the same
+            # ``None`` here because this seam has no error channel - a text or
+            # numeric slot goes through ``resolve_scalar_*`` above, which does.
+            tag, value = _scalar_cell(_expr_as_transform(binding), sources)
+            return value if tag == "resolved" else None
         # `State` keys on `key`; `Query` / `Filter` key on `name`; `Selection`
         # keys on `nodeId` (0.2.0 — the accessor sentinel is off the wire, the
         # name/id IS the lookup key).
@@ -121,6 +129,43 @@ def resolve_display_string(binding: Value, sources: BindingSources | None = None
 
 def _is_transform(binding: Value) -> bool:
     return isinstance(binding, Obj) and binding.tag == "Transform"
+
+
+def _is_expr(binding: Value) -> bool:
+    return isinstance(binding, Obj) and binding.tag == "Expr"
+
+
+def _expr_as_transform(expr_binding: Obj) -> Obj:
+    """Phase 1534 - a ``Binding.Expr`` as the equivalent one-row ``Transform``.
+
+    The whole implementation, on purpose: param resolution, list-param
+    substitution and the evaluator are then literally the code the pipeline
+    runs, so an expression cannot mean one thing inside a ``derive`` and another
+    inside an ``Expr``. A second evaluator here would be a second thing to
+    specify, certify on five hosts, and keep in step.
+
+    The frame carries one column of one row so ``derive`` has a row to produce;
+    the expression never reads it (a ``col`` reference is refused at decode),
+    and the trailing ``project`` drops it so the result is 1x1 by construction
+    rather than by inspection.
+    """
+    unit_frame = Obj(
+        None,
+        {
+            "columns": Obj(None, {"__unit": Arr([True])}),
+        },
+    )
+    pipeline = Arr(
+        [
+            Obj("derive", {"expr": expr_binding.fields["expr"], "name": "__value"}),
+            Obj("project", {"cols": Arr([Obj(None, {"a": "__value", "b": "__value"})])}),
+        ]
+    )
+    fields: dict[str, Value] = {"pipeline": pipeline, "source": unit_frame}
+    params = expr_binding.fields.get("params")
+    if params is not None:
+        fields["params"] = params
+    return Obj("Transform", fields)
 
 
 def _transform_state(sources: BindingSources | None) -> dict[str, object]:
@@ -220,6 +265,10 @@ def resolve_scalar_text(binding: Value, sources: BindingSources | None = None) -
     when unresolved / ambiguous (the caller renders ``""``). A ``Transform``
     resolves to its 1×1 result cell; every other binding resolves as
     :func:`resolve_binding` then stringifies."""
+    if _is_expr(binding):
+        assert isinstance(binding, Obj)
+        tag, value = _scalar_cell(_expr_as_transform(binding), sources)
+        return _cell_value_to_text(value) if tag == "resolved" else None
     if _is_transform(binding):
         assert isinstance(binding, Obj)
         tag, value = _scalar_cell(binding, sources)
@@ -233,6 +282,10 @@ def resolve_scalar_number(binding: Value, sources: BindingSources | None = None)
     unresolved / ambiguous / non-numeric (the caller renders the em-dash). A
     ``Transform`` resolves to its 1×1 result cell (coerced numerically); every
     other binding resolves as :func:`resolve_binding` then coerces."""
+    if _is_expr(binding):
+        assert isinstance(binding, Obj)
+        tag, value = _scalar_cell(_expr_as_transform(binding), sources)
+        return _cell_value_to_float(value) if tag == "resolved" else None
     if _is_transform(binding):
         assert isinstance(binding, Obj)
         tag, value = _scalar_cell(binding, sources)

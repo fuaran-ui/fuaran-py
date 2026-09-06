@@ -27,7 +27,6 @@ from typing import Literal
 from .canonical import encode_value
 from .model import Obj, Value, from_json
 from .result import (
-    INVALID_JSON,
     MISSING_FIELD,
     WRONG_NODE_KIND,
     WRONG_TYPE,
@@ -37,6 +36,7 @@ from .result import (
     Ok,
 )
 from .schema import decode_node
+from .shapeguard import check_shape, load_bounded
 
 # ── §15 profile / negotiation vocabulary ────────────────────────────────────
 
@@ -112,10 +112,15 @@ def decode_envelope(text: str) -> DecodeResult[Envelope]:
     decode; Behind → tolerate an unknown kind by preserving it verbatim). A
     Foreign profile refuses with ``FOREIGN_PROFILE`` at ``$.$profile``.
     """
-    try:
-        raw = json.loads(text)
-    except ValueError as exc:
-        return Err(DecodeError(INVALID_JSON, "$", f"input is not valid JSON: {exc}"))
+    # §20.1 — every entry point that admits wire bytes goes through the one
+    # guarded parse, so this reader answers the §20 rows exactly as
+    # ``decode_node`` does and is total on hostile input (§21.2 rule 3).
+    raw, guard_error = load_bounded(text)
+    if guard_error is not None:
+        return Err(guard_error)
+    shape_error = check_shape(raw)
+    if shape_error is not None:
+        return Err(shape_error)
 
     if not isinstance(raw, dict):
         return Err(DecodeError(WRONG_TYPE, "$", "expected an object at $"))

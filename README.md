@@ -72,9 +72,19 @@ else:
 ```
 
 Decoding never throws on malformed input — it returns `Ok(value)` or
-`Err(DecodeError)` carrying one of the six canonical codes (`INVALID_JSON`,
+`Err(DecodeError)` carrying one of the canonical codes (`INVALID_JSON`,
 `MISSING_FIELD`, `WRONG_TYPE`, `UNKNOWN_DU_CASE`, `WRONG_NODE_KIND`,
-`EMPTY_NODE_ID`) and a `$`-rooted path.
+`EMPTY_NODE_ID`, `LIMIT_EXCEEDED`) and a `$`-rooted path.
+
+That claim covers **every** reader here that takes wire text, not only
+`decode_node` and `decode_op`: the versioned envelope, the DAG record, the
+elicitation documents, the teleport bundle, the dataframe source and pipeline,
+the theme manifest and the client's reply parser all share one guarded parse. So
+each is total on hostile input, and each answers the decode-determinism rules the
+same way — a repeated object member, an unpaired surrogate, a bare `NaN`, a
+number outside the RFC 8259 grammar and content after the root value are refused
+at all of them, and the resource limits are enforced before the document is
+built rather than measured after.
 
 ## Author (ergonomic, typed)
 

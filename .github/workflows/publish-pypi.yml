@@ -6,6 +6,18 @@
 # environment `pypi` — then create the `pypi` environment on this repository.
 # The tag must equal the version in pyproject.toml; the gate below refuses otherwise, so a
 # mistyped tag never publishes a mismatched release.
+#
+# WHAT THIS WORKFLOW REFUSES TO PUBLISH, and why each refusal exists:
+#   * a tag whose version does not match pyproject.toml — the `build` job's version gate;
+#   * a tree whose suite is red — the `test` job below, which `publish` `needs`. Until it
+#     existed, a `v*` tag published whatever was at that commit having run no test, no lint
+#     and no type check: the ONLY gate on the released artefact was that it built. CI runs
+#     the same checks on a branch push, but a tag push is a different event on a different
+#     ref, so "CI was green on main" was never a statement about the tagged commit;
+#   * a version PyPI already serves — `skip-existing` is deliberately absent. With it, a
+#     re-tag of an already-published version exited 0 having uploaded nothing, so a release
+#     that silently did not happen was indistinguishable from one that did. Without it the
+#     run fails, by name, and the fix is to cut a new version.
 name: publish-pypi
 
 on:
@@ -16,6 +28,54 @@ permissions:
   contents: read
 
 jobs:
+  # The gate on the TAGGED tree. Mirrors ci.yml's blocking steps — the corpus
+  # checkout it certifies against, the lint/format/type checks, and the suite —
+  # on the release interpreter. Its failure is what stops `publish` below.
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fuaran-py
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: fuaran-py
+
+      # Deliberately UNPINNED, for the reason ci.yml states: the corpus is the
+      # shared conformance authority and one current spec for all hosts is the
+      # point of giving it a single home.
+      - name: Check out the wire-format conformance corpus
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-ui-specification
+          path: wire-format-fixtures
+
+      # Every corpus-dependent test skips when the corpus is absent, so a layout
+      # drift would retire the conformance leg and still report green. Assert it.
+      - name: Assert the corpus is where the tests resolve it
+        run: test -f ../wire-format-fixtures/manifest.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install ".[dev]"
+
+      - name: Lint (ruff check)
+        run: python -m ruff check .
+
+      - name: Format check (ruff format)
+        run: python -m ruff format --check .
+
+      - name: Type check (mypy)
+        run: python -m mypy
+
+      - name: Test (gated)
+        run: python -m pytest -q -rs
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -47,7 +107,9 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build
+    # BOTH, not just `build`: a green build says the artefact assembles, which is
+    # not a statement about whether the code in it works.
+    needs: [test, build]
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -58,7 +120,12 @@ jobs:
         with:
           name: dist
           path: dist/
+      # SHA-PINNED, not tag-pinned: this step holds the OIDC-minted publishing
+      # identity, so a moved `release/v1` is credential-bearing code nobody
+      # reviewed. `# v1.14.2` records which release the digest is; Dependabot's
+      # `github-actions` schedule proposes the bumps as reviewable PRs.
+      #
+      # `skip-existing` is deliberately ABSENT — see the header. A re-tag of an
+      # already-published version must fail, not exit 0 having uploaded nothing.
       - name: Publish to PyPI (Trusted Publishing)
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          skip-existing: true
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

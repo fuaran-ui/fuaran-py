@@ -58,6 +58,69 @@ type TurnStage = Literal["access-token", "provider", "parse", "apply"]
 TURN_STAGES: frozenset[str] = frozenset({"access-token", "provider", "parse", "apply"})
 
 
+class ClientCode:
+    """Well-known :attr:`RecoverableError.code` values this CLIENT synthesises,
+    as opposed to the codes the endpoint sends. A caller branching on ``code``
+    can tell "the endpoint refused" from "the call never reached it", which is a
+    different remedy every time."""
+
+    #: The call did not complete: the transport raised, or the configured
+    #: ``timeout`` elapsed. The message is FIXED — an upstream exception string
+    #: can quote a URL, a header, or a proxy's internal hostname, and this
+    #: result is routinely rendered into a page.
+    NETWORK = "NETWORK"
+
+    #: The endpoint replied 200 with no usable tree. Not a success: a caller
+    #: that accepted it would hold ``""`` as the current tree and silently
+    #: repair nothing on every subsequent turn.
+    MALFORMED_RESPONSE = "MALFORMED_RESPONSE"
+
+    #: The endpoint is a plaintext ``http://`` URL that is not loopback, and
+    #: ``allow_insecure_endpoint`` was not set. Refused BEFORE the request is
+    #: built, so neither credential is ever put on a socket.
+    INSECURE_ENDPOINT = "INSECURE_ENDPOINT"
+
+
+@dataclass(frozen=True)
+class SnapshotState:
+    """The grounding-corpus snapshot the endpoint served a turn against.
+
+    ``version`` / ``content_hash`` are present only when a payload was actually
+    loaded — a turn generated ungrounded still succeeds.
+    """
+
+    state: str
+    version: str | None = None
+    content_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class ProducedDetail:
+    """The deployment facts a produced turn carries beyond the tree itself.
+
+    They hang off
+    :meth:`~fuaran_py.client.client.FuaranClient.generate_detailed` rather than
+    sitting on :class:`Produced`, mirroring the F# and TypeScript clients: the
+    three things every caller needs stay on the result, and the things a caller
+    needs only when auditing a deployment are asked for.
+    """
+
+    #: How many ops the turn applied to reach the produced tree — a COUNT. The
+    #: endpoint does not return the op list, so :attr:`Produced.ops` is
+    #: populated only when something in front of it (a proxy, a mock) supplies
+    #: one.
+    ops_applied: int
+    #: The allowlisted provider id the deployment chose.
+    provider: str | None = None
+    #: The model the provider's own reply named as having served. ``None`` means
+    #: UNREPORTED, and is deliberately not the model the deployment asked for: a
+    #: substituted value would look like a report and hide an alias re-point,
+    #: which is the one thing this field exists to expose.
+    served_model: str | None = None
+    #: The grounding snapshot's state for this turn.
+    snapshot: SnapshotState | None = None
+
+
 @dataclass(frozen=True)
 class AppliedOp:
     """One op the turn applied to reach the produced tree.

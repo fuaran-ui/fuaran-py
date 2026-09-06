@@ -34,35 +34,44 @@ Public surface:
 
 from __future__ import annotations
 
-from .client import FuaranClient, Transport, default_transport
+from .client import FuaranClient, Transport, default_transport, is_secure_endpoint
 from .contract import (
     SURFACE_VERSION,
     AccessDenied,
     AppliedOp,
+    ClientCode,
     Produced,
+    ProducedDetail,
     RecoverableError,
+    SnapshotState,
     TurnFailed,
     TurnResult,
     TurnStage,
     is_surface_version_compatible,
 )
 from .session import FuaranSession
-from .wire import parse_turn_response, to_wire_body
+from .wire import malformed_response, parse_produced_detail, parse_turn_response, to_wire_body
 
 __all__ = [
     "SURFACE_VERSION",
     "AccessDenied",
     "AppliedOp",
+    "ClientCode",
     "FuaranClient",
     "FuaranSession",
     "Produced",
+    "ProducedDetail",
     "RecoverableError",
+    "SnapshotState",
     "Transport",
     "TurnFailed",
     "TurnResult",
     "TurnStage",
     "default_transport",
+    "is_secure_endpoint",
     "is_surface_version_compatible",
+    "malformed_response",
+    "parse_produced_detail",
     "parse_turn_response",
     "to_wire_body",
 ]

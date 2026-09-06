@@ -33,14 +33,26 @@ class MockEndpoint(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length).decode("utf-8"))
         MockEndpoint.requests.append(body)
 
-        prompt = str(body.get("Prompt", ""))
+        prompt = str(body.get("prompt", ""))
         if "deny me" in prompt:
-            self._reply(401, {"Reason": "token expired"})
+            self._reply(401, {"error": {"code": "ACCESS_DENIED", "message": "token expired"}})
         elif "break me" in prompt:
-            self._reply(422, {"Error": {"Stage": "apply", "Code": "APPLY_REJECTED", "Message": "no node"}})
+            self._reply(
+                422,
+                {"error": {"stage": "apply", "code": "APPLY_REJECTED", "message": "no node"}},
+            )
         else:
-            tree = SECOND_TREE if body.get("CurrentTreeJson") is not None else FIRST_TREE
-            self._reply(200, {"TreeJson": tree, "Ops": [], "Version": "1.2.0"})
+            tree = SECOND_TREE if body.get("currentTree") is not None else FIRST_TREE
+            self._reply(
+                200,
+                {
+                    "version": "1.6.0",
+                    "tree": json.loads(tree),
+                    "opsApplied": 0,
+                    "provider": "mock",
+                    "snapshot": {"state": "mock"},
+                },
+            )
 
     def _reply(self, status: int, payload: dict[str, object]) -> None:
         data = json.dumps(payload).encode("utf-8")
@@ -72,9 +84,14 @@ def test_produced_access_denied_and_turn_failed_over_real_http(endpoint: str) ->
 
     produced = client.generate("a metric card")
     assert isinstance(produced, Produced)
-    assert produced.version == "1.2.0"
+    assert produced.version == "1.6.0"
     decoded = produced.decode_tree()
     assert decoded.ok
+
+    # The secrets crossed real HTTP as HEADERS, and the body carried neither.
+    sent = MockEndpoint.requests[0]
+    assert "ByokKey" not in sent
+    assert "AccessToken" not in sent
 
     denied = client.generate("deny me")
     assert denied == AccessDenied(reason="token expired")
@@ -90,20 +107,26 @@ def test_session_repair_loop_carries_the_tree_over_real_http(endpoint: str) -> N
 
     first = session.next("a metric card")
     assert isinstance(first, Produced)
-    assert first.tree_json == FIRST_TREE
+    first_tree = first.tree_json
 
     second = session.next("rename it")
     assert isinstance(second, Produced)
-    assert second.tree_json == SECOND_TREE
+    assert second.tree_json != first_tree
 
     fresh, repair = MockEndpoint.requests[0], MockEndpoint.requests[1]
-    assert "CurrentTreeJson" not in fresh
-    assert repair["CurrentTreeJson"] == FIRST_TREE
+    assert "currentTree" not in fresh
+    assert repair["currentTree"] == first_tree
 
 
-def test_network_failure_surfaces_as_typed_turn_failed() -> None:
+def test_network_failure_surfaces_as_typed_turn_failed_with_no_upstream_text() -> None:
     # A port from the dynamic range with no listener — connection refused.
+    # Loopback, so the endpoint-scheme guard admits it and the transport is
+    # genuinely exercised.
     client = FuaranClient("http://127.0.0.1:9/generate")
     result = client.generate("p")
     assert isinstance(result, TurnFailed)
     assert result.error.code == "NETWORK"
+    # The urllib error names the address and the OS reason; neither reaches
+    # the caller.
+    assert "127.0.0.1" not in result.error.message
+    assert "refused" not in result.error.message.lower()

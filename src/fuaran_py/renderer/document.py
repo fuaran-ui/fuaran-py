@@ -80,6 +80,7 @@ from .projection import Disposition, disposition_of, omitted, open_live, rendere
 # copy of the tree-walking helpers here would be a second answer to what counts as a child
 # node, and the three projections must agree about that before they can agree about anything.
 from .render import _EM_DASH, Renderer, _a11y_name, _as_node, _child_nodes, _collect_fragments
+from .sanitize import sanitize_url_or_blank
 from .seeds import with_state_seeds
 
 #: How a chart is carried into a markdown document. See the module docstring — neither
@@ -160,7 +161,10 @@ SCOPE: Final[tuple[tuple[str, Disposition], ...]] = (
         "Heading",
         rendered(
             "an ATX heading at the node's declared level, OFFSET by the document's nesting so a "
-            "level-1 heading inside a card does not compete with the document's own title"
+            "level-1 heading inside a card does not compete with the document's own title - but "
+            "ONLY for the Standard variant. An Eyebrow or Caption is italic running text and a "
+            "Lead a plain paragraph, because a subtitle promoted to a heading invents an outline "
+            "entry the author never declared"
         ),
     ),
     (
@@ -398,7 +402,13 @@ class _MarkdownRenderer:
     def _open_live(self, node: Node, fallback: str) -> list[str]:
         label = self._live_label(node, fallback)
         if self.options.live_url is not None:
-            href = self._safe(EgressClass.HYPERLINK, self.options.live_url + "#" + node.id)
+            # The scheme floor, NOT the destination policy. `live_url` is supplied by the host
+            # in its own options record, so checking it against the host's own allowlist tests
+            # nothing and would make the common case ("point at my app") fail unless the host
+            # remembered to allowlist itself — which is the reference host's reasoning, and the
+            # digest keeps the same rule. The floor still applies: a `javascript:` live URL is
+            # neutered like any other.
+            href = sanitize_url_or_blank(self.options.live_url + "#" + node.id)
             return [f"[{escape_inline(label)} — open live]({_escape_destination(href)})"]
         return [f"*{escape_inline(label)} — available in the live view*"]
 
@@ -490,9 +500,27 @@ class _MarkdownRenderer:
     # ── Display ─────────────────────────────────────────────────────────────
 
     def _heading(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
+        """An ATX heading — but ONLY for the ``Standard`` variant.
+
+        A markdown document's outline is the thing it has that the page does not, and the
+        other three variants are running text occupying a heading's slot rather than sections:
+        an ``Eyebrow`` is a kicker above a title, a ``Caption`` a subtitle beneath one, a
+        ``Lead`` an introductory paragraph. Promoting any of them to ``##`` invents structure
+        the author did not declare and puts a subtitle in the table of contents.
+
+        The digest reaches the same conclusion by a different route — it styles those three as
+        muted or normal-weight text rather than at the type scale — so the two projections
+        agree about which of these is a section, which is the property that matters.
+        """
+        variant = fields.get("variant")
+        text = self._inline(fields.get("text"))
+        if variant == "Eyebrow" or variant == "Caption":
+            return [f"*{text}*"] if text else []
+        if variant == "Lead":
+            return [text] if text else []
         raw = fields.get("level")
         declared = raw if isinstance(raw, int) and not isinstance(raw, bool) else 2
-        return [_heading_block(level + declared - 1, self._inline(fields.get("text")))]
+        return [_heading_block(level + declared - 1, text)]
 
     def _markdown(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
         # Verbatim. This is the one kind whose content is already the target language;

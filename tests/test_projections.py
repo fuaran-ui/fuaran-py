@@ -388,3 +388,54 @@ def test_the_document_offsets_headings_beneath_its_title() -> None:
     assert md.startswith("# Weekly\n")
     assert len([line for line in md.splitlines() if line.startswith("# ")]) == 1
     assert "## Section" in md
+
+
+def test_the_live_url_is_not_subject_to_the_destination_policy() -> None:
+    """A host's own declaration is not a tree-authored destination.
+
+    ``live_url`` arrives in the options record the host constructs, so checking it against the
+    host's own allowlist tests nothing and would make the common case — "point at my app" —
+    fail unless the host remembered to allowlist itself. The scheme floor still applies; only
+    the policy does not.
+    """
+    tree = _decoded(F.dashboard("d", children=[F.button("go", label="Refresh")]))
+    live = "https://app.example/weekly"
+    assert f"{live}#go" in render_email(tree, options=EmailOptions(live_url=live))
+    assert f"{live}#go" in render_markdown(tree, options=MarkdownOptions(live_url=live))
+
+
+def test_a_hostile_live_url_still_meets_the_scheme_floor() -> None:
+    """The floor is not the policy, and dropping the policy must not drop the floor too."""
+    tree = _decoded(F.dashboard("d", children=[F.button("go", label="Refresh")]))
+    hostile = "javascript:alert(1)"
+    for output in (
+        render_email(tree, options=EmailOptions(live_url=hostile)),
+        render_markdown(tree, options=MarkdownOptions(live_url=hostile)),
+    ):
+        assert "javascript:" not in output
+        assert "about:blank" in output
+
+
+def test_only_a_standard_heading_becomes_an_outline_entry() -> None:
+    """A document's outline is what it has that the page does not.
+
+    An ``Eyebrow`` is a kicker, a ``Caption`` a subtitle, a ``Lead`` an introduction — running
+    text occupying a heading's slot. Promoting any of them to ``##`` puts a subtitle in the
+    table of contents, which is structure the author never declared.
+    """
+    tree = _decoded(
+        F.dashboard(
+            "d",
+            children=[
+                F.heading("std", "A section", level=2),
+                F.heading("eye", "KICKER", level=2, variant="Eyebrow"),
+                F.heading("cap", "A subtitle", level=2, variant="Caption"),
+                F.heading("lead", "An introduction", level=2, variant="Lead"),
+            ],
+        )
+    )
+    md = render_markdown(tree)
+    assert [line for line in md.splitlines() if line.startswith("#")] == ["## A section"]
+    assert "*KICKER*" in md
+    assert "*A subtitle*" in md
+    assert "\nAn introduction\n" in md

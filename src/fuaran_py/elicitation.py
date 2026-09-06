@@ -24,7 +24,6 @@ from dataclasses import dataclass
 from .canonical import encode_value
 from .model import Arr, Node, Obj, Value, from_json
 from .result import (
-    INVALID_JSON,
     MISSING_FIELD,
     UNKNOWN_DU_CASE,
     WRONG_TYPE,
@@ -34,6 +33,7 @@ from .result import (
     Ok,
 )
 from .schema import decode_node
+from .shapeguard import check_shape, load_bounded
 
 # ── §18 error codes ─────────────────────────────────────────────────────────
 # Kept OUT of the core six (like §15's FOREIGN_PROFILE); structural failures
@@ -332,11 +332,27 @@ def _reroot(error: DecodeError, prefix: str) -> DecodeError:
     return DecodeError(error.code, prefix + error.path[1:], error.message, error.expected_shape)
 
 
+def _guarded_parse(text: str) -> object:
+    """The one guarded parse for every reader in this module (§20.1).
+
+    §20.1 binds each of its rows to an ENTRY POINT rather than to a host, so an
+    elicitation envelope, an answer document and an outcome must answer a
+    repeated member or an unpaired surrogate exactly as ``decode_node`` does.
+    Routing them through ``shapeguard`` also makes them total on hostile input
+    (§21.2 rule 3): a deep payload comes back as a typed ``LIMIT_EXCEEDED``
+    rather than escaping as a throw.
+    """
+    parsed, guard_error = load_bounded(text)
+    if guard_error is not None:
+        _fail(guard_error.code, guard_error.path, guard_error.message)
+    shape_error = check_shape(parsed)
+    if shape_error is not None:
+        _fail(shape_error.code, shape_error.path, shape_error.message)
+    return parsed
+
+
 def _decode_elicitation(text: str) -> Elicitation:
-    try:
-        raw = json.loads(text)
-    except ValueError as exc:
-        _fail(INVALID_JSON, "$", f"input is not valid JSON: {exc}")
+    raw = _guarded_parse(text)
     if not isinstance(raw, dict):
         _fail(WRONG_TYPE, "$", "expected an object at $")
     obj: dict = raw  # type: ignore[assignment]
@@ -443,10 +459,7 @@ _ANSWER_DOC_KEYS = frozenset({"answer", "contract"})
 
 
 def _decode_answer_doc(text: str) -> None:
-    try:
-        raw = json.loads(text)
-    except ValueError as exc:
-        _fail(INVALID_JSON, "$", f"input is not valid JSON: {exc}")
+    raw = _guarded_parse(text)
     if not isinstance(raw, dict):
         _fail(WRONG_TYPE, "$", "expected an object at $")
     obj: dict = raw  # type: ignore[assignment]
@@ -495,10 +508,7 @@ _OUTCOME_KEYS: dict[str, frozenset[str]] = {
 
 
 def _decode_outcome(text: str) -> Outcome:
-    try:
-        raw = json.loads(text)
-    except ValueError as exc:
-        _fail(INVALID_JSON, "$", f"input is not valid JSON: {exc}")
+    raw = _guarded_parse(text)
     if not isinstance(raw, dict):
         _fail(WRONG_TYPE, "$", "expected an object at $")
     obj: dict = raw  # type: ignore[assignment]

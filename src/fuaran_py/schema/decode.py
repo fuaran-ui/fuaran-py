@@ -14,6 +14,7 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Callable
+from contextvars import ContextVar
 from typing import cast
 
 from ..limits import MAX_NODE_DEPTH, MAX_NODES
@@ -76,11 +77,69 @@ def _expect_string(value: object, path: str) -> str:
     return value  # type: ignore[return-value]
 
 
-def _expect_int(value: object, path: str) -> int:
+#: The width of every typed integer slot this format declares (§7.1).
+INT_SLOT_MIN = -2147483648
+INT_SLOT_MAX = 2147483647
+
+#: Where INTEGER IDENTITY stops in an untyped rule-12 payload position (§2
+#: rule 5). A different question from the slot width above, and answered by a
+#: different number: this one is the range in which every host's number
+#: representation agrees exactly, so a token inside it canonicalises the same
+#: way everywhere and a token outside it does not.
+PAYLOAD_INT_MAX = 9007199254740991
+
+
+def _integer_slot(value: object, path: str) -> int:
+    """The §7.1 integer-slot accept set, in one place.
+
+    A typed integer slot admits a JSON number that is finite, has **no
+    fractional part**, and lies within the signed 32-bit range. ``2.0`` decodes
+    as ``2``; ``2.5``, ``1e10``, ``1e400``, a §7 sentinel string, ``"banana"``
+    and ``true`` are each a ``WRONG_TYPE``.
+
+    This host previously answered the same question in two different ways —
+    a bare integer position refused ``2.0`` outright while a ``Binding<int>``
+    slot truncated ``2.5`` to ``2`` — so the two were reconciled here rather
+    than separately. §7.1 takes the accepting half of the first and the refusing
+    half of the second: ``2.0`` and ``2`` denote the same integer, and ``2.5``
+    denotes something an integer slot cannot hold.
+
+    ``bool`` is tested first because it is an ``int`` subclass in Python, so
+    ``True`` would otherwise satisfy the numeric test and decode as ``1``.
+    """
     value = _unwrap_static_envelope(value)
-    if isinstance(value, bool) or not isinstance(value, int):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         _fail(WRONG_TYPE, path, f"expected an integer at {path}")
-    return value  # type: ignore[return-value]
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected a finite integer at {path} — an integer slot has no non-finite form",
+                "a finite integral number within the signed 32-bit range",
+            )
+        if value != int(value):
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected an integer at {path}, but the value has a fractional part "
+                "— an integer slot holds no fraction, and truncating it would discard a value the author typed",
+                "a finite integral number within the signed 32-bit range",
+            )
+        value = int(value)
+    if not (INT_SLOT_MIN <= cast(int, value) <= INT_SLOT_MAX):
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"the value at {path} is outside the signed 32-bit range a typed integer slot can hold "
+            f"({INT_SLOT_MIN} … {INT_SLOT_MAX})",
+            "a finite integral number within the signed 32-bit range",
+        )
+    return cast(int, value)
+
+
+def _expect_int(value: object, path: str) -> int:
+    return _integer_slot(value, path)
 
 
 def _expect_bool(value: object, path: str) -> bool:
@@ -665,8 +724,16 @@ def _from_json_strict(value: object, path: str) -> Value:
             "null is not representable in the Fuaran wire model — omit the field instead",
             "any JSON value except null (rule 12: the wire model has no null)",
         )
-    if isinstance(value, bool) or isinstance(value, (int, float, str)):
+    if isinstance(value, bool) or isinstance(value, (float, str)):
         return value
+    if isinstance(value, int):
+        # §2 rule 5 — integer identity in a rule-12 payload position stops at
+        # +/-(2^53-1), the range every host holds exactly. Beyond it a decoder
+        # MUST take the token as a double and accept the rounding: keeping
+        # Python's arbitrary-precision int would give this host a tree, and
+        # canonical bytes, that no other host can produce from the same
+        # document.
+        return value if -PAYLOAD_INT_MAX <= value <= PAYLOAD_INT_MAX else float(value)
     if isinstance(value, list):
         return Arr([_from_json_strict(item, f"{path}[{i}]") for i, item in enumerate(value)])
     if isinstance(value, dict):
@@ -960,7 +1027,9 @@ def _decode_permissions(value: object, path: str) -> object:
 # the syntactic bound is not reached either — the same two false comforts, at a
 # new slot. The FIGURE is ``MAX_NODE_DEPTH``, reused rather than a sixth limit
 # minted: these frames cost what the node decoder's frames cost.
-_item_depth = 0
+#
+# A ``ContextVar`` rather than a module global — see the note on ``_walk_depth``.
+_item_depth: ContextVar[int] = ContextVar("fuaran_item_depth", default=0)
 
 
 def _decode_tree_item(value: object, path: str) -> Value:
@@ -981,8 +1050,7 @@ def _decode_tree_item(value: object, path: str) -> Value:
     reject vector sits one level DOWN precisely because a host whose child walker
     is looser than its root walker passes the other two.
     """
-    global _item_depth
-    if _item_depth >= MAX_NODE_DEPTH:
+    if _item_depth.get() >= MAX_NODE_DEPTH:
         _fail(
             LIMIT_EXCEEDED,
             path,
@@ -993,11 +1061,11 @@ def _decode_tree_item(value: object, path: str) -> Value:
     if "children" in obj:
         items = _expect_array(obj["children"], f"{path}.children")
         if items:
-            _item_depth += 1
+            token = _item_depth.set(_item_depth.get() + 1)
             try:
                 fields["children"] = Arr([_decode_tree_item(c, f"{path}.children[{i}]") for i, c in enumerate(items)])
             finally:
-                _item_depth -= 1
+                _item_depth.reset(token)
     if "icon" in obj:
         fields["icon"] = _expect_string(obj["icon"], f"{path}.icon")
     fields["id"] = _expect_string(_require(obj, "id", path), f"{path}.id")
@@ -1013,9 +1081,8 @@ def _decode_tree_items(value: object, path: str) -> Value:
     """A ``Tree``'s root row list. Required and never dropped — a tree with no
     rows is still a tree, where an absent ``items`` is a document that never said
     what it holds."""
-    global _item_depth
     items = _expect_array(value, path)
-    _item_depth = 0
+    _item_depth.set(0)
     return Arr([_decode_tree_item(item, f"{path}[{i}]") for i, item in enumerate(items)])
 
 
@@ -1516,34 +1583,25 @@ def _decode_integer(value: object, path: str) -> Value:
     §7 is asymmetric on purpose, and the asymmetry is the whole content of this
     function::
 
-        a FLOAT slot accepts  { JSON number } ∪ { "NaN", "Infinity", "-Infinity" }
-        an INT  slot accepts  { JSON number }                     (truncating)
+        a FLOAT slot accepts  { JSON number } u { "NaN", "Infinity", "-Infinity" }
+        an INT  slot accepts  { finite integral JSON number within int32 }
 
     An integer has no non-finite form, so a *correctly spelled* sentinel string
     here is a ``WRONG_TYPE`` — the case that makes the two sets distinguishable
-    rather than merely stated. The truncating integer cast mirrors the reference
-    host's ``requireInt`` (``JNumber n -> Ok(int n)``).
+    rather than merely stated. The accept set itself is §7.1's and is shared with
+    every bare integer position through :func:`_integer_slot`, so the two cannot
+    drift apart again.
 
-    Three Python-specific traps, all of them silent if missed:
+    Two Python-specific traps, both silent if missed:
 
-    * ``bool`` is an ``int`` subclass, so it is tested FIRST — ``True`` would
-      otherwise satisfy ``isinstance(v, int)`` and truncate to ``1``.
+    * ``bool`` is an ``int`` subclass, so it is tested FIRST in
+      :func:`_integer_slot` — ``True`` would otherwise decode as ``1``.
     * The sentinel widening is a *membership test against three exact strings*
       (:data:`_NON_FINITE_SENTINELS`) and lives in :func:`_decode_number` alone;
       a ``float(s)`` in a ``try`` would accept ``"nan"``, ``"inf"``, ``"1e5"``
       and ``"  NaN "`` at both slot classes.
-    * A non-finite ``float`` — reachable only through ``json.loads``'s default
-      acceptance of the bare ``NaN`` / ``Infinity`` *tokens*, a §20
-      decode-determinism question this does not reopen — is refused rather than
-      cast, because ``int(float("nan"))`` raises and decoding is TOTAL: a typed
-      refusal, never an exception.
     """
-    value = _unwrap_static_envelope(value)
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        _fail(WRONG_TYPE, path, f"expected an integer at {path}")
-    if isinstance(value, float) and not math.isfinite(value):
-        _fail(WRONG_TYPE, path, f"expected a finite integer at {path} — an integer slot has no non-finite form")
-    return int(cast(float, value))
+    return _integer_slot(value, path)
 
 
 # ── Drawing (Phase 524) ────────────────────────────────────────────────────
@@ -3576,44 +3634,53 @@ def _decode_state(value: object, path: str) -> Obj:
 # that runs after the walk it is meant to bound has already paid the cost it
 # exists to refuse.
 #
-# Module-level counters rather than threaded parameters: `_decode_node_value` is
-# reached from the per-kind field decoders through a table of callables whose
-# signature is `(value, path)`, so threading a depth argument would mean changing
-# every entry in that table and every decoder it names. Sound because decoding is
-# synchronous; `_reset_walk` is called by the public entry points, so a walk that
-# raised part-way through never leaves a counter poisoned for the next caller.
-_walk_depth = 0
-_walk_nodes = 0
+# Counters rather than threaded parameters: `_decode_node_value` is reached from
+# the per-kind field decoders through a table of callables whose signature is
+# `(value, path)`, so threading a depth argument would mean changing every entry
+# in that table and every decoder it names.
+#
+# They are ``ContextVar``s rather than module globals, and that is a correctness
+# requirement rather than a refinement. A host serving concurrent decodes in one
+# process — an ASGI route dispatched to a thread-pool worker is the ordinary
+# shape, and this repo ships one as a sample — shares a module global across
+# walks that know nothing of each other: two decodes each half the limit deep
+# refuse one another with a LIMIT_EXCEEDED naming a bound neither breached, and
+# one walk unwinding while another is mid-descent decrements a counter it does
+# not own and lets a document past the bound. A ``ContextVar`` is per-thread and
+# per-async-task by construction, so each walk reads and writes its own counter
+# with no lock and no change to the decoder table's signature. `_reset_walk` is
+# still called by the public entry points, so a walk that raised part-way through
+# never leaves ITS OWN counter poisoned for the next decode on the same thread.
+_walk_depth: ContextVar[int] = ContextVar("fuaran_walk_depth", default=0)
+_walk_nodes: ContextVar[int] = ContextVar("fuaran_walk_nodes", default=0)
 
 
 def _reset_walk() -> None:
-    global _walk_depth, _walk_nodes
-    _walk_depth = 0
-    _walk_nodes = 0
+    _walk_depth.set(0)
+    _walk_nodes.set(0)
 
 
 def _decode_node_value(value: object, path: str) -> Node:
-    global _walk_depth, _walk_nodes
-
-    if _walk_depth >= MAX_NODE_DEPTH:
+    if _walk_depth.get() >= MAX_NODE_DEPTH:
         _fail(
             LIMIT_EXCEEDED,
             path,
             f"node nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
         )
-    _walk_nodes += 1
-    if _walk_nodes > MAX_NODES:
+    nodes = _walk_nodes.get() + 1
+    _walk_nodes.set(nodes)
+    if nodes > MAX_NODES:
         _fail(
             LIMIT_EXCEEDED,
             path,
             f"the document holds more than the wire limit MAX_NODES = {MAX_NODES} nodes",
         )
 
-    _walk_depth += 1
+    token = _walk_depth.set(_walk_depth.get() + 1)
     try:
         return _decode_node_value_inner(value, path)
     finally:
-        _walk_depth -= 1
+        _walk_depth.reset(token)
 
 
 def _decode_node_value_inner(value: object, path: str) -> Node:
@@ -3621,7 +3688,11 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
 
     if "id" not in obj:
         _fail(MISSING_FIELD, f"{path}.id", "missing required field 'id'")
-    raw_id = obj["id"]
+    # The §16 Static-envelope shorthand applies here as at every other plain
+    # scalar position: the other four hosts unwrap a `{"$type":"Static",...}`
+    # around a node id, and a host that does not refuses a document the rest of
+    # the roster accepts.
+    raw_id = _unwrap_static_envelope(obj["id"])
     if not isinstance(raw_id, str):
         _fail(WRONG_TYPE, f"{path}.id", "id must be a string")
     if raw_id == "":

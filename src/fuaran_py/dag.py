@@ -66,7 +66,6 @@ other hosts by construction) and the shared ``TreeOp`` decoder for ``op``.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 
 from .canonical import encode_value
@@ -75,10 +74,8 @@ from .op_stream.hash_chain import encode_actor
 from .op_stream.types import Actor, AgentActor, HumanActor
 from .ops.decode import _decode_op_value
 from .result import (
-    INVALID_JSON,
     MISSING_FIELD,
     UNKNOWN_DU_CASE,
-    DecodeError,
     DecodeResult,
     Err,
     Ok,
@@ -93,6 +90,7 @@ from .schema.decode import (
     _Fail,
     _fail,
 )
+from .shapeguard import check_shape, load_bounded
 
 _ENVELOPE_CASES = frozenset({"Success", "Failure"})
 
@@ -266,10 +264,13 @@ def decode_dag_record(text: str) -> DecodeResult[DagOpRecord]:
     Never throws: returns ``Err`` with the canonical :class:`DecodeError` on any
     wire-shape violation, ``Ok`` with the record otherwise.
     """
-    try:
-        parsed = json.loads(text)
-    except ValueError:
-        return Err(DecodeError(INVALID_JSON, "$", "input is not syntactically valid JSON"))
+    # §20.1 / §21.2 rule 3 — the one guarded parse (see ``shapeguard``).
+    parsed, guard_error = load_bounded(text)
+    if guard_error is not None:
+        return Err(guard_error)
+    shape_error = check_shape(parsed)
+    if shape_error is not None:
+        return Err(shape_error)
     try:
         return Ok(_decode_dag_value(parsed, "$"))
     except _Fail as fail:

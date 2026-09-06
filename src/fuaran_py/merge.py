@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .canonical import encode_value
+from .canonical import encode_value, escape_string
 from .model import Arr, Node, Obj, Value
 
 # SemanticStyle sub-field defaults (an absent style ⟺ all of these; §3.1).
@@ -93,21 +93,49 @@ KEEP_OLD_KIND = "KeepOldKind"
 
 
 @dataclass(frozen=True)
+class MergeSide:
+    """One SIDE of a two-sided refusal: that branch's value for the contended
+    cell, plus the branch's own opaque provenance tag.
+
+    ``value`` is the contended cell's canonical encoding, EXCEPT for the
+    ``style.*`` sub-facets, whose value is the sub-field's case name — which
+    coincides with its wire spelling only because every style sub-field is
+    enum-shaped. Do not generalise it to a compound cell.
+    """
+
+    value: str
+    tag: str | None = None
+
+
+@dataclass(frozen=True)
 class MergeConflict:
-    """A conflicting ``(node_id, facet)`` cell.
+    """A conflicting ``(node_id, facet)`` cell, as a two-sided recovery envelope.
 
     ``node_id`` + ``facet`` are the minimal identity (the author-agnostic surface, the
-    twin of the TypeScript host's ``{nodeId, facet}``). The remaining fields carry the
-    DAG-layer resolution detail (the F# ``Dag.conflicts`` shape): the conflict ``class``,
-    the canonical ``base`` / ``primary`` / ``secondary`` cell values (``primary`` set only
-    when a pin was held), the opaque ``secondary_tag``, whether human-primacy resolved it
-    (``primacy_held``), and the ordered ``choices`` a host may pick from.
+    twin of the TypeScript host's ``{nodeId, facet}``).
+
+    ``a`` and ``b`` are the SIDES view: the first- and second-argument branches'
+    values for the contended cell, populated on EVERY refusal. Swapping the
+    branches TRANSPOSES them and changes nothing else — which is what lets two
+    replicas that merged the same pair in opposite orders agree about what the
+    other side wanted. ``base`` is the LCA value (the empty string for a cell that
+    exists on neither side of the LCA, such as an ``insert``).
+
+    The remaining fields carry the DAG-layer resolution detail (the F#
+    ``Dag.conflicts`` shape): the conflict ``class``, the canonical ``primary`` /
+    ``secondary`` cell values (``primary`` set only when a pin was held), the
+    opaque ``secondary_tag``, whether human-primacy resolved it
+    (``primacy_held``), and the ordered ``choices`` a host may pick from. On the
+    author-agnostic entry point ``primacy_held`` is always ``False`` — neither
+    side is pinned there — and the precedence slots are correspondingly empty.
     """
 
     node_id: str
     facet: str
     conflict_class: str = CONCURRENT_EDIT
     base: str | None = None
+    a: MergeSide = MergeSide("")
+    b: MergeSide = MergeSide("")
     primary: str | None = None
     secondary: str | None = None
     secondary_tag: str | None = None
@@ -257,6 +285,8 @@ def _record_conflict(
             facet=facet,
             conflict_class=conflict_class,
             base=base_v,
+            a=MergeSide(a_v or ""),
+            b=MergeSide(b_v or ""),
             primary=primary_v,
             secondary=secondary_v,
             secondary_tag=res.secondary_tag,
@@ -446,9 +476,27 @@ def _merge3(
         if bc is not None:
             return _merge3(conflicts, res, bc, a_map.get(cid), b_map.get(cid))
         ac = a_map.get(cid)
+        bb = b_map.get(cid)
+        if ac is not None and bb is not None:
+            # BOTH branches introduced this id. There is no base to merge
+            # against, so agreement is the only clean outcome: identical content
+            # is the shared value, and DIFFERENT content is a refusal naming the
+            # id. Taking the A side unconditionally is a silent,
+            # arrival-order-dependent pick.
+            a_canon = encode_value(ac)
+            b_canon = encode_value(bb)
+            if a_canon == b_canon:
+                return ac
+            # The id exists on neither side of the LCA, so it has no base value
+            # — the empty string, not an encoding of some node that was never
+            # there.
+            _record_conflict(conflicts, res, cid, "insert", "", a_canon, b_canon)
+            # The merge has already refused, so this value reaches no caller —
+            # but it must not depend on which branch arrived first either. Same
+            # doctrine as the insert tie-break: order by canonical bytes.
+            return ac if a_canon <= b_canon else bb
         if ac is not None:
             return ac
-        bb = b_map.get(cid)
         if bb is not None:
             return bb
         raise RuntimeError(f"merge3: child id {cid} vanished")
@@ -460,6 +508,12 @@ def _merge3(
         merged_children = [recurse_child(i) for i in a_ids]
     elif not a_struct and b_struct:
         merged_children = [recurse_child(i) for i in b_ids]
+    elif a_ids == b_ids:
+        # Both sides changed the children to the SAME id list — agreement, not a
+        # conflict, and the guard every other facet already has. The shared ids'
+        # CONTENTS are checked by ``recurse_child`` above, which refuses a
+        # same-id-different-content insert rather than defaulting to a side.
+        merged_children = [recurse_child(i) for i in a_ids]
     else:
         base_set = set(base_ids)
         a_new = [i for i in a_ids if i not in base_set]
@@ -537,3 +591,57 @@ def merge3(base: Node, a: Node, b: Node, *, human: str | None = None) -> MergeRe
     author_a: MergeAuthor = Primary() if human == "a" else Secondary()
     author_b: MergeAuthor = Primary() if human == "b" else Secondary()
     return merge3_way_with_author(author_a, author_b, base, a, b)
+
+
+# ─── the two-sided refusal envelope (the cross-host determinism artefact) ────
+
+
+def sort_conflicts_canonical(conflicts: tuple[MergeConflict, ...]) -> list[MergeConflict]:
+    """Conflicts in ``(node_id, facet)`` Ordinal order — the envelope's array order."""
+    return sorted(conflicts, key=lambda c: (c.node_id, c.facet))
+
+
+def _encode_side(side: MergeSide) -> str:
+    tag = "null" if side.tag is None else escape_string(side.tag)
+    return '{"tag":' + tag + ',"value":' + escape_string(side.value) + "}"
+
+
+def encode_envelope(conflicts: tuple[MergeConflict, ...]) -> str:
+    """Canonical JSON of a REFUSAL envelope.
+
+    The conflict set as a sorted array of
+    ``{a,b,base,class,facet,nodeId,primacyHeld}`` objects — object keys
+    alphabetical, array entries in ``(node_id, facet)`` order. Byte-stable across
+    hosts, so a sha256 over it is the cross-host refusal hash: the determinism
+    artefact for a REFUSED structural merge, the analogue of the outcome hash for
+    an auto-merge.
+
+    The precedence view is deliberately projected as ``primacyHeld`` alone. The
+    pinned winner and loser are derivable from the sides plus the pin, and a
+    corpus that committed both would pin the same value twice and go red on a
+    host that agreed about the merge. The ``choices`` menu is left out for a
+    different reason worth knowing: it is NOT empty on the author-agnostic tier —
+    an unpinned refusal offers ``KeepBase`` / ``KeepA`` / ``KeepB``, all three
+    well-defined once the sides are populated — but it is derivable from the
+    sides plus the pin, which is why the shared corpus does not encode it.
+    """
+    entries = [
+        "{"
+        + '"a":'
+        + _encode_side(c.a)
+        + ',"b":'
+        + _encode_side(c.b)
+        + ',"base":'
+        + escape_string(c.base or "")
+        + ',"class":'
+        + escape_string(c.conflict_class)
+        + ',"facet":'
+        + escape_string(c.facet)
+        + ',"nodeId":'
+        + escape_string(c.node_id)
+        + ',"primacyHeld":'
+        + ("true" if c.primacy_held else "false")
+        + "}"
+        for c in sort_conflicts_canonical(conflicts)
+    ]
+    return "[" + ",".join(entries) + "]"

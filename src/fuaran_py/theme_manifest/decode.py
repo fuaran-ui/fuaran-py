@@ -12,9 +12,9 @@ stdlib :mod:`json` parser (dependency-light).
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from ..shapeguard import check_shape, load_bounded
 from .manifest import (
     ANONYMOUS_META,
     DEFAULT_WEIGHT,
@@ -158,5 +158,17 @@ def of_json(root: Any) -> ThemeManifest:
 
 
 def decode(json_str: str) -> ThemeManifest:
-    """Decode a manifest from JSON. Raises :class:`json.JSONDecodeError` on a parse failure."""
-    return of_json(json.loads(json_str))
+    """Decode a manifest from JSON.
+
+    Raises :class:`ValueError` on a parse failure — including the §20 rows a
+    theme manifest shares with every other wire artefact (a repeated member, an
+    unpaired surrogate, a bare ``NaN``) and the §21 bounds, which a bare
+    ``json.loads`` let past or let escape as a ``RecursionError``. §20.1 binds a
+    row to an ENTRY POINT, and this is one.
+    """
+    parsed, error = load_bounded(json_str)
+    if error is None:
+        error = check_shape(parsed)
+    if error is not None:
+        raise ValueError(f"{error.code} at {error.path}: {error.message}")
+    return of_json(parsed)

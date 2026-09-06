@@ -26,6 +26,7 @@ from .canonical import encode_value
 from .model import Arr, Node, Obj, Value, from_json
 from .ops import decode_op
 from .schema import decode_node
+from .shapeguard import check_shape, load_bounded
 from .validator import validate_node
 
 # ── Format constants ────────────────────────────────────────────────────────
@@ -222,6 +223,11 @@ def _inflate(data: bytes) -> bytes:
 # ── base64url (unpadded, matching Go's RawURLEncoding) ───────────────────────
 
 
+#: The wire ``DecodeError`` code the guard reports for malformation, kept
+#: distinct from this module's own ``InvalidJson`` spelling of the same class.
+_INVALID_JSON_CODE = "INVALID_JSON"
+
+
 def _b64url_encode(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
@@ -233,7 +239,24 @@ def _b64url_decode(s: str) -> bytes:
 
 
 def _json_loads(text: str) -> object:
-    return json.loads(text)
+    """The §20.1 guarded parse, raising this module's own error vocabulary.
+
+    A teleport envelope is wire bytes, so it answers the §20 rows exactly as
+    ``decode_node`` does — including a repeated member and an unpaired
+    surrogate, the two rows that change what a document MEANS rather than
+    whether it is accepted. A lone surrogate mattered here in particular:
+    it decoded, and then raised an uncatchable encoding error at the first
+    canonical-bytes boundary rather than at decode.
+    """
+    parsed, error = load_bounded(text)
+    if error is None:
+        error = check_shape(parsed)
+    if error is not None:
+        raise TeleportError(
+            INVALID_JSON if error.code == _INVALID_JSON_CODE else OVERSIZE,
+            error.message,
+        )
+    return parsed
 
 
 def _json_dumps(value: object) -> str:

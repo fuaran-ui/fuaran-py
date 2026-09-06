@@ -177,11 +177,16 @@ def load_vocabulary(corpus_root: Path | None) -> list[str]:
 
 # ─── Alphabets ──────────────────────────────────────────────────────────────
 
-#: Note what is ABSENT relative to the reference host's list: the lone surrogates
-#: U+D800 / U+DFFF. A Python ``str`` can hold them, but the decoder is handed
-#: ``str`` and the transport this host is certified over is UTF-8, in which they
-#: are unencodable — so including them would fuzz the harness's own plumbing
-#: rather than the decoder. The gap is stated rather than silently closed.
+#: The lone surrogates U+D800 / U+DFFF are HERE now, and the reasoning that used
+#: to exclude them is kept because it was half right. A Python ``str`` can hold
+#: them and UTF-8 cannot encode them, so a harness that round-tripped its input
+#: through bytes would be fuzzing its own plumbing. This one does not — the
+#: decoder is handed the ``str`` — and since §20.2 row 6 the decoder REFUSES an
+#: unpaired surrogate, raw or escaped, with ``INVALID_JSON`` on the way down.
+#: That refusal is exactly what the totality assertion exists to exercise:
+#: before it, a lone surrogate DECODED and then raised an uncatchable encoding
+#: error at the first canonical-bytes boundary — a throw the decoder promised
+#: could not happen, arriving too far from its cause to attribute.
 _HOSTILE_CHARS: tuple[str, ...] = (
     "{",
     "}",
@@ -213,6 +218,8 @@ _HOSTILE_CHARS: tuple[str, ...] = (
     "\ufffd",
     "é",
     "中",
+    "\ud800",  # a RAW unpaired HIGH surrogate code unit (§20.2 row 6)
+    "\udfff",  # a RAW unpaired LOW surrogate code unit
 )
 
 _HOSTILE_TOKENS: tuple[str, ...] = (
@@ -238,6 +245,9 @@ _HOSTILE_TOKENS: tuple[str, ...] = (
     "5.",
     "\\u0000",
     "\\uD800",
+    "\\uDC00",  # an unpaired LOW surrogate escape — the twin of \\uD800
+    "\\uD800x\\uDC00",  # both halves present but SEPARATED (§20.2 row 6)
+    "\\uD800\\uDC00",  # a WELL-FORMED pair — the vector that must still be ACCEPTED
     "\\uFFFF",
     "\\x41",
     "\\",

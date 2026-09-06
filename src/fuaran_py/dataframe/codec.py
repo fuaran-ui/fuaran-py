@@ -15,16 +15,18 @@ envelope on any wire-shape violation.
 
 from __future__ import annotations
 
-import json
 from typing import Any
 
 from ..canonical import encode_value
 from ..model import Arr, Obj, Value
+from ..result import INVALID_JSON
+from ..shapeguard import check_shape, load_bounded
 from .model import (
     AGG_FNS,
     BIN_OPS,
     COLUMN_TYPES,
     JOIN_KINDS,
+    LIMIT_EXCEEDED,
     MALFORMED_SHAPE,
     MISSING_FIELD,
     NOT_JSON,
@@ -257,6 +259,26 @@ def encode_pipeline(pipeline: list[Transform]) -> str:
 # ════════════════════════════════════════════════════════════════════════════
 #  Decode — parse, then walk against the schema (six-code ColumnError envelope)
 # ════════════════════════════════════════════════════════════════════════════
+
+
+def _guarded_parse(text: str) -> tuple[object, Err[ColumnError] | None]:
+    """The one guarded parse for this module's two text readers (§20.1).
+
+    A §20 row binds an entry point, so a dataframe payload must answer a
+    repeated member or an unpaired surrogate exactly as ``decode_node`` does;
+    routing it through ``shapeguard`` also makes it total on hostile input,
+    where a bare ``json.loads`` let a deep document escape as a throw. The
+    guard's ``INVALID_JSON`` maps onto this module's own ``NOT_JSON`` spelling;
+    a limit breach keeps ``LIMIT_EXCEEDED``, because §21.2 rule 2 forbids
+    relabelling it as a syntax error.
+    """
+    parsed, error = load_bounded(text)
+    if error is None:
+        error = check_shape(parsed)
+    if error is not None:
+        code = NOT_JSON if error.code == INVALID_JSON else LIMIT_EXCEEDED
+        return None, _err(code, error.message)
+    return parsed, None
 
 
 def _err(code: str, detail: str) -> Err[ColumnError]:
@@ -515,10 +537,9 @@ def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
 
 
 def decode_source(text: str) -> Result[DataSource, ColumnError]:
-    try:
-        parsed = json.loads(text)
-    except ValueError as ex:
-        return _err(NOT_JSON, str(ex))
+    parsed, guard_error = _guarded_parse(text)
+    if guard_error is not None:
+        return guard_error
     return decode_source_json(parsed)
 
 
@@ -1059,10 +1080,9 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
 
 
 def decode_pipeline(text: str) -> Result[list[Transform], ColumnError]:
-    try:
-        parsed = json.loads(text)
-    except ValueError as ex:
-        return _err(NOT_JSON, str(ex))
+    parsed, guard_error = _guarded_parse(text)
+    if guard_error is not None:
+        return guard_error
     return decode_pipeline_json(parsed)
 
 

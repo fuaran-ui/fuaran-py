@@ -555,6 +555,22 @@
       "description": "Phase 1126 — the clipboard payload is a TextSource, so §16's transparent-Literal rule reaches it: the explicit {\"$type\":\"Literal\",\"text\":…} envelope normalises to the bare string, which is also the pre-1126 spelling and still the canonical one"
     },
     {
+      "id": "lenient-1521-int-slot-integral-float",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1521-int-slot-integral-float.json",
+      "expectedFile": "lenient/lenient-1521-int-slot-integral-float.expected.json",
+      "description": "§7.1 — an integer-VALUED number written with a fractional part decodes at an integer slot and canonicalises to the integer spelling. Two hosts refused `3.0` outright, which refuses a document whose intent is unambiguous for its spelling; `2.5` at the same slot stays a WRONG_TYPE, so the accept set widens by exactly the values an integer slot can hold"
+    },
+    {
+      "id": "lenient-1521-payload-integer-beyond-int53",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1521-payload-integer-beyond-int53.json",
+      "expectedFile": "lenient/lenient-1521-payload-integer-beyond-int53.expected.json",
+      "description": "§2 rule 5 — integer identity in a rule-12 payload stops at ±(2⁵³−1). `boundary` is at the limit and survives verbatim; `beyond` is one past it, has no representation every host holds exactly, and decodes to the nearest double. Pinned as a lenient NORMALISATION rather than left implicit, because three hosts silently rounded it, one kept an int64 and one an arbitrary-precision integer — the same document, five canonical byte sequences, five hash-chain digests"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1377,6 +1393,14 @@
       "inputFile": "nodes/custom-bounded-advisory.json",
       "expectedFile": "nodes/custom-bounded-advisory.json",
       "description": "Custom (bounded escape, AdvisoryWarning hash + no exposed-ids)"
+    },
+    {
+      "id": "custom-nonascii-keys",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/custom-nonascii-keys.json",
+      "expectedFile": "nodes/custom-nonascii-keys.json",
+      "description": "Custom (§2 rule 2 — astral vs BMP payload keys, the UTF-16-order discriminator)"
     },
     {
       "id": "dash-empty",
@@ -2283,6 +2307,14 @@
       "description": "Display/Metric (float divergence-zone — 17 significant digits)"
     },
     {
+      "id": "metric-float-1e17",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/metric-float-1e17.json",
+      "expectedFile": "nodes/metric-float-1e17.json",
+      "description": "Display/Metric (§2 rule 5 — 1e17, one past the fixed-point window)"
+    },
+    {
       "id": "metric-float-bigint",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3153,6 +3185,24 @@
       "description": "Image srcSet `null` — refused. Absent means the EMPTY LIST (the missing-list-field decode class); a present null is a second spelling for an absence that already has one, and admitting it would let two hosts disagree about the canonical bytes of the same document"
     },
     {
+      "id": "reject-int-slot-fractional",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-int-slot-fractional.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.rows",
+      "description": "§7.1 — a fractional value at an integer slot. Three hosts TRUNCATED it to 2, discarding the author's value at a slot the author typed; two refused it. §7.1 refuses, and accepts `2.0` (see the lenient twin). Twin: the `skel-1` node fixture"
+    },
+    {
+      "id": "reject-int-slot-out-of-range",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-int-slot-out-of-range.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.rows",
+      "description": "§7.1 — a value outside the 32-bit range an integer slot can hold. The cast was implementation-defined: the same bytes became Int32.MinValue on one runtime and 1410065408 on another, which is §20's defect one layer above the syntax. Twin: the `skel-1` node fixture"
+    },
+    {
       "id": "reject-invalid-empty",
       "kind": "reject",
       "decoder": "node",
@@ -3178,6 +3228,114 @@
       "expectedErrorCode": "INVALID_JSON",
       "expectedPath": "$",
       "description": "truncated object"
+    },
+    {
+      "id": "reject-json-bare-nan",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-bare-nan.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 4 — a bare `NaN` literal. RFC 8259 forbids it as a bare token and §7's QUOTED sentinels are the specified representation, which row 8 accepts unchanged; one host accepted the bare form and re-emitted it. Twin: the `markdown-1` node fixture (drop the trailing member)"
+    },
+    {
+      "id": "reject-json-duplicate-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-duplicate-key.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 1 — a repeated object member. THE row that changes what a document MEANS rather than whether it is accepted: this host kept the first occurrence and every other host the last, so a vetting host and a rendering host saw different trees from identical bytes with no error anywhere. Twin: the `markdown-1` node fixture (drop the second `id`)"
+    },
+    {
+      "id": "reject-json-lone-high-surrogate",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-lone-high-surrogate.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 6 — an unpaired HIGH surrogate. The second row that changes MEANING silently: two hosts lowered it to U+FFFD, two kept it in a UTF-16 string, and one kept it and then raised an uncatchable encoding error at the first canonical-bytes boundary rather than at decode. Twin: the `markdown-1` node fixture (drop the escape)"
+    },
+    {
+      "id": "reject-json-lone-low-surrogate",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-lone-low-surrogate.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 6 — an unpaired LOW surrogate. Pinned separately from its high twin because a pairing check written as \"a high must be followed by a low\" passes this vector while leaving the class open. Twin: the `markdown-1` node fixture (drop the escape)"
+    },
+    {
+      "id": "reject-json-number-empty-exponent",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-empty-exponent.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 3 — an exponent marker with no digits. Twin: the `skel-1` node fixture (drop the `e`)"
+    },
+    {
+      "id": "reject-json-number-leading-plus",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-leading-plus.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 3 — a leading `+` on a number. RFC 8259 does not permit it; three hosts accepted it because they reached a platform number parser without checking the grammar first. Twin: the `skel-1` node fixture (drop the `+`)"
+    },
+    {
+      "id": "reject-json-number-leading-zero",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-leading-zero.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 3 — a leading zero. RFC 8259's `int` production is `0` or a non-zero digit followed by digits. Twin: the `skel-1` node fixture (drop the leading zero)"
+    },
+    {
+      "id": "reject-json-number-no-integer-part",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-no-integer-part.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 3 — a number with no integer part. Refused as a GRAMMAR violation before the slot's type is ever consulted, which is why the vector sits at a slot that would refuse a number anyway: the point is that `.5` is not a number at all. Twin: the `markdown-1` node fixture (drop the trailing member)"
+    },
+    {
+      "id": "reject-json-number-trailing-point",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-trailing-point.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 3 — a decimal point with no fractional digits. Twin: the `skel-1` node fixture (drop the point)"
+    },
+    {
+      "id": "reject-json-raw-control-char",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-raw-control-char.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 5 — a RAW U+0009 inside a string. RFC 8259 requires a C0 control character to be escaped and §2 rule 6 requires a conformant encoder to escape it, so accepting the raw byte admits input this host's own encoder cannot produce. The escaped spelling stays legal. Twin: the `markdown-1` node fixture (the tab escaped, or a space)"
+    },
+    {
+      "id": "reject-json-surrogate-pair-split",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-surrogate-pair-split.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 6 — both halves of a pair present but separated. A host that counts surrogates rather than pairing them adjacently accepts this and reassembles a scalar the author never wrote. Twin: the `markdown-1` node fixture"
+    },
+    {
+      "id": "reject-json-trailing-content",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-trailing-content.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 2 — content after the root value. §1 makes a wire artefact a single JSON document; two hosts refused this and three accepted it, which is a framing ambiguity rather than a tolerance. Twin: the `markdown-1` node fixture (drop everything after the root object)"
     },
     {
       "id": "reject-limit-json-depth",

@@ -85,6 +85,17 @@ def merge_fixtures() -> list[dict]:
     return list(manifest["fixtures"])
 
 
+def merge_refusal_fixtures() -> list[dict]:
+    """The ``refusalFixtures`` key — held SEPARATELY from ``fixtures`` because a
+    host that iterates the latter expecting every entry to auto-merge is correct
+    to do so. A host that never reads this key certifies nothing about what it
+    does when it REFUSES."""
+    if not merge_corpus_available():
+        return []
+    manifest = json.loads((MERGE_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    return list(manifest.get("refusalFixtures", []))
+
+
 def chain_corpus_available() -> bool:
     return CHAIN_CORPUS_FILE.is_file()
 

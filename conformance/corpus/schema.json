@@ -643,6 +643,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -948,6 +981,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -1194,6 +1260,39 @@
             "$type",
             "pipeline",
             "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
           ]
         },
         {
@@ -1461,6 +1560,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -1707,6 +1839,39 @@
             "$type",
             "pipeline",
             "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
           ]
         },
         {
@@ -1985,6 +2150,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -2251,6 +2449,39 @@
             "$type",
             "pipeline",
             "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
           ]
         },
         {
@@ -2573,6 +2804,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -2845,6 +3109,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -3106,6 +3403,39 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "Invoke"
             },
             "args": {
@@ -3361,6 +3691,39 @@
             "$type",
             "pipeline",
             "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Expr"
+            },
+            "expr": {
+              "type": "object"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "expr"
           ]
         },
         {

@@ -264,7 +264,7 @@ def _is_tag_name_boundary(s: str, index: int) -> bool:
     builder emits, and with the bare prefix the first of them lost its opening
     tag to this sweep, leaving the provenance document's text loose in the
     figure.
-    
+
     Requiring the boundary narrows only false positives: no spelling of a real
     `<meta>` element survives it, because the name has to be delimited for a
     parser to read it as that element in the first place. End of input counts as
@@ -276,7 +276,6 @@ def _is_tag_name_boundary(s: str, index: int) -> bool:
     if index >= len(s):
         return True
     return s[index] in " \t\n\r/>"
-
 
 
 def _index_of_element_open(s: str, open_tag: str) -> int:
@@ -319,9 +318,7 @@ def _strip_dangerous_protocols(html: str) -> str:
     value ends the span early, which SKIPS a rewrite — the direction of error
     that leaves prose intact.
     """
-    return _TAG_SPAN.sub(
-        lambda m: _DANGEROUS_PROTOCOL.sub("about:blank", m.group(0)), html
-    )
+    return _TAG_SPAN.sub(lambda m: _DANGEROUS_PROTOCOL.sub("about:blank", m.group(0)), html)
 
 
 def sanitize_markdown_html(html: str) -> str:
@@ -433,9 +430,31 @@ def sanitize_css_value_for_slot(slot: str, value: str) -> tuple[str, list[tuple[
     return CSS_REFUSAL_VALUE, [(CSS_REFUSAL_ATTRIBUTE, slot)]
 
 
-_COLOUR_KEYWORDS = frozenset(
-    {"none", "transparent", "currentcolor", "inherit", "initial", "unset"}
-)
+def _is_css_ident(value: str) -> bool:
+    """Is this a bare CSS IDENT — an ASCII letter or ``-`` then letters, digits, ``-``, ``_``?
+
+    This is what admits the 148 named colours (``red``, ``steelblue``,
+    ``rebeccapurple``), the universal keywords (``none``, ``transparent``,
+    ``currentColor``), the inheritance keywords, the SVG2 paint keywords
+    (``context-fill``, ``context-stroke``) and every colour keyword CSS has not
+    shipped yet — as ONE rule rather than as a list somebody has to keep.
+
+    Enumerating the keywords instead is wrong, because the two ways of being
+    wrong here are not symmetric. A missing keyword produces no error an author
+    can see: the paint is replaced by ``none``, so a document that was correct
+    yesterday silently renders a differently-coloured picture. Meanwhile an
+    ident buys an attacker nothing at all — it cannot fetch, cannot leave its
+    declaration and cannot name a paint server, because every one of those needs
+    punctuation this test refuses.
+    """
+    if not value:
+        return False
+    head = value[0]
+    if not (("a" <= head <= "z") or ("A" <= head <= "Z") or head == "-"):
+        return False
+    return all(("a" <= c <= "z") or ("A" <= c <= "Z") or ("0" <= c <= "9") or c in "-_" for c in value)
+
+
 _COLOUR_FUNCTIONS = (
     "rgb(",
     "rgba(",
@@ -466,14 +485,10 @@ def is_colour_value(value: str) -> bool:
     if t.startswith("#"):
         digits = t[1:]
         return len(digits) in (3, 4, 6, 8) and all(c in _HEX_DIGITS for c in digits)
-    lower = t.lower()
-    if lower in _COLOUR_KEYWORDS:
+    if _is_css_ident(t):
         return True
-    return (
-        any(lower.startswith(fn) for fn in _COLOUR_FUNCTIONS)
-        and lower.endswith(")")
-        and is_safe_css_value(t)
-    )
+    lower = t.lower()
+    return any(lower.startswith(fn) for fn in _COLOUR_FUNCTIONS) and lower.endswith(")") and is_safe_css_value(t)
 
 
 def sanitize_paint_value(value: str) -> str:
@@ -560,17 +575,11 @@ def sanitize_link_rel(rel: str | None, sanitized_target: str | None) -> list[str
             lowered = token.lower()
             if lowered in ALLOWED_LINK_REL_TOKENS and lowered not in declared:
                 declared.append(lowered)
-    forced = (
-        [t for t in ("noopener", "noreferrer") if t not in declared]
-        if sanitized_target == "_blank"
-        else []
-    )
+    forced = [t for t in ("noopener", "noreferrer") if t not in declared] if sanitized_target == "_blank" else []
     return declared + forced
 
 
-def sanitize_link_anchor(
-    target: str | None, rel: str | None
-) -> tuple[str | None, str | None]:
+def sanitize_link_anchor(target: str | None, rel: str | None) -> tuple[str | None, str | None]:
     """The two anchor attributes, resolved TOGETHER.
 
     One call, because the ``rel`` rule DEPENDS on the sanitised target (the

@@ -512,9 +512,7 @@ class Renderer:
             # same document; the React client dropped the identical value
             # silently. The rule is the shared emission grammar, so every host
             # now emits the same bytes for the same tree.
-            template, css_refusal_attrs = sanitize_css_value_for_slot(
-                "grid-template-columns", template
-            )
+            template, css_refusal_attrs = sanitize_css_value_for_slot("grid-template-columns", template)
             # `gap` (Phase 459) emits only when set — a gap-free grid stays
             # byte-identical to the pre-459 emission (mirrors F# Render.fs).
             style = f"grid-template-columns:{template}"

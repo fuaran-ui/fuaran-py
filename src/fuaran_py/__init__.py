@@ -59,7 +59,7 @@ from .validator import Finding, validate_node
 
 #: Distribution version. Kept in step with ``pyproject.toml``; the packaging-contract
 #: test in ``tests/`` fails if the two disagree, so this is a pin rather than a copy.
-__version__ = "0.0.6"
+__version__ = "0.1.0"
 
 __all__ = [
     "decode_node",

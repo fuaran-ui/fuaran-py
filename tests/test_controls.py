@@ -101,14 +101,16 @@ def test_the_control_slot_and_the_parameter_source_are_the_same_binding() -> Non
     built from one binding rather than kept in step by hand."""
     region = control.select("region", options=["EMEA"], default="EMEA")
     (declaration,) = region.params
-    wire = json.loads(encode(region))
-    assert wire["kind"]["value"] == json.loads(json.dumps(_as_json(declaration.source)))
+    control_slot = json.loads(encode(region))["kind"]["value"]
+    assert control_slot == _as_json(declaration.source)
+    assert control_slot == {"$type": "State", "defaultValue": "EMEA", "key": "region"}
 
 
-def _as_json(binding: object) -> object:
+def _as_json(lowerable: object) -> object:
+    """One authoring value as the JSON it lowers to, so two of them are comparable."""
     from fuaran_py.canonical import encode_value
 
-    return json.loads(encode_value(binding.to_wire()))  # type: ignore[attr-defined]
+    return json.loads(encode_value(lowerable.to_wire()))  # type: ignore[attr-defined]
 
 
 # ── Recompute: the same evaluator, three states ──────────────────────────────

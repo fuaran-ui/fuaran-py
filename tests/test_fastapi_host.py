@@ -76,9 +76,7 @@ class _MockTransport:
         if "deny me" in prompt:
             return 401, json.dumps({"error": {"code": "ACCESS_DENIED", "message": "token expired"}})
         if "break me" in prompt:
-            return 422, json.dumps(
-                {"error": {"stage": "apply", "code": "APPLY_REJECTED", "message": "no node"}}
-            )
+            return 422, json.dumps({"error": {"stage": "apply", "code": "APPLY_REJECTED", "message": "no node"}})
         if "undecodable" in prompt:
             # A 200 whose tree the host cannot decode. It is a canonical-looking
             # object, so the SDK admits it; the HOST is what must refuse.

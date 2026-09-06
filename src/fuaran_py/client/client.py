@@ -231,21 +231,13 @@ class FuaranClient:
             status, text = self._transport(self._endpoint, headers, body)
         except TimeoutError:
             return (
-                TurnFailed(
-                    RecoverableError(
-                        stage="provider", code=ClientCode.NETWORK, message=_TIMEOUT_MESSAGE
-                    )
-                ),
+                TurnFailed(RecoverableError(stage="provider", code=ClientCode.NETWORK, message=_TIMEOUT_MESSAGE)),
                 None,
             )
         except Exception:  # noqa: BLE001 — every transport failure funnels into the typed result
             # Deliberately no exception text — see the module docstring.
             return (
-                TurnFailed(
-                    RecoverableError(
-                        stage="provider", code=ClientCode.NETWORK, message=_NETWORK_MESSAGE
-                    )
-                ),
+                TurnFailed(RecoverableError(stage="provider", code=ClientCode.NETWORK, message=_NETWORK_MESSAGE)),
                 None,
             )
 

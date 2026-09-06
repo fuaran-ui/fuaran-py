@@ -74,7 +74,7 @@ def test_visible_and_aria_hidden_stay_distinct() -> None:
 def test_default_visible_spelling_needs_no_host_state() -> None:
     # `visible-until-dismissed` declares `defaultValue: true`. That spelling is
     # what an author needs, because a DEFAULT-LESS State predicate follows the
-    # shared `Binding.State` rule and resolves false — the FUARAN143 shape.
+    # shared `Binding.State` rule and resolves false — the FUARAN148 shape.
     assert "Shown until the reader dismisses it" in _render("node-visible")
     assert "Shown until the reader dismisses it" not in _render("node-visible", {"banner.dismissed": False})
 

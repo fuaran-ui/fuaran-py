@@ -142,7 +142,7 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
         reported: set[str] = set()
         for index, case in enumerate(cases.items):
             if isinstance(case, Obj):
-                # fuaran#1535 — FUARAN142: a case selects on a string ``match``
+                # fuaran#1535 — FUARAN147: a case selects on a string ``match``
                 # XOR a ``when`` predicate. The PRE-EMIT twin of the decoder's
                 # own refusal, and it exists for the reason every pre-emit shape
                 # rule does: a tree authored in Python never passes through the
@@ -153,7 +153,7 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
                 if has_match and has_when:
                     findings.append(
                         Finding(
-                            "FUARAN142",
+                            "FUARAN147",
                             f"{path}.cases[{index}]",
                             "switch case carries both 'match' and 'when' — exactly one selects a "
                             "case; 'match' compares the switch's `on` selector against a literal, "
@@ -163,7 +163,7 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
                 elif not has_match and not has_when:
                     findings.append(
                         Finding(
-                            "FUARAN142",
+                            "FUARAN147",
                             f"{path}.cases[{index}]",
                             "switch case carries neither 'match' nor 'when' — a case that names no "
                             "condition can never be selected; give it a literal 'match' against the "

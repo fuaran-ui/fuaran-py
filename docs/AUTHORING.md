@@ -255,6 +255,66 @@ A worked notebook, committed with its recorded outputs, is
 [`../examples/notebook_display.ipynb`](../examples/notebook_display.ipynb); its
 header carries the one command that re-records it.
 
+## Parameter-bound controls (`fuaran_py.ui.control`)
+
+A dashboard built from the layers above is read-only: the numbers are baked in at
+authoring time and a reader can only look at them. A **control** makes it answer back.
+It declares a state slot; a pipeline reads that slot through `param(name)`; and a host
+re-derives the rows when the slot changes — with no Python present, because the
+`Transform` and its parameters are ordinary wire data:
+
+```python
+from fuaran_py.ui import col, control, frame, fuaran, node, param, quick
+
+region = control.select("region", options=col("region").unique(), source=frame(rows))
+
+fr = frame(rows).filter(col("region").eq(param("region"))).bind(region)
+
+app = quick.dashboard(
+    "Revenue by region",
+    region,
+    node.bare(fuaran.chart("revenue", source=fr.to_transform_binding(), x_field="month", y_fields=["revenue"])),
+)
+```
+
+| Constructor | Declares | Read it with |
+|---|---|---|
+| `control.select(name, options=…, default=…)` | `name` | `col("c").eq(param(name))` |
+| `control.multi_select(name, options=…, default=…)` | `name` (a LIST parameter) | `col("c").is_in(param(name))` |
+| `control.range(name, low=…, high=…)` | `name_min`, `name_max` | `col("c") >= param(f"{name}_min")` |
+| `control.date_range(name, start=…, end=…)` | `name_from`, `name_to` | `col("c") >= param(f"{name}_from")` |
+
+Ids are derived exactly as `quick`'s are, so a re-run of an unchanged cell is still
+byte-identical and still patchable.
+
+**A range declares two parameters, not one.** A `Transform` parameter resolves to a
+single scalar and the expression algebra has no projection from a pair to its ends, so a
+parameter bound to a pair-valued slot is a *list* parameter and can only test membership.
+Two scalar slots is the shape that can be compared against; the constructor still renders
+one labelled pair of inputs.
+
+**An unseeded slot is an absent constraint, not a zero.** The parameter is unbound, so
+the filter step reading it is pruned and that end is open — which is what makes
+`control.range("revenue", low=0)` mean "at least zero, no upper bound" and a cleared
+select mean "every region".
+
+**Options can be data.** `options=col("region").unique()` lowers to a `Transform` over
+the `source` frame that projects the column, de-duplicates, orders, and copies it to the
+`label` column — so the option list is derived by the same evaluator the rows are, and a
+region that appears in the data appears in the control without anyone maintaining a list.
+
+**A parameter no control fills is refused when the binding is lowered**, by name, and the
+refusal says what *is* declared:
+
+```python
+frame(rows).filter(col("region").eq(param("regoin"))).bind(region).to_transform_binding()
+# UnboundParamError: the pipeline reads parameter(s) 'regoin' that no declared control
+# fills; declared: region. Pass the control(s) to .bind(...) before lowering the binding.
+```
+
+The evaluator's `UNBOUND_PARAM` still exists and is still correct — it is the backstop
+for a pipeline that arrived some other way, never the first thing an author meets.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

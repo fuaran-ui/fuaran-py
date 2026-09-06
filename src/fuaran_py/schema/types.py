@@ -1634,6 +1634,13 @@ class Select:
     # when present. The multi onChange is a closure → no separate wire key.
     multiple: bool = False
     values: Binding | None = None
+    #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
+    #: closure and so rides as the sentinel; what matters is whether the key is there
+    #: at all, because a renderer arms its write-back default only for a control that
+    #: declares no handler. `True` is the default so every tree authored before this
+    #: flag encodes byte-identically; a control meant to WRITE its own slot passes
+    #: `on_change=False`. Same shape and same reason as `ToggleField.on_toggle`.
+    on_change: bool = True
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1642,7 +1649,7 @@ class Select:
                 "disabled": self.disabled,
                 "label": self.label,
                 "multiple": self.multiple if self.multiple else None,
-                "onChange": CLOSURE,
+                "onChange": CLOSURE if self.on_change else None,
                 "placeholder": self.placeholder,
                 "source": self.source,
                 "value": self.value,
@@ -1788,9 +1795,12 @@ class TextField:
 @dataclass(frozen=True)
 class NumberField:
     value: Binding
+    #: fuaran#1170 — see `Select.on_change`: the absent key is what arms a renderer's
+    #: write-back default, so a control that writes its own slot passes `False`.
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("Number", {"onChange": CLOSURE, "value": _lower(self.value)})
+        return _obj("Number", {"onChange": CLOSURE if self.on_change else None, "value": self.value})
 
 
 @dataclass(frozen=True)
@@ -1850,6 +1860,9 @@ class DateField:
     min: str | None = None
     max: str | None = None
     step: float | None = None
+    #: fuaran#1170 — see `Select.on_change`: the absent key is what arms a renderer's
+    #: write-back default, so a control that writes its own slot passes `False`.
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         return _obj(
@@ -1857,7 +1870,7 @@ class DateField:
             {
                 "max": self.max,
                 "min": self.min,
-                "onChange": CLOSURE,
+                "onChange": CLOSURE if self.on_change else None,
                 "step": self.step,
                 "value": self.value,
                 "variant": self.variant,

@@ -26,6 +26,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from typing import Protocol, runtime_checkable
 
 from ..canonical import encode_value
 from ..dataframe import (
@@ -45,10 +46,14 @@ from ..dataframe import (
     Embedded,
     Filter,
     GroupBy,
+    InList,
+    InParam,
+    IsNull,
     Join,
     Limit,
     Lit,
     Not,
+    Param,
     Pivot,
     PivotSpec,
     Project,
@@ -198,6 +203,34 @@ class Expr:
     def date_part(self, part: str) -> Expr:
         return Expr(ApplyFn("datePart", [Lit(cell_str(part)), self.colexpr]))
 
+    # membership ----------------------------------------------------------------
+    def is_in(self, items: Expr | Sequence[object]) -> Expr:
+        """Membership — ``col('region').is_in(param('regions'))`` or a literal list.
+
+        The two spellings are two wire cases and the difference is load-bearing: a
+        param names a slot a multi-select control writes, and an EMPTY selection is
+        *unbound* rather than an empty set, so the dependent filter prunes and the
+        unfiltered table shows. A literal list is a constraint the document carries.
+        """
+        if isinstance(items, Expr):
+            if not isinstance(items.colexpr, Param):
+                raise TypeError("is_in over an expression takes a param: col('x').is_in(param('xs'))")
+            return Expr(InParam(self.colexpr, items.colexpr.name))
+        return Expr(InList(self.colexpr, [_as_expr(item).colexpr for item in items]))
+
+    # option derivation ---------------------------------------------------------
+    def unique(self) -> OptionSource:
+        """This column's distinct values, as a control's option list.
+
+        Not an expression: it is a *declaration* that the option list is derived from
+        the data rather than enumerated in the document, and it lowers to a
+        ``Transform`` the host evaluates. Passing it where a predicate belongs fails
+        by type, which is the point of it not being an :class:`Expr`.
+        """
+        if not isinstance(self.colexpr, Col):
+            raise TypeError("unique() applies to a column expression, e.g. col('region').unique()")
+        return OptionSource(self.colexpr.name)
+
     # aggregation ---------------------------------------------------------------
     def _agg(self, fn: str) -> AggExpr:
         if not isinstance(self.colexpr, Col):
@@ -263,6 +296,22 @@ def col(name: str) -> Expr:
     return Expr(Col(name))
 
 
+def param(name: str) -> Expr:
+    """A named hole a declared control fills — ``col('region').eq(param('region'))``.
+
+    The name is the parameter's, and a control declares it: the ``Transform`` binding
+    carries a ``params`` entry pairing this name with the control's own slot, and the
+    host substitutes the slot's current value before it evaluates. Nothing here reads a
+    value; the artifact is still the pipeline.
+
+    A param the frame has not been told about is refused when the binding is lowered
+    (:meth:`Frame.to_transform_binding`), by name — the evaluator's ``UNBOUND_PARAM`` is
+    the backstop for a pipeline that reached it some other way, never the first thing an
+    author sees.
+    """
+    return Expr(Param(name))
+
+
 def lit(value: object, type_: str | None = None) -> Expr:
     """A literal. ``type_`` pins a ``date`` / ``timestamp`` (otherwise inferred from the Python type)."""
     if type_ == "date" and isinstance(value, str):
@@ -270,6 +319,123 @@ def lit(value: object, type_: str | None = None) -> Expr:
     if type_ == "timestamp" and isinstance(value, str):
         return Expr(Lit(cell_timestamp(value)))
     return Expr(Lit(_to_cell(value)))
+
+
+# ── Parameter declarations (fuaran#1170) ─────────────────────────────────────
+
+
+class UnboundParamError(ValueError):
+    """A pipeline reads a parameter no declared control fills.
+
+    Raised where the ``Transform`` binding is built, which is the last moment the
+    author's own names are still in hand. The alternative is a tree that renders and
+    silently drops the filter that mentions the name, in a browser, on someone else's
+    machine.
+    """
+
+
+@dataclass(frozen=True)
+class ParamDecl:
+    """One ``params`` entry: a parameter name, and the slot its value is read from.
+
+    ``source`` is an ordinary :class:`~fuaran_py.schema.types.Binding` — a control's
+    ``State`` slot, a filter, or a literal — so a parameter is bound to the same
+    vocabulary everything else in the tree reads from, and nothing new is minted for it.
+    """
+
+    name: str
+    source: object  # a `schema.types` Binding — anything that lowers via `to_wire()`
+
+    def to_wire(self) -> WireValue:
+        lowered = self.source
+        to_wire = getattr(lowered, "to_wire", None)
+        if not callable(to_wire):
+            raise TypeError(f"param {self.name!r}: source must be a Binding, got {type(self.source).__name__}")
+        return Obj(None, {"from": to_wire(), "name": self.name})
+
+
+@dataclass(frozen=True)
+class OptionSource:
+    """``col(name).unique()`` — a control's option list, derived from the data.
+
+    Lowered by a control constructor against whichever source the control was given, to
+    a pipeline projecting the column to ``value``, de-duplicating, ordering, and copying
+    it to ``label``. The two column names are the shape a host reads an option list in,
+    so the derived table IS the option list rather than something a second step has to
+    convert.
+    """
+
+    column: str
+
+    def pipeline(self) -> tuple[Transform, ...]:
+        """The steps that turn a table into ``(value, label)`` option rows."""
+        return (
+            Project([(self.column, "value")]),
+            Distinct(),
+            Sort([("value", "asc")]),
+            Derive("label", Col("value")),
+        )
+
+
+def _expr_param_names(expr: ColExpr) -> set[str]:
+    """Every parameter name an expression reads, scalar and list alike.
+
+    The twin of the host resolver's own walk (:mod:`fuaran_py.compute.evaluate`), and
+    deliberately total over the closed ``ColExpr`` union: a case this misses is a name
+    the author-time check would not refuse and the browser would.
+    """
+    if isinstance(expr, Param):
+        return {expr.name}
+    if isinstance(expr, InParam):
+        return _expr_param_names(expr.expr) | {expr.param}
+    if isinstance(expr, Binary):
+        return _expr_param_names(expr.left) | _expr_param_names(expr.right)
+    if isinstance(expr, (Not, Cast, IsNull)):
+        return _expr_param_names(expr.expr)
+    if isinstance(expr, Coalesce):
+        return {n for x in expr.exprs for n in _expr_param_names(x)}
+    if isinstance(expr, ApplyFn):
+        return {n for x in expr.args for n in _expr_param_names(x)}
+    if isinstance(expr, InList):
+        return _expr_param_names(expr.expr) | {n for x in expr.items for n in _expr_param_names(x)}
+    if isinstance(expr, Case):
+        names = _expr_param_names(expr.else_expr)
+        for when_e, then_e in expr.cases:
+            names |= _expr_param_names(when_e) | _expr_param_names(then_e)
+        return names
+    return set()  # Col, Lit
+
+
+def _pipeline_param_names(pipeline: Sequence[Transform]) -> set[str]:
+    """Every parameter name a pipeline reads. ``filter`` and ``derive`` are the only
+    steps carrying an expression, which is the same pair the host substitutes over."""
+    names: set[str] = set()
+    for step in pipeline:
+        if isinstance(step, Filter):
+            names |= _expr_param_names(step.pred)
+        elif isinstance(step, Derive):
+            names |= _expr_param_names(step.expr)
+    return names
+
+
+@runtime_checkable
+class _ParamSource(Protocol):
+    """Anything that declares parameters — a control, or a bare :class:`ParamDecl`."""
+
+    @property
+    def params(self) -> tuple[ParamDecl, ...]: ...
+
+
+def _declarations_of(source: ParamDecl | _ParamSource) -> tuple[ParamDecl, ...]:
+    if isinstance(source, ParamDecl):
+        return (source,)
+    declared = getattr(source, "params", None)
+    if declared is None:
+        raise TypeError(
+            f"bind() takes controls or ParamDecls; {type(source).__name__} declares no parameters. "
+            "A control built by `fuaran_py.ui.control` carries its own."
+        )
+    return tuple(declared)
 
 
 # ── when / then / otherwise (Case) ───────────────────────────────────────────
@@ -383,9 +549,38 @@ class Frame:
 
     source: DataSource
     pipeline: tuple[Transform, ...] = ()
+    #: fuaran#1170 — the parameters declared for this frame, in declaration order. A
+    #: frame that declares none emits no ``params`` key, so every pipeline authored
+    #: before controls existed encodes byte-identically.
+    params: tuple[ParamDecl, ...] = ()
 
     def _step(self, t: Transform) -> Frame:
-        return Frame(self.source, (*self.pipeline, t))
+        return replace(self, pipeline=(*self.pipeline, t))
+
+    # parameter declaration ------------------------------------------------------
+    def bind(self, *sources: ParamDecl | _ParamSource) -> Frame:
+        """Declare the controls (or bare :class:`ParamDecl`\\ s) this pipeline reads.
+
+        Binding is what makes :func:`param` resolvable, and declaring the same name
+        twice with two different slots is refused here rather than left to a host: one
+        slot cannot hold two values, and a renderer that had to pick would pick
+        differently from the next one. Re-declaring the SAME pairing is a no-op, so
+        binding one control to two frames costs nothing.
+        """
+        declared = {d.name: d for d in self.params}
+        added: list[ParamDecl] = []
+        for source in sources:
+            for decl in _declarations_of(source):
+                existing = declared.get(decl.name)
+                if existing is None:
+                    declared[decl.name] = decl
+                    added.append(decl)
+                elif existing.source != decl.source:
+                    raise UnboundParamError(
+                        f"parameter {decl.name!r} is already declared from a different slot; "
+                        "one parameter names one slot, so rename one of the controls."
+                    )
+        return replace(self, params=(*self.params, *added))
 
     # row / column verbs --------------------------------------------------------
     def filter(self, predicate: Expr) -> Frame:
@@ -474,8 +669,23 @@ class Frame:
         return _codec.encode_pipeline(list(self.pipeline))
 
     def to_transform_binding(self) -> TransformBinding:
-        """The ``Binding.Transform`` authoring value — usable as a data-bound node source."""
-        return TransformBinding(self.source, tuple(self.pipeline))
+        """The ``Binding.Transform`` authoring value — usable as a data-bound node source.
+
+        This is where an **unbound parameter is refused**: every name the pipeline reads
+        must have been declared by :meth:`bind`. The refusal names the missing parameters
+        and what IS declared, because the commonest cause is a spelling — a range control
+        declares ``<name>_min`` / ``<name>_max``, not ``<name>``.
+        """
+        declared = {d.name for d in self.params}
+        missing = sorted(_pipeline_param_names(self.pipeline) - declared)
+        if missing:
+            known = ", ".join(sorted(declared)) if declared else "nothing"
+            raise UnboundParamError(
+                f"the pipeline reads parameter(s) {', '.join(repr(m) for m in missing)} that no "
+                f"declared control fills; declared: {known}. Pass the control(s) to .bind(...) "
+                "before lowering the binding."
+            )
+        return TransformBinding(self.source, tuple(self.pipeline), tuple(self.params))
 
     def to_transform_json(self) -> str:
         """The canonical ``{"$type":"Transform","pipeline":[…],"source":{…}}`` wire string."""
@@ -510,15 +720,18 @@ class TransformBinding:
 
     source: DataSource
     pipeline: tuple[Transform, ...]
+    #: fuaran#1170 — the declared parameters. OMITTED from the wire when empty, so a
+    #: parameter-free binding is byte-identical to what this class emitted before.
+    params: tuple[ParamDecl, ...] = ()
 
     def to_wire(self) -> WireValue:
-        return Obj(
-            "Transform",
-            {
-                "pipeline": Arr([_codec.encode_transform_value(t) for t in self.pipeline]),
-                "source": _codec.encode_source_value(self.source),
-            },
-        )
+        fields: dict[str, WireValue] = {
+            "pipeline": Arr([_codec.encode_transform_value(t) for t in self.pipeline]),
+            "source": _codec.encode_source_value(self.source),
+        }
+        if self.params:
+            fields["params"] = Arr([p.to_wire() for p in self.params])
+        return Obj("Transform", fields)
 
 
 def frame(

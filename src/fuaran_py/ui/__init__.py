@@ -969,7 +969,11 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         disabled: Binding | None = None,
         multiple: bool = False,
         values: Binding | None = None,
+        on_change: bool = True,
     ) -> UiNode:
+        """The select control. ``on_change=False`` OMITS the handler key, which is what
+        arms a renderer's write-back default against ``value`` / ``values`` — see
+        :class:`~fuaran_py.schema.types.Select`."""
         kind = t.Select(
             _text(label),
             source,
@@ -978,6 +982,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             disabled,
             multiple,
             values,
+            on_change,
         )
         return _node(id, kind, accessibility.select)
 
@@ -1186,20 +1191,29 @@ from . import capability as capability  # noqa: E402, PLC0414 — append-only re
 # fuaran#1160 — the terse, notebook-grade layer OVER this surface (title-first,
 # records-in, ids derived). It composes the constructors defined above, so it is
 # imported here at the module foot rather than at the head.
+# fuaran#1170 — controls whose State slot feeds a Compute parameter. It composes both
+# this module's constructors and the compute layer's declarations, so it too is imported
+# at the module foot.
+from . import controls as controls  # noqa: E402, PLC0414 — append-only re-export at module foot
 from . import quick as quick  # noqa: E402, PLC0414 — append-only re-export at module foot
 from .capability import invoke  # noqa: E402 — the Invoke wire ctor (Binding.Invoke / Action.Invoke)
 from .compute import (  # noqa: E402 — append-only: kept below the existing surface (integration-lane convention)
     AggExpr,
     Expr,
     Frame,
+    OptionSource,
+    ParamDecl,
     TransformBinding,
+    UnboundParamError,
     col,
     frame,
     lit,
+    param,
     source_ref,
     transform,
     when,
 )
+from .controls import Control, control  # noqa: E402 — fuaran#1170, the control namespace
 
 __all__ = [
     "fuaran",
@@ -1234,4 +1248,12 @@ __all__ = [
     "invoke",
     # The terse notebook layer (fuaran#1160)
     "quick",
+    # Parameter-bound controls (fuaran#1170)
+    "controls",
+    "control",
+    "Control",
+    "param",
+    "ParamDecl",
+    "OptionSource",
+    "UnboundParamError",
 ]

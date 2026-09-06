@@ -122,6 +122,26 @@ short, typed op script a host can *apply* to the rendered page rather than a
 rebuild. See [docs/AUTHORING.md](docs/AUTHORING.md#the-terse-layer-fuaran_pyuiquick--title-first-records-in-ids-derived)
 and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py).
 
+### …and it can answer back
+
+`fuaran_py.ui.control` declares a state slot; a pipeline reads that slot through
+`param(name)`; and a host re-derives the rows when the slot changes — a `Transform` and
+its parameters are ordinary wire data, so this happens wherever the tree is rendered and
+needs no Python there.
+
+```python
+from fuaran_py.ui import col, control, frame, param
+
+region = control.select("region", options=col("region").unique(), source=frame(rows))
+fr = frame(rows).filter(col("region").eq(param("region"))).bind(region)
+```
+
+`select` / `multi_select` / `range` / `date_range`; the slot is seeded with the declared
+default (WIRE_FORMAT §24.4), an unseeded one is an absent constraint rather than a zero,
+and a parameter no control fills is refused when the binding is lowered rather than
+silently dropped in a browser. See
+[docs/AUTHORING.md](docs/AUTHORING.md#parameter-bound-controls-fuaran_pyuicontrol).
+
 ## Render (optional)
 
 A decoded tree renders to a sanitised HTML **body fragment** from Python — no

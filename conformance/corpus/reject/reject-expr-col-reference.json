@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Markdown","text":{"$type":"Bound","binding":{"$type":"Expr","expr":{"$type":"col","name":"total"}}}}}

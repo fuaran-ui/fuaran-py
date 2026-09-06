@@ -1491,6 +1491,22 @@
       "description": "Layout/Box (Phase 767 — the canonical empty state with a CTA: one Card region, no nested Callout)"
     },
     {
+      "id": "expr-params-state-selection",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/expr-params-state-selection.json",
+      "expectedFile": "nodes/expr-params-state-selection.json",
+      "description": "Binding/Expr (Phase 1534 — params from State / Selection / Query / Filter / Now, including an InParam membership test)"
+    },
+    {
+      "id": "expr-scalar",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/expr-scalar.json",
+      "expectedFile": "nodes/expr-scalar.json",
+      "description": "Binding/Expr (Phase 1534 — scalar logic with no params: concat, arithmetic, AND/NOT, a null test)"
+    },
+    {
       "id": "fact-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3129,6 +3145,24 @@
       "expectedErrorCode": "EMPTY_NODE_ID",
       "expectedPath": "$.id",
       "description": "Empty top-level id"
+    },
+    {
+      "id": "reject-expr-col-reference",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-expr-col-reference.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.text.binding.expr",
+      "description": "a `col` reference inside a Binding.Expr — an Expr evaluates against its params alone and has no row for a column name to read, so the reference can never resolve. The remedy is a different BINDING, not a different spelling: Binding.Transform supplies the frame `col` reads from. Refused at decode rather than left to fail once per render on every host (Phase 1534)"
+    },
+    {
+      "id": "reject-expr-unbound-param",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-expr-unbound-param.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.text.binding.expr",
+      "description": "a Binding.Expr whose expression reads `param quantity` while its own `params` binds only `unitPrice`. Unlike Binding.Transform — where an unbound filter param prunes its step, the deliberate unset-chip leniency — an Expr has no step to prune and no rows to fall back on, so the reference has no value it could ever take. Refused at decode, where the missing name can be named (Phase 1534)"
     },
     {
       "id": "reject-fieldrule-empty",

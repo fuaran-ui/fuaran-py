@@ -20,7 +20,7 @@ Modelling conventions, mirroring the sibling hosts:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from ..model import Node, Obj
 from ..ops import ApplyError
@@ -179,6 +179,7 @@ type ReplayError = ApplyFailed
 # ── Sink contract ────────────────────────────────────────────────────────────
 
 
+@runtime_checkable
 class OpStreamSink(Protocol):
     """The durable sink contract — the Python twin of ``IOpStreamSink``.
 
@@ -202,4 +203,78 @@ class OpStreamSink(Protocol):
 
     def streams(self) -> list[str]:
         """Distinct stream ids the sink holds records for. Order unspecified."""
+        ...
+
+
+# ── Compare-and-append (optional sink extension) ─────────────────────────────
+
+
+@dataclass(frozen=True)
+class AppendReceipt:
+    """The address of a record now in a stream, and its chain hash.
+
+    Deliberately not the whole :class:`OpRecord` — a receipt is what a retry
+    compares against, and the record it names is already recoverable via
+    ``sink.replay`` at this address.
+    """
+
+    stream_id: str
+    sequence: int
+    hash: str
+
+
+@dataclass(frozen=True)
+class Appended:
+    """A compare-and-append succeeded; ``receipt`` names the record now in the
+    stream."""
+
+    receipt: AppendReceipt
+
+
+@dataclass(frozen=True)
+class StaleHead:
+    """A compare-and-append was rejected: the stream's actual head was not
+    ``expected`` when the call reached the sink. ``actual`` is the value a
+    retry rebuilds its record against — a caller never needs a second round
+    trip just to learn what the real head is."""
+
+    expected: str
+    actual: str
+
+
+#: The outcome of a compare-and-append (:meth:`CasOpStreamSink.append_if`).
+type CasAppendOutcome = Appended | StaleHead
+
+
+@runtime_checkable
+class CasOpStreamSink(OpStreamSink, Protocol):
+    """Optional extension of :class:`OpStreamSink` adding a typed
+    compare-and-append.
+
+    A separate protocol, not new members on :class:`OpStreamSink` itself:
+    that protocol already ships with implementors outside this package, and a
+    structural ``Protocol`` cannot grow a required member without breaking
+    every one of them. A sink that supports the stronger contract implements
+    this one too (it already carries every :class:`OpStreamSink` member); a
+    caller checks ``isinstance(sink, CasOpStreamSink)`` — both protocols are
+    ``@runtime_checkable`` — before reaching for it, and falls back to plain
+    :meth:`OpStreamSink.append` when a sink does not support it.
+    """
+
+    def head(self, stream_id: str) -> str:
+        """The chain hash of the record at ``latest_sequence(stream_id)``, or
+        the chain's genesis anchor for a stream with no records yet."""
+        ...
+
+    def append_if(self, record: OpRecord, expected_head: str) -> CasAppendOutcome:
+        """Append ``record`` only if the stream's current head is
+        ``expected_head``.
+
+        At the true head this behaves exactly like
+        :meth:`OpStreamSink.append` plus a receipt. At a stale head
+        **nothing is persisted** and ``StaleHead(expected_head, actual)`` is
+        returned instead of raising — a conflict is a value a caller can
+        retry against, not an exception it has to catch and re-derive the
+        real head from.
+        """
         ...

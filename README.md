@@ -578,6 +578,43 @@ self-describing) and this host reproduces the committed golden hashes in the sha
 certify against. The module is stdlib-only (`hashlib.sha256`); a genuinely
 I/O-backed sink is a follow-up implementing the same `OpStreamSink` protocol.
 
+### Compare-and-append — the concurrent-writer write path
+
+`OpStreamSink.append` alone only supports a **proposal**: a caller reads
+`latest_sequence` and appends at `+1`, and two callers racing the same stream can
+propose the same sequence. One of them wins; historically the loser's `append`
+raised and `apply_and_persist` swallowed it by default — a real edit, silently
+gone, with the caller told the apply succeeded (which it had — only the durable
+record of it was lost).
+
+`InMemorySink` also implements the optional `CasOpStreamSink` extension — a typed
+compare-and-append:
+
+```python
+from fuaran_py.op_stream import Appended, StaleHead
+
+expected = sink.head("doc-1")  # the chain head, or GENESIS_PREVIOUS_HASH
+outcome = sink.append_if(record, expected)  # built against `expected`
+match outcome:
+    case Appended(receipt):
+        ...  # `receipt` names the record now at `receipt.sequence`
+    case StaleHead(expected, actual):
+        ...  # nothing was persisted; rebuild the record against `actual` and retry
+```
+
+`apply_and_persist` uses this automatically whenever `sink` supports it
+(`isinstance(sink, CasOpStreamSink)`), retrying against the sink-reported actual
+head — bounded, not unbounded spinning — instead of the plain read-then-append. A
+sink that does not implement the extension keeps the read-then-append path
+unchanged. Either way, a durability failure (a stale race exhausting its retries, a
+rejected append, or a detected gap in the stream) now reaches
+`PersistContext.on_sink_error`, whose default — `default_sink_error_reporter` — logs
+it rather than staying silent; pass `on_sink_error=None` to opt back into silence
+deliberately.
+
+This host declares no stability policy yet (pre-1.0, `0.0.1`), so the change is
+recorded here rather than in a `STABILITY.md` it does not have.
+
 ## Generate (client for the hosted endpoint, optional)
 
 The **Fuaran generation endpoint** is a paid, stateless, bring-your-own-key

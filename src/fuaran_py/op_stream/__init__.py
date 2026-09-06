@@ -15,7 +15,14 @@ Public surface::
         OpRecord, Checkpoint,
         compute_hash, verify_chain, encode_stream_entry, format_version,
         InMemorySink, apply_and_persist, replay_stream, PersistContext,
+        CasOpStreamSink, CasAppendOutcome, AppendReceipt, Appended, StaleHead,
     )
+
+``InMemorySink`` also implements the optional ``CasOpStreamSink`` extension (a
+typed compare-and-append: ``head`` / ``append_if``); ``apply_and_persist`` uses
+it automatically when a sink supports it, retrying a lost race against the
+sink-reported actual head instead of the plain read-then-append every sink
+still supports.
 """
 
 from __future__ import annotations
@@ -34,6 +41,8 @@ from .hash_chain import (
 )
 from .in_memory_sink import InMemorySink, create_in_memory_sink
 from .replay import (
+    CasRetryExhausted,
+    OpStreamGapError,
     PersistContext,
     PersistErr,
     PersistOk,
@@ -41,15 +50,21 @@ from .replay import (
     ReplayErr,
     ReplayOk,
     ReplayResult,
+    SinkAppendError,
     apply_and_persist,
     apply_to,
+    default_sink_error_reporter,
     replay_stream,
 )
 from .types import (
     SUCCESS,
     Actor,
     AgentActor,
+    Appended,
+    AppendReceipt,
     ApplyFailed,
+    CasAppendOutcome,
+    CasOpStreamSink,
     Checkpoint,
     Failure,
     HashMismatch,
@@ -60,6 +75,7 @@ from .types import (
     OutOfOrder,
     PreviousHashMismatch,
     ReplayError,
+    StaleHead,
     Success,
     VerificationError,
     actor_id,
@@ -97,6 +113,12 @@ __all__ = [
     "OutOfOrder",
     "ReplayError",
     "ApplyFailed",
+    # compare-and-append (optional sink extension)
+    "CasOpStreamSink",
+    "CasAppendOutcome",
+    "AppendReceipt",
+    "Appended",
+    "StaleHead",
     # sink
     "InMemorySink",
     "create_in_memory_sink",
@@ -105,6 +127,10 @@ __all__ = [
     "replay_stream",
     "apply_and_persist",
     "PersistContext",
+    "default_sink_error_reporter",
+    "SinkAppendError",
+    "OpStreamGapError",
+    "CasRetryExhausted",
     "ReplayOk",
     "ReplayErr",
     "ReplayResult",

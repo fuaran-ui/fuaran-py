@@ -13,6 +13,8 @@ apply-and-persist behaviour.
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable
 from dataclasses import replace
 
 import pytest
@@ -24,6 +26,7 @@ from fuaran_py.op_stream import (
     CHAIN_FORMAT_VERSION,
     GENESIS_PREVIOUS_HASH,
     AgentActor,
+    Appended,
     Failure,
     HashMismatch,
     HumanActor,
@@ -31,7 +34,10 @@ from fuaran_py.op_stream import (
     OpRecord,
     OutOfOrder,
     PersistContext,
+    PersistResult,
     PreviousHashMismatch,
+    SinkAppendError,
+    StaleHead,
     Success,
     apply_and_persist,
     compute_hash,
@@ -40,6 +46,7 @@ from fuaran_py.op_stream import (
     replay_stream,
     verify_chain,
 )
+from fuaran_py.op_stream.replay import _Gap, _previous_hash_for
 from fuaran_py.op_stream.types import Actor, OpResultEnvelope
 
 
@@ -266,3 +273,209 @@ def test_sink_rejects_duplicate_sequence() -> None:
     sink.append(r)
     with pytest.raises(ValueError, match="duplicate"):
         sink.append(r)
+
+
+# ── Compare-and-append — concurrent writers ──────────────────────────────────
+
+
+class _FirstPairGate:
+    """Makes the first TWO callers — across however many threads reach it, in
+    whichever order the OS scheduler picks — return the exact SAME value:
+    whatever the very first call actually computes. A call beyond the first
+    two reads live.
+
+    This is deliberately not a :class:`threading.Barrier`: a barrier only
+    synchronises *arrival*, and two threads released together can still run
+    their next line of Python in either order (or one can run to completion
+    before the other resumes at all — entirely possible under the GIL for a
+    lock-only critical section with no I/O). Caching the first call's result
+    for the second caller to reuse makes "two readers observe identical stale
+    state" a deterministic property of the test, not a hopeful side effect of
+    thread scheduling.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._count = 0
+        self._cached: object = None
+
+    def read(self, compute: Callable[[], object]) -> object:
+        with self._lock:
+            if self._count == 0:
+                self._cached = compute()
+            use_cache = self._count < 2
+            self._count += 1
+            if use_cache:
+                return self._cached
+        return compute()
+
+
+class _ForcedRaceSink(InMemorySink):
+    """An :class:`InMemorySink` whose ``head`` and ``latest_sequence`` each
+    gate their first two callers through their own :class:`_FirstPairGate`.
+
+    Both of :mod:`~fuaran_py.op_stream.replay`'s write paths read one or both
+    of these as their very first step, before either caller has appended
+    anything: the read-then-append fallback calls `latest_sequence` once; the
+    compare-and-append path calls `head` then `latest_sequence` once per
+    attempt, and only a RETRY (from whichever thread lost the race) calls
+    either a third time — by which point each gate's pair is already spent,
+    so a retry always reads live. Gating both methods independently — rather
+    than only `latest_sequence` — matters for the compare-and-append path
+    specifically: `_persist_via_cas` reads `head` before `latest_sequence`,
+    and real time only moves forward, so in genuine concurrent execution a
+    `head` read can never be FRESHER than the `latest_sequence` read that
+    follows it. Gating only `latest_sequence` breaks that invariant (an
+    artefact of the gate, not of the code under test) — the second thread
+    would see a live `head` paired with a stale cached `sequence`, a
+    combination `append_if` never protects against because real execution
+    cannot produce it, and the sink's own duplicate-sequence guard would raise
+    OUT of `append_if` instead of yielding the `StaleHead` the retry loop
+    knows how to handle. Gating both restores a consistent stale snapshot for
+    the second caller, exactly like a real race.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._head_gate = _FirstPairGate()
+        self._sequence_gate = _FirstPairGate()
+
+    def head(self, stream_id: str) -> str:
+        value = self._head_gate.read(lambda: InMemorySink.head(self, stream_id))
+        assert isinstance(value, str)
+        return value
+
+    def latest_sequence(self, stream_id: str) -> int:
+        value = self._sequence_gate.read(lambda: InMemorySink.latest_sequence(self, stream_id))
+        assert isinstance(value, int)
+        return value
+
+
+def test_two_concurrent_writers_both_persist_via_compare_and_append() -> None:
+    """Two threads racing `apply_and_persist` on the same stream must both end
+    up durably persisted, at contiguous sequences, with neither told it
+    succeeded while its op was actually lost.
+
+    This is the regression test for the read-then-append race: a plain
+    `latest_sequence` + `append` write path lets both threads compute the same
+    next sequence, and the loser's `append` used to raise into a default
+    `on_sink_error` hook that discarded it silently. Confirmed by hand: with
+    `apply_and_persist`'s `isinstance(sink, CasOpStreamSink)` branch forced to
+    always take the read-then-append path, this test fails — one thread's op
+    never reaches the sink, `sink.latest_sequence("s")` stops at 1, and
+    `errors` gains a `SinkAppendError` wrapping a plain duplicate-sequence
+    `ValueError` instead of staying empty. Restored immediately after
+    confirming that failure; not pinned as a second code path here.
+    """
+    sink = _ForcedRaceSink()
+    tree = _two_child_card()
+    results: dict[str, PersistResult] = {}
+    errors: list[Exception] = []
+
+    def _persist(name: str, target: str) -> None:
+        ctx = PersistContext(
+            stream_id="s",
+            user_id=name,
+            now=lambda: 1700000000,
+            on_sink_error=errors.append,
+        )
+        results[name] = apply_and_persist(sink, ctx, Obj("RemoveNode", {"target": target}), tree)
+
+    t1 = threading.Thread(target=_persist, args=("alice", "leaf"))
+    t2 = threading.Thread(target=_persist, args=("bob", "leaf2"))
+    t1.start()
+    t2.start()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+
+    # Both callers saw a successful apply — durability is best-effort, but
+    # neither actually lost its op underneath that success.
+    assert results["alice"].ok
+    assert results["bob"].ok
+
+    records = _chain_of(sink, "s")
+    assert [r.sequence for r in records] == [1, 2]
+    assert verify_chain(records) is None
+    persisted_targets = {r.op.fields["target"] for r in records}
+    assert persisted_targets == {"leaf", "leaf2"}
+    # The race was real (one attempt lost it and had to retry) but resolved —
+    # no failure ever reached the caller's hook.
+    assert errors == []
+
+
+def test_append_if_at_a_stale_head_persists_nothing() -> None:
+    sink = InMemorySink()
+    first = OpRecord(
+        stream_id="s",
+        sequence=1,
+        previous_hash=GENESIS_PREVIOUS_HASH,
+        hash="h1",
+        op=Obj("RemoveNode", {"target": "n1"}),
+        actor=HumanActor("u"),
+        timestamp_unix_seconds=1700000000,
+    )
+    outcome = sink.append_if(first, GENESIS_PREVIOUS_HASH)
+    assert isinstance(outcome, Appended)
+    assert outcome.receipt.sequence == 1
+    assert sink.head("s") == "h1"
+
+    stale = OpRecord(
+        stream_id="s",
+        sequence=2,
+        previous_hash="not-the-real-head",
+        hash="h2",
+        op=Obj("RemoveNode", {"target": "n2"}),
+        actor=HumanActor("u"),
+        timestamp_unix_seconds=1700000000,
+    )
+    outcome = sink.append_if(stale, "not-the-real-head")
+    assert isinstance(outcome, StaleHead)
+    assert outcome.expected == "not-the-real-head"
+    assert outcome.actual == "h1"
+    # Nothing was persisted for the rejected attempt.
+    assert sink.latest_sequence("s") == 1
+    assert sink.replay("s", 2, 2) == []
+    assert sink.head("s") == "h1"
+
+
+class _GappySink:
+    """Minimal :class:`~fuaran_py.op_stream.types.OpStreamSink` stand-in whose
+    ``replay`` reports nothing for any range, regardless of ``latest_sequence``
+    — a sink whose own bookkeeping has a hole in it. Deliberately does NOT
+    implement :class:`~fuaran_py.op_stream.types.CasOpStreamSink`, so
+    ``apply_and_persist`` takes the read-then-append path this scenario is
+    about."""
+
+    def append(self, record: OpRecord) -> None:
+        raise AssertionError("a detected gap must refuse the write, not attempt it")
+
+    def replay(self, stream_id: str, from_sequence: int, to_sequence: int) -> list[OpRecord]:
+        return []
+
+    def latest_sequence(self, stream_id: str) -> int:
+        return 5
+
+    def streams(self) -> list[str]:
+        return []
+
+
+def test_previous_hash_for_refuses_a_gap_rather_than_returning_genesis() -> None:
+    result = _previous_hash_for(_GappySink(), "s", 5)
+    assert isinstance(result, _Gap)
+    assert result.missing_sequence == 4
+
+
+def test_apply_and_persist_reports_a_gap_instead_of_writing_over_it() -> None:
+    sink = _GappySink()
+    errors: list[Exception] = []
+    ctx = PersistContext(stream_id="s", user_id="u", now=lambda: 1700000000, on_sink_error=errors.append)
+
+    result = apply_and_persist(sink, ctx, Obj("RemoveNode", {"target": "leaf"}), _two_child_card())
+
+    # The apply itself still succeeded — durability is best-effort, so a gap
+    # in the sink's own bookkeeping must not turn a successful edit into a
+    # PersistErr.
+    assert result.ok
+    assert len(errors) == 1
+    assert isinstance(errors[0], SinkAppendError)
+    assert "gap" in str(errors[0])

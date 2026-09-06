@@ -25,6 +25,7 @@ import pytest
 from fuaran_py import decode_node
 from fuaran_py.compute import evaluate_tree
 from fuaran_py.model import Node
+from fuaran_py.schema import types as t
 from fuaran_py.ui import (
     UnboundParamError,
     col,
@@ -264,3 +265,45 @@ def test_a_control_is_a_node_and_its_id_is_derived() -> None:
     assert region.id == control.select("region", options=["EMEA"]).id
     assert region.id.startswith("select-region-")
     assert control.select("region", options=["EMEA"], occurrence=1).id != region.id
+
+
+# ── FilterSpec.name vs the parameter its control writes ──────────────────────
+#
+# A filter chip names a parameter. The reference decoder auto-binds
+# `Filter(<name>)` only when the control carries NO `value`, so a chip whose
+# control declares its own binding leaves `name` reaching nothing but the element
+# id — and a name set apart from the bound parameter went undiagnosed.
+
+
+def test_filter_spec_refuses_a_name_that_disagrees_with_its_binding() -> None:
+    """Both names appear in the message: which one is wrong is the author's call,
+    and a refusal that named only one would be guessing at it."""
+    with pytest.raises(ValueError) as raised:
+        t.FilterSpec("area", t.LiteralText("Region"), t.TextFilter(t.State("region", "")))
+    message = str(raised.value)
+    assert "'area'" in message
+    assert "'region'" in message
+
+
+def test_filter_spec_derives_the_name_from_the_binding_when_none_is_given() -> None:
+    spec = t.FilterSpec(None, t.LiteralText("Region"), t.TextFilter(t.State("region", "")))
+    assert spec.name == "region"
+
+
+def test_filter_spec_derives_from_an_explicit_filter_binding_too() -> None:
+    """`Filter(<name>)` is the binding the decoder would have synthesised, so a chip
+    that writes it by hand names its parameter in exactly the same sense."""
+    assert t.FilterSpec(None, t.LiteralText("Tier"), t.TextFilter(t.Filter("tier"))).name == "tier"
+
+
+def test_filter_spec_leaves_an_unparameterised_chip_alone() -> None:
+    """A `Static` binding names no parameter, so there is nothing to disagree with —
+    the check must not fire on the chips the corpus already carries."""
+    spec = t.FilterSpec("q", t.LiteralText("Search"), t.TextFilter(t.Static("")))
+    assert spec.name == "q"
+
+
+def test_filter_spec_refuses_an_omitted_name_it_cannot_derive() -> None:
+    with pytest.raises(ValueError) as raised:
+        t.FilterSpec(None, t.LiteralText("Search"), t.TextFilter(t.Static("")))
+    assert "nothing to derive" in str(raised.value)

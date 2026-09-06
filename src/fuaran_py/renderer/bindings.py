@@ -344,5 +344,19 @@ def format_number(fmt: Value, value: object) -> str:
     if tag == "RelativeTime":
         # Phase 819 — the English form IS the canonical cell rendering.
         return format_relative_english(str(fields.get("unit")), num)
+    if tag == "Since":
+        # Phase 1533 — ``Format.Since`` renders the delta between its source
+        # instant and THE HOST'S OWN instant, and this host furnishes none: its
+        # binding sources are a flat identity-keyed map, and ``Now`` has no
+        # identity key, so there is nowhere for the instant to live. That is a
+        # deliberate reduction of this renderer's surface (it carries no locale
+        # either) rather than an oversight of this phase — the codec above
+        # round-trips ``Since`` faithfully, which is the conformance obligation.
+        #
+        # The empty string, NOT the plain number: an epoch integer rendered
+        # where a reader expects "3 hours ago" is a silently wrong answer, and
+        # the empty string is the surface every unresolvable binding already
+        # gets here.
+        return ""
     # Date / Custom: structural — fall back to the plain numeric form.
     return _plain_number(num)

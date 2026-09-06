@@ -387,6 +387,121 @@ The `Sparkline` row of the corpus's `render-fidelity.json` reads `"class":
 "none"` accordingly — the parity-checked fallback is the whole render, as it has
 been for `Drawing`.
 
+## Project (document + digest, optional)
+
+The same tree, rendered for two targets that run nothing at all. `render_html` above is the
+page a browser paints and a client hydrates; these two are the other things a decoded tree
+can be, from the same bytes:
+
+```python
+from fuaran_py import decode_node
+from fuaran_py.renderer import render_markdown, render_email_document
+
+tree = decode_node(wire_json).value
+
+open("report.md", "w", encoding="utf-8", newline="
+").write(render_markdown(tree, title="Weekly"))
+open("digest.html", "w", encoding="utf-8", newline="
+").write(render_email_document(tree, "Weekly"))
+```
+
+Both are **pure functions of the tree and its resolved bindings**: same tree, same options,
+same sources ⇒ same bytes, on every run and every platform. Both resolve text and figures
+through the functions `render_html` uses, so a document, a digest and the page cannot disagree
+about what a number is.
+
+### The scope line is the feature
+
+Neither target can execute anything, so each kind needs an answer to a question the browser
+renderer never asks: *what does this become when nothing runs?* Each projection declares one,
+per canonical wire kind, in a `SCOPE` table alongside the code —
+`fuaran_py.renderer.document.SCOPE` and `fuaran_py.renderer.email.SCOPE`, four dispositions
+from `fuaran_py.renderer.projection`:
+
+| Disposition | Meaning |
+|---|---|
+| `rendered` | painted in full by the projection |
+| `structural` | a carrier: the node paints nothing beyond layout, its children render |
+| `openLive` | a labelled "open live" affordance. Never a half-working control |
+| `omitted` | zero-paint in this target, deliberately |
+
+The distinction between the last two carries weight: `openLive` says "this exists and you have
+to leave the document to use it", `omitted` says "this carries nothing a static target can
+convey". A reader can act on the first.
+
+The tables are **checked, not asserted**. Completeness is measured against the corpus's
+`render-fidelity.json` kind list, so a new `NodeKind` cannot arrive with no declared posture;
+and every kind that artefact marks `behavioural` — "inert server-side, gains its behaviour at
+hydration" — must be `openLive` in both, derived from the manifest rather than restated. A new
+interactive kind therefore reddens the suite instead of shipping a dead button to an inbox.
+
+### The digest (`render_email`, `render_email_document`)
+
+HTML email is the most hostile render target in computing: no JavaScript, no external
+stylesheet, no flexbox or grid worth relying on, and a rendering engine per client (Outlook
+desktop still lays out through Word). The projection is bounded hard to the Display subset,
+lays out entirely in presentation tables with inline styles, and never emits a control.
+
+`EmailOptions` is deliberately small — a live URL, a column width (600px, what the Outlook
+reading pane fits), a webfont-free font stack, and the destination policy. An email projection
+with a theme engine is a CSS framework, and the client fragmentation this exists to survive is
+what defeats one.
+
+`fuaran_py.renderer.lint(html)` is the falsifiable half of "email-safe". The client-matrix
+question cannot be answered offline and it does not pretend to: it scans for constructs the
+matrix is *known* to break on — flexbox, grid, positioning, `<style>`, `<script>`, controls,
+`<svg>`, `<iframe>`, and an apostrophe entity inside a style attribute. A clean lint is not a
+certificate; a dirty one is proof of the opposite, and that asymmetry is worth automating.
+
+### The document (`render_markdown`)
+
+Markdown is what a tree becomes when it has to be read, diffed, committed, pasted into an issue
+or indexed by something that will never run JavaScript. The output stays inside §14's own IN
+bucket — CommonMark core plus GFM tables — so `fuaran_py.renderer.markdown.to_html`, the
+renderer this host already certifies against the shared corpus, is a valid reader of it.
+
+`MarkdownOptions.charts` is the one place that loop does not close, and it is a choice rather
+than a default:
+
+| `charts` | What a chart becomes | Right when |
+|---|---|---|
+| `"svg"` (default) | the picture, lowered through this host's own `Chart` → `Drawing` lowering and inlined as raw HTML | the reader passes HTML through — a docs site, a browser preview |
+| `"table"` | the chart's resolved rows as a GFM table under a caption | the reader is §14, a plain-text reader, or a diff |
+
+§14 escapes raw HTML by construction, so an `<svg>` prints as visible angle brackets through
+it. Neither mode is the safe one and neither is a fallback: they are two honest readings of a
+picture, and the caller knows which reader is downstream. Nothing is lost in `"table"` mode
+that the tree did not already carry as data — which is the argument for lowering charts from
+data in the first place.
+
+### Destination policy applies to both
+
+Every `href` and image `src` either projection emits is checked against the same ambient
+policy the page uses, defaulting to deny-non-local. In a digest this matters more than on a
+page the reader chose to load: an undeclared image `src` **is** the tracking pixel, fetched on
+open, reporting that this named person read this message. A refused destination becomes the
+inert `about:blank#fuaran-egress-refused`; neither projection emits the `data-*` marker the
+page carries, because `data-*` attributes do not survive the sanitisers most mail clients run
+and markdown has no spelling for one at all. The refusal itself is not dropped — the
+destination is still inert, which is the half that stops it being reached.
+
+### What these are NOT
+
+Neither is a second conformant rendering surface, and the digest is **not byte-parity with the
+reference host's** own email projection: that implementation is pinned by a golden corpus
+living inside its own test project rather than in the shared conformance corpus, so no
+cross-host gate exists for this surface in either direction. What is deliberately shared is the
+part worth a corpus — the four dispositions, the scope table row for row with its reasoning,
+the derivation of the interactive set from the fidelity manifest, the inline style
+vocabulary's values, the option defaults, and the lint's code and token set. Two hosts agreeing
+about what an email projection *is* is the property that matters; agreeing about which pixel a
+padding lands on is not, and claiming it without a gate would be the worse failure.
+
+The markdown projection has no reference at all: no language tier carries one. What every host
+carries is the opposite direction — §14's GFM **→ HTML** renderer for the `Markdown` node's own
+body. This one is written to be ported rather than re-derived, and its `SCOPE` table is the
+half a second implementation would agree with.
+
 ## Run (interactive, optional)
 
 Under **Pyodide** (CPython-on-WASM), `fuaran_py.runtime` adds the live loop the F#

@@ -1745,7 +1745,7 @@ class Renderer:
     def _drawing(self, node: Node, fields: dict[str, Value]) -> str:
         return element("div", [], self._drawing_svg(fields))
 
-    def _drawing_svg(self, fields: dict[str, Value]) -> str:
+    def bare_drawing_svg(self, fields: dict[str, Value]) -> str:
         """The shared SVG builder — the `<svg class="fuaran-drawing">` element for
         a ``Drawing`` kind's fields, without the wrapping element.
 
@@ -1753,8 +1753,11 @@ class Renderer:
         its OWN hook element (the `Sparkline` arm's ``fuaran-sparkline``
         container, where the sizing and the inherited ``color`` live) around the
         same bytes, exactly as the reference host's renderers call
-        ``DrawingSvg.render`` beside a per-arm wrapper. The two callers must stay
-        the only ones: this is the geometry builder, not a second renderer.
+        ``DrawingSvg.render`` beside a per-arm wrapper. Public since fuaran#1176,
+        because the markdown projection embeds this element with no wrapper at
+        all. It stays the geometry builder and never becomes a second renderer:
+        a caller wanting different GEOMETRY is asking for a different lowering,
+        not a different argument here.
         """
         vb = fields.get("viewBox")
         vb_fields = vb.fields if isinstance(vb, Obj) else {}
@@ -1771,8 +1774,19 @@ class Renderer:
         body = "".join(self._draw_shape(s) for s in shapes.items) if isinstance(shapes, Arr) else ""
         root_style = self._draw_style_attrs(fields.get("style"), False)
         aria = self._root_aria_label(t, d)
-        svg = f'<svg class="fuaran-drawing" role="img" viewBox="{view_box}"{aria}{root_style}>{title}{desc}{body}</svg>'
-        return element("div", [], svg)
+        return (
+            f'<svg class="fuaran-drawing" role="img" viewBox="{view_box}"{aria}{root_style}>{title}{desc}{body}</svg>'
+        )
+
+    def _drawing_svg(self, fields: dict[str, Value]) -> str:
+        """The `<svg>` inside the wrapping `<div>` both existing callers expect.
+
+        Kept as its own step so :meth:`bare_drawing_svg` can hand out the element WITHOUT
+        that wrapper — a markdown document embeds the SVG directly, where a `<div>` would be
+        block-level HTML the surrounding markdown never asked for. Splitting rather than
+        changing: both existing callers emit the same bytes they always did.
+        """
+        return element("div", [], self.bare_drawing_svg(fields))
 
     # ── inputs (inert — no dispatch server-side) ─────────────────────────────
 
@@ -2085,11 +2099,53 @@ class Renderer:
         )
 
     def _lower_chart(self, node: Node, fields: dict[str, Value], resolved: object) -> str | None:
-        """Lower a resolved chart (every ``LOWERED_KINDS`` arm) to a Drawing +
-        render inline SVG.
+        """Lower a resolved chart to a Drawing + render inline SVG, wrapped as the
+        HTML page emits it.
 
         Returns ``None`` (fall through to the placeholder) when the kind is not
         lowerable or the data source did not resolve to embedded rows.
+        """
+        drawing_node = self._lower_chart_node(node, fields, resolved)
+        if drawing_node is None or not isinstance(drawing_node.kind, Obj):
+            return None
+        return self._drawing(drawing_node, drawing_node.kind.fields)
+
+    def chart_svg(self, node: Node, fields: dict[str, Value]) -> str | None:
+        """The bare inline ``<svg>`` for a lowerable chart, or ``None``.
+
+        The picture without the page's wrapper, for a projection that has no page —
+        fuaran#1176's markdown document embeds it directly. It resolves the source and
+        lowers through exactly the path :meth:`_chart` takes, so a chart in a document is
+        the chart on the page: same geometry, same bytes inside the element.
+        """
+        drawing_node = self._lower_chart_node(node, fields, resolve_source(fields.get("source"), self.sources))
+        if drawing_node is None or not isinstance(drawing_node.kind, Obj):
+            return None
+        return self.bare_drawing_svg(drawing_node.kind.fields)
+
+    def sparkline_svg(self, node: Node, fields: dict[str, Value]) -> str | None:
+        """The bare inline ``<svg>`` for a resolved sparkline series, or ``None``.
+
+        The :meth:`chart_svg` argument at a smaller size, through the same shared geometry
+        builder :meth:`_sparkline` uses. ``None`` for an unresolved or empty series — the
+        condition under which the page renders its em-dash rather than a picture.
+        """
+        from ..charts import try_lower_sparkline_node
+
+        series = _float_series(resolve_binding(fields.get("source"), self.sources))
+        drawing = try_lower_sparkline_node(node.id, series) if series is not None else None
+        if drawing is None or not isinstance(drawing.kind, Obj):
+            return None
+        return self.bare_drawing_svg(drawing.kind.fields)
+
+    def _lower_chart_node(self, node: Node, fields: dict[str, Value], resolved: object) -> Node | None:
+        """Lower a resolved chart (every ``LOWERED_KINDS`` arm) to its canonical ``Drawing``
+        node.
+
+        Returns ``None`` when the kind is not lowerable or the data source did not resolve
+        to embedded rows. Split from :meth:`_lower_chart` by fuaran#1176 so a projection
+        that wants the geometry without the page's markup reaches the same lowering rather
+        than a second one.
         """
         from ..charts import LOWERED_KINDS, ChartSpec, lower_node
 
@@ -2167,9 +2223,7 @@ class Renderer:
             data_labels=data_labels,
             x_scale=x_scale,
         )
-        drawing_node = lower_node(node.id, spec, rows)
-        assert isinstance(drawing_node.kind, Obj)
-        return self._drawing(drawing_node, drawing_node.kind.fields)
+        return lower_node(node.id, spec, rows)
 
     def _chart(self, node: Node, fields: dict[str, Value]) -> str:
         resolved = resolve_source(fields.get("source"), self.sources)

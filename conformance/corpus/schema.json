@@ -406,7 +406,8 @@
             }
           },
           "required": [
-            "$type"
+            "$type",
+            "value"
           ]
         },
         {
@@ -674,7 +675,8 @@
             }
           },
           "required": [
-            "$type"
+            "$type",
+            "value"
           ]
         },
         {
@@ -1213,7 +1215,8 @@
             }
           },
           "required": [
-            "$type"
+            "$type",
+            "value"
           ]
         },
         {
@@ -2839,7 +2842,8 @@
             }
           },
           "required": [
-            "$type"
+            "$type",
+            "value"
           ]
         },
         {
@@ -2981,6 +2985,264 @@
             },
             "initialFrom": {
               "$ref": "#/$defs/Binding_str"
+            },
+            "onCommit": {
+              "const": "<closure>"
+            },
+            "parse": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "flushOn",
+            "format",
+            "initialFrom",
+            "onCommit",
+            "parse"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Format"
+            },
+            "format": {
+              "$ref": "#/$defs/Format"
+            },
+            "locale": {
+              "$ref": "#/$defs/LocaleSource"
+            },
+            "source": {
+              "$ref": "#/$defs/Binding_float"
+            }
+          },
+          "required": [
+            "$type",
+            "format",
+            "locale",
+            "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Transform"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "$ref": "#/$defs/Binding_json"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "from",
+                  "name"
+                ]
+              }
+            },
+            "pipeline": {
+              "type": "array",
+              "items": true
+            },
+            "source": {
+              "type": "object"
+            }
+          },
+          "required": [
+            "$type",
+            "pipeline",
+            "source"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Invoke"
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "capabilityId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "args",
+            "capabilityId"
+          ]
+        }
+      ]
+    },
+    "Binding_str_choice": {
+      "description": "Binding<string> at a choice-valued control (Choice / SegmentedChoice / Combobox / Select). The Static payload is OPTIONAL and its absence is the value: no selection. Every other string-valued slot uses Binding_str, where the payload is required.",
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Static"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Query"
+            },
+            "dependsOn": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Filter"
+            },
+            "defaultValue": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "name"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Selection"
+            },
+            "defaultValue": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "nodeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "nodeId"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "State"
+            },
+            "defaultValue": {
+              "type": "string"
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Computed"
+            },
+            "fn": {
+              "const": "<closure>"
+            }
+          },
+          "required": [
+            "$type",
+            "fn"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Now"
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "I18n"
+            },
+            "args": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/$defs/Binding_json"
+              }
+            },
+            "key": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "key"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Local"
+            },
+            "flushOn": {
+              "$ref": "#/$defs/LocalFlushTrigger"
+            },
+            "format": {
+              "const": "<closure>"
+            },
+            "initialFrom": {
+              "$ref": "#/$defs/Binding_str_choice"
             },
             "onCommit": {
               "const": "<closure>"
@@ -3953,7 +4215,7 @@
               "$ref": "#/$defs/Binding_list_SelectOption"
             },
             "value": {
-              "$ref": "#/$defs/Binding_str"
+              "$ref": "#/$defs/Binding_str_choice"
             }
           },
           "required": [
@@ -4036,7 +4298,7 @@
               "$ref": "#/$defs/Orientation"
             },
             "value": {
-              "$ref": "#/$defs/Binding_str"
+              "$ref": "#/$defs/Binding_str_choice"
             }
           },
           "required": [
@@ -4162,7 +4424,7 @@
               "$ref": "#/$defs/Binding_list_SelectOption"
             },
             "value": {
-              "$ref": "#/$defs/Binding_str"
+              "$ref": "#/$defs/Binding_str_choice"
             }
           },
           "required": [
@@ -6333,7 +6595,7 @@
           "$ref": "#/$defs/Binding_list_SelectOption"
         },
         "value": {
-          "$ref": "#/$defs/Binding_str"
+          "$ref": "#/$defs/Binding_str_choice"
         },
         "placeholder": {
           "$ref": "#/$defs/TextSource"

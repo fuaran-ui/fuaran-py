@@ -69,6 +69,25 @@ def reference_css() -> str:
 # fuaran#1161 — the notebook display protocol. Imported at the module FOOT
 # because `notebook` resolves the stylesheet through `reference_css` above; a
 # head import would reach for it before this module has defined it.
+# fuaran#1176 — the two STATIC projections of the same tree: a crawlable markdown
+# document and an email-safe digest. At the module foot beside `notebook` for the
+# same mechanical reason (`email` reaches this module's `render` internals), and
+# grouped because they answer one question the HTML renderer never asks: what does
+# a kind become when nothing can execute? `fuaran_py.renderer.projection` carries
+# the shared vocabulary; each module carries its own scope table.
+from .document import (  # noqa: E402  — append-only re-export at module foot
+    DEFAULT_MARKDOWN_OPTIONS,
+    MarkdownOptions,
+    render_markdown,
+)
+from .email import (  # noqa: E402  — append-only re-export at module foot
+    DEFAULT_EMAIL_OPTIONS,
+    EmailOptions,
+    LintFinding,
+    lint,
+    render_email,
+    render_email_document,
+)
 from .notebook import (  # noqa: E402  — append-only re-export at module foot
     FUARAN_UI_MIME,
     NOTEBOOK_OUTPUT_ATTR,
@@ -80,6 +99,8 @@ from .notebook import (  # noqa: E402  — append-only re-export at module foot
 )
 
 __all__ = [
+    "DEFAULT_EMAIL_OPTIONS",
+    "DEFAULT_MARKDOWN_OPTIONS",
     "DENY_NON_LOCAL_EGRESS",
     "FUARAN_UI_MIME",
     "HOST_RESERVED_STATE_PREFIX",
@@ -87,17 +108,24 @@ __all__ = [
     "PERMISSIVE_EGRESS",
     "EgressClass",
     "EgressPolicy",
+    "EmailOptions",
     "ExactHost",
     "HostSuffix",
+    "LintFinding",
+    "MarkdownOptions",
     "Renderer",
     "UnscopableCss",
     "allow_origin",
     "collect_state_seeds",
     "display_html",
+    "lint",
     "mimebundle",
     "reference_css",
     "reference_css_path",
+    "render_email",
+    "render_email_document",
     "render_html",
+    "render_markdown",
     "scope_css",
     "scoped_reference_css",
     "with_state_seeds",

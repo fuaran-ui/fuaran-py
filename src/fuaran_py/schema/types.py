@@ -429,10 +429,29 @@ class Dispatch:
 
 @dataclass(frozen=True)
 class Navigate:
-    route: str
+    """``Action.Navigate`` — fuaran#1536: the route is a ``TextSource``, not a
+    bare string, so a tree can name a destination it computes from what the
+    reader is looking at ("open the selected order"). ``target`` names the
+    browsing context and is omitted at ``"Self"``.
+
+    A plain ``str`` is accepted for ``route`` and carried as the bare JSON
+    string, which IS ``TextSource.Literal``'s canonical form — so a caller
+    written before the widening keeps working and its bytes do not move.
+
+    ``target`` is a closed two-member vocabulary (``"Self"`` | ``"Blank"``)
+    where ``LinkSpec.target`` is a free string: ``_parent`` and ``_top`` are
+    frame-busting gestures a hosted tree must not be able to ask for. A
+    ``"Blank"`` target is opened with ``noopener,noreferrer`` by the renderer.
+    """
+
+    route: Value
+    target: str = "Self"
 
     def to_wire(self) -> Value:
-        return Obj("Navigate", {"route": self.route})
+        fields: dict[str, Value] = {"route": self.route}
+        if self.target != "Self":
+            fields["target"] = self.target
+        return Obj("Navigate", fields)
 
 
 @dataclass(frozen=True)
@@ -2489,14 +2508,25 @@ class ErrorBoundary:
 
 @dataclass(frozen=True)
 class SwitchCase:
-    """One case in a :class:`Switch` (Phase 392): render ``child`` when the state
-    value's string form equals ``match``. Wire: ``{"child":<Node>,"match":<str>}``."""
+    """One case in a :class:`Switch`. EXACTLY ONE of ``match`` and ``when`` is set.
 
-    match: str
+    ``match`` (Phase 392) renders ``child`` when the selector's string form equals
+    it; ``when`` (fuaran#1535) renders ``child`` when the predicate resolves
+    ``True``, consulting no selector at all. Both together and neither at all are
+    decode errors (FUARAN142 pre-emit) — the Phase 818 ``value`` / ``valueFrom``
+    shape, where the "exactly one" rule is policy rather than something the
+    dataclass can express.
+    """
+
     child: UiNode
+    match: str | None = None
+    when: Value | None = None
 
     def to_wire(self) -> Obj:
-        return _obj(None, {"child": self.child, "match": self.match})
+        # ``_obj`` drops ``None`` fields (wire rule 4) and lowers each value, so
+        # the XOR needs no branching here: exactly one of the two is set, and the
+        # other is omitted by the same mechanism every optional slot uses.
+        return _obj(None, {"child": self.child, "match": self.match, "when": self.when})
 
 
 @dataclass(frozen=True)
@@ -2735,6 +2765,13 @@ class UiNode:
     accessibility: Accessibility | None = None
     style: SemanticStyle | None = None
     state: StateBehaviour | None = None
+    #: Conditional presence (fuaran#1535) — a Binding[bool] whose resolved
+    #: False removes this node from the rendered output ENTIRELY: no element,
+    #: no placeholder, no aria-hidden, nothing in the layout and nothing in
+    #: the accessibility tree. It is NOT accessibility.hidden, which is
+    #: aria-hidden over a node that IS rendered. An absent, unresolved or
+    #: errored predicate renders the node.
+    visible: Value | None = None
 
     def to_wire(self) -> WireNode:
         extras: dict[str, Value] = {}
@@ -2744,6 +2781,8 @@ class UiNode:
             extras["style"] = self.style.to_wire()
         if self.accessibility is not None:
             extras["accessibility"] = self.accessibility.to_wire()
+        if self.visible is not None:
+            extras["visible"] = self.visible
         return WireNode(self.id, self.kind.to_wire(), extras)
 
     def replace(self, **changes: object) -> UiNode:

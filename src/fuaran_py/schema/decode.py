@@ -266,6 +266,13 @@ EMBED_PERMISSION = frozenset({"AllowScripts", "AllowSameOrigin", "AllowForms", "
 CAPTURE_SOURCE = frozenset({"Camera", "Microphone"})
 # fuaran#1119 — the modal's modality. `Blocking` is the identity and omits.
 MODALITY_KIND = frozenset({"Blocking", "Popover"})
+# fuaran#1536 — which browsing context an `Action.Navigate` lands in. A BARE
+# enum; `Self` is the identity and omits. Two cases and NO lenient spelling:
+# HTML's `_self` / `_blank` / `_parent` / `_top` are not accepted as aliases,
+# because two of them are frame-busting gestures a hosted tree must not be able
+# to ask for and accepting the two harmless ones would teach an emitter that the
+# HTML vocabulary is the one in force here.
+NAVIGATE_TARGET = frozenset({"Self", "Blank"})
 # fuaran#1472 — the declared base direction, LOWER-CASE on the wire because that
 # is the spelling the isolation is ultimately expressed in. `auto` is the
 # identity and omits at it; an unrecognised token is REFUSED and never coerced to
@@ -1581,10 +1588,40 @@ def _decode_children(value: object, path: str) -> Value:
 
 def _decode_switch_case(value: object, path: str) -> Value:
     # One Switch case (Phase 392): ``{"child":<Node>,"match":<string>}``.
+    #
+    # fuaran#1535 — a case selects on a string ``match`` XOR a ``when`` predicate
+    # (a ``Binding<bool>`` evaluated at render time). Exactly one; both and
+    # neither are refused, naming both fields, on the Phase 818 value /
+    # valueFrom precedent.
+    #
+    # "Neither" is refused rather than skipped at render because a case that
+    # names no condition has no rendering that could be right: skipping it
+    # renders the ``default`` and reports nothing.
     obj = _expect_object(value, path)
     child = _decode_node_value(_require(obj, "child", path), f"{path}.child")
-    match = _expect_string(_require(obj, "match", path), f"{path}.match")
-    return Obj(None, {"child": child, "match": match})
+    has_match = "match" in obj
+    has_when = "when" in obj
+    if has_match and has_when:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.when",
+            "Switch case carries both 'match' and 'when' — exactly one is allowed: "
+            "either 'match' (a literal string compared against the switch's `on` selector) "
+            "or 'when' (a Binding<bool> predicate evaluated at render time, needing no selector)",
+        )
+    if not has_match and not has_when:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.match",
+            "Switch case carries neither 'match' nor 'when' — give it a literal string under "
+            "'match' (compared against the switch's `on` selector), or a Binding<bool> under "
+            "'when' (a predicate evaluated at render time)",
+        )
+    if has_match:
+        match = _expect_string(obj["match"], f"{path}.match")
+        return Obj(None, {"child": child, "match": match})
+    when = _decode_binding(obj["when"], f"{path}.when")
+    return Obj(None, {"child": child, "when": when})
 
 
 def _decode_switch_cases(value: object, path: str) -> Value:
@@ -1694,6 +1731,25 @@ def _decode_action(value: object, path: str) -> Value:
                     "an object carrying only $type",
                 )
         return Obj("Print", {})
+    elif tag == "Navigate":
+        # fuaran#1536 — the route is a `TextSource`, not a bare string, so a tree
+        # can name a destination it computes from what the reader is looking at.
+        # The bare JSON string IS `Literal`'s canonical form, so every document
+        # written before the widening decodes exactly as it did — including one
+        # using an alias, since the aliases above are resolved before this point,
+        # keeping exactly one canonical field a router can be reached through.
+        #
+        # `target` is omitted at `Self`, so absence is the pre-1536 behaviour. An
+        # unrecognised token is UNKNOWN_DU_CASE at the member's own path and is
+        # never coerced to one of the two.
+        route = _decode_text_source(_require(obj, "route", path), f"{path}.route")
+        decoded: dict[str, Value] = {"route": route}
+        if "target" in obj:
+            target = _enum_aliased(obj["target"], f"{path}.target", NAVIGATE_TARGET, {}, "NavigateTarget")
+            if target != "Self":
+                decoded["target"] = target
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "route", "target")}
+        return Obj("Navigate", {**rest, **decoded})
     elif tag == "WriteToClipboard":
         # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
         # bare JSON string IS `Literal`'s canonical form, so every document
@@ -3933,6 +3989,12 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
     # non-`$type`-tagged value is WRONG_TYPE and is never carried through.
     if "tooltip" in obj:
         extras["tooltip"] = _decode_text_source(obj["tooltip"], f"{path}.tooltip")
+    # fuaran#1535 — the node-level visibility predicate. An ordinary optional
+    # ``Binding<bool>``, decoded by the shared binding decoder for the reason the
+    # tooltip above states: the one time a host read a node-envelope slot as its
+    # own narrower thing it took two hosts and a ruling to unwind.
+    if "visible" in obj:
+        extras["visible"] = _decode_binding(obj["visible"], f"{path}.visible")
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

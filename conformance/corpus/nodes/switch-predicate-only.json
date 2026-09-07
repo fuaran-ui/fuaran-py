@@ -1,0 +1,1 @@
+{"id":"switch-predicate-only","kind":{"$type":"Switch","cases":[{"child":{"id":"switch-predicate-only-ready","kind":{"$type":"Markdown","text":"Ready to send"}},"when":{"$type":"State","key":"form.valid"}}],"default":{"id":"switch-predicate-only-default","kind":{"$type":"Markdown","text":"Fill in the form to continue"}},"stateKey":""}}

@@ -317,6 +317,97 @@ def resolve_scalar_number(binding: Value, sources: BindingSources | None = None)
     return None
 
 
+def resolve_scalar_bool(binding: Value, sources: BindingSources | None = None) -> bool | None:
+    """Resolve a binding in a **boolean scalar slot**, or ``None`` when
+    unresolved / ambiguous / non-boolean (fuaran#1535).
+
+    The third of the trio beside :func:`resolve_scalar_text` and
+    :func:`resolve_scalar_number`, so a ``Transform`` or an ``Expr`` reaches a
+    boolean slot through the same 1×1 seam a text or numeric one does.
+
+    STRICT: only a genuine boolean resolves. ``0``, ``""`` and ``"false"`` are
+    all ``None`` rather than ``False``, because every language that has guessed
+    at truthiness has guessed differently and five hosts agreeing on a rendering
+    is the whole point of the corpus. The vocabulary already carries the total
+    spellings (``isNull``, ``=``, ``not``), so refusing costs an author nothing
+    but the explicit operator.
+    """
+    if _is_expr(binding):
+        assert isinstance(binding, Obj)
+        tag, value = _scalar_cell(_expr_as_transform(binding), sources)
+        return value if tag == "resolved" and isinstance(value, bool) else None
+    if _is_transform(binding):
+        assert isinstance(binding, Obj)
+        tag, value = _scalar_cell(binding, sources)
+        return value if tag == "resolved" and isinstance(value, bool) else None
+    resolved = resolve_binding(binding, sources)
+    return resolved if isinstance(resolved, bool) else None
+
+
+# ── Conditional presence and predicate branching (fuaran#1535) ───────────────
+#
+# Two decisions a renderer takes BEFORE it draws anything. Both live here rather
+# than in the render module because every rendering surface in this package (the
+# HTML renderer, the email projection, the notebook one) must agree on them, and
+# because they are the same two rules the other four hosts state.
+
+
+def is_node_visible(visible: Value | None, sources: BindingSources | None = None) -> bool:
+    """THE rule for whether a node reaches the output at all (WIRE_FORMAT §3.1).
+
+    A node is removed ONLY on a resolved ``False``. An absent predicate, an
+    unresolved one and an errored one all RENDER, and the asymmetry is the design
+    rather than a leniency: a ``False`` is an author saying "not now", and every
+    other outcome is the renderer failing to answer the question. Content that
+    vanishes because a source was missing is the one failure a reader cannot see,
+    cannot report and cannot work around.
+
+    Note this takes the SLOT rather than the node, because this package's node
+    model carries envelope traits in an untyped ``extras`` map and a caller
+    already holding the slot should not have to reconstruct a node to ask.
+    """
+    if visible is None:
+        return True
+    return resolve_scalar_bool(visible, sources) is not False
+
+
+def select_switch_case(
+    cases: Value | None, selector: str | None, sources: BindingSources | None = None
+) -> Value | None:
+    """First-match-wins case selection over BOTH kinds of case (fuaran#1535).
+
+    ``selector`` is the switch's already-resolved ``on`` value (``None`` when it
+    did not resolve). A ``match`` case compares against it; a ``when`` case
+    evaluates its predicate and consults no selector at all — which is why a
+    switch whose cases are all predicates needs no selector.
+
+    A predicate case is taken ONLY on a resolved ``True``; ``False``, unresolved
+    and errored all fall through to the next case and ultimately to ``default``.
+    That is the OPPOSITE default from :func:`is_node_visible`, and deliberately
+    so: falling through here lands on a ``default`` branch the author wrote, so
+    no content disappears — whereas a node with no verdict has no fallback.
+
+    Returns the selected case's ``child``, or ``None`` for the default.
+    """
+    if not isinstance(cases, Arr):
+        return None
+    for case in cases.items:
+        if not isinstance(case, Obj):
+            continue
+        match = case.fields.get("match")
+        if match is not None:
+            if selector is not None and match == selector:
+                return case.fields.get("child")
+            continue
+        when = case.fields.get("when")
+        # A case carrying neither is unreachable from the wire (the decoder
+        # refuses it) and reported pre-emit; it is skipped rather than asserted
+        # away because a tree built in-process can still hold one.
+        if when is not None and resolve_scalar_bool(when, sources) is True:
+            return case.fields.get("child")
+    return None
+
+
 def _plain_number(value: float) -> str:
     """Mirror F# ``string (value: float)``: integral floats print without ``.0``."""
     if isinstance(value, bool):  # defensive: bool is an int subclass

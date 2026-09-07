@@ -835,6 +835,14 @@
       "description": "Phase 719 — the compact authoring twin of `master-detail-preselected`: all-valid columns as bare arrays (Core#88) and the inferable schema omitted; the canonical envelope stays the encoder's output. The pack teaches this form by example — the exemplar/prose contradiction measurably taught the envelope (claude-opus 81% envelope share, 2026-07-28 census)."
     },
     {
+      "id": "lenient-navigate-target-self",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-navigate-target-self.json",
+      "expectedFile": "lenient/lenient-navigate-target-self.expected.json",
+      "description": "Phase 1536 — an explicit `target: \"Self\"` normalises away; `Self` is omitted at default, so the canonical form carries no `target` member at all"
+    },
+    {
       "id": "lenient-null-static-options",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1121,6 +1129,22 @@
       "inputFile": "nodes/a11y-wrapper-state-bound.json",
       "expectedFile": "nodes/a11y-wrapper-state-bound.json",
       "description": "Accessibility (Phase 955 — State-bound label + hidden, mixed-case custom role doc-pageFooter, off)"
+    },
+    {
+      "id": "action-navigate-bound",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-navigate-bound.json",
+      "expectedFile": "nodes/action-navigate-bound.json",
+      "description": "Phase 1536 — Input/Button whose Action.Navigate carries a BOUND route (a TextSource over the grid's selection), resolved at dispatch time and gated on the resolved value"
+    },
+    {
+      "id": "action-navigate-target",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-navigate-target.json",
+      "expectedFile": "nodes/action-navigate-target.json",
+      "description": "Phase 1536 — Input/Button whose Action.Navigate names a Blank target (opened with noopener,noreferrer); `Self` is omitted, so this is the only shape that puts `target` on the wire"
     },
     {
       "id": "badge-1",
@@ -2427,6 +2451,14 @@
       "description": "Layout/Box (Phase 610 — multi-select chip + DataGrid scoped by a list-valued in/param)"
     },
     {
+      "id": "node-visible",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/node-visible.json",
+      "expectedFile": "nodes/node-visible.json",
+      "description": "Node envelope (Phase 1535 — visible: removal from flow, three predicate spellings, beside an aria-hidden sibling)"
+    },
+    {
       "id": "now-environment-binding",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2609,6 +2641,30 @@
       "inputFile": "nodes/switch-on-selection.json",
       "expectedFile": "nodes/switch-on-selection.json",
       "description": "Meta/Switch (Phase 768 — the selector widened: `on` takes a Selection, the branch follows the clicked row)"
+    },
+    {
+      "id": "switch-on-transform-scalar",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-on-transform-scalar.json",
+      "expectedFile": "nodes/switch-on-transform-scalar.json",
+      "description": "Meta/Switch (Phase 1535 — a computed selector: a Transform yielding one cell, read through the scalar path)"
+    },
+    {
+      "id": "switch-predicate",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-predicate.json",
+      "expectedFile": "nodes/switch-predicate.json",
+      "description": "Meta/Switch (Phase 1535 — predicate cases: a State bool and an Expr, MIXED with a match case in one ordered list)"
+    },
+    {
+      "id": "switch-predicate-only",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/switch-predicate-only.json",
+      "expectedFile": "nodes/switch-predicate-only.json",
+      "description": "Meta/Switch (Phase 1535 — selected entirely by predicate: no selector, nothing to write)"
     },
     {
       "id": "table-1",
@@ -3587,6 +3643,15 @@
       "description": "a Modal `modality` of `\"Sheet\"` — outside the closed pair `Modal | Popover`. A sheet, a drawer and a menu are all PRESENTATIONS of one of the two modalities rather than a third one, so the answer to this document is not to widen the enum but to say which of the two it meant. The path is the bare slot, per §6 and the Phase 1073 ruling: a bare enum carries no discriminator on the wire, so there is no `.$type` to name"
     },
     {
+      "id": "reject-navigate-target-invalid",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-navigate-target-invalid.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.onClick.target",
+      "description": "Action.Navigate's target is the closed enum Self | Blank, not HTML's target attribute. `_blank` is refused rather than aliased: the vocabulary it comes from also contains `_parent` and `_top`, which are frame-busting gestures a hosted tree must not be able to ask for, so accepting any of it would teach an emitter the wrong vocabulary (Phase 1536)"
+    },
+    {
       "id": "reject-nearmiss-a11y-aria-hidden",
       "kind": "reject",
       "decoder": "node",
@@ -3882,6 +3947,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.autoAdvanceMs",
       "description": "Switch autoAdvanceMs is 0 — refused, never canonicalised to absence. An absent key is already the only spelling of \"does not advance\", so accepting a zero would make two shapes mean one thing and hide the emitter's misreading of the slot (Phase 1122)"
+    },
+    {
+      "id": "reject-switch-case-match-and-when",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-case-match-and-when.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.cases[0].when",
+      "description": "a Switch case carrying both `match` and `when` — the two ways of selecting a case, in one case. `match` compares the switch's `on` selector against a literal; `when` evaluates a Binding<bool> and consults no selector at all. Refused rather than resolved by precedence: a precedence rule would need specifying, agreeing on five hosts and remembering, for a document nobody meant to write (Phase 1535)"
+    },
+    {
+      "id": "reject-switch-case-neither",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-switch-case-neither.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.cases[0].match",
+      "description": "a Switch case carrying neither `match` nor `when` — no condition, so no rendering could be right. Refused at decode rather than skipped silently at render: skipping it renders the `default` and reports nothing, which is the exact class of silence this phase's finding was filed about. The message names both fields, so the author is told which two spellings exist (Phase 1535)"
     },
     {
       "id": "reject-tokens-closed-without-suggestions",

@@ -759,6 +759,35 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, kind, accessibility.metric)
 
     @staticmethod
+    def fact(
+        id: str,  # noqa: A002
+        *,
+        label: t.TextInput,
+        value: t.TextInput,
+        tone: t.Tone = "Default",
+        emphasis: bool = False,
+        help: t.TextInput | None = None,  # noqa: A002
+        icon: str | None = None,
+    ) -> UiNode:
+        """``Fact`` — the labelled TEXT statement beside :meth:`metric`'s number.
+
+        ``value`` is a ``TextInput``, so a bare string is the literal and
+        ``t.Bound(binding.now())`` / ``t.Bound(binding.selection(...))`` are the
+        environment and master-detail readings the corpus carries. No ARIA is
+        injected — the reference host builds it with ``Accessibility.none``, and
+        a live region on a static statement would announce nothing.
+        """
+        kind = t.Fact(
+            label=_text(label),
+            value=_text(value),
+            tone=tone,
+            emphasis=emphasis,
+            help=_text(help) if help is not None else None,
+            icon=icon,
+        )
+        return _node(id, kind, accessibility.none)
+
+    @staticmethod
     def label_value_row(
         id: str,  # noqa: A002
         *,
@@ -1017,6 +1046,36 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     @staticmethod
     def math(id: str, source: str, *, display: t.MathDisplay = "Block") -> UiNode:  # noqa: A002
         return _node(id, t.Math(source, display), accessibility.none)
+
+    @staticmethod
+    def drawing(
+        id: str,  # noqa: A002
+        *,
+        view_box: t.ViewBox,
+        shapes: Sequence[t.Shape] = (),
+        style: t.DrawStyle | None = None,
+        title: t.TextInput | None = None,
+        description: t.TextInput | None = None,
+    ) -> UiNode:
+        """``Drawing`` — placed geometry over a user-space ``view_box``.
+
+        The shape vocabulary is closed and carries no raw SVG: it is the opposite
+        of :meth:`custom`. Geometry is static (a chart lowering hands over
+        concrete coordinates); colour and opacity stay bindable through
+        :class:`~fuaran_py.schema.types.DrawStyle`.
+
+        ``style`` is the ROOT style every shape inherits from and defaults to the
+        empty one, which is what makes an empty drawing the two-key document
+        rather than one carrying eleven nulls.
+        """
+        kind = t.Drawing(
+            view_box=view_box,
+            shapes=tuple(shapes),
+            style=style if style is not None else t.DrawStyle(),
+            title=_text(title) if title is not None else None,
+            description=_text(description) if description is not None else None,
+        )
+        return _node(id, kind, accessibility.none)
 
     @staticmethod
     def sparkline(id: str, *, source: Binding) -> UiNode:  # noqa: A002
@@ -1369,6 +1428,37 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         args: dict[str, t.FragmentArg] | None = None,
     ) -> UiNode:
         return _node(id, t.FragmentRef(name, args), accessibility.none)
+
+    @staticmethod
+    def mount(
+        id: str,  # noqa: A002
+        *,
+        scope_id: str,
+        channel: t.GuestChannel | None = None,
+        capabilities: Sequence[str] = (),
+        inputs: dict[str, t.FragmentArg] | None = None,
+        on_bubble: bool = True,
+    ) -> UiNode:
+        """``Mount`` — attach a guest tree behind an isolation boundary (§4o).
+
+        ``capabilities`` is the whole of what the guest may do, so the default is
+        the EMPTY list rather than an absent key: a mount that grants nothing is a
+        document, and default-deny is the posture the boundary exists for. The
+        channel likewise defaults to ``OutOnly`` — the guest can bubble, the host
+        cannot reach in.
+
+        ``inputs`` shares :data:`~fuaran_py.schema.types.FragmentArg` with
+        :meth:`fragment_ref`: scalars carry configuration, and ``t.SlotArg(tree)``
+        hands the guest a whole node tree as its initial state.
+        """
+        kind = t.Mount(
+            scope_id=scope_id,
+            channel=channel if channel is not None else t.GuestChannel(),
+            capabilities=tuple(capabilities),
+            inputs=inputs,
+            on_bubble=on_bubble,
+        )
+        return _node(id, kind, accessibility.none)
 
     # ── Display (defined last: ``list`` shadows the ``list`` builtin used as a
     #     type annotation by the constructors above, so it sits at the class foot

@@ -82,6 +82,12 @@ ImageLoading = Literal["Eager", "Lazy"]
 ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
 DateVariant = Literal["Date", "Time", "DateTime"]
 MathDisplay = Literal["Inline", "Block"]
+#: Text alignment for a `Drawing`'s `Label` shape — SVG's `text-anchor`, in the
+#: wire's own capitalised spelling. Absent means the renderer's inherited default.
+TextAnchor = Literal["Start", "Middle", "End"]
+#: Which way a `Mount`'s guest channel carries messages. `OutOnly` is the guest
+#: bubbling up with no host→guest leg; `TwoWay` opens both.
+ChannelDirection = Literal["OutOnly", "TwoWay"]
 IconSize = Literal["Small", "Medium", "Large"]  # Phase 821 — the Icon display kind
 # fuaran#867 — which direction of movement is an improvement. `Neutral` is
 # RESERVED and deliberately absent: the slot is an enum precisely so that a later
@@ -1299,6 +1305,45 @@ class Metric:
 
 
 @dataclass(frozen=True)
+class Fact:
+    """``Fact`` — the labelled TEXT statement, :class:`Metric`'s complementary kind.
+
+    Where a ``Metric`` carries a NUMBER through a :class:`CellFormat`, a ``Fact``
+    carries a ``TextSource``: "Patient — Alice Smith", "Today — <the host's
+    instant>". That is why ``value`` is a ``TextSource`` rather than a ``Binding``
+    — the corpus binds it through ``Bound`` (a ``Now`` for an environment
+    reading, a ``Selection`` for a master-detail pane), and a literal is the bare
+    string.
+
+    ``emphasis`` is the behavioural BOOL rather than the three-valued display
+    :data:`Emphasis` the rest of the surface uses — the wire spells it that way,
+    and it is omitted at ``False``; ``tone`` is omitted at ``"Default"``. Both
+    omissions are the §3.6 rule, so a Fact that declares neither is the minimal
+    two-key document the corpus carries.
+    """
+
+    label: TextSource
+    value: TextSource
+    tone: Tone = "Default"
+    emphasis: bool = False
+    help: TextSource | None = None
+    icon: str | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Fact",
+            {
+                "emphasis": True if self.emphasis else None,
+                "help": self.help,
+                "icon": self.icon,
+                "label": self.label,
+                "tone": None if self.tone == "Default" else self.tone,
+                "value": self.value,
+            },
+        )
+
+
+@dataclass(frozen=True)
 class Badge:
     label: TextSource
     variant: BadgeVariant = "Neutral"
@@ -1816,6 +1861,303 @@ class Math:
 
     def to_wire(self) -> Obj:
         return _obj("Math", {"display": self.display, "source": self.source})
+
+
+# ── Drawing — placed geometry (WIRE_FORMAT §4b) ─────────────────────────────
+#
+# A ``Drawing`` is a RESOLVED geometric artefact: a chart lowering produces
+# concrete coordinates, so every coordinate slot is a plain ``float`` and only
+# :class:`DrawStyle` carries bindings. That split is the reason the kind is worth
+# having at all — the picture survives the wire, and its colour stays reactive.
+#
+# The sub-records sit immediately above the kind that uses them, following the
+# §4l annotation family's placement above :class:`Chart` rather than being
+# scattered among the shared records at the module head.
+
+
+@dataclass(frozen=True)
+class ViewBox:
+    """The 2-D user-space coordinate box — SVG's ``viewBox``, field by field.
+
+    All four slots are REQUIRED and each admits the §7 non-finite sentinels
+    (``float("nan")`` / ``float("inf")``), which the canonical encoder writes as
+    the quoted ``"NaN"`` / ``"Infinity"`` / ``"-Infinity"`` tokens. Nothing here
+    refuses one: a degenerate box is a document a conformant host must be able to
+    carry and refuse for itself, and the ``drawing-nonfinite-sentinels`` fixture
+    exists to pin exactly that.
+    """
+
+    min_x: float
+    min_y: float
+    width: float
+    height: float
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"height": self.height, "minX": self.min_x, "minY": self.min_y, "width": self.width})
+
+
+@dataclass(frozen=True)
+class DrawPoint:
+    """A point in a drawing's user-space coordinates."""
+
+    x: float
+    y: float
+
+    def to_wire(self) -> Value:
+        return Obj(None, {"x": self.x, "y": self.y})
+
+
+@dataclass(frozen=True)
+class DrawStyle:
+    """The fill / stroke (+ text) style every :class:`Shape` carries.
+
+    EVERY slot is optional and omitted when absent (rule 4), so a shape emits only
+    what differs from the renderer's inherited default — which is what keeps
+    ``drawing-empty``'s ``"style":{}`` the empty object rather than eleven nulls.
+
+    The text cluster (``font_family`` / ``font_size`` / ``text_anchor`` /
+    ``emphasis`` / ``rotation``) is honoured off :class:`Label` alone; ``tip``
+    applies to every shape and is the hover-readable text the renderer emits as an
+    SVG ``<title>`` child. ``rotation`` at ``0.0`` is a DOCUMENT rather than an
+    absence — the fixture carries an explicit zero — so only ``None`` omits it.
+    """
+
+    fill: Binding | None = None
+    stroke: Binding | None = None
+    stroke_width: Binding | None = None
+    opacity: Binding | None = None
+    text_anchor: TextAnchor | None = None
+    font_size: float | None = None
+    emphasis: Emphasis | None = None
+    font_family: str | None = None
+    mark_id: str | None = None
+    rotation: float | None = None
+    tip: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(
+            None,
+            {
+                "emphasis": self.emphasis,
+                "fill": self.fill,
+                "fontFamily": self.font_family,
+                "fontSize": self.font_size,
+                "markId": self.mark_id,
+                "opacity": self.opacity,
+                "rotation": self.rotation,
+                "stroke": self.stroke,
+                "strokeWidth": self.stroke_width,
+                "textAnchor": self.text_anchor,
+                "tip": self.tip,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class MoveTo:
+    to: DrawPoint
+
+    def to_wire(self) -> Value:
+        return Obj("MoveTo", {"to": _lower(self.to)})
+
+
+@dataclass(frozen=True)
+class LineTo:
+    to: DrawPoint
+
+    def to_wire(self) -> Value:
+        return Obj("LineTo", {"to": _lower(self.to)})
+
+
+@dataclass(frozen=True)
+class CubicTo:
+    control1: DrawPoint
+    control2: DrawPoint
+    to: DrawPoint
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "CubicTo",
+            {"control1": _lower(self.control1), "control2": _lower(self.control2), "to": _lower(self.to)},
+        )
+
+
+@dataclass(frozen=True)
+class QuadraticTo:
+    control: DrawPoint
+    to: DrawPoint
+
+    def to_wire(self) -> Value:
+        return Obj("QuadraticTo", {"control": _lower(self.control), "to": _lower(self.to)})
+
+
+@dataclass(frozen=True)
+class Close:
+    """The tag-only subpath close — no fields at all."""
+
+    def to_wire(self) -> Value:
+        return Obj("Close", {})
+
+
+CurveCommand = MoveTo | LineTo | CubicTo | QuadraticTo | Close
+"""The typed path vocabulary for :class:`Curve` — closed, and with no ``d`` string.
+
+A path string would smuggle a whole second grammar past every validator and every
+tree op; these five commands are what a conformant host has to understand.
+"""
+
+
+@dataclass(frozen=True)
+class Group:
+    children: tuple[Shape, ...] = ()
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj("Group", {"children": Arr([_lower(c) for c in self.children]), "style": _lower(self.style)})
+
+
+@dataclass(frozen=True)
+class Rectangle:
+    x: float
+    y: float
+    width: float
+    height: float
+    corner_radius: float | None = None
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Rectangle",
+            {
+                "cornerRadius": self.corner_radius,
+                "height": self.height,
+                "style": self.style,
+                "width": self.width,
+                "x": self.x,
+                "y": self.y,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class Line:
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "Line",
+            {
+                "style": _lower(self.style),
+                "x1": self.x1,
+                "x2": self.x2,
+                "y1": self.y1,
+                "y2": self.y2,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class Polyline:
+    points: tuple[DrawPoint, ...] = ()
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj("Polyline", {"points": Arr([_lower(p) for p in self.points]), "style": _lower(self.style)})
+
+
+@dataclass(frozen=True)
+class Polygon:
+    points: tuple[DrawPoint, ...] = ()
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj("Polygon", {"points": Arr([_lower(p) for p in self.points]), "style": _lower(self.style)})
+
+
+@dataclass(frozen=True)
+class Curve:
+    commands: tuple[CurveCommand, ...] = ()
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj("Curve", {"commands": Arr([_lower(c) for c in self.commands]), "style": _lower(self.style)})
+
+
+@dataclass(frozen=True)
+class Circle:
+    cx: float
+    cy: float
+    r: float
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj("Circle", {"cx": self.cx, "cy": self.cy, "r": self.r, "style": _lower(self.style)})
+
+
+@dataclass(frozen=True)
+class Ellipse:
+    cx: float
+    cy: float
+    rx: float
+    ry: float
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "Ellipse",
+            {"cx": self.cx, "cy": self.cy, "rx": self.rx, "ry": self.ry, "style": _lower(self.style)},
+        )
+
+
+@dataclass(frozen=True)
+class Label:
+    x: float
+    y: float
+    text: TextSource
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+
+    def to_wire(self) -> Value:
+        return Obj(
+            "Label",
+            {"style": _lower(self.style), "text": _lower(self.text), "x": self.x, "y": self.y},
+        )
+
+
+Shape = Group | Rectangle | Line | Polyline | Polygon | Curve | Circle | Ellipse | Label
+"""The closed primitive set. An unknown discriminator is default-denied on decode."""
+
+
+@dataclass(frozen=True)
+class Drawing:
+    """``Drawing`` — the placed-geometry kind (WIRE_FORMAT §4b).
+
+    ``shapes`` / ``style`` / ``view_box`` are required and always emitted — an
+    empty shape list and an all-default style are the ``drawing-empty`` document,
+    not an absence — while ``title`` and ``description`` are the accessible name
+    and long description, omitted when unnamed.
+    """
+
+    view_box: ViewBox
+    shapes: tuple[Shape, ...] = ()
+    style: DrawStyle = field(default_factory=lambda: DrawStyle())
+    title: TextSource | None = None
+    description: TextSource | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            "Drawing",
+            {
+                "description": self.description,
+                "shapes": Arr([_lower(s) for s in self.shapes]),
+                "style": self.style,
+                "title": self.title,
+                "viewBox": self.view_box,
+            },
+        )
 
 
 # Input -----------------------------------------------------------------------
@@ -3242,6 +3584,56 @@ class FragmentRef:
         if self.args:
             args = Obj(None, {k: _lower(v) for k, v in self.args.items()})
         return _obj("FragmentRef", {"args": args, "name": self.name})
+
+
+@dataclass(frozen=True)
+class GuestChannel:
+    """A :class:`Mount`'s message channel — a direction, and optionally the guest's
+    message shape, which is what the capability gate validates against."""
+
+    direction: ChannelDirection = "OutOnly"
+    message_shape: str | None = None
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"direction": self.direction, "messageShape": self.message_shape})
+
+
+@dataclass(frozen=True)
+class Mount:
+    """``Mount`` — the isolation / embedding boundary (WIRE_FORMAT §4o).
+
+    A guest tree attaches under ``scope_id``, talks over ``channel``, and may do
+    only what ``capabilities`` names — so ``capabilities`` is REQUIRED and its
+    empty list is the meaningful default-deny document rather than an omission.
+
+    ``inputs`` is the host→guest configuration map, sharing :data:`FragmentArg`
+    with :class:`FragmentRef` (reuse, not a second vocabulary): the scalar cases
+    carry config, and ``SlotArg`` carries a whole node tree as the guest's initial
+    state. ``on_bubble`` follows the surface's handler-flag convention — ``True``
+    (the default) emits the closure sentinel the corpus carries, ``False`` omits
+    the key for a guest whose bubbles the host does not take.
+    """
+
+    scope_id: str
+    channel: GuestChannel = field(default_factory=lambda: GuestChannel())
+    capabilities: tuple[str, ...] = ()
+    inputs: dict[str, FragmentArg] | None = None
+    on_bubble: bool = True
+
+    def to_wire(self) -> Obj:
+        inputs = None
+        if self.inputs is not None:
+            inputs = Obj(None, {k: _lower(v) for k, v in self.inputs.items()})
+        return _obj(
+            "Mount",
+            {
+                "capabilities": Arr(list(self.capabilities)),
+                "channel": self.channel,
+                "inputs": inputs,
+                "onBubble": CLOSURE if self.on_bubble else None,
+                "scopeId": self.scope_id,
+            },
+        )
 
 
 # ── The node envelope ───────────────────────────────────────────────────────

@@ -257,6 +257,69 @@ Three details are decisions rather than mechanics:
 Additive on the same terms as the section above: every slot is absent by default, so a
 tree authored before any of them existed encodes byte-for-byte as it did. Rides 0.2.0.
 
+### 0.3.0 — `Drawing`, `Fact` and `Mount` become authorable
+
+The codec has decoded all three for a long time; what it did not have was a *spelling*.
+`encode` needs a `.to_wire()` root, so a node kind the typed model omitted could not be
+written from Python at all — thirteen corpus fixtures were readable and unwritable.
+
+```python
+from fuaran_py.schema import types as t
+from fuaran_py.ui import fuaran, encode
+
+# Placed geometry: a closed shape vocabulary, no raw SVG. Geometry is STATIC —
+# a chart lowering hands over concrete coordinates — and only DrawStyle binds.
+fuaran.drawing(
+    "chart",
+    view_box=t.ViewBox(0, 0, 200, 100),
+    title="Quarterly revenue",
+    shapes=[
+        t.Rectangle(10, 10, 80, 40, corner_radius=4, style=t.DrawStyle(fill=t.Static("#3366cc"))),
+        t.Curve((t.MoveTo(t.DrawPoint(0, 0)), t.LineTo(t.DrawPoint(40, 20)), t.Close())),
+        t.Label(100, 90, t.LiteralText("Revenue"), style=t.DrawStyle(rotation=-30, text_anchor="Middle")),
+    ],
+)
+
+# The labelled TEXT statement beside metric()'s number. Its value is a TextSource,
+# so it binds to the host's clock or to a grid selection.
+fuaran.fact("today", label="Today", value=t.Bound(t.Now("Day")))
+fuaran.fact("patient", label="Patient", value="Alice Smith", tone="Brand", emphasis=True)
+
+# The isolation boundary: a guest tree, a channel, and the whole of what it may do.
+fuaran.mount(
+    "metrics",
+    scope_id="guest-metrics",
+    channel=t.GuestChannel("TwoWay", "MetricsMsg"),
+    capabilities=["notify"],
+    inputs={"seed": t.SlotArg(fuaran.markdown("seed", "Initial guest state"))},
+)
+```
+
+Four details are decisions rather than mechanics:
+
+1. **Geometry accepts the non-finite sentinels.** `NaN` / `Infinity` reach every typed
+   float slot and encode as the quoted tokens. Nothing refuses them here: a degenerate
+   box is a document a conformant host must be able to *carry* and refuse for itself,
+   and a record that raised would make this the one tier unable to read a fixture the
+   corpus ships.
+2. **An explicit `rotation=0` is a document; an absent one is not.** Only `None` omits
+   the key — an upright label the author wrote and a label never asked about are two
+   different trees.
+3. **A mount's empty capability list is written, never omitted.** Default-deny is the
+   posture the boundary exists for, so the empty grant says something; an absent key
+   would read as "unspecified" to the host that has to decide.
+4. **`Mount.onBubble` is optional on the wire, and this host's decoder had it required** —
+   so a mount whose bubbles the host does not take was a document every other host
+   accepts and this one refused. Both corpus fixtures carry the sentinel, which is why
+   no fixture caught it; the generative floor did, on the first run after the authoring
+   surface could spell the absence. Decode-side only: nothing that encoded before
+   encodes differently.
+
+Additive: the three kinds are new constructors and new records, and no existing tree
+moves a byte. The version advances because the public surface does — 0.2.0 is tagged and
+published, so a widened surface rides a new slot rather than being repacked over an old
+one.
+
 ## Render (optional)
 
 A decoded tree renders to a sanitised HTML **body fragment** from Python — no

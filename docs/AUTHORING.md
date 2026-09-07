@@ -436,6 +436,56 @@ pointed at. It is a `TextSource`, so it can be bound or localised. **It is never
 accessible name**: an icon-only control whose only name is a tooltip has no name — give it
 `accessibility.label` and let the tooltip say the thing the name cannot.
 
+## Placed geometry, labelled statements, and guest boundaries
+
+`fuaran.drawing` / `fuaran.fact` / `fuaran.mount` complete the three kinds that had no
+spelling at all here. The distinction from the sections above is worth keeping straight:
+those records were *narrower* than the wire, these kinds were *absent* — `encode` needs a
+`.to_wire()` root, so an omitted kind is not awkward to author, it is unauthorable.
+
+```python
+from fuaran_py.schema import types as t
+from fuaran_py.ui import fuaran
+
+fuaran.drawing(
+    "revenue",
+    view_box=t.ViewBox(0, 0, 200, 100),
+    title="Quarterly revenue",
+    shapes=[
+        t.Rectangle(10, 10, 80, 40, corner_radius=4, style=t.DrawStyle(fill=t.Static("#3366cc"))),
+        t.Group((t.Circle(150, 50, 20), t.Line(0, 0, 200, 100))),
+        t.Label(100, 90, t.LiteralText("Revenue"), style=t.DrawStyle(rotation=-30, text_anchor="Middle")),
+    ],
+)
+
+fuaran.fact("today", label="Today", value=t.Bound(t.Now("Day")))
+
+fuaran.mount("side", scope_id="guest-sidebar", capabilities=["notify"])
+```
+
+**`Drawing` — the shape vocabulary is closed and carries no `d` string.** `Group`,
+`Rectangle`, `Line`, `Polyline`, `Polygon`, `Curve`, `Circle`, `Ellipse` and `Label`, with
+`Curve` taking the five typed path commands (`MoveTo` / `LineTo` / `CubicTo` /
+`QuadraticTo` / `Close`). A path string would smuggle a second grammar past every
+validator and every tree op. Coordinates are plain floats — a drawing is a *resolved*
+artefact, and a chart lowering produces concrete numbers — while `DrawStyle` carries the
+bindings, which is what keeps colour reactive on a static picture. Every `DrawStyle` slot
+is absent by default, so a shape emits only what differs from what it inherits; the one
+trap is `rotation`, where an explicit `0` is a document and only `None` omits the key.
+
+**`Fact` — `metric()`'s complementary kind.** A metric carries a number through a
+`CellFormat`; a fact carries a `TextSource`, which is why its value binds to the host's
+clock (`t.Bound(t.Now(...))`) or to a grid selection (`t.Bound(binding.selection(...))`)
+as naturally as it takes a literal. `tone` omits at `"Default"` and `emphasis` at `False`,
+so the minimal fact is the two-key document.
+
+**`Mount` — the isolation boundary.** `capabilities` is the whole of what the guest may
+do, so its default is the EMPTY list rather than an absent key: default-deny is a
+statement. `inputs` shares the `FragmentArg` vocabulary with `fragment_ref`, so scalars
+carry configuration and `t.SlotArg(tree)` hands the guest a whole node tree. `on_bubble`
+follows the handler-flag convention from the section above — `True` by default, `False`
+for a guest whose bubbles the host does not take.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

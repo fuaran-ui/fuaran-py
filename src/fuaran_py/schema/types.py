@@ -1355,7 +1355,24 @@ class Tabs:
         return _obj(
             "Tabs",
             {
-                "activeIndex": self.active_index,
+                # Phase 1585 — omitted at the identity `Static(0)`. Every host's
+                # decoder restores it on absence, so a tab strip opening on its
+                # first tab pays no key for it. The test is on the CASE and its
+                # PAYLOAD, unlike `Chart.stacked`'s: the identity is one
+                # inhabitant of a union with an unbounded payload domain, so a
+                # `Static` carrying any other index still rides, and so does
+                # every `State` / `Filter` / `Selection` / `Query` binding.
+                # `type(v) is int` rather than `== 0`: Python makes `False == 0`
+                # and `0.0 == 0` both true, and a mistyped payload must reach the
+                # wire to be refused there rather than being silently dropped
+                # here as if it were the identity.
+                "activeIndex": (
+                    None
+                    if isinstance(self.active_index, Static)
+                    and type(self.active_index.value) is int
+                    and self.active_index.value == 0
+                    else self.active_index
+                ),
                 "activeTag": self.active_tag,
                 "children": list(self.children),
                 "onSelect": CLOSURE if self.on_select else None,

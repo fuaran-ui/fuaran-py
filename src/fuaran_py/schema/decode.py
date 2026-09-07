@@ -826,6 +826,36 @@ def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
     return dec
 
 
+def _omit_default_binding_static_int(default: int) -> Callable[[object, str], object]:
+    """Phase 1585 — a ``Binding<int>`` slot omitted at the identity
+    ``Static(<default>)``.
+
+    The sibling of :func:`_omit_default_bool`, and the differences are the whole
+    reason it is its own function. A bool default has two inhabitants, so
+    "is it the default" and "which case is it" are the same question; a binding
+    default is one inhabitant of a union whose payload domain is unbounded, so
+    the test is on the CASE **and** its PAYLOAD — a ``Static`` carrying any other
+    index must survive, and so must every ``State`` / ``Filter`` / ``Selection``
+    / ``Query`` binding. Dropping on the tag alone would silently discard a
+    document's authored tab.
+
+    ``type(...) is int`` rather than ``== default``: Python makes ``False == 0``
+    and ``0.0 == 0`` both true, and the wire decoder above has already refused a
+    mistyped payload, so the only way one reaches here is a shape this function
+    must not quietly absorb.
+    """
+
+    def dec(value: object, path: str) -> object:
+        v = _decode_binding_int(value, path)
+        if isinstance(v, Obj) and v.tag == "Static":
+            payload = v.fields.get("value")
+            if type(payload) is int and payload == default:
+                return _DROP
+        return v
+
+    return dec
+
+
 def _decode_emphasis_enum(value: object, path: str) -> str:
     """The `Emphasis` style ENUM, with the §3.6 aliases and the cross-vocabulary
     bool projection (true ⇒ Loud, false ⇒ Normal)."""
@@ -2505,8 +2535,15 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # `children` was added to both after the audit above: minimal is not the same
     # as blind, and leaving a node-valued position structural is the one omission
     # that costs more than it saves.
+    # Phase 1585 — `activeIndex` is omit-at-default (`Static(0)`), so the decoder
+    # drops the identity rather than carrying it: on the generic structural model
+    # the encoder re-emits exactly the fields present, so an explicit
+    # `{"$type":"Static","value":0}` carried through would make the pre-phase
+    # spelling a SECOND canonical form. `Stepper.activeStep` is deliberately NOT
+    # given the same treatment — it is IDL-`required`, not omit-at-default, and
+    # this decoder must not invent a rule the artefact does not state.
     "Tabs": [
-        ("activeIndex", False, _decode_binding_int),
+        ("activeIndex", False, _omit_default_binding_static_int(0)),
         ("children", True, _decode_children),
     ],
     "Stepper": [

@@ -1,0 +1,1 @@
+{"id":"action-focus","kind":{"$type":"Button","label":"Clear search","onClick":{"$type":"Chain","ops":[{"$type":"SetState","key":"search","value":""},{"$type":"Focus","nodeId":"search-field"}]},"variant":"Secondary"}}

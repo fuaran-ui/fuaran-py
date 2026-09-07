@@ -1131,6 +1131,30 @@
       "description": "Accessibility (Phase 955 — State-bound label + hidden, mixed-case custom role doc-pageFooter, off)"
     },
     {
+      "id": "action-confirm",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-confirm.json",
+      "expectedFile": "nodes/action-confirm.json",
+      "description": "Phase 1537 — Input/Button whose Action.Confirm asks a BOUND question (naming the selected row) before a Call; no onCancel, which is how the language spells 'nothing happens'"
+    },
+    {
+      "id": "action-confirm-cancel",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-confirm-cancel.json",
+      "expectedFile": "nodes/action-confirm-cancel.json",
+      "description": "Phase 1537 — Input/Button whose Action.Confirm carries a LITERAL prompt and both branches; the only fixture in which the recursive encoder descends into a named continuation rather than a Chain list"
+    },
+    {
+      "id": "action-focus",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/action-focus.json",
+      "expectedFile": "nodes/action-focus.json",
+      "description": "Phase 1537 — Input/Button whose Action.Focus moves the caret to an addressed node, chained after the write that emptied it"
+    },
+    {
       "id": "action-navigate-bound",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3124,6 +3148,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.allowFreeText",
       "description": "a Combobox `allowFreeText` of `\"yes\"` — refused rather than coerced. The slot decides whether values OUTSIDE the option set are admitted, so a lenient truthiness read is a constraint silently relaxed by a string: `\"yes\"`, `\"no\"` and `\"false\"` are all non-empty, and a host that coerced them would widen the field on two of the three. It also omits at `false`, so absence already spells the safe answer and a wrong-typed present value can only mean the emitter meant something it did not say"
+    },
+    {
+      "id": "reject-confirm-missing-onconfirm",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-confirm-missing-onconfirm.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick",
+      "description": "Confirm with no 'onConfirm' — a question with no answer. The other two members are absent-legal (`onCancel`) or shorthand-legal (`prompt` as a bare string), so this vector is what keeps an emitter from generalising 'optional' across the case (Phase 1537)"
+    },
+    {
+      "id": "reject-confirm-nested",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-confirm-nested.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.onConfirm.ops[1]",
+      "description": "A Confirm inside a Confirm's continuation, reached through a Chain — confirmation is bounded at one question, and the check walks the DECODED continuation so a chain cannot hide the nesting (Phase 1537)"
     },
     {
       "id": "reject-daterange-unordered",

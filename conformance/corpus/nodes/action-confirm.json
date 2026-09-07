@@ -1,0 +1,1 @@
+{"id":"action-confirm","kind":{"$type":"Button","label":"Delete","onClick":{"$type":"Confirm","onConfirm":{"$type":"Call","endpoint":"/orders/delete","into":{"$type":"State","key":"delete-result"}},"prompt":{"$type":"Bound","binding":{"$type":"Selection","field":"reference","nodeId":"orders-grid"}}},"variant":"Secondary"}}

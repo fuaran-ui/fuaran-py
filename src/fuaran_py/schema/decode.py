@@ -1596,6 +1596,9 @@ ACTION_CASES = frozenset(
         "WriteToClipboard",
         # fuaran#1124 — the format's first PAYLOAD-FREE action case.
         "Print",
+        # fuaran#1537 — the confirm-before-action dialogue and the focus move.
+        "Confirm",
+        "Focus",
         "ReadFileBody",
         "Call",
         "AiTool",
@@ -1658,6 +1661,61 @@ def _decode_action(value: object, path: str) -> Value:
                 decoded["target"] = target
         rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "route", "target")}
         return Obj("Navigate", {**rest, **decoded})
+    elif tag == "Confirm":
+        # fuaran#1537 — ask, then act. `prompt` is a `TextSource` (so the
+        # question can name what the reader selected), `onConfirm` is required
+        # and `onCancel` optional; an author who declares no cancel branch means
+        # "nothing happens", which an absent action already expresses.
+        #
+        # THE DEPTH-ONE REFUSAL is the substance of this arm. A `Confirm`
+        # reachable from either continuation is refused, and the check walks the
+        # DECODED continuation rather than its immediate `$type`, so a nested
+        # confirm inside a `Chain` is caught by the same line that catches a bare
+        # one. A dialogue that answers a dialogue is a modal stack the reader
+        # cannot escape, and it says nothing one question does not.
+        #
+        # WRONG_TYPE follows the `SetState` value/valueFrom and Print-with-
+        # payload precedents: a decoder POLICY refusal reuses it rather than
+        # minting a code every host in the roster would owe an adoption for.
+        def _nested_confirm_path(p: str, action: Value) -> str | None:
+            if isinstance(action, Obj):
+                if action.tag == "Confirm":
+                    return p
+                if action.tag == "Chain":
+                    ops = action.fields.get("ops")
+                    if isinstance(ops, Arr):
+                        for i, inner in enumerate(ops.items):
+                            found = _nested_confirm_path(f"{p}.ops[{i}]", inner)
+                            if found is not None:
+                                return found
+            return None
+
+        def _refuse_nested(p: str, action: Value) -> None:
+            found = _nested_confirm_path(p, action)
+            if found is not None:
+                _fail(
+                    WRONG_TYPE,
+                    found,
+                    "a Confirm may not appear inside another Confirm's continuation — confirmation is "
+                    "bounded at one question. A dialogue that answers a dialogue is a modal stack the "
+                    "reader cannot escape (WIRE_FORMAT §3.6.22)",
+                    "any action but Confirm",
+                )
+
+        prompt = _decode_text_source(_require(obj, "prompt", path), f"{path}.prompt")
+        on_confirm = _decode_action(_require(obj, "onConfirm", path), f"{path}.onConfirm")
+        _refuse_nested(f"{path}.onConfirm", on_confirm)
+        decoded_confirm: dict[str, Value] = {"onConfirm": on_confirm, "prompt": prompt}
+        if "onCancel" in obj:
+            on_cancel = _decode_action(obj["onCancel"], f"{path}.onCancel")
+            _refuse_nested(f"{path}.onCancel", on_cancel)
+            decoded_confirm["onCancel"] = on_cancel
+        rest = {
+            k: _from_json_strict(v, f"{path}.{k}")
+            for k, v in obj.items()
+            if k not in ("$type", "prompt", "onConfirm", "onCancel")
+        }
+        return Obj("Confirm", {**rest, **decoded_confirm})
     elif tag == "WriteToClipboard":
         # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
         # bare JSON string IS `Literal`'s canonical form, so every document

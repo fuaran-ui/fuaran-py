@@ -1,7 +1,7 @@
 {
   "version": 1,
   "$id": "https://fuaran.dev/wire-format/v1/render-fidelity.json",
-  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. See WIRE_FORMAT.md 13.",
+  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. See WIRE_FORMAT.md 13.",
   "tiers": [
     {
       "tier": "source",
@@ -98,6 +98,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -111,6 +112,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -126,6 +128,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -139,6 +142,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -156,6 +160,7 @@
         "nodes/chart-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 526; docs/SSR.md (Visualisation)"
     },
     {
@@ -173,6 +178,7 @@
         "nodes/code-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 290; WIRE_FORMAT.md 3.2; docs/SSR.md (deterministic-render + client-only-enhancement contract)"
     },
     {
@@ -196,6 +202,7 @@
           "section": "WIRE_FORMAT.md 25.4"
         }
       ],
+      "intrinsic": [],
       "contract": "Phase 141; Phase 1108; docs/SSR.md (custom-renderer registry); WIRE_FORMAT.md 25; SANITIZATION.md"
     },
     {
@@ -213,6 +220,23 @@
         "nodes/grid-1.json"
       ],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the transfer status region beside a transfer-enabled grid",
+          "role": "status",
+          "live": "polite",
+          "condition": "a grid declaring a transfer key; rendered EMPTY, and only a reader's own gesture puts text in it",
+          "tier": "clientOnly",
+          "tierNote": "a transfer needs script, so the static floor renders no lift or drop affordance and has nothing to announce"
+        },
+        {
+          "element": "the pager position",
+          "live": "polite",
+          "condition": "a paged grid; the page position changes without the surrounding layout moving",
+          "tier": "clientOnly",
+          "tierNote": "paging is a hydration-time affordance; the static floor emits the requested page and no pager"
+        }
+      ],
       "contract": "Phase 393; docs/SSR.md (Visualisation, sortable rendered tables)"
     },
     {
@@ -226,6 +250,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "docs/SSR.md (Layout.Disclosure)"
     },
     {
@@ -239,6 +264,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -252,6 +278,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -265,6 +292,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -290,6 +318,7 @@
           "section": "WIRE_FORMAT.md 3.6.10"
         }
       ],
+      "intrinsic": [],
       "contract": "Phase 1115; WIRE_FORMAT.md 3.6.10; docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -305,6 +334,26 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the filter chip's checkbox input",
+          "role": "switch",
+          "condition": "a `Toggle` filter - the same boolean data as a checkbox, announced as on/off rather than checked",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "the segmented filter's group container",
+          "role": "radiogroup",
+          "condition": "a `SegmentedChoice` filter in `Horizontal` orientation; the `Vertical` form floors on native radio inputs and emits no hand-written role",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "each segmented option button",
+          "role": "radio",
+          "condition": "a `SegmentedChoice` filter in `Horizontal` orientation",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -320,6 +369,29 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the toggle field's checkbox input",
+          "role": "switch",
+          "condition": "a `Toggle` field - the same boolean data as a checkbox, announced as on/off rather than checked",
+          "tier": "clientOnly",
+          "tierNote": "the server floor renders the field through its generic input arm and emits no role, where the FILTER twin emits one on both sides - a recorded asymmetry, not a claim that the floor is complete"
+        },
+        {
+          "element": "the segmented field's group container",
+          "role": "radiogroup",
+          "condition": "a `SegmentedChoice` field in `Horizontal` orientation; the `Vertical` form floors on native radio inputs and emits no hand-written role",
+          "tier": "clientOnly",
+          "tierNote": "the server floor renders the field through its generic input arm and emits no group role - the same asymmetry as the toggle above"
+        },
+        {
+          "element": "each segmented option button",
+          "role": "radio",
+          "condition": "a `SegmentedChoice` field in `Horizontal` orientation",
+          "tier": "clientOnly",
+          "tierNote": "the server floor emits no option buttons for a form-side segmented choice"
+        }
+      ],
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -333,6 +405,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -346,6 +419,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -359,6 +433,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -372,6 +447,14 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the icon span",
+          "role": "img",
+          "condition": "a LABELLED icon (`label` present); a decorative icon emits `aria-hidden=\"true\"` instead, which is the same decision made the other way rather than an omission",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -416,6 +499,7 @@
           "section": "WIRE_FORMAT.md 3.6.4"
         }
       ],
+      "intrinsic": [],
       "contract": "Phase 1079; WIRE_FORMAT.md 3.6.5; docs/SSR.md (expandable images)"
     },
     {
@@ -429,6 +513,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -444,6 +529,7 @@
         "nodes/link-protected-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 812; WIRE_FORMAT.md 3.2 (link protection); docs/SSR.md (protected email links)"
     },
     {
@@ -457,6 +543,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -474,6 +561,7 @@
         "nodes/map-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "docs/SSR.md (Visualisation)"
     },
     {
@@ -491,6 +579,7 @@
         "nodes/markdown-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phases 292, 293; WIRE_FORMAT.md 14; docs/MARKDOWN.md"
     },
     {
@@ -508,6 +597,7 @@
         "nodes/math-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phases 293, 658; WIRE_FORMAT.md 3.2; docs/SSR.md; docs/MATH-DEGRADATION.md"
     },
     {
@@ -565,6 +655,7 @@
           "section": "WIRE_FORMAT.md 3.6.6"
         }
       ],
+      "intrinsic": [],
       "contract": "Phase 1076; WIRE_FORMAT.md 3.6.6; docs/SSR.md (media)"
     },
     {
@@ -598,6 +689,7 @@
           "section": "WIRE_FORMAT.md 19.1"
         }
       ],
+      "intrinsic": [],
       "contract": "Phase 1111; WIRE_FORMAT.md 3.6.8, 19.1; docs/SSR.md (embed)"
     },
     {
@@ -611,6 +703,14 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the trend glyph beside the figure",
+          "role": "img",
+          "condition": "a `trend` binding that resolves to a number; the glyph is a direction, so it carries the sentiment as its accessible name rather than being read out as a character",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -636,6 +736,13 @@
           "section": "WIRE_FORMAT.md 3.6.11"
         }
       ],
+      "intrinsic": [
+        {
+          "element": "the dialog surface, in BOTH modalities",
+          "role": "dialog",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "Phase 289; Phase 1119; WIRE_FORMAT.md 3.2 + 3.6.11; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -649,6 +756,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -662,6 +770,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -677,6 +786,7 @@
         "nodes/scroll-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 289; WIRE_FORMAT.md 3.2; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -692,6 +802,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 291; docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -705,6 +816,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -720,6 +832,7 @@
         "nodes/spark-1.json"
       ],
       "obligations": [],
+      "intrinsic": [],
       "contract": "Phase 644 4k; Phase 1098; docs/SSR.md (Display.Sparkline)"
     },
     {
@@ -733,6 +846,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -748,6 +862,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "docs/SSR.md (Layout)"
     },
     {
@@ -761,6 +876,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -774,6 +890,7 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [],
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -789,6 +906,23 @@
       },
       "fixtures": [],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the tab bar",
+          "role": "tablist",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "each tab header button",
+          "role": "tab",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "the active panel",
+          "role": "tabpanel",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "docs/SSR.md (Layout.Tabs)"
     },
     {
@@ -804,6 +938,14 @@
         "nodes/toast-1.json"
       ],
       "obligations": [],
+      "intrinsic": [
+        {
+          "element": "the toast surface",
+          "role": "status",
+          "live": "polite",
+          "tier": "bothPipelines"
+        }
+      ],
       "contract": "Phase 289; WIRE_FORMAT.md 3.2 (Toast vs Action.Notify); docs/SSR.md"
     },
     {
@@ -827,6 +969,24 @@
           "id": "accessible-name-always",
           "statement": "every row carries a stated `aria-label` equal to its visible label - a treeitem OWNS its child group, so a name computed from contents would read the whole branch out as the row's own name",
           "section": "WIRE_FORMAT.md 3.6.12"
+        }
+      ],
+      "intrinsic": [
+        {
+          "element": "the root list",
+          "role": "tree",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "each row",
+          "role": "treeitem",
+          "tier": "bothPipelines"
+        },
+        {
+          "element": "the nested child list under an expandable row",
+          "role": "group",
+          "condition": "a row that HAS children",
+          "tier": "bothPipelines"
         }
       ],
       "contract": "Phase 1120; WIRE_FORMAT.md 3.6.12, 21.5; docs/SSR.md (the Tree server floor)"

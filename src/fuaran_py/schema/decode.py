@@ -2539,16 +2539,23 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # builder (`_decode_switch`), not a flat field schema, because the selector
     # is one-of `stateKey` / `on` with the Phase 768 collapse rule.
     # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
-    # capabilities + the onBubble closure sentinel are always present on the
-    # canonical wire; inputs is a FragmentArg map (additive) whose non-node cases
-    # pass through structurally WITHOUT null-strictness — it embeds whole node
-    # trees whose Binding.Static values are §5 opaque seams — while a `SlotArg`'s
-    # `tree` routes through the node decoder like any other node position.
+    # capabilities are required; inputs is a FragmentArg map (additive) whose
+    # non-node cases pass through structurally WITHOUT null-strictness — it embeds
+    # whole node trees whose Binding.Static values are §5 opaque seams — while a
+    # `SlotArg`'s `tree` routes through the node decoder like any other node
+    # position.
+    #
+    # Phase 1579 — `onBubble` is OPTIONAL, and was wrongly required here. The IDL
+    # declares it optional and the reference decoder reads it with a presence
+    # test, so a mount whose bubbles the host does not take is a document every
+    # other host accepts and this one refused. Both corpus fixtures carry the
+    # sentinel, which is why no fixture caught it; the generative floor did, on
+    # the first run after the authoring surface could spell the absence.
     "Mount": [
         ("scopeId", True, _decode_string),
         ("channel", True, _decode_guest_channel),
         ("capabilities", True, _decode_json_value),
-        ("onBubble", True, _decode_string),
+        ("onBubble", False, _decode_string),
         ("inputs", False, _decode_fragment_args),
     ],
 }

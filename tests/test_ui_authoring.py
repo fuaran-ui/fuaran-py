@@ -20,9 +20,12 @@ import pytest
 from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py.canonical import encode_value
 from fuaran_py.dataframe.codec import encode_expr_value
+from fuaran_py.dataframe.model import ApplyFn
 from fuaran_py.model import Arr, Obj
 from fuaran_py.schema import types as t
 from fuaran_py.ui import (
+    Expr,
+    Frame,
     ParamDecl,
     accessibility,
     action,
@@ -133,6 +136,108 @@ def _board_column(node_id: str, key: str, rows: list[dict[str, object]], *, rele
             transfer_out_key="board" if releases else None,
         )
     )
+
+
+# ── Phase 1579 — the Drawing / Fact / Mount builders ─────────────────────────
+
+
+def _mark_style(fill: str, stroke: str) -> t.DrawStyle:
+    """``drawing-1``'s per-mark style: the root style's four slots, restated with
+    the mark's own colours. A shape emits only what differs from the inherited
+    default, so a mark that restates all four carries all four."""
+    return t.DrawStyle(fill=t.Static(fill), opacity=t.Static(0.9), stroke=t.Static(stroke), stroke_width=t.Static(1.5))
+
+
+def _label_style(
+    *, rotation: float | None = None, anchor: t.TextAnchor = "Middle", tip: str | None = None
+) -> t.DrawStyle:
+    """The axis-label text cluster. ``rotation=0`` is a DOCUMENT (``drawing-rotated-labels``
+    carries an explicit zero beside an absent one), so only ``None`` omits the key."""
+    return t.DrawStyle(
+        emphasis="Loud",
+        fill=t.Static("#111111"),
+        font_family="system-ui, sans-serif",
+        font_size=14,
+        rotation=rotation,
+        text_anchor=anchor,
+        tip=t.LiteralText(tip) if tip is not None else None,
+    )
+
+
+def _days_overdue() -> Expr:
+    """``dateDiffDays(param 'today', col 'due')`` — the derive step the two ``Now``
+    fixtures share. Assembled from :class:`ApplyFn` directly because the scalar-fn
+    surface exposes the one-argument verbs as ``Expr`` methods and this one takes
+    two roots, neither of which is a receiver. The same escape ``_expr_predicate``
+    takes above, and for the same reason."""
+    return Expr(ApplyFn("dateDiffDays", [param("today").colexpr, col("due").colexpr]))
+
+
+#: The invoice grid both ``Now`` fixtures render, including the derived column.
+_OVERDUE_COLUMNS = [
+    t.Column(label="Invoice", field_name="id"),
+    t.Column(label="Due", field_name="due"),
+    t.Column(label="Days overdue", field_name="daysOverdue"),
+]
+
+
+def _overdue_frame(ids: list[str], dues: list[str], grain: t.TimeGrain | None) -> object:
+    return (
+        frame({"id": ids, "due": dues}, schema=[("id", "string"), ("due", "string")])
+        .derive("daysOverdue", _days_overdue())
+        .bind(ParamDecl("today", t.Now(grain)))
+    )
+
+
+def _ticket_columns(*names: str) -> list[t.Column]:
+    labels = {"id": "Ticket", "priority": "Priority", "assignee": "Assignee", "note": "Note"}
+    return [t.Column(label=labels[n], field_name=n) for n in names]
+
+
+def _two_ticket_frame(*, with_assignee: bool = False) -> Frame:
+    """The two-row ticket table the first two master-detail fixtures select over.
+
+    ``master-detail-multi-field`` carries an extra ``assignee`` column and nothing
+    else differs, so the pair share one declaration; the three-row table below is
+    a genuinely different one (its own priorities, its own note column) and is
+    kept apart rather than derived by slicing.
+    """
+    columns: dict[str, list[object]] = {"id": ["TCK-2041", "TCK-2042"], "priority": ["high", "low"]}
+    schema = [("id", "string"), ("priority", "string")]
+    if with_assignee:
+        columns["assignee"] = ["R. Okafor", "M. Lindqvist"]
+        schema.append(("assignee", "string"))
+    return frame(columns, schema=schema)
+
+
+def _three_ticket_frame() -> Frame:
+    """``master-detail-preselected-second-row``'s table: three rows, id + priority + note."""
+    return frame(
+        {
+            "id": ["TCK-2041", "TCK-2042", "TCK-2043"],
+            "priority": ["high", "medium", "low"],
+            "note": ["Payment gateway timeout", "Search index stale", "Avatar upload fails"],
+        },
+        schema=[("id", "string"), ("priority", "string"), ("note", "string")],
+    )
+
+
+def _picked_ticket_frame() -> Frame:
+    """The three-row table filtered to the SELECTED ticket. Two consumers — the
+    related grid and the note callout — build from the same declaration rather
+    than from two that could drift."""
+    return (
+        _three_ticket_frame()
+        .filter(col("id").eq(param("ticketId")))
+        .bind(ParamDecl("ticketId", _selected("id", "TCK-2042")))
+    )
+
+
+def _selected(field: str, default: str) -> t.Selection:
+    """``Binding.Selection`` on the master grid, projecting one row field. The
+    ``default_value`` is what the detail pane reads BEFORE the first click, which
+    is the whole of what ``master-detail-preselected`` pins."""
+    return t.Selection("ticket-grid", default, field)
 
 
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
@@ -1357,6 +1462,295 @@ def _authored() -> dict[str, t.UiNode]:
                 ),
                 fuaran.markdown("tooltip-icon-button-note", "Updated hourly."),
             ],
+        ),
+        # ── Phase 1579 — Drawing (5) ─────────────────────────────────────────
+        "drawing-1": fuaran.drawing(
+            "drawing-1",
+            view_box=t.ViewBox(0, 0, 200, 100),
+            style=_mark_style("#ffffff", "#000000"),
+            title="Quarterly revenue chart",
+            description="A bar and line chart of revenue by quarter.",
+            shapes=[
+                t.Rectangle(10, 10, 80, 40, corner_radius=4, style=_mark_style("#3366cc", "#102040")),
+                t.Line(0, 0, 200, 100),
+                t.Polyline((t.DrawPoint(0, 0), t.DrawPoint(10, 20), t.DrawPoint(20, 5))),
+                t.Polygon(
+                    (t.DrawPoint(100, 10), t.DrawPoint(120, 30), t.DrawPoint(90, 40)),
+                    style=_mark_style("#cc6633", "#402010"),
+                ),
+                t.Curve(
+                    (
+                        t.MoveTo(t.DrawPoint(0, 0)),
+                        t.LineTo(t.DrawPoint(10, 10)),
+                        t.CubicTo(t.DrawPoint(20, 0), t.DrawPoint(30, 20), t.DrawPoint(40, 10)),
+                        t.QuadraticTo(t.DrawPoint(50, 0), t.DrawPoint(60, 10)),
+                        t.Close(),
+                    )
+                ),
+                t.Circle(150, 50, 20, style=_mark_style("#33aa55", "#0a2010")),
+                t.Ellipse(50, 80, 30, 15),
+                t.Label(100, 90, t.LiteralText("Revenue"), style=_label_style()),
+                t.Group((t.Circle(5, 5, 2), t.Line(0, 0, 10, 10)), style=_mark_style("#999999", "#333333")),
+            ],
+        ),
+        "drawing-empty": fuaran.drawing("drawing-empty", view_box=t.ViewBox(0, 0, 100, 100)),
+        "drawing-nonfinite-sentinels": fuaran.drawing(
+            "drawing-nonfinite-sentinels",
+            # The §7 sentinels reach the typed float slots as ordinary Python
+            # non-finites; the canonical encoder writes the quoted tokens.
+            view_box=t.ViewBox(float("-inf"), float("nan"), float("inf"), 120),
+            title="Non-finite sentinels at typed float slots",
+            shapes=[t.Circle(float("nan"), 50, 20)],
+        ),
+        "drawing-rotated-labels": fuaran.drawing(
+            "drawing-rotated-labels",
+            view_box=t.ViewBox(0, 0, 200, 120),
+            title="Rotated axis labels",
+            shapes=[
+                t.Label(30, 100, t.LiteralText("Q1 2026"), style=_label_style(rotation=-30)),
+                t.Label(70, 100, t.LiteralText("Q2 2026"), style=_label_style(rotation=-90, anchor="End")),
+                t.Label(8, 60, t.LiteralText("Revenue"), style=_label_style(rotation=90)),
+                t.Label(110, 100, t.LiteralText("Fractional"), style=_label_style(rotation=12.34, anchor="Start")),
+                t.Label(150, 100, t.LiteralText("Explicit zero"), style=_label_style(rotation=0)),
+                t.Label(180, 100, t.LiteralText("Hairline"), style=_label_style(rotation=-0.5, anchor="End")),
+                t.Label(100, 20, t.LiteralText("Upright"), style=_label_style()),
+            ],
+        ),
+        "drawing-tipped-shapes": fuaran.drawing(
+            "drawing-tipped-shapes",
+            view_box=t.ViewBox(0, 0, 200, 120),
+            title="Tipped marks",
+            shapes=[
+                t.Rectangle(
+                    10,
+                    40,
+                    30,
+                    60,
+                    style=t.DrawStyle(fill=t.Static("#3366cc"), tip=t.LiteralText("revenue · Q1 2026 · 1,234,567.89")),
+                ),
+                t.Circle(
+                    70,
+                    60,
+                    5,
+                    style=t.DrawStyle(fill=t.Static("#3366cc"), tip=t.LiteralText("revenue · Q2 2026 · -0.5%")),
+                ),
+                t.Curve(
+                    (t.MoveTo(t.DrawPoint(100, 60)), t.LineTo(t.DrawPoint(130, 60)), t.Close()),
+                    style=t.DrawStyle(fill=t.Static("#3366cc"), tip=t.LiteralText("share · Other · £42.00")),
+                ),
+                t.Polyline(
+                    (t.DrawPoint(140, 20), t.DrawPoint(160, 80)),
+                    style=t.DrawStyle(stroke=t.Static("#cc6633"), tip=t.LiteralText("revenue")),
+                ),
+                # A BOUND tip: the text resolves at render time, so the wire
+                # carries the binding rather than a string.
+                t.Group(
+                    (t.Circle(170, 100, 3),),
+                    style=t.DrawStyle(tip=t.Bound(t.Static("resolved at render time"))),
+                ),
+                t.Label(
+                    100,
+                    110,
+                    t.LiteralText("Hover me"),
+                    style=_label_style(tip="<script>alert(\"xss\") & 'done'</script>"),
+                ),
+                # An EMPTY tip is a document, not an absence — it survives the
+                # round trip as the empty string.
+                t.Ellipse(30, 110, 6, 3, style=t.DrawStyle(tip=t.LiteralText(""))),
+                t.Line(0, 0, 200, 0),
+            ],
+        ),
+        # ── Phase 1579 — Fact (6) ────────────────────────────────────────────
+        "fact-1": fuaran.fact(
+            "fact-1",
+            label="Patient",
+            value="Alice Smith",
+            tone="Brand",
+            emphasis=True,
+            help="Primary insured",
+            icon="user",
+        ),
+        "now-environment-binding": node.bare(
+            fuaran.dashboard(
+                "now-environment-binding",
+                children=[
+                    fuaran.fact("today-fact", label="Today", value=t.Bound(t.Now())),
+                    node.bare(
+                        fuaran.grid(
+                            "overdue-grid",
+                            source=_overdue_frame(
+                                ["INV-1001", "INV-1002"], ["2026-07-01", "2026-07-28"], None
+                            ).to_transform_binding(),
+                            columns=_OVERDUE_COLUMNS,
+                            row_key_field="id",
+                        )
+                    ),
+                ],
+            )
+        ),
+        "now-grain": node.bare(
+            fuaran.dashboard(
+                "now-grain",
+                children=[
+                    fuaran.fact("asof-minute", label="As of (minute)", value=t.Bound(t.Now("Minute"))),
+                    fuaran.fact("asof-hour", label="As of (hour)", value=t.Bound(t.Now("Hour"))),
+                    fuaran.fact("asof-day", label="Today", value=t.Bound(t.Now("Day"))),
+                    node.bare(
+                        fuaran.grid(
+                            "overdue-grid-day-grain",
+                            source=_overdue_frame(["INV-2001"], ["2026-07-01"], "Day").to_transform_binding(),
+                            columns=_OVERDUE_COLUMNS,
+                            row_key_field="id",
+                        )
+                    ),
+                ],
+            )
+        ),
+        "master-detail-multi-field": node.bare(
+            fuaran.dashboard(
+                "master-detail-multi-field",
+                children=[
+                    node.bare(
+                        fuaran.grid(
+                            "ticket-grid",
+                            source=_two_ticket_frame(with_assignee=True).to_transform_binding(),
+                            columns=_ticket_columns("id", "priority", "assignee"),
+                            row_key_field="id",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.card(
+                            "ticket-detail",
+                            heading="Ticket detail",
+                            children=[
+                                fuaran.fact(
+                                    "detail-ticket",
+                                    label="Selected ticket",
+                                    value=t.Bound(_selected("id", "TCK-2041")),
+                                ),
+                                fuaran.fact(
+                                    "detail-priority",
+                                    label="Priority",
+                                    value=t.Bound(_selected("priority", "TCK-2041")),
+                                ),
+                                fuaran.fact(
+                                    "detail-assignee",
+                                    label="Assignee",
+                                    value=t.Bound(_selected("assignee", "TCK-2041")),
+                                ),
+                                node.bare(
+                                    fuaran.callout(
+                                        "detail-note",
+                                        body=t.Bound(_selected("assignee", "R. Okafor")),
+                                        heading="Assigned to",
+                                        tone="Info",
+                                    )
+                                ),
+                            ],
+                        )
+                    ),
+                ],
+            )
+        ),
+        "master-detail-preselected": node.bare(
+            fuaran.dashboard(
+                "master-detail-preselected",
+                children=[
+                    node.bare(
+                        fuaran.grid(
+                            "ticket-grid",
+                            source=_two_ticket_frame().to_transform_binding(),
+                            columns=_ticket_columns("id", "priority"),
+                            row_key_field="id",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.card(
+                            "ticket-detail",
+                            heading="Ticket detail",
+                            children=[
+                                fuaran.fact(
+                                    "detail-ticket",
+                                    label="Selected ticket",
+                                    emphasis=True,
+                                    value=t.Bound(_selected("id", "TCK-2041")),
+                                )
+                            ],
+                        )
+                    ),
+                    node.bare(
+                        fuaran.grid(
+                            "related-grid",
+                            source=_two_ticket_frame()
+                            .filter(col("id").eq(param("ticketId")))
+                            .bind(ParamDecl("ticketId", _selected("id", "TCK-2041")))
+                            .to_transform_binding(),
+                            columns=_ticket_columns("id", "priority"),
+                            row_key_field="id",
+                        )
+                    ),
+                ],
+            )
+        ),
+        "master-detail-preselected-second-row": node.bare(
+            fuaran.dashboard(
+                "master-detail-preselected-second-row",
+                children=[
+                    node.bare(
+                        fuaran.grid(
+                            "ticket-grid",
+                            source=_three_ticket_frame().to_transform_binding(),
+                            columns=_ticket_columns("id", "priority", "note"),
+                            row_key_field="id",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.card(
+                            "ticket-detail",
+                            heading="Ticket detail",
+                            children=[
+                                fuaran.fact(
+                                    "detail-ticket",
+                                    label="Selected ticket",
+                                    emphasis=True,
+                                    value=t.Bound(_selected("id", "TCK-2042")),
+                                )
+                            ],
+                        )
+                    ),
+                    node.bare(
+                        fuaran.grid(
+                            "related-grid",
+                            source=_picked_ticket_frame().to_transform_binding(),
+                            columns=_ticket_columns("id", "priority", "note"),
+                            row_key_field="id",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.callout(
+                            "detail-note",
+                            # The SAME selection, projected to one cell: filter to the
+                            # selected row, keep `note`, take one. A Callout body is a
+                            # TextSource, so the pipeline rides a `Bound`.
+                            body=t.Bound(_picked_ticket_frame().select("note").limit(1).to_transform_binding()),
+                            heading="Ticket note",
+                            tone="Info",
+                        )
+                    ),
+                ],
+            )
+        ),
+        # ── Phase 1579 — Mount (2) ───────────────────────────────────────────
+        "mount-1": fuaran.mount("mount-1", scope_id="guest-sidebar"),
+        "mount-2": fuaran.mount(
+            "mount-2",
+            scope_id="guest-metrics",
+            channel=t.GuestChannel("TwoWay", "MetricsMsg"),
+            capabilities=["notify", "call:reports.*"],
+            inputs={
+                "seed": t.SlotArg(fuaran.markdown("seed-tree", "Initial guest state")),
+                "title": t.ScalarStr("Metrics"),
+            },
         ),
     }
 

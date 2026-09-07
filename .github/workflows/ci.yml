@@ -83,6 +83,12 @@ jobs:
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
+          # Full history, because the drift step below measures the DISTANCE
+          # between the committed snapshot's recorded commit and this HEAD. The
+          # default depth of 1 holds HEAD and nothing else, under which that
+          # distance is unmeasurable — the check would report "unknown" on every
+          # run and the number the report exists to give would never appear.
+          fetch-depth: 0
 
       - name: Assert the corpus is where the tests resolve it
         run: test -f ../wire-format-fixtures/manifest.json
@@ -90,6 +96,35 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      # Non-blocking, on every push: how far the committed offline snapshot
+      # (conformance/corpus/, and the authority commit it records in
+      # snapshot.json) has fallen behind the authority at HEAD.
+      #
+      # It is a WARN and not a gate on purpose. A snapshot lagging the authority
+      # is not by itself a defect — the suite certifies against the AUTHORITY
+      # here, so a lagging snapshot changes nothing about what this run proved,
+      # and reddening main for it would train people to ignore it. What it does
+      # is make the distance visible before the release gesture, where the same
+      # check IS a refusal (publish-pypi.yml). The first v0.1.0 tag failed its
+      # gated test_corpus_sync because the authority had moved twice after CI
+      # passed on that head, and nothing between the two runs said so.
+      #
+      # Needs no install: the check is standard library plus git.
+      - name: Corpus snapshot drift (reported, non-blocking)
+        continue-on-error: true
+        run: |
+          set +e
+          python conformance/sync_corpus.py --check 2>&1 | tee corpus-drift.log
+          status=${PIPESTATUS[0]}
+          {
+            echo "### Corpus snapshot vs the authority"
+            echo
+            echo '```'
+            cat corpus-drift.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
       - name: Install
         run: |

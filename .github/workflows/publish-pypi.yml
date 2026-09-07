@@ -18,6 +18,12 @@
 #     re-tag of an already-published version exited 0 having uploaded nothing, so a release
 #     that silently did not happen was indistinguishable from one that did. Without it the
 #     run fails, by name, and the fix is to cut a new version.
+#   * a tree whose committed corpus snapshot is behind the authority — the `test` job's
+#     corpus-drift refusal, which runs FIRST and names both commits and the re-sync command.
+#     Both this workflow and CI check the corpus out at HEAD, so a snapshot that matched when
+#     CI passed can be behind it minutes later when the tag is cut; the first v0.1.0 tag failed
+#     that way, deep inside `test_corpus_sync`, and had to be withdrawn and re-cut. Refusing up
+#     front makes the failure read as what it is — a stale snapshot, not a broken host.
 name: publish-pypi
 
 on:
@@ -49,6 +55,9 @@ jobs:
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
+          # Full history — the refusal below reports how many commits the
+          # snapshot is behind, which the default depth of 1 cannot answer.
+          fetch-depth: 0
 
       # Every corpus-dependent test skips when the corpus is absent, so a layout
       # drift would retire the conformance leg and still report green. Assert it.
@@ -58,6 +67,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+
+      # THE RELEASE-PATH REFUSAL, and deliberately the FIRST thing this job
+      # decides — before the install, the lint, the type check and the suite.
+      #
+      # The same check CI runs as a warning on every push is a hard refusal here,
+      # because the two workflows differ in exactly the way that matters: on a
+      # push a lagging snapshot costs nothing (the suite certifies against the
+      # authority it just checked out), while on a tag the gated
+      # `test_corpus_sync` compares the snapshot to a HEAD that may have moved
+      # since CI passed. That is not hypothetical — it is how the first v0.1.0
+      # tag failed and had to be withdrawn.
+      #
+      # Running it first is the whole point. The same staleness reached as a
+      # `test_corpus_sync` failure two minutes into pytest reads as a broken
+      # host; reached here it reads as what it is, and the message carries both
+      # commits and the one command that fixes it.
+      #
+      # Needs no install: the check is standard library plus git.
+      - name: Refuse a corpus snapshot behind the authority
+        run: python conformance/sync_corpus.py --check
 
       - name: Install
         run: |

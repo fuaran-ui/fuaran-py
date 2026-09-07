@@ -41,6 +41,29 @@ BadgeVariant = Literal["Neutral", "Brand", "Success", "Warning", "Critical", "In
 HeadingVariant = Literal["Standard", "Eyebrow", "Caption", "Lead"]
 ButtonVariant = Literal["Primary", "Secondary", "Tertiary", "Destructive"]
 ChartKind = Literal["Line", "Bar", "Area", "Pie", "Scatter", "Heatmap"]
+#: Which edge of the chart the series legend occupies — or ``"None"``, which
+#: suppresses it entirely. A WIRE vocabulary: WHERE an author wants the legend is
+#: their meaning; the geometry that puts it there stays the host's chart style,
+#: which carries the default (``"Right"``). An explicit value beats it.
+ChartLegendPosition = Literal["Top", "Right", "Bottom", "None"]
+#: Data labels, with exactly two states. ``"Ends"`` names the SELECTIVE
+#: placements that read — a bar's cap, the last point of a line or area edge —
+#: and the set is closed there; an all-points case would retract the legibility
+#: guarantee the vocabulary exists for. Absent means ``"Off"``.
+ChartDataLabels = Literal["Off", "Ends"]
+#: What a chart's x axis MEANS — DECLARED, never sniffed. Absent means
+#: ``"Category"`` (one band per row, in row order); ``"Temporal"`` says the x
+#: column carries canonical ISO-8601 dates and the axis is continuous. The
+#: pre-emit validator grounds the declaration against the column type where the
+#: schema is statically known (FUARAN097).
+ChartXScale = Literal["Category", "Temporal"]
+#: Sort direction on a :class:`DefaultSort`. Lower-case on the wire, unlike the
+#: capitalised display vocabularies above — the wire's own spelling, not a style.
+SortDirection = Literal["asc", "desc"]
+#: Phase 812 — anti-scraper render strategy for a :class:`Link`. ``"email"``
+#: marks a ``mailto:`` link whose address must not appear in plaintext in emitted
+#: HTML; the renderers own the emission strategy.
+LinkProtection = Literal["email"]
 StyleRole = Literal["None", "Eyebrow", "Data", "Lede", "Caption"]
 FontVoice = Literal["Default", "Display", "Structural"]
 LiveRegion = Literal["polite", "assertive", "off"]
@@ -1400,6 +1423,12 @@ class Link:
     download: bool = False
     rel: str | None = None
     target: str | None = None
+    #: Phase 812 — how the emitting host must PROTECT this destination, not how
+    #: it must draw it. The one admitted value marks a ``mailto:`` address that
+    #: must not reach emitted HTML in plaintext; a renderer that has no strategy
+    #: still has the declaration, which is why it rides the wire rather than
+    #: living in a host's own configuration.
+    protection: LinkProtection | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1408,6 +1437,7 @@ class Link:
                 "download": self.download,
                 "href": self.href,
                 "label": self.label,
+                "protection": self.protection,
                 "rel": self.rel,
                 "target": self.target,
             },
@@ -1910,6 +1940,114 @@ class FileUpload:
 
 
 # Visualisation ---------------------------------------------------------------
+#
+# ── Chart annotations (§4l) ──────────────────────────────────────────────────
+#
+# An annotation carries an ADDRESS and a LABEL, and nothing else: WHERE in the
+# data a threshold or an episode sits is the author's meaning, while the stroke
+# weights, opacities and label offsets that draw it are the host's, in
+# :mod:`fuaran_py.charts`. That split is why the union is a WIRE vocabulary and
+# why it is CLOSED at three members — a reference line on the value axis, an
+# event marker at one x address, a range band between two.
+#
+# The addresses are DECLARED rather than sniffed, which is what lets the pre-emit
+# validator ground them (FUARAN137-141) instead of the lowering guessing: a
+# category key that names no band, a date on a band axis, a pair that runs
+# backwards are each refused by name.
+
+
+@dataclass(frozen=True)
+class AnnotationCategory:
+    """An x address on a BAND axis — one category key, which must name exactly
+    one row of the chart's own source."""
+
+    key: str
+
+    def to_wire(self) -> Value:
+        return _obj("Category", {"key": self.key})
+
+
+@dataclass(frozen=True)
+class AnnotationDate:
+    """An x address on a TEMPORAL axis — a canonical ISO-8601 ``YYYY-MM-DD``."""
+
+    iso: str
+
+    def to_wire(self) -> Value:
+        return _obj("Date", {"iso": self.iso})
+
+
+AnnotationX = AnnotationCategory | AnnotationDate
+"""One x-axis address, in the axis's own form. The validator refuses the
+mismatch rather than coercing it: a date read as a category grounds against no
+band, and a category read as a date lands on the epoch."""
+
+
+@dataclass(frozen=True)
+class ValueRange:
+    """A range band's ends on the VALUE axis, in the axis's own units."""
+
+    # ``from`` is a Python keyword, so the member is ``from_`` and the WIRE key
+    # is spelled out in `to_wire` — the same accommodation `Column.field_name`
+    # makes for `field`.
+    from_: float
+    to: float
+
+    def to_wire(self) -> Value:
+        return _obj("ValueRange", {"from": self.from_, "to": self.to})
+
+
+@dataclass(frozen=True)
+class XRange:
+    """A range band's ends on the X axis — two addresses of the SAME form."""
+
+    from_: AnnotationX
+    to: AnnotationX
+
+    def to_wire(self) -> Value:
+        return _obj("XRange", {"from": self.from_, "to": self.to})
+
+
+AnnotationRange = ValueRange | XRange
+
+
+@dataclass(frozen=True)
+class ReferenceLine:
+    """A horizontal line at one place on the VALUE axis — a target, a floor, a
+    budget. Neutralised on a Pie, which has no value axis."""
+
+    value: float
+    label: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("ReferenceLine", {"label": self.label, "value": self.value})
+
+
+@dataclass(frozen=True)
+class EventMarker:
+    """A vertical rule at one x address — a launch, a repricing, an incident."""
+
+    at: AnnotationX
+    label: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("EventMarker", {"at": self.at, "label": self.label})
+
+
+@dataclass(frozen=True)
+class RangeBand:
+    """A shaded interval — a tolerance band on the value axis, a freeze window on
+    the x axis."""
+
+    range: AnnotationRange
+    label: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("RangeBand", {"label": self.label, "range": self.range})
+
+
+ChartAnnotation = ReferenceLine | EventMarker | RangeBand
+"""The closed three-member annotation union (§4l)."""
 
 
 @dataclass(frozen=True)
@@ -1920,21 +2058,67 @@ class Chart:
     kind: ChartKind = "Line"
     stacked: bool = False
     title: TextSource | None = None
+    #: The VALUE axis's number format, reusing the shared `Format` vocabulary
+    #: (Phase 876). A semantic declaration, not an appearance: "these are pounds"
+    #: is the author's, the tick-label typography is the host's.
+    value_format: Format | None = None
+    #: The two axis titles and the chart's second line (Phase 878/880). Each is a
+    #: `TextSource`, so a bare `str` lowers to the canonical bare string.
+    x_title: TextSource | None = None
+    y_title: TextSource | None = None
+    subtitle: TextSource | None = None
+    #: Phase 880 — an explicit legend edge beats the chart style's default.
+    legend_position: ChartLegendPosition | None = None
+    #: Phase 879 — data labels, absent meaning `"Off"`.
+    data_labels: ChartDataLabels | None = None
+    #: Phase 882 — what the x column MEANS, absent meaning `"Category"`.
+    x_scale: ChartXScale | None = None
+    #: Phase 1490/1491/1492 (§4l) — the data-addressed annotations, in DOCUMENT
+    #: order, which is what the per-case ordinal in a mark id indexes. Absent and
+    #: empty are the same picture, but they are not the same wire: absent omits
+    #: the key, so a chart authored before the slot existed still encodes
+    #: byte-for-byte as it did.
+    annotations: tuple[ChartAnnotation, ...] | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
             "Chart",
             {
+                "annotations": list(self.annotations) if self.annotations is not None else None,
+                "dataLabels": self.data_labels,
                 "kind": self.kind,
+                "legendPosition": self.legend_position,
                 "source": self.source,
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.
                 "stacked": True if self.stacked else None,
+                "subtitle": self.subtitle,
                 "title": self.title,
+                "valueFormat": self.value_format,
                 "xField": self.x_field,
+                "xScale": self.x_scale,
+                "xTitle": self.x_title,
                 "yFields": list(self.y_fields),
+                "yTitle": self.y_title,
             },
         )
+
+
+@dataclass(frozen=True)
+class DefaultSort:
+    """Phase 801 — the column a sortable table or grid is sorted by BEFORE the
+    reader touches anything, and in which direction.
+
+    ``column`` is a zero-based ORDINAL into the headers / columns as authored,
+    not a field name: the static-rows table has no field names at all, and one
+    shape for both halves is what keeps the two from drifting.
+    """
+
+    column: int
+    direction: SortDirection
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"column": self.column, "direction": self.direction})
 
 
 @dataclass(frozen=True)
@@ -1949,6 +2133,14 @@ class Table:
 
     headers: tuple[TextSource, ...]
     rows: tuple[tuple[TextSource, ...], ...]
+    #: Phase 801 — the reader may re-sort the table by clicking a header. TRI-STATE
+    #: rather than a plain bool: absent is the pre-801 wire byte-for-byte, and an
+    #: explicit ``False`` is an author saying so, which a host may read differently
+    #: from an author who has not been asked.
+    sortable: bool | None = None
+    #: The sort in force before any click. Meaningful with ``sortable`` absent —
+    #: an author can order a table the reader cannot re-order.
+    default_sort: DefaultSort | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1956,10 +2148,18 @@ class Table:
             {
                 "columns": [],
                 "source": Static(Arr([])),
-                "staticRows": {
-                    "headers": list(self.headers),
-                    "rows": [list(r) for r in self.rows],
-                },
+                # `_obj`, not a bare dict: `_lower` keeps every key a dict carries,
+                # so the two optional slots would encode as JSON null rather than
+                # being omitted.
+                "staticRows": _obj(
+                    None,
+                    {
+                        "defaultSort": self.default_sort,
+                        "headers": list(self.headers),
+                        "rows": [list(r) for r in self.rows],
+                        "sortable": self.sortable,
+                    },
+                ),
             },
         )
 
@@ -2632,6 +2832,13 @@ class Column:
     kind: AnyColumnKind = field(default_factory=ColumnKind)
     width: ColumnWidth = field(default_factory=ColumnWidth)
     field_name: str | None = None
+    #: Phase 801 / Phase 806 — this column's OPT-OUT from the grid's declarative
+    #: sort / edit affordance. Both are TRI-STATE for the same reason: absent
+    #: defers to the grid, and an explicit ``False`` on one column of a sortable
+    #: grid is the whole point of the slot (``grid-bound-sort``'s free-text note
+    #: column, ``grid-declared-edit``'s read-only one).
+    sortable: bool | None = None
+    editable: bool | None = None
 
     def to_wire(self) -> Value:
         # Phase 460 — `format` / `width` omitted-when-default (`CellFormat.None`
@@ -2639,10 +2846,12 @@ class Column:
         return _obj(
             None,
             {
+                "editable": self.editable,
                 "field": self.field_name,
                 "format": None if isinstance(self.format, FormatNone) else self.format,
                 "kind": self.kind,
                 "label": self.label,
+                "sortable": self.sortable,
                 "value": None if self.field_name is not None else CLOSURE,
                 "width": None if self.width.kind == "Auto" else self.width,
             },
@@ -2684,20 +2893,46 @@ class DataGrid:
     #: fuaran#1473 — the column headers repeat at the top of every page the grid
     #: continues onto.
     repeat_header: bool = False
+    #: Phase 801 — the DECLARATIVE sort. `sort_state_key` names the host State key
+    #: the grid's live sort is read from and written back to, which is what makes
+    #: the affordance survive the wire: a closure-sorted grid sorts nowhere a
+    #: decoded document can see. `default_sort` is the order in force before the
+    #: reader touches a header, and is meaningful without the key.
+    sort_state_key: str | None = None
+    default_sort: DefaultSort | None = None
+    #: Phase 803 — declarative paging, the same shape: a page SIZE the author
+    #: fixes, and the State key the current page number lives in.
+    page_size: int | None = None
+    page_state_key: str | None = None
+    #: Phase 806 — the State key the grid's pending row edits accumulate in. It is
+    #: what `editable` needs to mean anything after a round trip, and per-column
+    #: `Column.editable` narrows it.
+    edit_state_key: str | None = None
+    #: fuaran#1123 — the reader may re-order rows by dragging them. Omitted at its
+    #: `False` identity, like the behaviour flags above it.
+    reorderable: bool = False
 
     def to_wire(self) -> Obj:
-        # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 join it on
-        # exactly those terms, and the two transfer keys ride only when declared.
+        # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 and
+        # `reorderable` join it on exactly those terms. Everything else declared
+        # here rides only when the author named it, so a grid authored before any
+        # of these slots existed encodes byte-for-byte as it did.
         return _obj(
             "DataGrid",
             {
                 "columns": list(self.columns),
+                "defaultSort": self.default_sort,
+                "editStateKey": self.edit_state_key,
                 "editable": True if self.editable else None,
                 "exportable": True if self.exportable else None,
                 "keepRowsTogether": True if self.keep_rows_together else None,
+                "pageSize": self.page_size,
+                "pageStateKey": self.page_state_key,
+                "reorderable": True if self.reorderable else None,
                 "repeatHeader": True if self.repeat_header else None,
                 "rowKey": None if self.row_key_field is not None else CLOSURE,
                 "rowKeyField": self.row_key_field,
+                "sortStateKey": self.sort_state_key,
                 "source": self.source,
                 "transferInKey": self.transfer_in_key,
                 "transferOutKey": self.transfer_out_key,
@@ -3034,6 +3269,12 @@ class UiNode:
     #: aria-hidden over a node that IS rendered. An absent, unresolved or
     #: errored predicate renders the node.
     visible: Value | None = None
+    #: A short supplementary hint about this node, on the NODE rather than on any
+    #: one kind — a tooltip is a trait of the thing pointed at, and every kind can
+    #: be pointed at. A `TextSource`, so it can be bound or localised, and never a
+    #: replacement for `accessibility.label`: a hint that is the only name a
+    #: control has is a missing name, not a tooltip.
+    tooltip: TextSource | None = None
 
     def to_wire(self) -> WireNode:
         extras: dict[str, Value] = {}
@@ -3045,6 +3286,8 @@ class UiNode:
             extras["accessibility"] = self.accessibility.to_wire()
         if self.visible is not None:
             extras["visible"] = self.visible
+        if self.tooltip is not None:
+            extras["tooltip"] = _lower(self.tooltip)
         return WireNode(self.id, self.kind.to_wire(), extras)
 
     def replace(self, **changes: object) -> UiNode:

@@ -10,10 +10,18 @@ the language tier's validator framework) is filled in incrementally.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
+from ..charts import _string_of, _try_parse_day
 from ..model import Arr, Node, Obj, Value
 from ..schema.decode import KNOWN_KINDS
+
+# ``_string_of`` / ``_try_parse_day`` are the LOWERING's own projections, imported
+# rather than re-derived: the annotation grounding below decides which category
+# keys and which dates exist, and the picture decides the same thing when it
+# labels its bands and places its ticks. A second copy is how a validator ends up
+# refusing a key the chart goes on to draw, or admitting one it cannot find.
 
 
 @dataclass(frozen=True)
@@ -198,6 +206,256 @@ honoured: a timestamp's time-of-day is DISCARDED by the lowering, which is a
 documented narrowing, not a mismatch."""
 
 
+def _non_finite_spelling(value: object) -> str | None:
+    """How a non-finite number would be *named* in a finding, or ``None`` when the
+    value is finite — or is not a number at all, which is the decoder's defect and
+    not this one's."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    f = float(value)
+    if math.isnan(f):
+        return "NaN"
+    if f == math.inf:
+        return "Infinity"
+    if f == -math.inf:
+        return "-Infinity"
+    return None
+
+
+def _annotation_value_subjects(declared: list[Obj]) -> list[tuple[str, object]]:
+    """Every VALUE-axis number an annotation carries, each with the subject that
+    names it in a finding.
+
+    The ordinal is per CASE, matching the ``<n>`` in the lowering's mark id, so a
+    finding names the mark the picture would have drawn — and it is counted over
+    ALL of the case's members rather than over the surviving ones: a defect is
+    something to repair, not a member to renumber around, and a fix must not
+    silently move its neighbours' identities. A band's two ends carry their own
+    subjects so a pair with one bad end names that end.
+    """
+    out: list[tuple[str, object]] = []
+    for i, ann in enumerate(a for a in declared if a.tag == "ReferenceLine"):
+        out.append((f"reference line {i}", ann.fields.get("value")))
+    for i, ann in enumerate(a for a in declared if a.tag == "RangeBand"):
+        rng = ann.fields.get("range")
+        if isinstance(rng, Obj) and rng.tag == "ValueRange":
+            out.append((f"range band {i} (from)", rng.fields.get("from")))
+            out.append((f"range band {i} (to)", rng.fields.get("to")))
+    return out
+
+
+def _check_chart_annotations(kind: Obj, path: str, findings: list[Finding]) -> None:
+    """The §4l annotation family's grounding — FUARAN137-141.
+
+    §4l rule 1's declared-not-sniffed posture made a refusal: an annotation
+    addresses the axis in the axis's OWN form, and the language refuses a
+    mismatch rather than coercing it, because a date read as a category grounds
+    against no band and a category read as a date lands on the epoch.
+
+    Two windows, and the difference is the whole design. FUARAN137 reads the
+    SPEC's own literal, so it needs no data and is total over every source shape.
+    FUARAN138/141's category arms need the ROWS, so they fire only where the rows
+    are literally in the tree (a `Static` source) and stand down otherwise — the
+    FUARAN086 posture: refuse only what is PROVABLY wrong.
+    """
+    raw = kind.fields.get("annotations")
+    declared = [a for a in raw.items if isinstance(a, Obj)] if isinstance(raw, Arr) else []
+    if not declared:
+        return
+
+    # FUARAN137 (Error) — a non-finite annotation value. It cannot arrive from the
+    # wire (the canonical-float codec refuses it), so this is the AUTHORING path's
+    # half: the damage is not local, because the value joins the axis domain and
+    # takes every gridline, tick and mark to NaN with it.
+    for subject, value in _annotation_value_subjects(declared):
+        spelling = _non_finite_spelling(value)
+        if spelling is not None:
+            findings.append(
+                Finding(
+                    "FUARAN137",
+                    f"{path}.annotations",
+                    f"chart {subject} carries the value {spelling} — an annotation addresses a place on the "
+                    "value axis, and NaN / Infinity names none; it would also enter the axis domain and take "
+                    "every gridline, tick and mark to NaN with it. Give a finite value in the axis's own "
+                    "units, or drop the annotation",
+                )
+            )
+
+    # PIE IS SILENT for the address rules, matching the lowering, which
+    # neutralises the whole annotation family there: the polar arm HAS no x axis,
+    # so there is no axis form for an address to match or mismatch, and a code
+    # that fired on one would report the absence of a space rather than a defect.
+    chart_kind = kind.fields.get("kind")
+    if chart_kind == "Pie":
+        return
+
+    temporal_x = kind.fields.get("xScale") == "Temporal"
+    # The x is a BAND axis on exactly the arms the lowering draws bands on: not
+    # Scatter, whose x is a continuous numeric measure, and not a temporal
+    # declaration, whose x is a continuous calendar.
+    band_x = not temporal_x and chart_kind != "Scatter"
+    axis_form = "temporal" if temporal_x else ("band (category)" if band_x else "continuous numeric")
+
+    static_keys = _static_x_keys(kind)
+
+    def occurrences_of(key: str) -> int | None:
+        """How many rows carry a category key — ``None`` when the window is open,
+        which is the case the rules stand down on."""
+        return None if static_keys is None else sum(1 for k in static_keys if k == key)
+
+    def check_address(subject: str, at: Obj) -> None:
+        """One x address, grounded and form-checked. Lifted out of the marker's own
+        loop so a RANGE BAND's two ends go through the identical rule: an address
+        is an address, and a second copy of three refusals is how two of them end
+        up disagreeing about what "grounded" means."""
+        if at.tag == "Category":
+            key = at.fields.get("key")
+            if not isinstance(key, str):
+                return
+            if not band_x:
+                findings.append(_axis_mismatch(path, subject, "category", axis_form))
+                return
+            hits = occurrences_of(key)
+            if hits is not None and hits != 1:
+                # The two spellings are different repairs, which is why one
+                # message would not do: a key that is ABSENT wants a different
+                # key, and a key that appears TWICE wants the rows aggregated.
+                detail = (
+                    "which none of the rows carries — a band axis's domain IS the set of keys in its rows, so "
+                    "a key outside that set names no band to draw at. Use a key the x column carries, or "
+                    "declare xScale 'Temporal' and address a date"
+                    if hits == 0
+                    else f"which {hits} rows carry — an annotation is placed from the band's own extent, and a "
+                    "duplicated key has two, so which one it lands on would depend on traversal order rather "
+                    "than on the data. Aggregate the rows to one per key, or address a key that appears once"
+                )
+                findings.append(
+                    Finding(
+                        "FUARAN138",
+                        f"{path}.annotations",
+                        f"chart {subject} addresses the category '{key}', {detail}",
+                    )
+                )
+        elif at.tag == "Date":
+            iso = at.fields.get("iso")
+            if not isinstance(iso, str):
+                return
+            # Both facts are reported when both hold: a date that does not parse
+            # AND sits under a band axis has two separate repairs, and naming one
+            # would leave the author fixing it twice.
+            if _try_parse_day(iso) is None:
+                findings.append(
+                    Finding(
+                        "FUARAN140",
+                        f"{path}.annotations",
+                        f"chart {subject} carries the date '{iso}', which is not a readable ISO-8601 day — a "
+                        "temporal address enters the axis extent before the ticks are chosen, so an "
+                        "unreadable one would be placed at 1970-01-01 and drag the whole axis back with it. "
+                        "Give a canonical YYYY-MM-DD date naming a real calendar day",
+                    )
+                )
+            if not temporal_x:
+                findings.append(_axis_mismatch(path, subject, "date", axis_form))
+
+    def address_text(at: Obj) -> str:
+        key = at.fields.get("key")
+        iso = at.fields.get("iso")
+        return key if isinstance(key, str) else (iso if isinstance(iso, str) else "")
+
+    def out_of_order(a: Obj, b: Obj) -> bool:
+        """Whether a band's pair runs BACKWARDS, decided on the axis it addresses.
+
+        AN UNGROUNDED END RAISES NO ORDERING FINDING: `check_address` has already
+        said the key names no band, and an interval with one end nowhere has no
+        order to be wrong about — reporting both would be two findings for one
+        repair.
+        """
+        if a.tag == "Category" and b.tag == "Category" and band_x:
+            ka, kb = address_text(a), address_text(b)
+            if static_keys is None or occurrences_of(ka) != 1 or occurrences_of(kb) != 1:
+                return False
+            return static_keys.index(ka) > static_keys.index(kb)
+        if a.tag == "Date" and b.tag == "Date" and temporal_x:
+            da, db = _try_parse_day(address_text(a)), _try_parse_day(address_text(b))
+            return da is not None and db is not None and da > db
+        return False
+
+    # FUARAN141 (Error) — the band pair's ORDER. A CATEGORY pair is ordered by the
+    # ROWS, so it is decided only under the closed static window; a DATE pair is
+    # ordered by the calendar and a VALUE pair by arithmetic, so both of those are
+    # decidable wherever they appear.
+    for i, ann in enumerate(a for a in declared if a.tag == "RangeBand"):
+        rng = ann.fields.get("range")
+        if not isinstance(rng, Obj):
+            continue
+        if rng.tag == "ValueRange":
+            lo, hi = rng.fields.get("from"), rng.fields.get("to")
+            if (
+                isinstance(lo, (int, float))
+                and isinstance(hi, (int, float))
+                and _non_finite_spelling(lo) is None
+                and _non_finite_spelling(hi) is None
+                and float(lo) > float(hi)
+            ):
+                findings.append(_range_unordered(path, f"range band {i}", _num_text(lo), _num_text(hi)))
+        elif rng.tag == "XRange":
+            lo_at, hi_at = rng.fields.get("from"), rng.fields.get("to")
+            if not (isinstance(lo_at, Obj) and isinstance(hi_at, Obj)):
+                continue
+            check_address(f"range band {i} (from)", lo_at)
+            check_address(f"range band {i} (to)", hi_at)
+            if out_of_order(lo_at, hi_at):
+                findings.append(_range_unordered(path, f"range band {i}", address_text(lo_at), address_text(hi_at)))
+
+    for i, ann in enumerate(a for a in declared if a.tag == "EventMarker"):
+        at = ann.fields.get("at")
+        if isinstance(at, Obj):
+            check_address(f"event marker {i}", at)
+
+
+def _static_x_keys(kind: Obj) -> list[str] | None:
+    """The x labels the lowering will draw, when — and ONLY when — the rows are
+    literally in the tree. A ``Ref``, a ``Query``, a ``State`` or a pipeline is an
+    open window and the grounding stands down rather than guessing."""
+    source = kind.fields.get("source")
+    x_field = kind.fields.get("xField")
+    if not (isinstance(source, Obj) and source.tag == "Static" and isinstance(x_field, str)):
+        return None
+    rows = source.fields.get("value")
+    if not isinstance(rows, Arr):
+        return None
+    return [_string_of(r.fields, x_field) for r in rows.items if isinstance(r, Obj)]
+
+
+def _num_text(value: float) -> str:
+    """A finite annotation end as a finding quotes it — the shortest round-tripping
+    spelling, so ``200.0`` reads back as the ``200`` the author wrote."""
+    f = float(value)
+    return str(int(f)) if f.is_integer() else repr(f)
+
+
+def _axis_mismatch(path: str, subject: str, address_form: str, axis_form: str) -> Finding:
+    return Finding(
+        "FUARAN139",
+        f"{path}.annotations",
+        f"chart {subject} carries a {address_form} address on a {axis_form} x axis — an annotation "
+        "addresses the axis in the axis's own form, and the language refuses the mismatch rather than "
+        "coercing it (a date read as a category grounds against no band; a category read as a date lands "
+        "on 1970-01-01). Give the address in the axis's form, or change the axis",
+    )
+
+
+def _range_unordered(path: str, subject: str, from_text: str, to_text: str) -> Finding:
+    return Finding(
+        "FUARAN141",
+        f"{path}.annotations",
+        f"chart {subject} runs from '{from_text}' to '{to_text}', which is backwards on the axis it "
+        "addresses — a band names an interval, and the ends are not interchangeable. Swap them; the "
+        "language will not, because a pair written backwards is a mistake about the data and drawing the "
+        "band you did not describe would carry it through to the reader",
+    )
+
+
 def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
     """Schema-grounded ChartSpec validation (Phase 640, FUARAN086-089; Phase 882,
     FUARAN097).
@@ -234,6 +492,12 @@ def _check_chart(node: Node, kind: Obj, path: str, findings: list[Finding]) -> N
                 f"stacked is meaningless on a {chart_kind} chart — the lowering ignores the flag",
             )
         )
+
+    # FUARAN137-141 (§4l) — the annotation family's own grounding. Run BEFORE the
+    # FUARAN086/087 window below, which returns early on a source it cannot read:
+    # the annotation rules have their own two windows and must not inherit that
+    # one's exit.
+    _check_chart_annotations(kind, path, findings)
 
     # FUARAN086/087 — grounding, only where the schema is statically known.
     source = kind.fields.get("source")

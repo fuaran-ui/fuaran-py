@@ -94,6 +94,47 @@ def _content_frame() -> object:
     )
 
 
+# ── Phase 1577 — the field-widening wave's shared row sets ───────────────────
+#
+# Three fixtures each reuse one of these verbatim, so a single copy is what keeps
+# the annotation fixtures' grounding (the category keys an address must name)
+# reading off the same rows the corpus carries.
+
+_LEDGER_ROWS = [{"month": "Jan", "revenue": 980}, {"month": "Feb", "revenue": 1105}]
+_QUARTER_ROWS = [
+    {"quarter": "Q1", "revenue": 120},
+    {"quarter": "Q2", "revenue": 150},
+    {"quarter": "Q3", "revenue": 90},
+    {"quarter": "Q4", "revenue": 175},
+]
+_DAY_ROWS = [
+    {"day": "2026-01-05", "sessions": 40},
+    {"day": "2026-02-05", "sessions": 65},
+    {"day": "2026-03-05", "sessions": 55},
+]
+
+
+def _numeric_col(label: str, field_name: str) -> t.Column:
+    return t.Column(label=label, field_name=field_name, kind=t.ColumnKind("Numeric"))
+
+
+def _board_column(node_id: str, key: str, rows: list[dict[str, object]], *, releases: bool) -> t.UiNode:
+    """One column of ``transfer-board`` — a reorderable grid on the shared
+    ``board`` transfer key. The archive column ACCEPTS and never releases, which
+    is why the two ends are separate members rather than one symmetric key."""
+    return node.bare(
+        fuaran.grid(
+            node_id,
+            source=t.State(key, rows),
+            columns=[t.Column(label="Card", field_name="card")],
+            row_key_field="card",
+            reorderable=True,
+            transfer_in_key="board",
+            transfer_out_key="board" if releases else None,
+        )
+    )
+
+
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
 # so the import-time module body stays readable.
 def _authored() -> dict[str, t.UiNode]:
@@ -1010,6 +1051,311 @@ def _authored() -> dict[str, t.UiNode]:
                     "fmt-relative",
                     t.Bound(binding.format(t.Static(-3), t.FmtRelativeTime("Day"), t.Explicit("en-US"))),
                 ),
+            ],
+        ),
+        # ── Phase 1577 — the field-widening wave ─────────────────────────────
+        #
+        # Seventeen fixtures the typed surface could not reach because the record
+        # was narrower than the wire: the grid's declarative sort / page / edit /
+        # reorder slots, the chart's eight, the node-level tooltip, the link's
+        # protection and the static table's sort pair.
+        "grid-bound-sort": node.bare(
+            fuaran.grid(
+                "grid-bound-sort",
+                source=t.State("ledger", _LEDGER_ROWS),
+                columns=[
+                    t.Column(label="Month", field_name="month"),
+                    t.Column(label="Revenue", field_name="revenue"),
+                    # The free-text note column opts OUT of a sort the grid offers.
+                    t.Column(label="Note", field_name="note", sortable=False),
+                ],
+                row_key_field="month",
+                sort_state_key="ledger-sort",
+                default_sort=t.DefaultSort(1, "desc"),
+            )
+        ),
+        "grid-sort-state-key": node.bare(
+            fuaran.grid(
+                "grid-sort-state-key",
+                source=t.State("inventory", _LEDGER_ROWS),
+                columns=[t.Column(label="Month", field_name="month"), _numeric_col("Revenue", "revenue")],
+                row_key_field="month",
+                sort_state_key="inventory-sort",
+            )
+        ),
+        "grid-paged": node.bare(
+            fuaran.grid(
+                "grid-paged",
+                source=t.State("members", _LEDGER_ROWS),
+                columns=[t.Column(label="Month", field_name="month"), _numeric_col("Revenue", "revenue")],
+                row_key_field="month",
+                page_size=20,
+                page_state_key="members-page",
+            )
+        ),
+        "grid-paged-sorted": node.bare(
+            fuaran.grid(
+                "grid-paged-sorted",
+                source=t.State("ledger", _LEDGER_ROWS),
+                columns=[t.Column(label="Month", field_name="month"), _numeric_col("Revenue", "revenue")],
+                row_key_field="month",
+                page_size=10,
+                page_state_key="ledger-page",
+                sort_state_key="ledger-sort",
+            )
+        ),
+        "grid-reorderable": node.bare(
+            fuaran.grid(
+                "grid-reorderable",
+                source=t.State(
+                    "sprint-order",
+                    [{"rank": 1, "task": "Design"}, {"rank": 2, "task": "Build"}, {"rank": 3, "task": "Verify"}],
+                ),
+                columns=[t.Column(label="Task", field_name="task"), _numeric_col("Rank", "rank")],
+                row_key_field="task",
+                edit_state_key="sprint-order",
+                reorderable=True,
+            )
+        ),
+        "transfer-board": t.UiNode(
+            "transfer-board",
+            t.Box(
+                children=(
+                    _board_column(
+                        "todo",
+                        "board-todo",
+                        [{"card": "Draft the brief"}, {"card": "Size the work"}],
+                        releases=True,
+                    ),
+                    _board_column("doing", "board-doing", [{"card": "Write the walk"}], releases=True),
+                    _board_column("archive", "board-archive", [], releases=False),
+                ),
+                layout=t.AutoLayout(),
+                role="Group",
+                heading=t.LiteralText("Sprint board"),
+            ),
+        ),
+        "table-sortable-1": node.bare(
+            fuaran.table(
+                "table-sortable-1",
+                headers=["Region", "Revenue"],
+                rows=[["North", "1200"], ["South", "980"]],
+                sortable=True,
+                default_sort=t.DefaultSort(1, "desc"),
+            )
+        ),
+        "link-protected-1": node.bare(
+            fuaran.link(
+                "link-protected-1",
+                href="mailto:contact@example.com",
+                label="Email us",
+                protection="email",
+            )
+        ),
+        "chart-axis-titles": node.bare(
+            fuaran.chart(
+                "chart-axis-titles",
+                source=t.Static([{"quarter": "Q1", "revenue": 12500000}, {"quarter": "Q2", "revenue": 15200000}]),
+                x_field="quarter",
+                y_fields=["revenue"],
+                kind="Bar",
+                title="Revenue by quarter",
+                subtitle="Millions of £",
+                x_title="Quarter",
+                y_title="Revenue",
+                value_format=t.FmtCurrency("GBP"),
+            )
+        ),
+        "chart-value-format": node.bare(
+            fuaran.chart(
+                "chart-value-format",
+                source=t.Static([{"month": "Jan", "revenue": 12500000}, {"month": "Feb", "revenue": 15200000}]),
+                x_field="month",
+                y_fields=["revenue"],
+                kind="Bar",
+                title="Revenue",
+                value_format=t.FmtCurrency("GBP"),
+            )
+        ),
+        "chart-data-labels": node.bare(
+            fuaran.chart(
+                "chart-data-labels",
+                source=t.Static([{"quarter": "Q1", "revenue": 120}, {"quarter": "Q2", "revenue": 150}]),
+                x_field="quarter",
+                y_fields=["revenue"],
+                kind="Bar",
+                title="Revenue by quarter",
+                data_labels="Ends",
+            )
+        ),
+        "chart-legend-position": node.bare(
+            fuaran.chart(
+                "chart-legend-position",
+                source=t.Static(
+                    [
+                        {"region": "North", "sales": 80, "target": 100},
+                        {"region": "South", "sales": 130, "target": 110},
+                    ]
+                ),
+                x_field="region",
+                y_fields=["sales", "target"],
+                kind="Bar",
+                title="Sales vs target",
+                legend_position="Bottom",
+            )
+        ),
+        "chart-temporal-x": node.bare(
+            fuaran.chart(
+                "chart-temporal-x",
+                source=t.Static(
+                    [
+                        {"day": "2026-01-05", "sessions": 1200},
+                        {"day": "2026-01-12", "sessions": 1450},
+                        {"day": "2026-01-19", "sessions": 1310},
+                        {"day": "2026-01-26", "sessions": 1580},
+                    ]
+                ),
+                x_field="day",
+                y_fields=["sessions"],
+                kind="Line",
+                title="Sessions by week",
+                x_scale="Temporal",
+            )
+        ),
+        "chart-annotations": node.bare(
+            fuaran.chart(
+                "chart-annotations",
+                source=t.Static(_QUARTER_ROWS),
+                x_field="quarter",
+                y_fields=["revenue"],
+                kind="Bar",
+                title="Revenue by quarter",
+                annotations=[t.ReferenceLine(140, "Target"), t.ReferenceLine(0)],
+            )
+        ),
+        "chart-annotation-bands": node.bare(
+            fuaran.dashboard(
+                "chart-annotation-bands",
+                children=[
+                    node.bare(
+                        fuaran.chart(
+                            "bands-value",
+                            source=t.Static(
+                                [
+                                    {"latencyMs": 180, "week": "W1"},
+                                    {"latencyMs": 240, "week": "W2"},
+                                    {"latencyMs": 210, "week": "W3"},
+                                ]
+                            ),
+                            x_field="week",
+                            y_fields=["latencyMs"],
+                            kind="Line",
+                            title="p95 latency",
+                            annotations=[
+                                t.RangeBand(t.ValueRange(200, 260), "Tolerance"),
+                                t.RangeBand(t.ValueRange(0, 100)),
+                            ],
+                        )
+                    ),
+                    node.bare(
+                        fuaran.chart(
+                            "bands-category",
+                            source=t.Static(_QUARTER_ROWS),
+                            x_field="quarter",
+                            y_fields=["revenue"],
+                            kind="Bar",
+                            title="Revenue by quarter",
+                            annotations=[
+                                t.RangeBand(t.XRange(t.AnnotationCategory("Q2"), t.AnnotationCategory("Q3")), "Freeze")
+                            ],
+                        )
+                    ),
+                    node.bare(
+                        fuaran.chart(
+                            "bands-temporal",
+                            source=t.Static(_DAY_ROWS),
+                            x_field="day",
+                            y_fields=["sessions"],
+                            kind="Line",
+                            title="Sessions by day",
+                            x_scale="Temporal",
+                            annotations=[
+                                t.RangeBand(
+                                    t.XRange(t.AnnotationDate("2026-01-20"), t.AnnotationDate("2026-02-20")),
+                                    "Incident",
+                                )
+                            ],
+                        )
+                    ),
+                ],
+            )
+        ),
+        "chart-annotation-events": node.bare(
+            fuaran.dashboard(
+                "chart-annotation-events",
+                children=[
+                    node.bare(
+                        fuaran.chart(
+                            "events-band",
+                            source=t.Static(_QUARTER_ROWS),
+                            x_field="quarter",
+                            y_fields=["revenue"],
+                            kind="Bar",
+                            title="Revenue by quarter",
+                            annotations=[t.EventMarker(t.AnnotationCategory("Q3"), "Repricing")],
+                        )
+                    ),
+                    node.bare(
+                        fuaran.chart(
+                            "events-temporal",
+                            source=t.Static(_DAY_ROWS),
+                            x_field="day",
+                            y_fields=["sessions"],
+                            kind="Line",
+                            title="Sessions by day",
+                            x_scale="Temporal",
+                            annotations=[
+                                t.EventMarker(t.AnnotationDate("2026-02-14"), "Launch"),
+                                t.EventMarker(t.AnnotationDate("2026-03-01")),
+                            ],
+                        )
+                    ),
+                ],
+            )
+        ),
+        "tooltip-button-1": node.with_tooltip(
+            "Re-reads every document; takes about a minute on this corpus.",
+            node.bare(
+                fuaran.button(
+                    "tooltip-button-1",
+                    label="Rebuild index",
+                    on_click=action.notify("rebuild", {}),
+                    variant="Secondary",
+                )
+            ),
+        ),
+        "tooltip-icon-button-1": fuaran.stack(
+            "tooltip-icon-button-1",
+            orientation="Horizontal",
+            children=[
+                node.with_tooltip(
+                    "Exports the rows currently shown, not the whole table.",
+                    fuaran.button(
+                        "tooltip-icon-button-control",
+                        label="",
+                        on_click=action.notify("export", {}),
+                        variant="Tertiary",
+                        icon="download",
+                    ).replace(
+                        # The tooltip is the HINT; the accessible NAME is the ARIA
+                        # label beside it. An icon-only control whose only name is
+                        # a tooltip has no name.
+                        accessibility=t.Accessibility(
+                            label=t.Static("Download CSV"), described_by="tooltip-icon-button-note"
+                        )
+                    ),
+                ),
+                fuaran.markdown("tooltip-icon-button-note", "Updated hourly."),
             ],
         ),
     }

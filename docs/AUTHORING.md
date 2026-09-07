@@ -356,6 +356,86 @@ The structural members each control requires are unaffected — `options`, `rows
 from a `TextAreaField` is refused by name at construction rather than encoded as a
 control no schema accepts.
 
+## Declarative behaviours, chart annotations, and the node tooltip
+
+A second family of slots was missing for a different reason: not a hard-coded value, but
+a record simply **narrower than the wire**. The grid, the chart, the static table, the
+link and the node envelope each now carry the whole set the wire declares.
+
+**Every one of them is absent by default**, in one of three shapes, and the shape is what
+a host reads back:
+
+| Shape | Members | Absent means |
+|---|---|---|
+| optional | grid `sort_state_key` / `default_sort` / `page_size` / `page_state_key` / `edit_state_key`; every chart slot; `Link.protection`; `UiNode.tooltip` | the author said nothing |
+| tri-state | `Column.sortable`, `Column.editable`, `Table.sortable` | the author was not asked — which is NOT the same as an explicit `False` |
+| omitted-at-false | `DataGrid.reorderable` | `False`, restored by every host's decoder |
+
+**A declarative behaviour names a State key, and that is the whole point.** `sortStateKey`,
+`pageStateKey` and `editStateKey` say WHERE the live sort, page and pending edits live, so
+the affordance survives a round trip; a closure-sorted grid sorts somewhere a decoded
+document cannot reach. The server-side renderer in this host does not realise them — it
+emits every row in source order — and carries them intact for a client host that does.
+
+### Chart annotations (§4l)
+
+```python
+fuaran.chart(
+    "revenue",
+    source=t.Static(rows),
+    x_field="quarter",
+    y_fields=["revenue"],
+    kind="Bar",
+    annotations=[
+        t.ReferenceLine(140, "Target"),  # a place on the VALUE axis
+        t.EventMarker(t.AnnotationCategory("Q3"), "Repricing"),  # one x address
+        t.RangeBand(t.ValueRange(0, 100), "Tolerance"),  # an interval on the value axis
+        t.RangeBand(
+            t.XRange(
+                t.AnnotationDate("2026-01-20"),  # …or on the x axis
+                t.AnnotationDate("2026-02-20"),
+            ),
+            "Incident",
+        ),
+    ],
+)
+```
+
+Three members, closed. An annotation carries an **address** and a **label** and nothing
+else — the ink is the host's. An address is `t.AnnotationCategory(key)` on a band axis or
+`t.AnnotationDate(iso)` on one declaring `x_scale="Temporal"`, and the language refuses
+the mismatch rather than coercing it: a date read as a category grounds against no band,
+and a category read as a date lands on 1970-01-01.
+
+That refusal is the pre-emit validator's, and it is what "declared, not sniffed" buys:
+
+| Code | Refuses |
+|---|---|
+| `FUARAN137` | a non-finite value on a reference line or a value band's end |
+| `FUARAN138` | a category key no row carries — or one that two rows do |
+| `FUARAN139` | an address in the other axis's form |
+| `FUARAN140` | a `Date` that is not a readable ISO-8601 day |
+| `FUARAN141` | a band whose pair runs backwards |
+
+Two windows, deliberately different. `FUARAN137` reads the spec's own literal, so it is
+total over every source shape. The grounding rules need the ROWS, so they fire only where
+the rows are literally in the tree (a `Static` source) and stand down otherwise — refuse
+only what is *provably* wrong. A `Pie` is silent about every address, matching the
+lowering, which neutralises the whole family there: the polar arm has no x axis, so there
+is no form for an address to mismatch.
+
+### The tooltip is a node trait
+
+```python
+node.with_tooltip("Re-reads every document; about a minute.", fuaran.button("b", label="Rebuild"))
+```
+
+A postfix modifier beside `node.with_tone` / `node.bare`, not a keyword on forty
+constructors, because a tooltip is a trait of the thing pointed at and every kind can be
+pointed at. It is a `TextSource`, so it can be bound or localised. **It is never the
+accessible name**: an icon-only control whose only name is a tooltip has no name — give it
+`accessibility.label` and let the tooltip say the thing the name cannot.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

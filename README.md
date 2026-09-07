@@ -186,6 +186,77 @@ This host declares no stability policy yet (pre-1.0), so the change is recorded 
 rather than in a `STABILITY.md` it does not have. It rides the 0.2.0 slot: it is
 additive — new keyword arguments, and every prior call encodes identically.
 
+### …and the records are no longer narrower than the wire
+
+Several records reached fewer slots than the wire declares, so a document every other
+host can read had no spelling here at all. They now carry the whole set:
+
+```python
+from fuaran_py.schema import types as t
+from fuaran_py.ui import fuaran, node
+
+# A grid's DECLARATIVE behaviours — each names a host State key, which is what makes
+# the affordance survive the wire where a closure cannot.
+fuaran.grid(
+    "ledger",
+    source=t.State("ledger", rows),
+    columns=[t.Column(label="Month", field_name="month"), t.Column(label="Note", field_name="note", sortable=False)],
+    row_key_field="month",
+    sort_state_key="ledger-sort",
+    default_sort=t.DefaultSort(1, "desc"),
+    page_size=20,
+    page_state_key="ledger-page",
+    edit_state_key="ledger-edits",
+    reorderable=True,
+)
+
+# A chart's eight: the value-axis format, the two axis names and the subtitle, the
+# legend edge, data labels, what the x column MEANS, and the §4l annotations.
+fuaran.chart(
+    "revenue",
+    source=t.Static(rows),
+    x_field="quarter",
+    y_fields=["revenue"],
+    kind="Bar",
+    subtitle="Millions",
+    x_title="Quarter",
+    y_title="Revenue",
+    value_format=t.FmtCurrency("GBP"),
+    legend_position="Bottom",
+    data_labels="Ends",
+    x_scale="Category",
+    annotations=[
+        t.ReferenceLine(140, "Target"),
+        t.EventMarker(t.AnnotationCategory("Q3"), "Repricing"),
+        t.RangeBand(t.ValueRange(0, 100), "Tolerance"),
+    ],
+)
+
+node.with_tooltip("Takes about a minute.", fuaran.button("b", label="Rebuild"))
+fuaran.link("m", href="mailto:a@example.com", label="Email us", protection="email")
+fuaran.table("t", headers=[...], rows=[...], sortable=True, default_sort=t.DefaultSort(1, "desc"))
+```
+
+Three details are decisions rather than mechanics:
+
+1. **The annotation union is CLOSED at three members**, and each carries an ADDRESS and
+   a LABEL and nothing else: where in the data a threshold or an episode sits is the
+   author's meaning, while the strokes and offsets that draw it are the host's. The
+   addresses are declared rather than sniffed, which is what lets the pre-emit validator
+   **ground** them — a category key no row carries, a date on a band axis, an
+   unparseable date, a non-finite value and a band whose pair runs backwards are each
+   refused by name (`FUARAN137`–`FUARAN141`) instead of drawing a picture nobody meant.
+2. **`Column.sortable` / `Column.editable` and `Table.sortable` are TRI-STATE.** Absent,
+   `true` and `false` are three different documents: a column that explicitly declines a
+   sort has said something a column that was never asked has not.
+3. **`tooltip` is a NODE trait, not a per-kind keyword** — every kind can be pointed at —
+   so it is reached through `node.with_tooltip(...)` beside the other postfix modifiers.
+   It is never a substitute for an accessible name: an icon-only control whose only name
+   is a tooltip has no name.
+
+Additive on the same terms as the section above: every slot is absent by default, so a
+tree authored before any of them existed encodes byte-for-byte as it did. Rides 0.2.0.
+
 ## Render (optional)
 
 A decoded tree renders to a sanitised HTML **body fragment** from Python — no

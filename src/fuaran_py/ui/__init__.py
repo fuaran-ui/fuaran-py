@@ -478,6 +478,19 @@ class node:  # noqa: N801 — namespace object
         return n.replace(style=_replace(_style(n), voice=voice))
 
     @staticmethod
+    def with_tooltip(tooltip: t.TextInput, n: UiNode) -> UiNode:
+        """Attach a supplementary hint to any node.
+
+        A postfix modifier rather than a per-constructor keyword because the
+        tooltip is a trait of the NODE, exactly as style and ARIA are: every kind
+        can be pointed at, and threading one keyword through forty constructors
+        would say otherwise. It is not a substitute for
+        ``accessibility.label`` — a hint that is the only name a control has is a
+        missing name.
+        """
+        return n.replace(tooltip=_text(tooltip))
+
+    @staticmethod
     def on_loading(placeholder: UiNode, n: UiNode) -> UiNode:
         return n.replace(state=_replace(_state(n), on_loading=placeholder))
 
@@ -777,8 +790,16 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         rel: str | None = None,
         target: str | None = None,
         download: bool = False,
+        protection: t.LinkProtection | None = None,
     ) -> UiNode:
-        return _node(id, t.Link(_str_binding(href), _text(label), download, rel, target), accessibility.none)
+        """``protection`` declares how the emitting host must PROTECT the
+        destination — today, that a ``mailto:`` address must not reach emitted
+        HTML in plaintext (Phase 812)."""
+        return _node(
+            id,
+            t.Link(_str_binding(href), _text(label), download, rel, target, protection),
+            accessibility.none,
+        )
 
     @staticmethod
     def image(
@@ -1164,8 +1185,38 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         kind: t.ChartKind = "Line",
         title: t.TextInput | None = None,
         stacked: bool = False,
+        subtitle: t.TextInput | None = None,
+        x_title: t.TextInput | None = None,
+        y_title: t.TextInput | None = None,
+        value_format: t.Format | None = None,
+        legend_position: t.ChartLegendPosition | None = None,
+        data_labels: t.ChartDataLabels | None = None,
+        x_scale: t.ChartXScale | None = None,
+        annotations: Sequence[t.ChartAnnotation] | None = None,
     ) -> UiNode:
-        spec = t.Chart(source, x_field, tuple(y_fields), kind, stacked, _text(title) if title is not None else None)
+        """The eight slots past ``stacked`` are each ABSENT by default, so a chart
+        authored before they existed encodes byte-for-byte as it did.
+
+        ``annotations`` takes the three-member ``§4l`` union — ``t.ReferenceLine``
+        / ``t.EventMarker`` / ``t.RangeBand`` — in document order; the pre-emit
+        validator grounds each address against the chart's own rows.
+        """
+        spec = t.Chart(
+            source,
+            x_field,
+            tuple(y_fields),
+            kind,
+            stacked,
+            _text(title) if title is not None else None,
+            value_format=value_format,
+            x_title=_text(x_title) if x_title is not None else None,
+            y_title=_text(y_title) if y_title is not None else None,
+            subtitle=_text(subtitle) if subtitle is not None else None,
+            legend_position=legend_position,
+            data_labels=data_labels,
+            x_scale=x_scale,
+            annotations=tuple(annotations) if annotations is not None else None,
+        )
         return _node(id, spec, accessibility.chart)
 
     @staticmethod
@@ -1174,10 +1225,18 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         *,
         headers: list[t.TextInput],
         rows: list[list[t.TextInput]],
+        sortable: bool | None = None,
+        default_sort: t.DefaultSort | None = None,
     ) -> UiNode:
+        """``sortable`` is TRI-STATE: absent is the pre-801 wire byte-for-byte,
+        and an explicit ``False`` is an author declining the affordance rather
+        than one who was never asked. ``default_sort`` names the header ORDINAL
+        the table arrives sorted by, and is meaningful on its own."""
         spec = t.Table(
             tuple(_text(h) for h in headers),
             tuple(tuple(_text(c) for c in row) for row in rows),
+            sortable=sortable,
+            default_sort=default_sort,
         )
         return _node(id, spec, accessibility.table)
 
@@ -1200,11 +1259,48 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         columns: list[t.Column] | None = None,
         editable: bool = False,
         row_key_field: str | None = None,
+        sort_state_key: str | None = None,
+        default_sort: t.DefaultSort | None = None,
+        page_size: int | None = None,
+        page_state_key: str | None = None,
+        edit_state_key: str | None = None,
+        reorderable: bool = False,
+        transfer_out_key: str | None = None,
+        transfer_in_key: str | None = None,
+        exportable: bool = False,
+        keep_rows_together: bool = False,
+        repeat_header: bool = False,
     ) -> UiNode:
         """``row_key_field`` names the row property that identifies a row — the
         declarative sibling of the erased ``rowKey`` closure; pass it whenever the
-        columns are ``field``-projected, so a decoded grid can key its rows."""
-        return _node(id, t.DataGrid(source, tuple(columns or ()), editable, row_key_field), accessibility.grid)
+        columns are ``field``-projected, so a decoded grid can key its rows.
+
+        Every slot past it is a DECLARATIVE grid behaviour: one that survives the
+        wire because it names a host State key rather than a closure. The
+        constructor now reaches the whole record, so the ergonomic surface and the
+        typed one admit the same documents.
+        """
+        return _node(
+            id,
+            t.DataGrid(
+                source,
+                tuple(columns or ()),
+                editable,
+                row_key_field,
+                transfer_out_key=transfer_out_key,
+                transfer_in_key=transfer_in_key,
+                exportable=exportable,
+                keep_rows_together=keep_rows_together,
+                repeat_header=repeat_header,
+                sort_state_key=sort_state_key,
+                default_sort=default_sort,
+                page_size=page_size,
+                page_state_key=page_state_key,
+                edit_state_key=edit_state_key,
+                reorderable=reorderable,
+            ),
+            accessibility.grid,
+        )
 
     # ── Structural ─────────────────────────────────────────────────────────────
     @staticmethod

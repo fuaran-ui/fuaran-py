@@ -1,7 +1,9 @@
 """Phase 1577 — the field-widening wave: DataGrid, Chart, tooltip, Link, Table.
 
-Seventeen corpus fixtures were unreachable from the typed authoring surface for
-one reason: the record was NARROWER THAN THE WIRE. The grid carried none of the
+Twenty quarantined corpus fixtures name a field this phase adds, and eighteen of
+them were unreachable from the typed authoring surface for one reason: the record
+was NARROWER THAN THE WIRE. (The other two fail on a SECOND cause behind the field
+gap — see the last section. The count is asserted below, not stated here alone.) The grid carried none of the
 declarative sort / page / edit-state slots and no ``reorderable``; ``Chart``
 reached eight slots fewer than the wire, including the whole §4l annotation
 family; ``UiNode`` had no ``tooltip``, ``Link`` no ``protection``, and the static
@@ -522,6 +524,15 @@ def test_the_widened_set_is_the_one_the_parity_table_carries() -> None:
 
     assert set(WIDENED_FIXTURES) <= set(_authored())
     assert set(BLOCKED_BY_ANOTHER_CONSTRUCT).isdisjoint(_authored())
+
+
+def test_the_census_is_computed_rather_than_recited() -> None:
+    """The module docstring's numbers, asserted. Prose carrying a count is wrong
+    out loud the first time either list moves and nobody re-reads the paragraph;
+    this is the same discipline the quarantine's own census keeps."""
+    assert len(WIDENED_FIXTURES) == 18
+    assert len(BLOCKED_BY_ANOTHER_CONSTRUCT) == 2
+    assert len(set(WIDENED_FIXTURES)) == len(WIDENED_FIXTURES)
 
 
 @corpus_required

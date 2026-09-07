@@ -81,6 +81,25 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
             # numeric slot goes through ``resolve_scalar_*`` above, which does.
             tag, value = _scalar_cell(_expr_as_transform(binding), sources)
             return value if tag == "resolved" else None
+        if binding.tag == "Computed":
+            # A decoded ``Computed`` has nothing to compute WITH: the case's whole
+            # payload is a host closure and it crosses the wire as
+            # ``"<closure>"``. It resolves to nothing, and this arm is explicit
+            # rather than a fall-through so it stays that way — the case carries
+            # no ``key`` / ``name`` / ``nodeId`` today, so the lookup below misses
+            # and the answer is the same, but a future member named like one of
+            # those would silently turn a host-only computation into a resolved
+            # value.
+            #
+            # KNOWN LIMIT, stated rather than implied: this seam has no error
+            # channel — it answers ``object | None``, and ``None`` is the slot's
+            # empty state — so a Python host renders the empty state where the F#
+            # and TypeScript hosts render an error naming
+            # ``Binding.Expr`` / ``Transform`` / ``State`` as the replacement.
+            # That is strictly better than the silent DEFAULT those hosts used to
+            # produce, and strictly worse than the error they now do; closing it
+            # is a widening of this function's return type through every caller.
+            return None
         # `State` keys on `key`; `Query` / `Filter` key on `name`; `Selection`
         # keys on `nodeId` (0.2.0 — the accessor sentinel is off the wire, the
         # name/id IS the lookup key).

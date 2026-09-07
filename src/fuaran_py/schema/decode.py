@@ -1130,6 +1130,66 @@ def _alias_get(obj: dict, canonical: str, aliases: tuple[str, ...]) -> tuple[obj
     return None, False
 
 
+# The `Format` cases with a TOTAL, LOCALE-INDEPENDENT inverse — the only ones a
+# `Binding.Local` may declare as its edit-buffer codec (WIRE_FORMAT.md Section
+# 3.3.3). `Binding.Format` carries a `LocaleSource` because it renders for
+# READING; a `Local` codec carries none, because whatever it renders it must
+# also parse back from what the reader typed. `Currency` prepends a
+# locale-chosen symbol, `Date`'s four styles are locale renditions, and
+# `RelativeTime` / `Since` / `Duration` render a phrase rather than a number.
+# `Percent` is refused for a narrower reason worth recording, since it looks
+# admissible: its inverse needs a x100 scale whose IEEE round-trip is not exact.
+_LOCAL_CODEC_CASES = frozenset({"Number"})
+
+
+def _decode_local_binding(obj: dict, path: str) -> Value:
+    """Decode ``Binding.Local``, with the two refusals its declarative half carries.
+
+    Everything else about the case passes through structurally, exactly as it did
+    before the declarative members existed: ``flushOn`` and ``initialFrom`` were
+    always wire-carried, and ``format`` / ``onCommit`` / ``parse`` are the
+    ``"<closure>"`` sentinels a re-encode reproduces verbatim.
+
+    What is new is that two members are DATA — ``codec`` and ``commitTo`` — and
+    each brings a refusal that structure alone cannot make:
+
+    * a ``codec`` whose ``Format`` case has no total, locale-independent
+      inverse. Admitted silently it would give a buffer that formats one way and
+      parses another, which is the round-trip hole the members exist to close.
+    * ``onCommit`` and ``commitTo`` together. Not resolved by a precedence rule,
+      because the wire cannot carry the closure at all: a host honouring one and
+      a host honouring the other would write to different places from identical
+      bytes.
+    """
+    codec = obj.get("codec")
+    if codec is not None:
+        codec_obj = _expect_object(codec, f"{path}.codec")
+        case = codec_obj.get("$type")
+        if not isinstance(case, str) or case not in _LOCAL_CODEC_CASES:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.codec",
+                "Binding.Local 'codec' must be a Format case with a total, locale-independent"
+                " inverse - only 'Number' has one",
+                'use {"$type":"Number","decimals":2}, or drop the codec and let the buffer use the'
+                " identity; a locale-rendered format (Currency / Date / RelativeTime / Since /"
+                " Duration) cannot be parsed back from what the reader typed",
+            )
+    if "commitTo" in obj:
+        if "onCommit" in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.commitTo",
+                "Binding.Local carries both 'onCommit' and 'commitTo' - exactly one commit destination is allowed",
+                "either 'onCommit' (a host closure, which crosses the wire only as the closure"
+                " sentinel) or 'commitTo' (the State key the flush writes); a decoding host can"
+                " honour only the second, so keeping both makes the same document commit to two"
+                " different places depending on who read it",
+            )
+        _expect_string(obj["commitTo"], f"{path}.commitTo")
+    return from_json(obj)
+
+
 def _normalise_binding_obj(
     obj: dict,
     path: str,
@@ -1196,6 +1256,8 @@ def _normalise_binding_obj(
             grain = _enum(obj["grain"], f"{path}.grain", TIME_GRAIN, "TimeGrain")
             return Obj("Now", {"grain": grain})
         return Obj("Now", {})
+    if tag == "Local":
+        return _decode_local_binding(obj, path)
     if tag == "Transform":
         return _decode_transform_binding(obj, path)
     if tag == "Expr":

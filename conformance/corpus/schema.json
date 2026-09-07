@@ -553,6 +553,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -574,7 +580,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -891,6 +896,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -912,7 +923,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -1176,6 +1186,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -1197,7 +1213,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -1470,6 +1485,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -1491,7 +1512,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -1755,6 +1775,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -1776,7 +1802,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -2060,6 +2085,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -2081,7 +2112,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -2365,6 +2395,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -2386,7 +2422,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -2714,6 +2749,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -2735,7 +2776,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -3019,6 +3059,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -3040,7 +3086,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -3313,6 +3358,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -3334,7 +3385,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },
@@ -3607,6 +3657,12 @@
             "$type": {
               "const": "Local"
             },
+            "codec": {
+              "$ref": "#/$defs/Format"
+            },
+            "commitTo": {
+              "type": "string"
+            },
             "flushOn": {
               "$ref": "#/$defs/LocalFlushTrigger"
             },
@@ -3628,7 +3684,6 @@
             "flushOn",
             "format",
             "initialFrom",
-            "onCommit",
             "parse"
           ]
         },

@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Form","fields":[{"id":"email","kind":{"$type":"Text","value":{"$type":"Local","commitTo":"form.email","flushOn":{"$type":"OnBlur"},"format":"<closure>","initialFrom":{"$type":"Static","value":"a@b.c"},"onCommit":"<closure>","parse":"<closure>"}},"label":"Email","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

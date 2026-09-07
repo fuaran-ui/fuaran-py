@@ -1667,6 +1667,14 @@
       "description": "Input/Form (Local-bound text, OnDebounce 250)"
     },
     {
+      "id": "form-local-declared",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-local-declared.json",
+      "expectedFile": "nodes/form-local-declared.json",
+      "description": "Input/Form (Fuaran-UI Phase 1538 — a DECLARED Local: codec + commitTo, no closure)"
+    },
+    {
       "id": "form-ranged",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3415,6 +3423,24 @@
       "expectedErrorCode": "LIMIT_EXCEEDED",
       "expectedPath": "$.kind.items[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0].children[0]",
       "description": "§21.5 the tree-item axis — 25 nested TreeItem rows inside ONE node. Counted separately from the node axis, which cannot see it at all (the whole hierarchy is one node) and from the syntactic bound, which at ~50 levels is nowhere near reached. The `TreeOp.Batch` lesson on a third axis"
+    },
+    {
+      "id": "reject-local-codec-no-inverse",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-local-codec-no-inverse.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.value.codec",
+      "description": "a Binding.Local declaring a `Currency` codec. `Binding.Format` carries a LocaleSource because it renders for reading; a Local codec carries none, because whatever it renders it must be able to parse back from the reader's keystrokes — and a currency symbol, a locale decimal mark and a grouping separator are all chosen by the reader's locale, not by the document. `Number` is the one case with a total, locale-independent inverse. Refused at decode rather than left to format one way and parse another (Fuaran-UI Phase 1538)"
+    },
+    {
+      "id": "reject-local-oncommit-and-committo",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-local-oncommit-and-committo.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.value.commitTo",
+      "description": "a Binding.Local carrying BOTH an `onCommit` closure sentinel and a declared `commitTo` key. The SetState value/valueFrom law, applied to the buffer's flush: exactly one commit destination. A decoding host can honour only the declared one — the closure is `\"<closure>\"` and nothing more — so admitting the pair would make the same bytes commit to two different places depending on who read them (Fuaran-UI Phase 1538)"
     },
     {
       "id": "reject-media-autoplay-nonbool",

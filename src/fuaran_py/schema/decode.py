@@ -3322,6 +3322,14 @@ def _decode_chart(obj: dict, path: str) -> Obj:
     for key, raw in obj.items():
         if key not in _chart_known:
             fields[key] = from_json(raw)
+    # Phase 1585 — ``stacked`` is omit-at-default (`False`). This decoder is
+    # structural, so an explicit `"stacked": false` would otherwise be carried
+    # into the model and re-emitted, making the pre-phase spelling a SECOND
+    # canonical form. Dropping it here is the same `_DROP` rule the
+    # schema-driven kinds get from `_omit_default_bool`, reached by hand because
+    # `Chart` decodes through its own function.
+    if fields.get("stacked") is False:
+        del fields["stacked"]
     return Obj("Chart", fields)
 
 

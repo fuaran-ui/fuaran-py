@@ -695,7 +695,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -1040,7 +1052,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -1332,7 +1356,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -1633,7 +1669,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -1925,7 +1973,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -2237,7 +2297,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -2549,7 +2621,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -2905,7 +2989,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -3217,7 +3313,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -3518,7 +3626,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -3819,7 +3939,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -4514,8 +4646,7 @@
           "required": [
             "$type",
             "encoding",
-            "fileRef",
-            "onRead"
+            "fileRef"
           ]
         },
         {
@@ -4527,7 +4658,19 @@
             "args": {
               "type": "array",
               "items": {
-                "type": "object"
+                "type": "object",
+                "properties": {
+                  "addr": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "addr",
+                  "value"
+                ]
               }
             },
             "capabilityId": {
@@ -5479,8 +5622,7 @@
             }
           },
           "required": [
-            "$type",
-            "onEdit"
+            "$type"
           ]
         },
         {
@@ -5498,8 +5640,7 @@
           },
           "required": [
             "$type",
-            "get",
-            "onToggle"
+            "get"
           ]
         },
         {
@@ -5517,8 +5658,7 @@
           },
           "required": [
             "$type",
-            "label",
-            "onClick"
+            "label"
           ]
         },
         {
@@ -5540,8 +5680,7 @@
                   }
                 },
                 "required": [
-                  "label",
-                  "onClick"
+                  "label"
                 ]
               }
             }
@@ -5629,8 +5768,7 @@
           },
           "required": [
             "$type",
-            "fractionFn",
-            "labelFn"
+            "fractionFn"
           ]
         },
         {
@@ -7592,8 +7730,7 @@
       "required": [
         "accept",
         "label",
-        "multiple",
-        "onSelect"
+        "multiple"
       ]
     },
     "InputKind": {
@@ -9414,7 +9551,6 @@
             "$type",
             "capabilities",
             "channel",
-            "onBubble",
             "scopeId"
           ]
         }

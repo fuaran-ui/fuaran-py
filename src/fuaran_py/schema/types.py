@@ -1885,7 +1885,9 @@ class Chart:
             {
                 "kind": self.kind,
                 "source": self.source,
-                "stacked": self.stacked,
+                # Phase 1585 — omitted-when-false. Every host's decoder restores
+                # `False` on absence, so a grouped chart pays no key for it.
+                "stacked": True if self.stacked else None,
                 "title": self.title,
                 "xField": self.x_field,
                 "yFields": list(self.y_fields),

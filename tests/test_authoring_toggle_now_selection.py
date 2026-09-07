@@ -151,7 +151,7 @@ def test_switch_driven_by_selection_is_now_expressible() -> None:
 
 
 def test_switch_requires_exactly_one_selector() -> None:
-    cases = tuple(t.SwitchCase(m, c) for m, c in _cases())
+    cases = tuple(t.SwitchCase(match=m, child=c) for m, c in _cases())
     with pytest.raises(ValueError):
         t.Switch(None, cases, _default())
     with pytest.raises(ValueError):

@@ -1,0 +1,28 @@
+{
+  "host": "fuaran-py",
+  "entryPoints": [
+    "decode_node",
+    "decode_op"
+  ],
+  "config": "long",
+  "seed": "20260906",
+  "iterations": 250000,
+  "inputs": 500000,
+  "corpusSeeds": 450,
+  "corpusPresent": true,
+  "accepted": 9426,
+  "rejectCodes": {
+    "EMPTY_NODE_ID": 122,
+    "INVALID_JSON": 335146,
+    "LIMIT_EXCEEDED": 11878,
+    "MISSING_FIELD": 72016,
+    "UNKNOWN_DU_CASE": 4124,
+    "WRONG_NODE_KIND": 7051,
+    "WRONG_TYPE": 60237
+  },
+  "counterexamples": 0,
+  "maxDecodeMs": 502.617,
+  "maxCanonicalAmplification": 1.991,
+  "elapsedSeconds": 368.889,
+  "generatedAt": "2026-09-06T22:52:27Z"
+}

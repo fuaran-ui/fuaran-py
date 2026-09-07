@@ -1526,10 +1526,40 @@ def _decode_children(value: object, path: str) -> Value:
 
 def _decode_switch_case(value: object, path: str) -> Value:
     # One Switch case (Phase 392): ``{"child":<Node>,"match":<string>}``.
+    #
+    # fuaran#1535 — a case selects on a string ``match`` XOR a ``when`` predicate
+    # (a ``Binding<bool>`` evaluated at render time). Exactly one; both and
+    # neither are refused, naming both fields, on the Phase 818 value /
+    # valueFrom precedent.
+    #
+    # "Neither" is refused rather than skipped at render because a case that
+    # names no condition has no rendering that could be right: skipping it
+    # renders the ``default`` and reports nothing.
     obj = _expect_object(value, path)
     child = _decode_node_value(_require(obj, "child", path), f"{path}.child")
-    match = _expect_string(_require(obj, "match", path), f"{path}.match")
-    return Obj(None, {"child": child, "match": match})
+    has_match = "match" in obj
+    has_when = "when" in obj
+    if has_match and has_when:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.when",
+            "Switch case carries both 'match' and 'when' — exactly one is allowed: "
+            "either 'match' (a literal string compared against the switch's `on` selector) "
+            "or 'when' (a Binding<bool> predicate evaluated at render time, needing no selector)",
+        )
+    if not has_match and not has_when:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.match",
+            "Switch case carries neither 'match' nor 'when' — give it a literal string under "
+            "'match' (compared against the switch's `on` selector), or a Binding<bool> under "
+            "'when' (a predicate evaluated at render time)",
+        )
+    if has_match:
+        match = _expect_string(obj["match"], f"{path}.match")
+        return Obj(None, {"child": child, "match": match})
+    when = _decode_binding(obj["when"], f"{path}.when")
+    return Obj(None, {"child": child, "when": when})
 
 
 def _decode_switch_cases(value: object, path: str) -> Value:
@@ -3955,6 +3985,12 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
     # non-`$type`-tagged value is WRONG_TYPE and is never carried through.
     if "tooltip" in obj:
         extras["tooltip"] = _decode_text_source(obj["tooltip"], f"{path}.tooltip")
+    # fuaran#1535 — the node-level visibility predicate. An ordinary optional
+    # ``Binding<bool>``, decoded by the shared binding decoder for the reason the
+    # tooltip above states: the one time a host read a node-envelope slot as its
+    # own narrower thing it took two hosts and a ruling to unwind.
+    if "visible" in obj:
+        extras["visible"] = _decode_binding(obj["visible"], f"{path}.visible")
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

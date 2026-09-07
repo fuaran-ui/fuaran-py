@@ -497,6 +497,13 @@ def _state(n: UiNode) -> StateBehaviour:
 # ── Components — the ``fuaran`` author surface ───────────────────────────────
 
 
+#: The `Modal.on_dismiss` default — the no-op ``Action.Chain []`` every modal
+#: authored before Phase 1576 emitted. A shared frozen instance so the parameter
+#: default can be DISTINGUISHED from an explicit ``None``, which is how an author
+#: declares no handler at all (the spelling the corpus's popovers carry).
+_NO_OP_DISMISS = t.Chain()
+
+
 def _node(id: str, kind: Kind, a11y: Accessibility | None = None) -> UiNode:  # noqa: A002
     return UiNode(id=id, kind=kind, accessibility=a11y)
 
@@ -569,7 +576,16 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         active_tag: Binding | None = None,
         tab_headers: list[t.TabHeader] | None = None,
         tab_tags: list[str] | None = None,
+        on_select: bool = True,
+        on_select_tag: bool = False,
     ) -> UiNode:
+        """A tab strip, over TWO independent selection channels (Phase 1576).
+
+        ``on_select=False`` omits the index handler, which is what ARMS a
+        renderer's write-back default: an ``active_index`` bound to
+        ``State`` / ``Filter`` has the clicked index written to that slot.
+        ``on_select_tag=True`` declares the tag channel's handler beside it.
+        """
         idx = t.Static(active_index) if isinstance(active_index, int) else active_index
         kind = t.Tabs(
             tuple(children or ()),
@@ -578,6 +594,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             active_tag,
             tuple(tab_headers) if tab_headers is not None else None,
             tuple(tab_tags) if tab_tags is not None else None,
+            on_select,
+            on_select_tag,
         )
         return _node(id, kind, accessibility.tabs)
 
@@ -598,9 +616,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         *,
         children: list[UiNode] | None = None,
         active_step: Binding | int = 0,
+        on_select: bool = True,
     ) -> UiNode:
         step = t.Static(active_step) if isinstance(active_step, int) else active_step
-        return _node(id, t.Stepper(tuple(children or ()), step), accessibility.none)
+        return _node(id, t.Stepper(tuple(children or ()), step, on_select), accessibility.none)
 
     @staticmethod
     def summary_list(
@@ -623,10 +642,13 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         heading: t.TextInput = "",
         open: Binding | bool = False,  # noqa: A002
         default_open: bool = False,
+        on_toggle: bool = False,
     ) -> UiNode:
         op = t.Static(open) if isinstance(open, bool) else open
         return _node(
-            id, t.Disclosure(tuple(children or ()), _text(heading), op, default_open), accessibility.disclosure
+            id,
+            t.Disclosure(tuple(children or ()), _text(heading), op, default_open, on_toggle),
+            accessibility.disclosure,
         )
 
     @staticmethod
@@ -636,7 +658,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         children: list[UiNode] | None = None,
         open: Binding | bool = False,  # noqa: A002
         dismissable: bool = False,
-        on_dismiss: Action | None = None,
+        on_dismiss: Action | None = _NO_OP_DISMISS,
         heading: t.TextInput | None = None,
         modality: t.ModalityKind = "Blocking",
         anchor: str | None = None,
@@ -649,13 +671,18 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         that claim — the page behind it is genuinely still available, and a host
         that claimed otherwise would tell assistive technology the rest of the
         page is unreachable when it is not.
+
+        `on_dismiss=None` declares NO handler (Phase 1576), which is what arms a
+        renderer's dismiss write-back default: a dismissable modal whose `open` is
+        bound to `State` / `Filter` closes itself with no host code. Omitting the
+        argument keeps the no-op `Chain` every pre-phase modal emitted.
         """
         op = t.Static(open) if isinstance(open, bool) else open
         kind = t.Modal(
             tuple(children or ()),
             op,
             dismissable,
-            on_dismiss if on_dismiss is not None else t.Chain(),
+            on_dismiss,
             _text(heading) if heading is not None else None,
             modality,
             anchor,
@@ -1050,10 +1077,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         multiple: bool = False,
         values: Binding | None = None,
         on_change: bool = True,
+        on_change_multi: bool = False,
     ) -> UiNode:
         """The select control. ``on_change=False`` OMITS the handler key, which is what
         arms a renderer's write-back default against ``value`` / ``values`` — see
-        :class:`~fuaran_py.schema.types.Select`."""
+        :class:`~fuaran_py.schema.types.Select`. ``on_change_multi`` is the MULTI
+        channel's own handler (Phase 1576) and arms independently of it."""
         kind = t.Select(
             _text(label),
             source,
@@ -1063,6 +1092,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             multiple,
             values,
             on_change,
+            on_change_multi,
         )
         return _node(id, kind, accessibility.select)
 
@@ -1078,6 +1108,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         accept_paste: bool = False,
         capture: t.CaptureSource | None = None,
         destination: str | None = None,
+        on_select: bool = True,
     ) -> UiNode:
         """The upload control, and its FOUR optional declarations.
 
@@ -1102,6 +1133,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             accept_paste,
             capture,
             destination,
+            on_select,
         )
         return _node(id, kind, accessibility.file_upload)
 

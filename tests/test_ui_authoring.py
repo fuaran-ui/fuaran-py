@@ -18,10 +18,25 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
+from fuaran_py.canonical import encode_value
 from fuaran_py.dataframe.codec import encode_expr_value
 from fuaran_py.model import Arr, Obj
 from fuaran_py.schema import types as t
-from fuaran_py.ui import ParamDecl, accessibility, action, binding, encode, fuaran, lit, node, param, track
+from fuaran_py.ui import (
+    ParamDecl,
+    accessibility,
+    action,
+    binding,
+    col,
+    encode,
+    frame,
+    fuaran,
+    lit,
+    node,
+    param,
+    rule,
+    track,
+)
 
 
 def _expr_predicate() -> Obj:
@@ -40,6 +55,42 @@ def _expr_predicate() -> Obj:
             "expr": encode_expr_value((param("itemCount") > lit(3)).colexpr),
             "params": Arr([ParamDecl("itemCount", t.State("cart.itemCount", None)).to_wire()]),
         },
+    )
+
+
+def _dept_frame() -> object:
+    """``multiselect-chip-list-param``'s pipeline: a LIST parameter fed by the
+    chip's own ``Filter`` slot, so the grid re-derives when the reader selects."""
+    return (
+        frame(
+            {"dept": ["eng", "sales", "ops"], "amount": [100, 90, 70]},
+            schema=[("dept", "string"), ("amount", "int")],
+        )
+        .filter(col("dept").is_in(param("depts")))
+        .bind(ParamDecl("depts", t.Filter("depts")))
+    )
+
+
+def _content_frame() -> object:
+    """``filterable-static-dashboard``'s pipeline, shared by its chart and grid.
+
+    The schema order is the DECLARED one and the fixture keeps it, so a frame
+    built from an unordered mapping alone would encode a different `schema` array
+    from the same columns.
+    """
+    return (
+        frame(
+            {
+                "region": ["emea", "amer"],
+                "genre": ["drama", "docs"],
+                "month": ["jan", "jan"],
+                "retention": [0.62, 0.55],
+            },
+            schema=[("region", "string"), ("genre", "string"), ("month", "string"), ("retention", "float")],
+        )
+        .filter(col("region").eq(param("region")))
+        .filter(col("genre").eq(param("genre")))
+        .bind(ParamDecl("region", t.Filter("region")), ParamDecl("genre", t.Filter("genre")))
     )
 
 
@@ -475,6 +526,467 @@ def _authored() -> dict[str, t.UiNode]:
                 ],
             )
         ),
+        # ── Phase 1576 — the handler and the value are OPTIONAL on every control ─
+        #
+        # Nineteen corpus fixtures the authoring surface could not reach while
+        # `TextField` / `CheckboxField` / `ChoiceField` / `DateField` /
+        # `DateRangeField` / `ComboboxField` / `TokensField` / `RatingField` /
+        # `ColorField` / `Tabs` / `Modal` / `Disclosure` / `Select` hard-coded a
+        # handler or a value. Each is authored here in the spelling the fixture
+        # carries, so the flags are pinned to bytes rather than to intent: an
+        # `on_change=False` that stopped omitting would fail HERE, and an
+        # `on_change` default that stopped emitting would fail on the fixtures
+        # above (`tabs-1`, `step-1`, `form-1`), which is the other half.
+        "form-declarative": node.bare(
+            fuaran.form(
+                "form-declarative",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "profile-name",
+                        t.LiteralText("Name"),
+                        t.TextField(binding.state("profileName", ""), on_change=False),
+                        True,
+                    ),
+                    t.FormField(
+                        "profile-age",
+                        t.LiteralText("Age"),
+                        t.NumberField(binding.state("profileAge", 0), on_change=False),
+                        False,
+                    ),
+                    t.FormField(
+                        "profile-agree",
+                        t.LiteralText("I agree"),
+                        t.CheckboxField(binding.state("profileAgree", False), on_toggle=False),
+                        True,
+                    ),
+                    t.FormField(
+                        "profile-tier",
+                        t.LiteralText("Tier"),
+                        t.ChoiceField(
+                            binding.static([t.SelectOption("Basic", "basic"), t.SelectOption("Pro", "pro")]),
+                            t.State("profileTier", None),
+                            on_change=False,
+                        ),
+                        False,
+                    ),
+                ],
+            )
+        ),
+        # The canonical MINIMAL control, four times over: `{"$type":"Text"}` is a
+        # bound control, not an empty one — the decoder synthesises the form
+        # field's own `State(id, <placeholder>)` for it.
+        "form-declarative-minimal": node.bare(
+            fuaran.form(
+                "form-declarative-minimal",
+                submit_label="Book",
+                fields=[
+                    t.FormField("guest-name", t.LiteralText("Name"), t.TextField(on_change=False), True),
+                    t.FormField("party-size", t.LiteralText("Party size"), t.NumberField(on_change=False), False),
+                    t.FormField(
+                        "seating",
+                        t.LiteralText("Seating"),
+                        t.ChoiceField(
+                            binding.static([t.SelectOption("Indoor", "indoor"), t.SelectOption("Terrace", "terrace")]),
+                            on_change=False,
+                        ),
+                        False,
+                    ),
+                    t.FormField("visit-date", t.LiteralText("Date"), t.DateField(on_change=False), True),
+                ],
+            )
+        ),
+        "form-field-rules": node.bare(
+            fuaran.form(
+                "form-field-rules",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "work-email",
+                        t.LiteralText("Work email"),
+                        t.TextField(on_change=False),
+                        True,
+                        rule=rule.format("email"),
+                    ),
+                    t.FormField(
+                        "postcode",
+                        t.LiteralText("Postcode"),
+                        t.TextField(on_change=False),
+                        True,
+                        rule=rule.pattern(
+                            "[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}", "Enter a UK postcode, e.g. EH1 1YZ"
+                        ),
+                    ),
+                    t.FormField(
+                        "username",
+                        t.LiteralText("Username"),
+                        t.TextField(on_change=False),
+                        True,
+                        rule=rule.length(3, 24),
+                    ),
+                    t.FormField("hire-start-date", t.LiteralText("Start date"), t.DateField(on_change=False), True),
+                    t.FormField(
+                        "hire-end-date",
+                        t.LiteralText("End date"),
+                        t.DateField(on_change=False),
+                        True,
+                        rule=rule.compare(
+                            t.State("hire-start-date", None), "gte", "End date must be on or after the start date"
+                        ),
+                    ),
+                ],
+            )
+        ),
+        "form-toggle": node.bare(
+            fuaran.form(
+                "form-toggle",
+                submit_label="Save",
+                fields=[
+                    t.FormField("irrigation-running", t.LiteralText("Irrigation"), t.ToggleField(), False),
+                    t.FormField(
+                        "accept-terms", t.LiteralText("I accept the terms"), t.CheckboxField(on_toggle=False), True
+                    ),
+                ],
+            )
+        ),
+        # Three DateRanges, and the middle one is the discriminator: two carry the
+        # handler and one omits it, so a record that emitted `onChange`
+        # unconditionally and one that omitted it unconditionally both fail here.
+        "form-date-range": node.bare(
+            fuaran.form(
+                "form-date-range",
+                submit_label="Book",
+                fields=[
+                    t.FormField(
+                        "stay",
+                        t.LiteralText("Stay"),
+                        t.DateRangeField(("2026-03-01", "2026-03-08"), min="2026-01-01", max="2026-12-31"),
+                        True,
+                    ),
+                    t.FormField(
+                        "shift",
+                        t.LiteralText("Shift"),
+                        t.DateRangeField(
+                            t.State("shift", Obj(None, {"from": "08:00", "to": "17:00"})),
+                            "Time",
+                            step=900,
+                            on_change=False,
+                        ),
+                        False,
+                    ),
+                    t.FormField(
+                        "window",
+                        t.LiteralText("Window"),
+                        t.DateRangeField(("2026-03-01T09:00", "2026-03-01T17:00"), "DateTime"),
+                        False,
+                    ),
+                ],
+            )
+        ),
+        # `Range` — the PAIR-valued numeric chip, and the one control in the
+        # schema's `FormFieldKind` list that had no record here at all.
+        "filters-declarative": fuaran.filters(
+            "filters-declarative",
+            items=[
+                t.FilterSpec("q", t.LiteralText("Search"), t.TextFilter(on_change=False)),
+                t.FilterSpec(
+                    "tier",
+                    t.LiteralText("Tier"),
+                    t.ChoiceFilter(binding.static([t.SelectOption("All", "all")]), on_change=False),
+                ),
+                t.FilterSpec("age", t.LiteralText("Age"), t.RangeFilter((0, 100), on_change=False)),
+            ],
+        ),
+        "filters-date-range": fuaran.filters(
+            "filters-date-range",
+            items=[t.FilterSpec("stay", t.LiteralText("Stay"), t.DateRangeField(on_change=False))],
+        ),
+        "filters-rating-colour": fuaran.filters(
+            "filters-rating-colour",
+            items=[
+                t.FilterSpec("stars", t.LiteralText("At least"), t.RatingField(5, on_change=False)),
+                t.FilterSpec("swatch", t.LiteralText("Colour"), t.ColorField(on_change=False)),
+            ],
+        ),
+        "filters-tokens": fuaran.filters(
+            "filters-tokens",
+            items=[
+                t.FilterSpec(
+                    "labels",
+                    t.LiteralText("Labels"),
+                    t.TokensField(
+                        allow_free_text=False,
+                        suggestions=binding.static(
+                            [t.SelectOption("Urgent", "urgent"), t.SelectOption("Blocked", "blocked")]
+                        ),
+                        on_change=False,
+                    ),
+                )
+            ],
+        ),
+        "form-combobox-freetext": node.bare(
+            fuaran.form(
+                "form-combobox-freetext",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "tag",
+                        t.LiteralText("Tag"),
+                        t.ComboboxField(
+                            binding.static([t.SelectOption("Urgent", "urgent"), t.SelectOption("Blocked", "blocked")]),
+                            binding.static("needs-a-second-look"),
+                            allow_free_text=True,
+                            on_change=False,
+                        ),
+                        False,
+                    )
+                ],
+            )
+        ),
+        "form-rating-halves": node.bare(
+            fuaran.form(
+                "form-rating-halves",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "stars",
+                        t.LiteralText("Your rating"),
+                        t.RatingField(5, binding.static(3.5), allow_half=True, on_change=False),
+                        False,
+                    ),
+                    t.FormField("average", t.LiteralText("Average rating"), t.RatingField(10, on_change=False), False),
+                ],
+            )
+        ),
+        "form-tokens-freetext": node.bare(
+            fuaran.form(
+                "form-tokens-freetext",
+                submit_label="Save",
+                fields=[t.FormField("labels", t.LiteralText("Labels"), t.TokensField(on_change=False), False)],
+            )
+        ),
+        # `on_dismiss=None` is the declaration of NO handler — distinct from the
+        # omitted argument, which keeps the no-op `Chain` `modal-1` carries.
+        "popover-open-1": node.bare(
+            fuaran.modal(
+                "popover-open-1",
+                children=[fuaran.markdown("markdown-1", "Updated hourly.")],
+                open=True,
+                dismissable=True,
+                on_dismiss=None,
+                modality="Popover",
+                anchor="help-trigger",
+            )
+        ),
+        "popover-anchored-1": node.bare(
+            fuaran.modal(
+                "popover-anchored-1",
+                children=[fuaran.markdown("markdown-1", "Updated hourly.")],
+                open=binding.state("swatchOpen", False),
+                dismissable=True,
+                on_dismiss=None,
+                heading="Choose a colour",
+                modality="Popover",
+                anchor="swatch",
+            )
+        ),
+        "frag-stdlib-filter-bar": fuaran.fragment_decl(
+            "frag-stdlib-filter-bar",
+            name="filter-bar",
+            body=fuaran.filters(
+                "filter-bar",
+                items=[
+                    t.FilterSpec(
+                        "search", t.Bound(binding.state("searchLabel", "Search")), t.TextFilter(on_change=False)
+                    ),
+                    t.FilterSpec(
+                        "status",
+                        t.Bound(binding.state("statusLabel", "Status")),
+                        t.ChoiceFilter(
+                            binding.static([t.SelectOption("Open", "open"), t.SelectOption("Closed", "closed")]),
+                            on_change=False,
+                        ),
+                    ),
+                ],
+            ),
+            effect=t.EffectClass("ReadsHost", "Deterministic"),
+            holes=[
+                t.ValueHole("searchLabel", t.StringLen(1, 32), t.ScalarStr("Search")),
+                t.ValueHole("statusLabel", t.StringLen(1, 32), t.ScalarStr("Status")),
+            ],
+        ),
+        # The declarative / closure PAIR, and reading them together is the point:
+        # every handler slot this phase touched appears absent in one and present
+        # in the other, over the same four controls.
+        "controls-declarative": fuaran.stack(
+            "controls-declarative",
+            children=[
+                node.bare(
+                    fuaran.tabs(
+                        "decl-tabs",
+                        children=[fuaran.markdown("markdown-1", "Updated hourly.")],
+                        active_index=binding.state("activePane", 0),
+                        on_select=False,
+                    )
+                ),
+                node.bare(
+                    fuaran.modal(
+                        "decl-modal",
+                        children=[fuaran.markdown("markdown-2", "Updated hourly.")],
+                        open=binding.state("modalOpen", False),
+                        dismissable=True,
+                        on_dismiss=None,
+                        heading="Confirm",
+                    )
+                ),
+                node.bare(
+                    fuaran.disclosure(
+                        "decl-disclosure",
+                        children=[fuaran.markdown("markdown-3", "Updated hourly.")],
+                        heading="Advanced",
+                        open=binding.state("advancedOpen", False),
+                    )
+                ),
+                node.bare(
+                    fuaran.select(
+                        "decl-select",
+                        label="Region",
+                        source=binding.static([t.SelectOption("UK", "uk")]),
+                        value=t.State("region", None),
+                        placeholder="Choose one",
+                        on_change=False,
+                    )
+                ),
+            ],
+        ),
+        "controls-closure": fuaran.stack(
+            "controls-closure",
+            children=[
+                node.bare(
+                    fuaran.tabs(
+                        "closure-tabs",
+                        children=[
+                            fuaran.markdown("markdown-1", "Updated hourly."),
+                            fuaran.sparkline("spark-1", source=binding.static([1.0, 2.0, 3.0, 2.0, 4.0])),
+                        ],
+                        active_index=0,
+                        active_tag=binding.static("overview"),
+                        tab_tags=["overview", "detail"],
+                        on_select_tag=True,
+                    )
+                ),
+                node.bare(
+                    fuaran.disclosure(
+                        "closure-disclosure",
+                        children=[fuaran.markdown("markdown-2", "Updated hourly.")],
+                        heading="Advanced",
+                        open=False,
+                        on_toggle=True,
+                    )
+                ),
+                node.bare(
+                    fuaran.select(
+                        "closure-multiselect",
+                        label="Tags",
+                        source=binding.static([t.SelectOption("Red", "red")]),
+                        value=t.Static(None),
+                        multiple=True,
+                        values=binding.static(["red"]),
+                        on_change_multi=True,
+                    )
+                ),
+            ],
+        ),
+        "multiselect-chip-list-param": node.bare(
+            fuaran.dashboard(
+                "multiselect-chip-list-param",
+                heading="Spend by department",
+                children=[
+                    node.bare(
+                        fuaran.select(
+                            "dept-chip",
+                            label="Departments",
+                            source=binding.static(
+                                [
+                                    t.SelectOption("Engineering", "eng"),
+                                    t.SelectOption("Sales", "sales"),
+                                    t.SelectOption("Operations", "ops"),
+                                ]
+                            ),
+                            value=t.Static(None),
+                            multiple=True,
+                            values=binding.filter("depts"),
+                            on_change=False,
+                        )
+                    ),
+                    node.bare(
+                        fuaran.grid(
+                            "dept-grid",
+                            source=_dept_frame().to_transform_binding(),
+                            columns=[
+                                t.Column(label="Department", field_name="dept"),
+                                t.Column(label="Spend", field_name="amount"),
+                            ],
+                            row_key_field="dept",
+                        )
+                    ),
+                ],
+            )
+        ),
+        "filterable-static-dashboard": node.bare(
+            fuaran.dashboard(
+                "filterable-static-dashboard",
+                heading="Content performance",
+                children=[
+                    fuaran.filters(
+                        "content-filters",
+                        items=[
+                            t.FilterSpec(
+                                "region",
+                                t.LiteralText("Region"),
+                                t.ChoiceFilter(
+                                    binding.static(
+                                        [t.SelectOption("EMEA", "emea"), t.SelectOption("Americas", "amer")]
+                                    ),
+                                    on_change=False,
+                                ),
+                            ),
+                            t.FilterSpec(
+                                "genre",
+                                t.LiteralText("Genre"),
+                                t.ChoiceFilter(
+                                    binding.static(
+                                        [t.SelectOption("Drama", "drama"), t.SelectOption("Documentary", "docs")]
+                                    ),
+                                    on_change=False,
+                                ),
+                            ),
+                        ],
+                    ),
+                    node.bare(
+                        fuaran.chart(
+                            "retention-chart",
+                            source=_content_frame().to_transform_binding(),
+                            x_field="month",
+                            y_fields=["retention"],
+                            kind="Line",
+                            title="Retention",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.grid(
+                            "episode-grid",
+                            source=_content_frame().to_transform_binding(),
+                            columns=[
+                                t.Column(label="Month", field_name="month"),
+                                t.Column(label="Retention", field_name="retention"),
+                            ],
+                            row_key_field="month",
+                        )
+                    ),
+                ],
+            )
+        ),
         "format-bindings": fuaran.stack(
             "format-bindings",
             children=[
@@ -621,3 +1133,159 @@ def test_local_keeps_the_handler_spelling_by_default() -> None:
     wire = encode(fuaran.markdown("m", t.Bound(binding.local(t.State("salary", ""), t.OnBlur()))))
     assert '"onCommit":"<closure>"' in wire
     assert "commitTo" not in wire
+
+
+# ── Phase 1576 — what a byte comparison cannot say ───────────────────────────
+#
+# The parity entries above pin the SHAPES the corpus happens to carry. These pin
+# the RULE those shapes are instances of, in both directions: that the handler
+# and the value are each optional, that omitting the argument still emits what it
+# always emitted, and that an omitted handler leaves a control the host still
+# treats as live rather than as broken.
+
+#: Every control record this phase made handler-optional, with the handler's
+#: keyword, the wire key it drives, and the arguments the record requires.
+_HANDLER_RECORDS = [
+    (t.TextField, "on_change", "onChange", ()),
+    (t.NumberField, "on_change", "onChange", ()),
+    (t.CheckboxField, "on_toggle", "onToggle", ()),
+    (t.TextAreaField, "on_change", "onChange", (None, 4)),
+    (t.RangedNumber, "on_change", "onChange", ()),
+    (t.RangeField, "on_change", "onChange", ()),
+    (t.DateField, "on_change", "onChange", ()),
+    (t.DateRangeField, "on_change", "onChange", ()),
+    (t.ChoiceField, "on_change", "onChange", (t.Static([]),)),
+    (t.SegmentedChoice, "on_change", "onChange", (t.Static([]),)),
+    (t.ComboboxField, "on_change", "onChange", (t.Static([]),)),
+    (t.TokensField, "on_change", "onChange", ()),
+    (t.RatingField, "on_change", "onChange", (5,)),
+    (t.ColorField, "on_change", "onChange", ()),
+]
+
+
+@pytest.mark.parametrize("record,flag,key,args", _HANDLER_RECORDS, ids=lambda v: getattr(v, "__name__", ""))
+def test_a_control_declaring_no_handler_carries_none_on_the_wire(
+    record: object, flag: str, key: str, args: tuple
+) -> None:
+    """The 1170 rule, generalised: the ABSENT key is what arms a renderer's
+    write-back default, so every control must be able to reach it."""
+    wire = encode_value(record(*args, **{flag: False}).to_wire())  # type: ignore[operator]
+    assert key not in wire
+
+
+@pytest.mark.parametrize("record,flag,key,args", _HANDLER_RECORDS, ids=lambda v: getattr(v, "__name__", ""))
+def test_a_controls_handler_is_present_by_default(record: object, flag: str, key: str, args: tuple) -> None:
+    """The other half, and the reason the default is `True` rather than the
+    reference host's `None`: every tree authored against the pre-phase surface
+    said nothing about the handler and got one, so silence has to keep meaning
+    what it meant. Reaching the shorter document is an explicit `False`."""
+    del flag
+    wire = encode_value(record(*args).to_wire())  # type: ignore[operator]
+    assert f'"{key}":"<closure>"' in wire
+
+
+@pytest.mark.parametrize("record,flag,key,args", _HANDLER_RECORDS, ids=lambda v: getattr(v, "__name__", ""))
+def test_a_control_declaring_no_value_carries_none_on_the_wire(
+    record: object, flag: str, key: str, args: tuple
+) -> None:
+    """`{"$type":"Text"}` is the canonical MINIMAL control, and it is a BOUND one:
+    the decoder synthesises the context's auto-binding for it. A record that
+    emitted `value` unconditionally could not reach it at all."""
+    del flag, key
+    # Read the control's OWN fields rather than the encoded string: an options
+    # binding is itself a `Static` carrying a `value`, so a substring test would
+    # pass on `Choice` for the wrong reason.
+    assert "value" not in record(*args).to_wire().fields  # type: ignore[operator]
+
+
+def test_a_declared_local_binding_is_honoured_rather_than_defaulted_away() -> None:
+    """Making `value` optional must not make a DECLARED value optional: the
+    buffer the author wrote is the one that ships."""
+    wire = encode_value(t.TextField(t.Local(t.State("salary", ""), t.OnBlur())).to_wire())
+    assert '"value":{"$type":"Local"' in wire
+    assert '"onCommit":"<closure>"' in wire
+
+
+def test_text_area_refuses_a_missing_rows() -> None:
+    """`rows` is the one control member the schema requires beyond `$type`. It
+    carries a default only so `value` can precede it and every positional
+    `TextAreaField(value, rows)` call keeps working — the refusal is what stops
+    that convenience becoming a control no schema accepts."""
+    with pytest.raises(ValueError, match="rows"):
+        t.TextAreaField(t.Static(""))
+
+
+def test_range_lowers_a_literal_pair_as_the_bare_object() -> None:
+    """`Range`'s pair rides the wire without a `Static` envelope — the
+    `DateRange` posture, and the shape `filters-declarative` carries."""
+    assert '"value":{"max":100,"min":0}' in encode_value(t.RangeField((0, 100), on_change=False).to_wire())
+
+
+def test_modal_omitting_the_argument_keeps_the_no_op_chain() -> None:
+    """`modal-1` carries `"onDismiss":{"$type":"Chain","ops":[]}`, and an author
+    who says nothing must still get it — which is why `None` had to become a
+    DISTINCT declaration rather than the parameter's default."""
+    assert '"onDismiss":{"$type":"Chain","ops":[]}' in encode(fuaran.modal("m", dismissable=True))
+
+
+def test_modal_declaring_no_dismiss_handler_omits_the_key() -> None:
+    assert "onDismiss" not in encode(fuaran.modal("m", dismissable=True, on_dismiss=None))
+
+
+def test_the_two_tab_selection_channels_arm_independently() -> None:
+    """A tab strip may dispatch the tag while writing back the index, which is
+    what `controls-closure` does — so one flag could not have served both."""
+    index_only = encode(fuaran.tabs("t", tab_tags=["a", "b"]))
+    assert '"onSelect":"<closure>"' in index_only and "onSelectTag" not in index_only
+
+    tag_only = encode(fuaran.tabs("t", tab_tags=["a", "b"], on_select=False, on_select_tag=True))
+    assert '"onSelectTag":"<closure>"' in tag_only and '"onSelect"' not in tag_only
+
+
+def test_select_multi_channel_arms_independently_of_the_single_one() -> None:
+    both = encode(
+        fuaran.select(
+            "s",
+            label="Tags",
+            source=binding.static([]),
+            value=t.Static(None),
+            multiple=True,
+            values=binding.static([]),
+            on_change_multi=True,
+        )
+    )
+    assert '"onChange":"<closure>"' in both and '"onChangeMulti":"<closure>"' in both
+
+
+@corpus_required
+def test_a_handler_less_control_over_a_state_slot_is_LIVE_not_inert() -> None:
+    """The acceptance criterion's second half, through the host's own validator:
+    omitting the handler is the DECLARATIVE shape, and the write-back default is
+    what carries the interaction. The falsifier is the same control over a
+    `Static` value, which genuinely cannot act — without it this test would pass
+    on a validator that had stopped checking."""
+    from fuaran_py import decode_node
+    from fuaran_py.validator import validate_node
+
+    def findings(tree: object) -> list[str]:
+        decoded = decode_node(encode(tree))  # type: ignore[arg-type]
+        assert decoded.ok, decoded
+        return [f.code for f in validate_node(decoded.value)]
+
+    live = fuaran.form(
+        "f",
+        submit_label="Save",
+        fields=[
+            t.FormField(
+                "email", t.LiteralText("Email"), t.TextField(t.State("draft.email", ""), on_change=False), False
+            )
+        ],
+    )
+    assert findings(live) == []
+
+    inert = fuaran.form(
+        "f",
+        submit_label="Save",
+        fields=[t.FormField("email", t.LiteralText("Email"), t.TextField(t.Static(""), on_change=False), False)],
+    )
+    assert findings(inert) == ["FUARAN069"]

@@ -152,6 +152,40 @@ and a parameter no control fills is refused when the binding is lowered rather t
 silently dropped in a browser. See
 [docs/AUTHORING.md](docs/AUTHORING.md#parameter-bound-controls-fuaran_pyuicontrol).
 
+### …and every handler and value is optional
+
+A control's **handler** and its **value** are each optional on the wire, and the two
+absences say different things a host acts on. Every constructor in `fuaran_py.ui` can
+now reach both, where several used to hard-code one:
+
+```python
+from fuaran_py.ui import binding, fuaran
+from fuaran_py.schema import types as t
+
+# No handler: the renderer's write-back default arms, so the control writes its own slot.
+t.TextField(binding.state("profileName", ""), on_change=False)
+
+# No value either: `{"$type":"Text"}` — the canonical MINIMAL control, and a BOUND one.
+# A decoder synthesises the context's auto-binding (`Filter(name)` on a filter chip,
+# `State(field id, <typed placeholder>)` on a form field).
+t.TextField(on_change=False)
+
+fuaran.tabs("t", on_select=False)  # the index channel writes back
+fuaran.modal("m", dismissable=True, on_dismiss=None)  # a decoded modal closes itself
+```
+
+The handler flag defaults to **present** on every control that emitted one before this
+change, so no tree authored against the earlier surface moves a byte; reaching the
+shorter document is an explicit `False` (or, for `Modal.on_dismiss`, an explicit `None`,
+which is why the omitted argument still yields the no-op `Chain`). `Tabs` gained
+`on_select_tag` and `Select` gained `on_change_multi` — a second channel each, arming
+independently of the first — and the `Range` pair-valued control record joined the
+`FormFieldKind` roster it had been missing from.
+
+This host declares no stability policy yet (pre-1.0), so the change is recorded here
+rather than in a `STABILITY.md` it does not have. It rides the 0.2.0 slot: it is
+additive — new keyword arguments, and every prior call encodes identically.
+
 ## Render (optional)
 
 A decoded tree renders to a sanitised HTML **body fragment** from Python — no

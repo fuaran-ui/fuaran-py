@@ -1073,6 +1073,17 @@ class Tabs:
     active_tag: Binding | None = None
     tab_headers: tuple[TabHeader, ...] | None = None
     tab_tags: tuple[str, ...] | None = None
+    #: Phase 1576 — whether a HOST HANDLER is present on the INDEX channel. The
+    #: reference host types this as an option whose `None` arms the write-back
+    #: default (an `activeIndex` bound to `State` / `Filter` has the clicked index
+    #: written to that slot); `True` is the default here so every tree authored
+    #: before this flag encodes byte-identically.
+    on_select: bool = True
+    #: Phase 1576 — the TAG channel's handler, the sibling of `on_select` over
+    #: `active_tag` / `tab_tags`. A separate slot rather than a mode of the first:
+    #: the two channels arm independently, and a tab strip may dispatch the tag
+    #: while writing back the index (`controls-closure` carries both).
+    on_select_tag: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1081,7 +1092,8 @@ class Tabs:
                 "activeIndex": self.active_index,
                 "activeTag": self.active_tag,
                 "children": list(self.children),
-                "onSelect": CLOSURE,
+                "onSelect": CLOSURE if self.on_select else None,
+                "onSelectTag": CLOSURE if self.on_select_tag else None,
                 # 0.2.0 — omitted-when-Horizontal (the universal default).
                 "orientation": None if self.orientation == "Horizontal" else self.orientation,
                 "tabHeaders": list(self.tab_headers) if self.tab_headers is not None else None,
@@ -1099,11 +1111,19 @@ def Card(children: tuple[UiNode, ...] = (), heading: TextSource | None = None) -
 class Stepper:
     children: tuple[UiNode, ...] = ()
     active_step: Binding = field(default_factory=lambda: Static(0))
+    #: Phase 1576 — `Tabs.on_select`'s twin: absent arms the write-back default on
+    #: `activeStep`, `True` (the default, so pre-phase trees are byte-identical)
+    #: declares the host closure.
+    on_select: bool = True
 
     def to_wire(self) -> Obj:
         return _obj(
             "Stepper",
-            {"activeStep": self.active_step, "children": list(self.children), "onSelect": CLOSURE},
+            {
+                "activeStep": self.active_step,
+                "children": list(self.children),
+                "onSelect": CLOSURE if self.on_select else None,
+            },
         )
 
 
@@ -1122,6 +1142,11 @@ class Disclosure:
     heading: TextSource = field(default_factory=lambda: LiteralText(""))
     open: Binding = field(default_factory=lambda: Static(False))
     default_open: bool = False
+    #: Phase 1576 — the host toggle handler. `False` is the default because this
+    #: record never emitted the key at all before the phase, so absence (the
+    #: write-back default the reference host describes) is what every existing
+    #: tree already means; `True` declares the closure `controls-closure` carries.
+    on_toggle: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1130,6 +1155,7 @@ class Disclosure:
                 "children": list(self.children),
                 "defaultOpen": self.default_open,
                 "heading": self.heading,
+                "onToggle": CLOSURE if self.on_toggle else None,
                 "open": self.open,
             },
         )
@@ -1140,7 +1166,13 @@ class Modal:
     children: tuple[UiNode, ...] = ()
     open: Binding = field(default_factory=lambda: Static(False))
     dismissable: bool = False
-    on_dismiss: Action = field(default_factory=Chain)
+    #: Phase 1576 — OPTIONAL, and `None` is a distinct fact rather than a missing
+    #: argument: the reference host arms the dismiss write-back default when the
+    #: wire omits the key, so a decoded dismissable modal closes itself with no
+    #: host code. The default stays the no-op `Chain` every pre-phase tree already
+    #: emitted (`modal-1` carries it), so passing `None` is how an author declares
+    #: no handler.
+    on_dismiss: Action | None = field(default_factory=Chain)
     heading: TextSource | None = None
     #: fuaran#1119 — `Blocking` is the identity and omits at it, so every modal
     #: written before this member is byte-identical. The two differ in ONE claim
@@ -1791,7 +1823,7 @@ class Select:
     # Multi-select (Phase 291): ``multiple`` is emitted only when ``True`` (a
     # single-select stays byte-identical to the pre-multi corpus); ``values``
     # is the ``Binding<string list>`` of selected option values, emitted only
-    # when present. The multi onChange is a closure → no separate wire key.
+    # when present.
     multiple: bool = False
     values: Binding | None = None
     #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
@@ -1801,6 +1833,12 @@ class Select:
     #: flag encodes byte-identically; a control meant to WRITE its own slot passes
     #: `on_change=False`. Same shape and same reason as `ToggleField.on_toggle`.
     on_change: bool = True
+    #: Phase 1576 — the MULTI channel's handler, over ``values``. A separate wire
+    #: key (`onChangeMulti`) and so a separate slot: a multi-select may dispatch
+    #: the whole selection while the single-value channel does something else, and
+    #: `controls-closure` carries both. `False` by default — the record never
+    #: emitted the key before this phase.
+    on_change_multi: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1810,6 +1848,7 @@ class Select:
                 "label": self.label,
                 "multiple": self.multiple if self.multiple else None,
                 "onChange": CLOSURE if self.on_change else None,
+                "onChangeMulti": CLOSURE if self.on_change_multi else None,
                 "placeholder": self.placeholder,
                 "source": self.source,
                 "value": self.value,
@@ -1849,6 +1888,9 @@ class FileUpload:
     #: arbitrary emitter, and a URL here would let that emitter choose where a
     #: reader's file goes.
     destination: str | None = None
+    #: Phase 1576 — the selection handler. `True` by default so every pre-phase
+    #: upload is byte-identical; `False` reaches the handler-less spelling.
+    on_select: bool = True
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1862,7 +1904,7 @@ class FileUpload:
                 "dropTarget": True if self.drop_target else None,
                 "label": self.label,
                 "multiple": self.multiple,
-                "onSelect": CLOSURE,
+                "onSelect": CLOSURE if self.on_select else None,
             },
         )
 
@@ -1944,19 +1986,40 @@ class Map:
 # Input — composite (Form / Filters) ------------------------------------------
 #
 # ``onChange`` / ``onToggle`` handlers are closures → the ``CLOSURE`` sentinel.
+#
+# **Both the handler and the value are OPTIONAL on every control** (Phase 1576,
+# generalising fuaran#1170's `Select` / `NumberField` pair). The schema's required
+# list for each case is `$type` plus that case's own structural members —
+# `options`, `rows`, `variant`, `max` — and never the handler or the value, and
+# the two absences say different things a host acts on:
+#
+# * **No handler** is what ARMS the renderer's write-back default. A closure
+#   cannot cross the wire, so a control declaring one describes changes that go
+#   somewhere the document cannot reach; a control declaring none writes its own
+#   slot. `on_change` / `on_toggle` therefore say whether a HOST HANDLER is
+#   present, and default to `True` on every record that emitted one
+#   unconditionally before this phase — so every tree authored against the older
+#   surface encodes byte-identically, and reaching the canonical minimal control
+#   is an explicit `False`.
+# * **No value** is the auto-bound control: the decoder synthesises `Filter(name)`
+#   on a chip and `State(field id, <typed placeholder>)` on a form field, so
+#   `{"$type":"Text"}` IS a bound control rather than an empty one. A declared
+#   `State` / `Local` binding is honoured exactly as before — the default is
+#   absence, and absence is only what an author who says nothing gets.
 
 
 @dataclass(frozen=True)
 class TextField:
-    value: Binding
+    value: Binding | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("Text", {"onChange": CLOSURE, "value": _lower(self.value)})
+        return _obj("Text", {"onChange": CLOSURE if self.on_change else None, "value": self.value})
 
 
 @dataclass(frozen=True)
 class NumberField:
-    value: Binding
+    value: Binding | None = None
     #: fuaran#1170 — see `Select.on_change`: the absent key is what arms a renderer's
     #: write-back default, so a control that writes its own slot passes `False`.
     on_change: bool = True
@@ -1967,10 +2030,11 @@ class NumberField:
 
 @dataclass(frozen=True)
 class CheckboxField:
-    value: Binding
+    value: Binding | None = None
+    on_toggle: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("Checkbox", {"onToggle": CLOSURE, "value": _lower(self.value)})
+        return _obj("Checkbox", {"onToggle": CLOSURE if self.on_toggle else None, "value": self.value})
 
 
 @dataclass(frozen=True)
@@ -1994,30 +2058,83 @@ class ToggleField:
 
 @dataclass(frozen=True)
 class TextAreaField:
-    value: Binding
-    rows: int
+    value: Binding | None = None
+    #: REQUIRED by the schema (`TextArea` is the one control whose required list
+    #: names a member beyond `$type` that is not a discriminating structure), but
+    #: it carries a default so `value` can precede it and every positional
+    #: `TextAreaField(value, rows)` call keeps working. An omitted `rows` is
+    #: refused by name at construction rather than encoded as a control the
+    #: schema rejects.
+    rows: int | None = None
+    on_change: bool = True
+
+    def __post_init__(self) -> None:
+        if self.rows is None:
+            raise ValueError("FormFieldKind.TextArea requires 'rows' — the schema's required list names it")
 
     def to_wire(self) -> Value:
-        return Obj("TextArea", {"onChange": CLOSURE, "rows": self.rows, "value": _lower(self.value)})
+        return _obj(
+            "TextArea", {"onChange": CLOSURE if self.on_change else None, "rows": self.rows, "value": self.value}
+        )
 
 
 @dataclass(frozen=True)
 class RangedNumber:
-    value: Binding
+    value: Binding | None = None
     min: float | None = None
     max: float | None = None
     step: float | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         return _obj(
             "RangedNumber",
-            {"max": self.max, "min": self.min, "onChange": CLOSURE, "step": self.step, "value": self.value},
+            {
+                "max": self.max,
+                "min": self.min,
+                "onChange": CLOSURE if self.on_change else None,
+                "step": self.step,
+                "value": self.value,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class RangeField:
+    """``FormFieldKind.Range`` — the PAIR-valued numeric range control.
+
+    The sibling of :class:`RangedNumber`, and the difference is the value rather
+    than the bounds: a `RangedNumber` resolves to ONE number inside `min`/`max`,
+    where this resolves to the ordered `(min, max)` pair the reader has narrowed
+    to. A literal pair rides the wire as the BARE ``{"max":…,"min":…}`` object
+    (no ``Static`` envelope — the ``DateRange`` posture), and the auto-bound
+    spelling omits `value` entirely.
+    """
+
+    value: Binding | tuple[float, float] | None = None
+    min: float | None = None
+    max: float | None = None
+    step: float | None = None
+    on_change: bool = True
+
+    def to_wire(self) -> Value:
+        pair = self.value
+        lowered: object = Obj(None, {"max": pair[1], "min": pair[0]}) if isinstance(pair, tuple) else pair
+        return _obj(
+            "Range",
+            {
+                "max": self.max,
+                "min": self.min,
+                "onChange": CLOSURE if self.on_change else None,
+                "step": self.step,
+                "value": lowered,
+            },
         )
 
 
 @dataclass(frozen=True)
 class DateField:
-    value: Binding
+    value: Binding | None = None
     variant: DateVariant = "Date"
     min: str | None = None
     max: str | None = None
@@ -2052,21 +2169,22 @@ class DateRangeField:
     ``step`` (seconds) bound BOTH ends.
     """
 
-    value: Binding | tuple[str, str]
+    value: Binding | tuple[str, str] | None = None
     variant: DateVariant = "Date"
     min: str | None = None
     max: str | None = None
     step: float | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         pair = self.value
-        lowered: object = Obj(None, {"from": pair[0], "to": pair[1]}) if isinstance(pair, tuple) else _lower(pair)
+        lowered: object = Obj(None, {"from": pair[0], "to": pair[1]}) if isinstance(pair, tuple) else pair
         return _obj(
             "DateRange",
             {
                 "max": self.max,
                 "min": self.min,
-                "onChange": CLOSURE,
+                "onChange": CLOSURE if self.on_change else None,
                 "step": self.step,
                 "value": lowered,
                 "variant": self.variant,
@@ -2077,26 +2195,31 @@ class DateRangeField:
 @dataclass(frozen=True)
 class ChoiceField:
     options: Binding
-    value: Binding
+    value: Binding | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("Choice", {"onChange": CLOSURE, "options": _lower(self.options), "value": _lower(self.value)})
+        return _obj(
+            "Choice",
+            {"onChange": CLOSURE if self.on_change else None, "options": self.options, "value": self.value},
+        )
 
 
 @dataclass(frozen=True)
 class SegmentedChoice:
     options: Binding
-    value: Binding
+    value: Binding | None = None
     orientation: Orientation = "Horizontal"
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return Obj(
+        return _obj(
             "SegmentedChoice",
             {
-                "onChange": CLOSURE,
-                "options": _lower(self.options),
+                "onChange": CLOSURE if self.on_change else None,
+                "options": self.options,
                 "orientation": self.orientation,
-                "value": _lower(self.value),
+                "value": self.value,
             },
         )
 
@@ -2116,17 +2239,18 @@ class ComboboxField:
     """
 
     options: Binding
-    value: Binding
+    value: Binding | None = None
     allow_free_text: bool = False
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         return _obj(
             "Combobox",
             {
                 "allowFreeText": True if self.allow_free_text else None,
-                "onChange": CLOSURE,
-                "options": _lower(self.options),
-                "value": _lower(self.value),
+                "onChange": CLOSURE if self.on_change else None,
+                "options": self.options,
+                "value": self.value,
             },
         )
 
@@ -2154,21 +2278,22 @@ class TokensField:
     where `suggestions` is optional so "open" is this one's.
     """
 
-    value: Binding
+    value: Binding | None = None
     allow_free_text: bool = True
     #: An ABSENT source and an EMPTY one are different facts: absent means the
     #: control has no candidate set at all, resolved-empty means it has one that
     #: is currently empty — which is also every asynchronous source's first frame.
     suggestions: Binding | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         return _obj(
             "Tokens",
             {
                 "allowFreeText": None if self.allow_free_text else False,
-                "onChange": CLOSURE,
-                "suggestions": None if self.suggestions is None else _lower(self.suggestions),
-                "value": _lower(self.value),
+                "onChange": CLOSURE if self.on_change else None,
+                "suggestions": self.suggestions,
+                "value": self.value,
             },
         )
 
@@ -2196,8 +2321,9 @@ class RatingField:
     """
 
     max: int
-    value: Binding
+    value: Binding | None = None
     allow_half: bool = False
+    on_change: bool = True
 
     def to_wire(self) -> Value:
         return _obj(
@@ -2205,8 +2331,8 @@ class RatingField:
             {
                 "allowHalf": True if self.allow_half else None,
                 "max": self.max,
-                "onChange": CLOSURE,
-                "value": _lower(self.value),
+                "onChange": CLOSURE if self.on_change else None,
+                "value": self.value,
             },
         )
 
@@ -2227,10 +2353,11 @@ class ColorField:
     the DOM, which is their business and not the wire's.
     """
 
-    value: Binding
+    value: Binding | None = None
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return _obj("Color", {"onChange": CLOSURE, "value": _lower(self.value)})
+        return _obj("Color", {"onChange": CLOSURE if self.on_change else None, "value": self.value})
 
 
 FormFieldKind = (
@@ -2240,6 +2367,7 @@ FormFieldKind = (
     | ToggleField
     | TextAreaField
     | RangedNumber
+    | RangeField
     | DateField
     | DateRangeField
     | ChoiceField
@@ -2363,6 +2491,7 @@ class Form:
 TextFilter = TextField
 ChoiceFilter = ChoiceField
 SegmentedFilter = SegmentedChoice
+RangeFilter = RangeField
 
 FilterKind = FormFieldKind
 

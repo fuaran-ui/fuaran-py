@@ -320,6 +320,42 @@ frame(rows).filter(col("region").eq(param("regoin"))).bind(region).to_transform_
 The evaluator's `UNBOUND_PARAM` still exists and is still correct — it is the backstop
 for a pipeline that arrived some other way, never the first thing an author meets.
 
+## Handlers and values are optional on every control
+
+Two slots on a control are optional on the wire, and an author reaches each by saying
+nothing about it — but "nothing" has to be spelled, because on this surface the *default*
+is what every tree written before them already meant.
+
+| You want | You write | On the wire |
+|---|---|---|
+| a host closure (the default) | `t.TextField(value)` | `"onChange":"<closure>"` |
+| the write-back default | `t.TextField(value, on_change=False)` | no `onChange` key |
+| the auto-bound minimal control | `t.TextField(on_change=False)` | `{"$type":"Text"}` |
+
+**No handler is what ARMS the write-back default.** A closure cannot cross the wire, so a
+control declaring one describes changes that go somewhere the document cannot reach; a
+control declaring none writes its own slot, and that single fact is what makes an exported
+file interactive rather than merely pretty. It is why `fuaran_py.ui.control`'s
+constructors have always passed `on_change=False`.
+
+**No value is a BOUND control, not an empty one.** A decoder synthesises the context's
+auto-binding — `Filter(name)` on a filter chip, `State(<field id>, <typed placeholder>)`
+on a form field — so `{"$type":"Text"}` is the canonical minimal control and carries a
+slot. A declared `State` or `Local` binding is honoured exactly as before; absence is
+only what an author who says nothing gets.
+
+The flags are `on_change` on the text, number, ranged, range, date, date-range, choice,
+segmented, combobox, tokens, rating and colour controls; `on_toggle` on the checkbox and
+the switch; `on_select` on `Tabs`, `Stepper` and `FileUpload`; `on_toggle` on
+`Disclosure`; and `on_dismiss=None` on `Modal`. Two controls carry a SECOND channel that
+arms independently of the first: `Tabs.on_select_tag` over `active_tag` / `tab_tags`, and
+`Select.on_change_multi` over `values`.
+
+The structural members each control requires are unaffected — `options`, `rows`,
+`variant`, `max` are required where the wire schema requires them, and omitting `rows`
+from a `TextAreaField` is refused by name at construction rather than encoded as a
+control no schema accepts.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

@@ -2,7 +2,7 @@
   "version": 1,
   "schema": "schema.json",
   "idl": "idl.json",
-  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
   "kinds": [
     "Badge",
     "Box",
@@ -4385,6 +4385,86 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.style.tone",
       "description": "Style.tone is integer not string"
+    },
+    {
+      "id": "tp-wizard-step1",
+      "kind": "teleport-decode",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-wizard-step1.json",
+      "expectedFile": "teleport/tp-wizard-step1.expected.json",
+      "description": "the reference bundle: a 3-step signup wizard resumed on step 1, name + email filled — produced by the reference encoder, so a second host decoding it byte-for-byte IS the cross-host claim. Its carried tree spells TextSource.Literal in the decode-accepted envelope form, so expectedFile is the NORMALISED twin (bare strings, WIRE_FORMAT 3.5 and 16) and not the input bytes — a decoder that treats the payload as opaque JSON fails here, which is the point (WIRE_FORMAT 17.6)"
+    },
+    {
+      "id": "tp-reject-bad-base64",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-bad-base64.json",
+      "expectedErrorCode": "InvalidFormat",
+      "expectedPath": "$",
+      "description": "the reference bundle with one payload character outside the RFC 4648 5 alphabet — refused before any inflate work (WIRE_FORMAT 17.4 step 2)"
+    },
+    {
+      "id": "tp-reject-chainhead-injected",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-chainhead-injected.json",
+      "expectedErrorCode": "DigestMismatch",
+      "expectedPath": "$.digest",
+      "description": "a chainHead member added to the reference envelope, its digest left alone — binding a bundle to a position it never held is the tamper WIRE_FORMAT 17.3 names first (17.4 step 4)"
+    },
+    {
+      "id": "tp-reject-inflate-bomb",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-inflate-bomb.json",
+      "expectedErrorCode": "Oversize",
+      "expectedPath": "$",
+      "description": "a 367-character bundle inflating to 262144 bytes against a maxDecodedBytes of 65536 — the deflate-bomb guard, which is why the inflate cap is normative (WIRE_FORMAT 17.1, 17.4 step 1)"
+    },
+    {
+      "id": "tp-reject-missing-digest",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-missing-digest.json",
+      "expectedErrorCode": "InvalidEnvelope",
+      "expectedPath": "$.digest",
+      "description": "the reference envelope with its digest member removed — an unsigned envelope is refused by shape, never accepted as one with nothing to check (WIRE_FORMAT 17.4 step 3)"
+    },
+    {
+      "id": "tp-reject-not-a-bundle",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-not-a-bundle.json",
+      "expectedErrorCode": "InvalidFormat",
+      "expectedPath": "$",
+      "description": "an ordinary string carrying no FT1. tag (WIRE_FORMAT 17.4 step 2)"
+    },
+    {
+      "id": "tp-reject-oversize-encoded",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-oversize-encoded.json",
+      "expectedErrorCode": "Oversize",
+      "expectedPath": "$",
+      "description": "the reference bundle against a maxEncodedChars of 256 — the size gate fires before any decompression work, so a valid bundle is refused purely for exceeding the limits the vector names (WIRE_FORMAT 17.4 step 1)"
+    },
+    {
+      "id": "tp-reject-tampered-state",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-tampered-state.json",
+      "expectedErrorCode": "DigestMismatch",
+      "expectedPath": "$.digest",
+      "description": "one state value rewritten in the reference envelope, its digest left alone — resuming a bundle whose captured state was edited in transit is what the integrity check exists to prevent (WIRE_FORMAT 17.4 step 4)"
+    },
+    {
+      "id": "tp-reject-unsupported-version",
+      "kind": "teleport-reject",
+      "decoder": "teleport",
+      "inputFile": "teleport/tp-reject-unsupported-version.json",
+      "expectedErrorCode": "UnsupportedVersion",
+      "expectedPath": "$.bundle",
+      "description": "the reference envelope re-stamped teleport@2 with its digest correctly recomputed, so the version refusal is what bites rather than the digest — an unrecognised envelope version is refused BY NAME, never decoded on the guess that the shape is close enough (WIRE_FORMAT 17.2, 17.4 step 3)"
     }
   ]
 }

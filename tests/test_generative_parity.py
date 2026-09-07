@@ -28,7 +28,8 @@ from hypothesis import strategies as st  # noqa: E402
 
 from fuaran_py.schema import decode_node, encode_node  # noqa: E402
 from fuaran_py.schema import types as t  # noqa: E402
-from fuaran_py.ui import encode, fuaran  # noqa: E402
+from fuaran_py.ui import action, binding, encode, fuaran  # noqa: E402
+from fuaran_py.ui import node as node_ops  # noqa: E402 — `node` is a test parameter name below
 
 # ── The cross-host-safe value subspace (WIRE_FORMAT.md §5) ───────────────────
 # Non-empty ids (empty → EMPTY_NODE_ID); strings span quotes / backslash / control
@@ -112,6 +113,70 @@ def _leaf() -> st.SearchStrategy:
             st.lists(_text, max_size=3),
             st.sampled_from(["OutOnly", "TwoWay"]),
             st.booleans(),
+        ),
+        # Phase 1580 — the five binding / action / text-source cases the typed
+        # unions gained. Reached HERE and not by the node recursion, because they
+        # are not kinds: nothing in the tree walk above generates a `Query`
+        # source, an `Invoke` in either position, a `Call`'s three result
+        # spellings, an `AiTool` payload or an `I18n` bag, so without these arms
+        # the floor would be silent about every one of them.
+        st.builds(
+            lambda i, label, name, deps: fuaran.metric(i, label=label, value=binding.query(name, *deps)),
+            _ids,
+            _text,
+            _text,
+            st.lists(_text, max_size=3),
+        ),
+        st.builds(
+            lambda i, label, cap, arg: fuaran.metric(i, label=label, value=binding.invoke(cap, addr=arg)),
+            _ids,
+            _text,
+            _text,
+            _text,
+        ),
+        st.builds(
+            lambda i, alt, key, year: fuaran.image(i, src="/x.png", alt=alt, caption=binding.i18n(key, year=year)),
+            _ids,
+            _text,
+            _text,
+            _numbers,
+        ),
+        st.builds(
+            lambda i, label, key: node_ops.with_tooltip(binding.i18n(key), fuaran.markdown(i, label)),
+            _ids,
+            _text,
+            _text,
+        ),
+        st.builds(
+            lambda i, label, endpoint, into: fuaran.button(i, label=label, on_click=action.call(endpoint, into=into)),
+            _ids,
+            _text,
+            _text,
+            st.one_of(
+                st.none(),
+                st.builds(action.into_state, _text),
+                st.builds(action.into_query, _text),
+            ),
+        ),
+        st.builds(
+            lambda i, label, endpoint: fuaran.button(i, label=label, on_click=action.call(endpoint, on_result=True)),
+            _ids,
+            _text,
+            _text,
+        ),
+        st.builds(
+            lambda i, label, tool, args: fuaran.button(i, label=label, on_click=action.ai_tool(tool, args)),
+            _ids,
+            _text,
+            _text,
+            st.dictionaries(_text, st.one_of(_numbers, _text, st.booleans()), max_size=3),
+        ),
+        st.builds(
+            lambda i, label, cap, arg: fuaran.button(i, label=label, on_click=action.invoke(cap, addr=arg)),
+            _ids,
+            _text,
+            _text,
+            _text,
         ),
         st.builds(fuaran.heading, id=_ids, text=_text, level=st.integers(1, 6)),
         st.builds(lambda i, label, value: fuaran.metric(i, label=label, value=value), _ids, _text, _numbers),

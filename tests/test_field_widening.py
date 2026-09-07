@@ -1,9 +1,11 @@
 """Phase 1577 — the field-widening wave: DataGrid, Chart, tooltip, Link, Table.
 
-Twenty quarantined corpus fixtures name a field this phase adds, and eighteen of
-them were unreachable from the typed authoring surface for one reason: the record
-was NARROWER THAN THE WIRE. (The other two fail on a SECOND cause behind the field
-gap — see the last section. The count is asserted below, not stated here alone.) The grid carried none of the
+Twenty quarantined corpus fixtures name a field this phase adds, and every one of
+them was unreachable from the typed authoring surface for one reason: the record
+was NARROWER THAN THE WIRE. (Two of the twenty carried a SECOND cause behind the
+field gap — a binding and a text source the typed unions did not spell — and were
+held back here until Phase 1580 added them. The count is asserted below, not
+stated here alone.) The grid carried none of the
 declarative sort / page / edit-state slots and no ``reorderable``; ``Chart``
 reached eight slots fewer than the wire, including the whole §4l annotation
 family; ``UiNode`` had no ``tooltip``, ``Link`` no ``protection``, and the static
@@ -21,9 +23,7 @@ everything a fixture set cannot pin on its own:
   (FUARAN137-141), each with the clean case beside it — an assertion that a
   defect is raised passes on a validator that raises everything;
 * the RENDER PROJECTION's treatment of every new field, as a declared table:
-  rendered, or exempt BY NAME;
-* the two fixtures of the phase's set that are still out of reach, named with the
-  construct they need and the phase that owns it.
+  rendered, or exempt BY NAME.
 """
 
 from __future__ import annotations
@@ -453,6 +453,13 @@ WIDENED_FIXTURES = [
     "tooltip-button-1",
     "tooltip-icon-button-1",
     "transfer-board",
+    # The two the field widening alone could not reach. Each needed a SECOND
+    # construct — a `Binding.Query` grid source, a `TextSource.I18n` tooltip
+    # value — which Phase 1580 added to the typed unions. They were recorded here
+    # by name rather than by a count, with a falsifier that reddened the moment
+    # the construct landed, and this is that falsifier having fired.
+    "grid-declared-edit",
+    "tooltip-metric-1",
 ]
 
 
@@ -490,48 +497,19 @@ def test_a_rendered_field_actually_reaches_the_html(fixture_id: str, field_name:
     assert RENDERED_FIELDS[field_name] in render_html(decoded.value)
 
 
-# ── What the phase's fixture set still cannot reach ──────────────────────────
-#
-# Two of the fixtures this phase names fail on a SECOND cause behind the field
-# gap — a construct another phase owns. Recorded here by NAME rather than left to
-# a count, and asserted, so the day the construct lands this test reddens and the
-# note cannot outlive its cause.
-
-BLOCKED_BY_ANOTHER_CONSTRUCT = {
-    "grid-declared-edit": "Binding.Query — the grid's source; the editStateKey / Column.editable half is shipped",
-    "tooltip-metric-1": "TextSource.I18n — the tooltip's own value; the UiNode.tooltip slot is shipped",
-}
-
-
-@corpus_required
-@pytest.mark.parametrize("fixture_id", sorted(BLOCKED_BY_ANOTHER_CONSTRUCT))
-def test_a_blocked_fixture_still_names_a_construct_the_typed_model_lacks(fixture_id: str) -> None:
-    """The falsifier for the note above. Each fixture's remaining cause is a wire
-    tag no member of this host's typed ``Binding`` / ``TextSource`` union writes,
-    so the check is that the tag is still absent from the authoring surface."""
-    raw = (CORPUS_ROOT / "nodes" / f"{fixture_id}.json").read_text(encoding="utf-8")
-    tag = BLOCKED_BY_ANOTHER_CONSTRUCT[fixture_id].split(" ")[0].split(".")[1]
-    assert f'"$type":"{tag}"' in raw
-    union = {"Query": t.Binding, "I18n": t.TextSource}[tag]
-    spellings = {getattr(member, "__name__", "") for member in getattr(union, "__args__", ())}
-    assert tag not in spellings
-
-
 def test_the_widened_set_is_the_one_the_parity_table_carries() -> None:
     """The two lists are kept in different files on purpose — the byte assertions
     belong to the host's one parity table — so this pins them to each other."""
     from test_ui_authoring import _authored
 
     assert set(WIDENED_FIXTURES) <= set(_authored())
-    assert set(BLOCKED_BY_ANOTHER_CONSTRUCT).isdisjoint(_authored())
 
 
 def test_the_census_is_computed_rather_than_recited() -> None:
     """The module docstring's numbers, asserted. Prose carrying a count is wrong
-    out loud the first time either list moves and nobody re-reads the paragraph;
+    out loud the first time the list moves and nobody re-reads the paragraph;
     this is the same discipline the quarantine's own census keeps."""
-    assert len(WIDENED_FIXTURES) == 18
-    assert len(BLOCKED_BY_ANOTHER_CONSTRUCT) == 2
+    assert len(WIDENED_FIXTURES) == 20
     assert len(set(WIDENED_FIXTURES)) == len(WIDENED_FIXTURES)
 
 

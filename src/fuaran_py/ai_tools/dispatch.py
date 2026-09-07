@@ -26,8 +26,16 @@ from ..schema.decode import ACTION_CASES
 # capability-invoke). An effect not in this set is still default-denied unless
 # permitted; this set is what a host reasons about when granting.
 GATED_EFFECT_SHAPES = frozenset(
-    {"Dispatch", "Navigate", "AiTool", "ReadFileBody", "Notify", "WriteToClipboard", "Invoke"}
+    {"Dispatch", "Navigate", "AiTool", "ReadFileBody", "Notify", "WriteToClipboard", "Invoke", "Call"}
 )
+# `Call` joined the set in 0.3.0. It was named FIRST in the comment above from the
+# day this module was written ("call/navigate/ai-tool/read-file-body") and absent
+# from the set itself — a transcription slip rather than a policy, and one nothing
+# caught because `authorize` default-denies an unclassified shape anyway, so the
+# gate's VERDICT was already right. What was wrong is what a host reasoning with
+# `is_gated_effect` was told: that an HTTP call to a host endpoint is not an
+# outward effect it must decide about. A permission model is only as good as the
+# question it is asked, and that one was being asked wrong.
 
 # Structural, side-effect-free composition — safe to permit broadly. ``Chain`` is
 # a sequence (its members are gated individually); ``SetState`` mutates only the

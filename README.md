@@ -320,6 +320,83 @@ moves a byte. The version advances because the public surface does — 0.2.0 is 
 published, so a widened surface rides a new slot rather than being repacked over an old
 one.
 
+### 0.3.0 — `Query`, `Invoke`, `Call`, `AiTool` and `I18n` become authorable
+
+The other half of the same gap, one level down: the decoder has carried all five for a
+long time, and the typed `Binding` / `Action` / `TextSource` unions did not. A case that
+is not a member of its union has no spelling, so a `Query`-sourced grid, a capability
+invocation, an endpoint call, an AI-tool dispatch and a localised caption were all
+readable and unwritable.
+
+```python
+from fuaran_py.schema import types as t
+from fuaran_py.ui import action, binding, fuaran, node
+
+# A value the HOST resolves, re-run when a named dependency changes.
+fuaran.grid(
+    "settlements",
+    source=binding.query("settlements"),
+    row_key_field="reference",
+    columns=[t.Column("Reference", field_name="reference")],
+)
+fuaran.metric("rev", label="Revenue", value=binding.query("orders", "status", "region"))
+
+# A host-registered capability, BY ID with typed string arguments — never code.
+# The same record in both positions: a value source, and an effect.
+fuaran.metric("forecast", label="Forecast", value=binding.invoke("forecast.revenue", horizon="12"))
+fuaran.button("run", label="Run model", on_click=action.invoke("model.score", rows="all"))
+
+# An endpoint call, with the DECLARATIVE result target that survives the wire.
+action.call("/api/total", into=action.into_state("total"))
+action.call("/api/orders", into=action.into_query("orders"))
+action.call("/api/preferences")  # reads nothing back
+action.call("/api/refresh", on_result=True)  # the emitting host holds a closure
+
+# A named tool on the host's AI surface, with a JSON argument bag.
+action.ai_tool("summarise", {"rows": 20, "tone": "brief"})
+
+# A catalog key the READER's host resolves, with placeholder values. It is a
+# TextSource, so it goes wherever text goes — including the node-level tooltip.
+fuaran.image(
+    "harbour", src="/harbour.jpg", alt="Fishing boats", caption=binding.i18n("gallery.caption.harbour", year=1908)
+)
+node.with_tooltip(binding.i18n("metric.latency.hint"), fuaran.metric("p50", label="p50", value=128))
+```
+
+Five details are decisions rather than mechanics:
+
+1. **`Invoke` is ONE record in two unions.** The wire shape is identical in a value
+   position and an effect position; the reference tier spells that as two cases carrying
+   the same fields, and one class in both aliases is the same statement with nothing to
+   keep in step. It also moved: it was already shipping from the capability seam and
+   lowering to exactly these bytes, while sitting *outside* the unions — which is how a
+   record can encode correctly and still be invisible to every consumer that asks the
+   union what this host models.
+2. **`dependsOn` omits at empty; `args` is written at empty.** Opposite answers to what
+   looks like one question, and both follow the wire: a dependency-free query is the bare
+   two-key document, while an `I18n` key with no placeholders and a capability with no
+   arguments each carry their empty container, because the emptiness is a statement and
+   an absent key would read as "unspecified".
+3. **An invocation argument's value is a string.** The alias narrowed from
+   `str | int | float | bool`, which was never right: both reference decoders require a
+   string, so the wider spelling was an authoring surface for documents this host emits
+   and the reference host refuses. An argument's real type lives in the capability's own
+   signature, which validates it on the host that owns the body.
+4. **A `Call` result target is `into_state` / `into_query`, not a binding.** Their wire
+   tags are `State` and `Query` — the names the two *reading* bindings already hold in
+   this flat namespace — so the Python names differ deliberately. It is what stops
+   `into=` being handed a `Filter`, which no host could honour.
+5. **`Call` is a gated effect, and was not.** It was named first in the dispatch gate's
+   own description of the gated set and absent from the set itself. The gate's verdict
+   was never wrong — an unclassified shape is default-denied anyway — but a host asking
+   `is_gated_effect` which shapes it must decide about was told an HTTP call to a host
+   endpoint was not one of them.
+
+Additive for trees: nothing that encoded before encodes differently, and the fifteen
+fixtures these constructs unlock now encode byte-identically and decode back byte-stably.
+The two narrowings above (`InvokeArgValue`, and `is_gated_effect("Call")` answering
+`True`) ride the same 0.3.0 slot the section above opened.
+
 ## Render (optional)
 
 A decoded tree renders to a sanitised HTML **body fragment** from Python — no

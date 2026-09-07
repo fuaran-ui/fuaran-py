@@ -26,6 +26,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Literal, Protocol, runtime_checkable
 
+from ..canonical import encode_value
 from ..model import Arr, Obj, Value
 from ..model import Node as WireNode
 
@@ -458,7 +459,97 @@ class Local:
         )
 
 
-Binding = Static | State | Filter | Selection | Now | FormatBinding | Local
+@dataclass(frozen=True)
+class Query:
+    """``Binding.Query`` — a value the HOST resolves under a module-scoped name.
+
+    The wire carries the name and, optionally, the names this query re-runs on:
+    ``dependsOn`` is a list of the State / filter keys whose change invalidates
+    the result. It is omitted when empty, so a dependency-free query is the bare
+    ``{"$type":"Query","name":…}`` the grid and ``Call`` fixtures carry.
+
+    What the wire does NOT carry is the RESULT: the typed ``accessor`` that
+    projects the host's raw payload into the slot's type is a closure and has
+    been off the wire since 0.2.0. So a query declares WHAT to ask for and WHEN
+    to ask again, and nothing about the shape of the answer — the reading host
+    resolves the name against its own registered sources, which is the same
+    default-deny seam the capability registry gives ``Invoke``.
+    """
+
+    name: str
+    #: The names whose change re-runs this query. A ``tuple`` rather than a list
+    #: because the record is frozen and this is part of its identity; the
+    #: authored ORDER is carried to the wire verbatim (the wire is a list, not a
+    #: set, and two orders are two documents).
+    depends_on: tuple[str, ...] = ()
+
+    def to_wire(self) -> Value:
+        fields: dict[str, Value] = {}
+        if self.depends_on:
+            fields["dependsOn"] = Arr(list(self.depends_on))
+        fields["name"] = self.name
+        return Obj("Query", fields)
+
+
+@dataclass(frozen=True)
+class InvokeArg:
+    """One argument of an :class:`Invoke` — an ``addr`` naming a declared hole and
+    the ``value`` bound into it.
+
+    Both members are STRINGS on the wire, and the typing here says so rather than
+    widening to a JSON value: the reference IDL declares ``req "addr" TStr;
+    req "value" TStr``, so a number written here is a document the reference host
+    refuses to decode. A capability's own signature is where an argument's real
+    type lives (``fuaran_py.ui.capability.HoleSpace``), and it validates the
+    parsed value at invocation time, on the host that owns the body.
+    """
+
+    addr: str
+    value: str
+
+    def to_wire(self) -> Value:
+        # A bare (tag-less) record, not a discriminated case: `InvokeArg` is one
+        # of the format's plain object records, so it carries no `$type`.
+        return Obj(None, {"addr": self.addr, "value": self.value})
+
+
+@dataclass(frozen=True)
+class Invoke:
+    """``Binding.Invoke`` / ``Action.Invoke`` — a host-registered capability
+    referenced BY ID, with typed arguments; never code.
+
+    One record for both unions, because the wire shape is identical in the two
+    positions: as a binding it is a value SOURCE (the host resolves the
+    invocation and the slot reads its result), as an action it is an EFFECT (the
+    host runs it and the tree reads nothing back). The reference tier spells them
+    as two distinct DU cases carrying the same fields; here one class is a member
+    of both aliases, which is the same statement with nothing to keep in step.
+
+    ``args`` is REQUIRED on the wire and is written even when empty (``"args":[]``)
+    — an argument-free capability is a real thing and its emptiness is a
+    statement, where an omitted key would read as "unspecified".
+
+    The id is a reference, so it is only ever as safe as the registry that
+    resolves it: an unregistered id is refused by
+    :class:`~fuaran_py.ui.capability.CapabilityRegistry`, and the SHAPE is refused
+    by the dispatch gate before that (``Invoke`` is a gated effect shape).
+    """
+
+    capability_id: str
+    args: tuple[InvokeArg, ...] = ()
+
+    def to_wire(self) -> Value:
+        return Obj("Invoke", {"args": Arr([a.to_wire() for a in self.args]), "capabilityId": self.capability_id})
+
+    def to_json(self) -> str:
+        """The canonical JSON of this invocation on its own — the host bridge's
+        input (``parse_invocation`` reads it back). Kept from the 0.2.0 surface
+        this record was moved out of; nothing else in this module carries one,
+        because nothing else is handed across a process boundary alone."""
+        return encode_value(self.to_wire())
+
+
+Binding = Static | State | Filter | Selection | Now | FormatBinding | Local | Query | Invoke
 
 NumberInput = float | int | Binding
 """A numeric ``Binding``, or a bare number coerced to :class:`Static`."""
@@ -480,10 +571,44 @@ class Bound:
         return Obj("Bound", {"binding": _lower(self.binding)})
 
 
-TextSource = LiteralText | Bound
-"""The authoring ``TextSource`` surface (``Literal`` + ``Bound``)."""
+@dataclass(frozen=True)
+class I18n:
+    """A ``TextSource.I18n`` — a catalog KEY the reading host resolves in the
+    reader's own locale, with a name-keyed bag of placeholder values.
 
-TextInput = str | LiteralText | Bound
+    The key is the whole of what travels: the translated strings live in the
+    host's catalog, so a document is locale-free and one document serves every
+    reader. ``args`` fills the placeholders the catalog entry declares — plain
+    JSON values, written verbatim.
+
+    ``args`` is REQUIRED and is emitted even when empty (``"args":{}``), which is
+    what the reference IDL declares (``req "args" (TMap TJson)``) and what
+    ``tooltip-metric-1`` carries. Omitting it at empty would make a key with no
+    placeholders a different document from the one every other host writes.
+
+    Named ``I18n`` for the TEXT case, because the flat Python namespace has one
+    name per class and this is the case the corpus exercises. The ``Binding``
+    union has an ``I18n`` case of its own on the wire — a DIFFERENT shape, whose
+    ``args`` are ``Binding<JVal>`` sources rather than literal values, and
+    optional rather than required. When it is modelled here it takes a distinct
+    class name (``I18nBinding``), on the ``FormatBinding``-beside-``Fmt*``
+    precedent: two wire tags that collide under one Python name are two records,
+    not one.
+    """
+
+    key: str
+    args: dict[str, Value] = field(default_factory=dict)
+
+    def to_wire(self) -> Value:
+        # `_obj` would drop an empty dict only if it were `None`; `{}` is a value
+        # and rides, which is the point — see the docstring.
+        return _obj("I18n", {"args": dict(self.args), "key": self.key})
+
+
+TextSource = LiteralText | Bound | I18n
+"""The authoring ``TextSource`` surface (``Literal`` + ``Bound`` + ``I18n``)."""
+
+TextInput = str | LiteralText | Bound | I18n
 """A ``TextSource``, or a bare ``str`` coerced to a :class:`LiteralText`."""
 
 
@@ -681,7 +806,119 @@ class ReadFileBody:
         return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
 
 
-Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | Print | Confirm | Focus | ReadFileBody
+@dataclass(frozen=True)
+class IntoState:
+    """A :class:`Call` result landing in the reactive State channel under ``key``
+    — read back by every ``Binding.State`` naming it. Wire tag: ``State``."""
+
+    key: str
+
+    def to_wire(self) -> Value:
+        return Obj("State", {"key": self.key})
+
+
+@dataclass(frozen=True)
+class IntoQuery:
+    """A :class:`Call` result landing in the query-results slot under ``name`` —
+    read back by every ``Binding.Query`` naming it. Wire tag: ``Query``."""
+
+    name: str
+
+    def to_wire(self) -> Value:
+        return Obj("Query", {"name": self.name})
+
+
+CallResultTarget = IntoState | IntoQuery
+"""Where a :class:`Call`'s result lands, declaratively.
+
+The two case classes are named ``IntoState`` / ``IntoQuery`` where their WIRE
+tags are ``State`` / ``Query``, because Python's namespace is flat and both of
+those names are already taken by the ``Binding`` cases that READ these slots.
+Keeping them distinct is not cosmetic: it is what stops an author writing
+``into=Filter("x")`` — a binding, not a result target — and getting a document
+no host can honour.
+"""
+
+
+@dataclass(frozen=True)
+class Call:
+    """``Action.Call`` — ask a host endpoint, then do something with the answer.
+
+    Two independent, both-optional ways to take the result, and the wire allows
+    any combination of them including neither:
+
+    * ``into`` — the DECLARATIVE target (:data:`CallResultTarget`). This is the
+      half that survives the wire: a decoding host can honour it, where a closure
+      it can only see the sentinel of.
+    * ``on_result`` — the HANDLER spelling. A host closure, so it crosses the
+      wire as ``"<closure>"`` and carries nothing a decoder can act on; it is a
+      declaration that this call HAS a handler in the emitting host.
+
+    Neither is the third real shape (``composite-tabs-panels``'s form submits and
+    reads nothing back), which is why ``on_result`` is a plain ``False`` default
+    rather than the tri-state ``Binding.Local`` uses: there is no "whichever the
+    other implies" rule to express, because a call with no result target and no
+    handler is an ordinary fire-and-forget submit rather than an under-specified
+    one.
+    """
+
+    endpoint: str
+    into: CallResultTarget | None = None
+    #: Whether the emitting host holds a result handler. Written as the closure
+    #: sentinel when true, omitted when false — never as a value, because there
+    #: is no value: a closure does not cross a wire.
+    on_result: bool = False
+
+    def to_wire(self) -> Value:
+        return _obj(
+            "Call",
+            {
+                "endpoint": self.endpoint,
+                "into": self.into,
+                "onResult": CLOSURE if self.on_result else None,
+            },
+        )
+
+
+@dataclass(frozen=True)
+class AiTool:
+    """``Action.AiTool`` — invoke a named tool on the host's AI surface with a
+    JSON argument bag.
+
+    ``args`` is a JVal written verbatim, exactly as :class:`Notify`'s ``payload``
+    and :class:`SetState`'s ``value`` are, and for the same reason: these three
+    carry real data in both directions, so erasing them to a sentinel would be
+    silent data loss. Both members are required on the wire.
+
+    Distinct from :class:`Invoke`, which it is easy to conflate. ``Invoke`` names
+    a capability the HOST registered, with typed string args validated against a
+    declared signature; this names a tool on an AI surface, with a free-form
+    payload. Both are gated effect shapes, and neither is a route around the
+    gate.
+    """
+
+    tool_name: str
+    args: Value
+
+    def to_wire(self) -> Value:
+        return Obj("AiTool", {"args": _lower(self.args), "toolName": self.tool_name})
+
+
+Action = (
+    Chain
+    | Dispatch
+    | Navigate
+    | SetState
+    | Notify
+    | WriteToClipboard
+    | Print
+    | Confirm
+    | Focus
+    | ReadFileBody
+    | Call
+    | AiTool
+    | Invoke
+)
 
 
 # ── CellFormat (WIRE_FORMAT.md §3.3) ────────────────────────────────────────

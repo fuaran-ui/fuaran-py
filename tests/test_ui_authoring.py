@@ -233,6 +233,76 @@ def _picked_ticket_frame() -> Frame:
     )
 
 
+#: ``btn-json-payloads``'s payload, authored ONCE and handed to all three of the
+#: format's JSON-carrying actions, exactly as the fixture does. Its contents are
+#: the canonical writer's hard cases in one value: a whole-valued float, an
+#: exponent that must not round-trip as a decimal, a raw control character, an
+#: astral-plane character, an escaped quote and backslash, an empty object and an
+#: empty array, and keys whose authored order is not their sorted order.
+_JSON_PAYLOAD: dict[str, object] = {
+    "alpha": 1,
+    "escapes": 'quote" back\\slash \x01 astral-\U0001f600',
+    "float-whole": 2,
+    "nested": [{"a": 1e-07, "b": True}, [0, 3], {}, []],
+    "zeta": "last key authored first",
+}
+
+
+def _overview_panel() -> t.UiNode:
+    """``composite-tabs-panels``'s first tab — a ``Card``-role box with a GRID
+    layout, which ``fuaran.card`` cannot reach (it fixes the layout), so the
+    record is built directly. That is the intended escape hatch, not a gap: the
+    smart constructors are the common shapes, and :class:`~fuaran_py.schema.types.Box`
+    is the whole of what the wire allows."""
+    return t.UiNode(
+        "overview-panel",
+        t.Box(
+            (
+                node.bare(fuaran.sparkline("spark-1", source=binding.static([1.0, 2.0, 3.0, 2.0, 4.0]))),
+                node.bare(fuaran.badge("badge-1", label="Beta", variant="Info")),
+            ),
+            t.GridTemplate(cols=2, gap=16),
+            "Card",
+            t.LiteralText("This month"),
+        ),
+    )
+
+
+def _settings_panel() -> t.UiNode:
+    """``composite-tabs-panels``'s second tab — the form whose ``onSubmit`` is the
+    ``Action.Call`` that kept this fixture quarantined, over two controls that
+    declare no handler (``on_change=False``)."""
+    form = node.bare(
+        fuaran.form(
+            "preferences-form",
+            submit_label="Save preferences",
+            on_submit=action.call("/api/preferences"),
+            fields=[
+                t.FormField(
+                    "displayName",
+                    t.LiteralText("Display name"),
+                    t.TextField(value=t.Static("Ada Lovelace"), on_change=False),
+                    True,
+                ),
+                t.FormField(
+                    "theme",
+                    t.LiteralText("Theme"),
+                    t.ChoiceField(
+                        options=t.Static([t.SelectOption("Light", "light"), t.SelectOption("Dark", "dark")]),
+                        value=t.Static("dark"),
+                        on_change=False,
+                    ),
+                    True,
+                ),
+            ],
+        )
+    )
+    return t.UiNode(
+        "settings-panel",
+        t.Box((form,), t.FlexLayout("Vertical", False, 12), "Card", t.LiteralText("Preferences")),
+    )
+
+
 def _selected(field: str, default: str) -> t.Selection:
     """``Binding.Selection`` on the master grid, projecting one row field. The
     ``default_value`` is what the detail pane reads BEFORE the first click, which
@@ -1751,6 +1821,233 @@ def _authored() -> dict[str, t.UiNode]:
                 "seed": t.SlotArg(fuaran.markdown("seed-tree", "Initial guest state")),
                 "title": t.ScalarStr("Metrics"),
             },
+        ),
+        # ── Phase 1580 — Query / Invoke / Call / AiTool / I18n (15) ──────────
+        #
+        # The census in tests/test_bindings_actions.py computes this set from the
+        # corpus and names the two fixtures it deliberately leaves out, so a new
+        # fixture carrying one of these constructs reddens there rather than
+        # sitting silently unauthored here.
+        #
+        # Binding.Query (7 — the six the phase names, plus grid-declared-edit).
+        "query-dependson": node.bare(
+            fuaran.metric(
+                "query-dependson",
+                label="Revenue",
+                value=binding.query("orders", "status", "region"),
+                format=format.currency("GBP"),
+                tone="Brand",
+                icon="trending-up",
+                subtext="vs last month",
+            )
+        ),
+        "form-combobox-query": node.bare(
+            fuaran.form(
+                "form-combobox-query",
+                submit_label="Search",
+                fields=[
+                    t.FormField(
+                        "city",
+                        t.LiteralText("City"),
+                        # `on_change=False`: the canonical control declares no
+                        # handler, and this record CAN say so — unlike the four
+                        # whose `to_wire` writes the sentinel unconditionally.
+                        t.ComboboxField(options=binding.query("cities", "country"), on_change=False),
+                    )
+                ],
+            )
+        ),
+        "form-tokens-query": node.bare(
+            fuaran.form(
+                "form-tokens-query",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "skills",
+                        t.LiteralText("Skills"),
+                        t.TokensField(suggestions=binding.query("skills", "role"), on_change=False),
+                    )
+                ],
+            )
+        ),
+        "grid-exportable-1": node.bare(
+            fuaran.grid(
+                "grid-exportable-1",
+                source=binding.query("settlements"),
+                row_key_field="reference",
+                exportable=True,
+                columns=[
+                    t.Column("Reference", field_name="reference"),
+                    t.Column(
+                        "Amount",
+                        format=format.currency("GBP"),
+                        kind=t.ColumnKind("Numeric"),
+                        field_name="amount",
+                    ),
+                ],
+            )
+        ),
+        "grid-keep-rows-together-1": node.bare(
+            fuaran.grid(
+                "grid-keep-rows-together-1",
+                source=binding.query("notes"),
+                row_key_field="note",
+                keep_rows_together=True,
+                columns=[t.Column("Note", field_name="note")],
+            )
+        ),
+        "grid-repeat-header-1": node.bare(
+            fuaran.grid(
+                "grid-repeat-header-1",
+                source=binding.query("lines"),
+                row_key_field="line",
+                repeat_header=True,
+                columns=[t.Column("Line", field_name="line")],
+            )
+        ),
+        "grid-declared-edit": node.bare(
+            fuaran.grid(
+                "grid-declared-edit",
+                source=binding.query("stock"),
+                row_key_field="month",
+                editable=True,
+                edit_state_key="stock-adjustments",
+                columns=[
+                    t.Column("Month", field_name="month"),
+                    t.Column("Revenue", field_name="revenue"),
+                    # The per-column opt-OUT: an explicit False on one column of
+                    # an editable grid is the whole point of the tri-state slot.
+                    t.Column("Note", field_name="note", editable=False),
+                ],
+            )
+        ),
+        # Binding.Invoke / Action.Invoke (2). Both encoded byte-identically
+        # before this phase — through `capability.Invoke`, a record that lowered
+        # to the right wire while sitting outside the `Binding` / `Action`
+        # unions. They join the table here because 1580 made the record a MEMBER
+        # of both, and this is where the estate reads which fixtures a construct
+        # covers.
+        "metric-invoke": node.bare(
+            fuaran.metric(
+                "metric-invoke",
+                label="Revenue",
+                value=binding.invoke("forecast.revenue", horizon="12", scenario="base"),
+                format=format.currency("GBP"),
+                tone="Brand",
+                icon="trending-up",
+                subtext="vs last month",
+            )
+        ),
+        "btn-invoke": node.bare(
+            fuaran.button(
+                "btn-invoke",
+                label="Run model",
+                on_click=action.invoke("model.score", rows="all"),
+                variant="Primary",
+            )
+        ),
+        # TextSource.I18n (2) — a caption and a node-level tooltip.
+        "image-caption-i18n-1": fuaran.image(
+            "image-caption-i18n-1",
+            src="/harbour.jpg",
+            alt="Fishing boats moored at first light",
+            caption=binding.i18n("gallery.caption.harbour", year=1908),
+        ),
+        "tooltip-metric-1": node.with_tooltip(
+            # An EMPTY args bag, written rather than omitted — see the omission
+            # tests in tests/test_bindings_actions.py.
+            binding.i18n("metric.latency.hint"),
+            node.bare(
+                fuaran.metric(
+                    "tooltip-metric-1",
+                    label="Median latency",
+                    value=128,
+                    format=None,
+                    trend_polarity="LowerIsBetter",
+                )
+            ),
+        ),
+        # Action.Call (3) — all three reachable shapes: the handler spelling, the
+        # two declarative targets, and neither.
+        "call-into": node.bare(
+            fuaran.stack(
+                "call-into",
+                children=[
+                    node.bare(
+                        fuaran.button(
+                            "btn-call-closure",
+                            label="Refresh (closure)",
+                            on_click=action.call("/api/refresh", on_result=True),
+                            variant="Secondary",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.button(
+                            "btn-fetch-total",
+                            label="Fetch total",
+                            on_click=action.call("/api/total", into=action.into_state("total")),
+                            variant="Primary",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.metric("total-metric", label="Total", value=binding.state("total", 0), format=None)
+                    ),
+                    node.bare(
+                        fuaran.button(
+                            "btn-fetch-orders",
+                            label="Fetch orders",
+                            on_click=action.call("/api/orders", into=action.into_query("orders")),
+                            variant="Primary",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.metric("orders-metric", label="Orders", value=binding.query("orders"), format=None)
+                    ),
+                ],
+            )
+        ),
+        "action-confirm": node.bare(
+            fuaran.button(
+                "action-confirm",
+                label="Delete",
+                variant="Secondary",
+                on_click=t.Confirm(
+                    t.Bound(binding.selection("orders-grid", field="reference")),
+                    action.call("/orders/delete", into=action.into_state("delete-result")),
+                ),
+            )
+        ),
+        "composite-tabs-panels": node.bare(
+            fuaran.tabs(
+                "composite-tabs-panels",
+                children=[_overview_panel(), _settings_panel()],
+                active_index=0,
+                active_tag=t.Static("overview"),
+                tab_headers=[
+                    t.TabHeader(label=t.LiteralText("Overview"), icon="chart-glyph"),
+                    t.TabHeader(label=t.LiteralText("Settings"), disabled=t.Static(False)),
+                ],
+                tab_tags=["overview", "settings"],
+                on_select=False,
+            )
+        ),
+        # Action.AiTool (1) — the same JSON payload through all three of the
+        # format's JSON-carrying actions, which is what the fixture is FOR: one
+        # value, three arms, and any divergence in the canonical writer shows up
+        # as a byte difference between two arms of one document.
+        "btn-json-payloads": node.bare(
+            fuaran.button(
+                "btn-json-payloads",
+                label="Fire the JSON-payload actions",
+                on_click=action.chain(
+                    [
+                        action.notify("audit.channel", _JSON_PAYLOAD),
+                        action.set_state("draft", _JSON_PAYLOAD),
+                        action.ai_tool("summarise", _JSON_PAYLOAD),
+                    ]
+                ),
+                variant="Primary",
+            )
         ),
     }
 

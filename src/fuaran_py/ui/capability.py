@@ -26,15 +26,24 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from ..canonical import encode_value
-from ..model import Arr, Obj
-from ..model import Value as WireValue
+from ..schema.types import Invoke as _Invoke
+from ..schema.types import InvokeArg as _InvokeArg
 
 # A capability body: typed args (by name) → a realized value.
 CapabilityBody = Callable[[Mapping[str, Any]], Any]
 
-# An invocation argument's value — a bare JSON scalar (the wire carries it untyped).
-InvokeArgValue = str | int | float | bool
+#: An invocation argument's value on the WIRE. A string, and only a string: the
+#: reference IDL declares ``req "value" TStr`` and both reference decoders
+#: (``decInvokeArg`` and ``decodeInvokeArgs``) require one, so a number written
+#: here is a document this host emits and the reference host refuses.
+#:
+#: This narrowed in 0.3.0 from ``str | int | float | bool``. The wider alias was
+#: never right — an argument's real type lives in the capability's own
+#: :class:`Signature`, which validates the parsed value on the host that owns the
+#: body — and leaving it wide would have been an authoring surface for
+#: cross-host-invalid documents, which is the one thing a conformant host must
+#: not offer.
+InvokeArgValue = str
 
 
 @dataclass(frozen=True)
@@ -179,32 +188,27 @@ def any_string() -> HoleSpace:
 # ``{"$type":"Invoke","args":[{"addr":…,"value":…}],"capabilityId":…}``.
 
 
-@dataclass(frozen=True)
-class Invoke:
-    """An ``Invoke`` authoring value — usable as a node ``source`` (binding) or an
-    ``onClick`` / action (effect); both lower to the same canonical wire."""
-
-    capability_id: str
-    args: tuple[tuple[str, InvokeArgValue], ...] = ()
-
-    def to_wire(self) -> WireValue:
-        return Obj(
-            "Invoke",
-            {
-                "args": Arr([Obj(None, {"addr": addr, "value": value}) for addr, value in self.args]),
-                "capabilityId": self.capability_id,
-            },
-        )
-
-    def to_json(self) -> str:
-        return encode_value(self.to_wire())
+#: The ``Invoke`` authoring record — usable as a node ``source`` (binding) or an
+#: ``onClick`` / action (effect); both lower to the same canonical wire.
+#:
+#: Phase 1580 moved the definition into :mod:`fuaran_py.schema.types`, beside
+#: every other ``Binding`` / ``Action`` case, and made it a member of both
+#: unions. That membership is the whole of the move: a record that lowers to a
+#: binding's wire but is not IN the binding union is unreachable from any typed
+#: consumer that reasons over the union — which is exactly how this host could
+#: encode ``metric-invoke`` byte-identically while a cross-host projector
+#: measured it as unmodelled. The name here is an alias, so every existing
+#: ``from fuaran_py.ui.capability import Invoke`` keeps working and there is one
+#: record rather than two that could drift.
+Invoke = _Invoke
+InvokeArg = _InvokeArg
 
 
 def invoke(capability_id: str, **args: InvokeArgValue) -> Invoke:
     """Author an ``Invoke`` — ``invoke("forecast.revenue", horizon="12", scenario="base")``.
 
     Argument order is preserved (kwargs are ordered); it is the wire ``args`` order."""
-    return Invoke(capability_id, tuple(args.items()))
+    return Invoke(capability_id, tuple(_InvokeArg(addr, value) for addr, value in args.items()))
 
 
 @dataclass(frozen=True)

@@ -47,6 +47,7 @@ from ..schema.types import (
     TextSource,
     UiNode,
 )
+from .capability import invoke as _invoke_record
 
 # ── Ergonomic input coercions (the Pythonic analogue of the TS options object) ─
 
@@ -87,7 +88,9 @@ def _switch_case(entry: SwitchCaseInput) -> t.SwitchCase:
     selector, child = entry
     if isinstance(selector, str):
         return t.SwitchCase(child=child, match=selector)
-    if isinstance(selector, (t.Static, t.State, t.Filter, t.Selection, t.Now, t.FormatBinding, t.Local, Obj)):
+    if isinstance(
+        selector, (t.Static, t.State, t.Filter, t.Selection, t.Now, t.FormatBinding, t.Local, t.Query, t.Invoke, Obj)
+    ):
         return t.SwitchCase(child=child, when=selector)
     raise TypeError(
         "a switch case selector is either a literal 'match' string (compared against the "
@@ -171,6 +174,43 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
     def now() -> Binding:
         """``Binding.Now`` — the host-furnished current instant (tag-only on the wire)."""
         return t.Now()
+
+    @staticmethod
+    def query(name: str, *depends_on: str) -> Binding:
+        """``Binding.Query`` — a value the host resolves under a module-scoped
+        ``name``, re-run when any of ``depends_on`` changes.
+
+        The dependency names are VARIADIC because a query most often has none
+        (``binding.query("orders")``) and the alternative — a keyword taking a
+        sequence — makes the common call carry punctuation for a slot it does
+        not use. Order is carried to the wire verbatim: the wire slot is a list,
+        so two orders are two documents.
+        """
+        return t.Query(name, tuple(depends_on))
+
+    @staticmethod
+    def invoke(capability_id: str, **args: str) -> Binding:
+        """``Binding.Invoke`` — a host-registered capability as a value SOURCE.
+
+        The same record the ``action`` namespace's twin builds, because the wire
+        shape is identical in the two positions; this is the spelling that reads
+        right at a ``value=`` / ``source=`` slot. Argument values are strings on
+        the wire (see :data:`~fuaran_py.ui.capability.InvokeArgValue`).
+        """
+        return _invoke_record(capability_id, **args)
+
+    @staticmethod
+    def i18n(key: str, **args: t.Value) -> t.TextSource:
+        """``TextSource.I18n`` — a catalog key the reading host resolves in the
+        reader's locale, with placeholder values.
+
+        On the ``binding`` namespace rather than a namespace of its own because
+        it is where an author looks for "a value the host resolves", which is
+        what it is — but note the RESULT is a ``TextSource``, not a ``Binding``:
+        it goes in a ``label`` / ``caption`` / ``tooltip`` slot, never in a
+        ``value`` one.
+        """
+        return t.I18n(key, dict(args))
 
     @staticmethod
     def opaque() -> Binding:
@@ -272,6 +312,47 @@ class action:  # noqa: N801 — namespace object
     def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text") -> Action:
         """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure."""
         return t.ReadFileBody(file_ref, encoding)
+
+    @staticmethod
+    def call(endpoint: str, *, into: t.CallResultTarget | None = None, on_result: bool = False) -> Action:
+        """``Action.Call`` — ask a host endpoint.
+
+        ``into`` is the declarative result target (:meth:`into_state` /
+        :meth:`into_query`) and is the half a decoding host can honour;
+        ``on_result`` declares that the EMITTING host holds a result closure,
+        which crosses the wire only as the sentinel. Naming neither is the
+        ordinary fire-and-forget submit, not an omission.
+        """
+        return t.Call(endpoint, into, on_result)
+
+    @staticmethod
+    def into_state(key: str) -> t.CallResultTarget:
+        """A :meth:`call` result landing in the State channel under ``key``."""
+        return t.IntoState(key)
+
+    @staticmethod
+    def into_query(name: str) -> t.CallResultTarget:
+        """A :meth:`call` result landing in the query-results slot under ``name``."""
+        return t.IntoQuery(name)
+
+    @staticmethod
+    def ai_tool(tool_name: str, args: t.Value) -> Action:
+        """``Action.AiTool`` — invoke a named tool on the host's AI surface.
+
+        ``args`` is written verbatim, as :meth:`notify`'s payload is. Not to be
+        confused with :meth:`invoke`, which names a host-registered capability
+        with typed string arguments validated against a declared signature.
+        """
+        return t.AiTool(tool_name, args)
+
+    @staticmethod
+    def invoke(capability_id: str, **args: str) -> Action:
+        """``Action.Invoke`` — a host-registered capability as an EFFECT.
+
+        The same record ``binding.invoke`` builds — the wire shape is identical
+        in the two positions — spelled where an ``on_click=`` slot reads right.
+        """
+        return _invoke_record(capability_id, **args)
 
 
 # ── Typed cell-format entry points (the ``format`` namespace) ────────────────

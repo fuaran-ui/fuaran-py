@@ -486,6 +486,65 @@ carry configuration and `t.SlotArg(tree)` hands the guest a whole node tree. `on
 follows the handler-flag convention from the section above — `True` by default, `False`
 for a guest whose bubbles the host does not take.
 
+## Values the host resolves, and effects it performs
+
+The sections above are about node KINDS. This one is about the three cross-cutting unions
+underneath them — `Binding`, `Action`, `TextSource` — and the five cases that had no
+spelling here until 0.3.0. The gap had the same shape as an absent kind and was easier to
+miss: `encode` lowers whatever it is handed, so a case outside its union is not rejected,
+it is simply unwritable.
+
+```python
+from fuaran_py.schema import types as t
+from fuaran_py.ui import action, binding, fuaran, node
+
+binding.query("orders")  # {"$type":"Query","name":"orders"}
+binding.query("orders", "status", "region")  # ... plus "dependsOn":["status","region"]
+binding.invoke("forecast.revenue", horizon="12", scenario="base")
+binding.i18n("gallery.caption.harbour", year=1908)
+
+action.invoke("model.score", rows="all")
+action.call("/api/total", into=action.into_state("total"))
+action.ai_tool("summarise", {"rows": 20})
+```
+
+**`Binding.Query` — a name, and when to ask again.** The host resolves the name against
+its own registered sources; `depends_on` names the State or filter keys whose change
+re-runs it. The order is carried verbatim, because the wire slot is a list and two orders
+are two documents. What the wire does *not* carry is the shape of the answer: the typed
+accessor that projects the host's payload into the slot is a closure and rides off the
+wire, so a query says what to ask for and nothing about what comes back.
+
+**`Invoke` — a capability BY ID, never code.** One record, and it is a member of both
+`Binding` (a value source) and `Action` (an effect), because the wire shape is the same in
+both positions. Arguments are `(addr, value)` pairs of **strings**; an argument's real
+type lives in the capability's own `Signature`, which validates the parsed value on the
+host that owns the body (`fuaran_py.ui.capability`). An id the registry does not know is
+refused there, and the SHAPE is refused before that by the dispatch gate — `Invoke` is a
+gated effect, so a host that has permitted nothing runs nothing.
+
+**`Action.Call` — an endpoint, and optionally somewhere to put the answer.** `into` is the
+declarative half and the only one a decoding host can honour: `action.into_state(key)`
+writes the reactive State slot every `binding.state(key, …)` reads, `action.into_query(name)`
+writes the query-results slot every `binding.query(name)` reads. `on_result=True` declares
+that the *emitting* host holds a closure, which crosses the wire as the sentinel and tells
+a decoder nothing. Declaring neither is the ordinary fire-and-forget submit, not an
+omission — and note the Python names `IntoState` / `IntoQuery` stand for the wire tags
+`State` / `Query`, which the two reading bindings already hold in this flat namespace.
+
+**`Action.AiTool` — a named tool with a JSON bag.** `args` is written verbatim, exactly as
+`notify()`'s payload is; it is not `Invoke` with different words, and the difference is
+where the contract lives. An invocation is checked against a declared signature; a tool
+call carries whatever the tool's own surface accepts.
+
+**`TextSource.I18n` — a catalog key, resolved in the READER's locale.** The key is what
+travels, so one document serves every reader; `args` fills the placeholders the catalog
+entry declares. It goes wherever a `TextSource` goes — a caption, a label, a prompt, and
+the node-level `tooltip` from the section above. Its `args` bag is **always written**, even
+empty: the reference declares it required, so a key with no placeholders is `"args":{}` on
+every host, where `Query.dependsOn` — declared optional — omits at empty. Two containers,
+opposite rules, both read off the wire rather than guessed at.
+
 ## Conformance
 
 `encode(tree)` is byte-identical to the canonical wire-format corpus for any tree

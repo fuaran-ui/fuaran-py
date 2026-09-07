@@ -34,9 +34,33 @@ Usage::
     python conformance/sync_corpus.py <path-to-wire-format-fixtures>
     python conformance/sync_corpus.py --check
     python conformance/sync_corpus.py --check <path-to-wire-format-fixtures>
+    python conformance/sync_corpus.py --declare
+    python conformance/sync_corpus.py --declare <path-to-wire-format-fixtures>
 
 The optional path argument names the authority explicitly, for a checkout whose
 directory depth is not the canonical side-by-side one (a git worktree, say).
+
+The estate declaration and ``--declare``
+----------------------------------------
+
+``--declare`` (re)writes this snapshot's per-file records into the authority's
+own ``copies.json`` — the estate's generated-cross-repo-copy registry that
+``roadmapctl copies <workspace-root>`` projects on every sweep as
+``RM-COPY-STALE``, quoting the regenerating command verbatim. The record set is
+derived from the same payload list ``sync`` copies, so the declaration cannot
+drift from what is actually bundled; a hand-kept list would be exactly the
+hand-kept copy the registry exists to remove.
+
+``fuaran-ts`` declares into the SAME file, so this step MERGES: it replaces only
+the records whose copy lives under this snapshot and leaves every other record
+untouched. Both writers emit identical byte formatting, so whichever runs second
+does not re-churn the other's rows.
+
+What this buys over the two guards above: both of them live on ONE side of the
+copy and can only see their own checkout, so a corpus commit nobody re-synced is
+invisible until someone runs that host's suite. The sweep holds every repo at
+once and names the stale files with the command that fixes them, before anyone
+inherits a red gate they did not cause.
 
 The provenance sentinel and ``--check``
 ---------------------------------------
@@ -89,6 +113,27 @@ SENTINEL = SNAPSHOT / "snapshot.json"
 SENTINEL_KIND = "corpusSnapshot"
 
 _RESYNC_COMMAND = "python conformance/sync_corpus.py"
+
+# The `regen` clause the estate sweep quotes verbatim on a stale finding. Rooted at
+# the workspace, because that is where the reader of a `roadmapctl copies` finding is.
+_REGEN_COMMAND = f"cd Fuaran/Fuaran-UI/fuaran-py; {_RESYNC_COMMAND}"
+
+# The estate copy registry the `--declare` step writes into, at the authority's root.
+_COPIES_MANIFEST = "copies.json"
+
+# JSON carries no comment syntax, so the header note the registry's readers need is a
+# field. `roadmapctl copies` reads `kind`, `producer` and `records` and ignores anything
+# else, so this rides along unmolested. Seeded once and then preserved verbatim by both
+# writers, so a hand edit to it survives the next declare.
+_COPIES_NOTE = (
+    "GENERATED — do not hand-edit the records. Each bundled-corpus record is (re)written by "
+    "the host that bundles the snapshot: fuaran-ts via `pnpm --filter @fuaran-ui/conformance "
+    "declare-corpus`, fuaran-py via `python conformance/sync_corpus.py --declare`. Each writer "
+    "replaces only the records whose copy lives under its own snapshot, so the two co-own this "
+    "file without clobbering each other. fuaran-go and fuaran-rs are DELIBERATELY UNDECLARED: "
+    "they bundle no snapshot and read this corpus directly from the workspace (their CI checks "
+    "it out to ../wire-format-fixtures), so there is no copy of it that can go stale."
+)
 
 # The core certification families — the Node/TreeOp/reject/lenient/envelope set
 # the schema + cross-host runner certify. Mirrors sync-corpus.mjs exactly.
@@ -201,6 +246,114 @@ def sync(authority: Path | None = None, snapshot: Path | None = None) -> Path:
     return snapshot
 
 
+def payload_files(authority: Path) -> list[str]:
+    """Every bundled file, authority-relative and sorted — the declaration's record set.
+
+    Derived from the same ``_FILES`` / ``_DIRS`` the sync copies, never from a second
+    list: a declaration that enumerated the payload independently could go out of step
+    with what is actually bundled, which is precisely the drift this exists to report.
+    """
+    files = [name for name in _FILES if (authority / name).is_file()]
+    for name in _DIRS:
+        root = authority / name
+        if not root.is_dir():
+            continue
+        files.extend(sorted(p.relative_to(authority).as_posix() for p in root.rglob("*") if p.is_file()))
+    return sorted(files)
+
+
+def declare(authority: Path | None = None, snapshot: Path | None = None) -> int:
+    """(Re)write this snapshot's per-file records into the authority's ``copies.json``.
+
+    One record per COPY, not per source. A source bundled by two hosts is two records,
+    because a record carries exactly one ``regen`` clause and the two hosts are re-synced
+    by different commands — the sweep must be able to quote the right one at whoever is
+    reading the finding.
+
+    ``check: "fingerprint"`` rather than ``bytes``: the corpus generator writes the
+    platform newline, so a freshly regenerated authority working tree can be CRLF while a
+    committed snapshot is the LF its ``.gitattributes`` pins. A registry that reported all
+    ~600 files as drifted on that is a registry the estate learns to scroll past.
+    """
+    authority = AUTHORITY if authority is None else Path(authority).resolve()
+    snapshot = SNAPSHOT if snapshot is None else Path(snapshot).resolve()
+
+    if not (authority / "manifest.json").is_file():
+        print(
+            f"cannot declare: no authoritative corpus at {authority}",
+            file=sys.stderr,
+        )
+        return 1
+
+    # The workspace root: the directory the estates sit under, three levels above the
+    # authority in the canonical layout. `roadmapctl copies` resolves every consumer path
+    # against it, and there is no other root that can address a file in a different repo.
+    workspace_root = authority.parents[2]
+    try:
+        prefix = snapshot.relative_to(workspace_root).as_posix()
+    except ValueError:
+        print(
+            f"cannot declare: the bundled snapshot at {snapshot} does not sit under the "
+            f"workspace root inferred from the authority ({workspace_root}). The estate copy "
+            "registry addresses consumers by workspace-relative path, so a checkout outside "
+            "the canonical side-by-side layout cannot declare — re-run from one that is.",
+            file=sys.stderr,
+        )
+        return 1
+
+    mine = [
+        {
+            "source": rel,
+            "consumers": [f"{prefix}/{rel}"],
+            "check": "fingerprint",
+            "regen": _REGEN_COMMAND,
+        }
+        for rel in payload_files(authority)
+    ]
+
+    # Merge: keep every record that is not about a copy under THIS snapshot.
+    manifest_path = authority / _COPIES_MANIFEST
+    existing: list[dict] = []
+    note = ""
+    if manifest_path.is_file():
+        parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if parsed.get("kind") != "copies":
+            print(
+                f'cannot declare: {manifest_path} exists but is not a "kind": "copies" manifest',
+                file=sys.stderr,
+            )
+            return 1
+        note = parsed["note"] if isinstance(parsed.get("note"), str) else ""
+        existing = [
+            r for r in parsed.get("records", []) if not any(c.startswith(f"{prefix}/") for c in r.get("consumers", []))
+        ]
+
+    records = sorted(existing + mine, key=lambda r: (r["source"], (r["consumers"] or [""])[0]))
+
+    payload = {
+        "kind": "copies",
+        "producer": "wire-format-fixtures",
+        "note": note or _COPIES_NOTE,
+        "records": records,
+    }
+    # ensure_ascii=False and the explicit newline="" so these bytes match the ones
+    # fuaran-ts's sync-corpus.mjs writes for the same content — the two hosts co-own this
+    # file, and a formatting difference would make each rewrite churn the other's rows.
+    manifest_path.write_text(
+        json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+        newline="",
+    )
+
+    print(
+        f"Declared {len(mine)} bundled snapshot file(s) as estate copies in {manifest_path}\n"
+        f"  consumer prefix: {prefix}\n"
+        f"  total records now: {len(records)}",
+        file=sys.stderr,
+    )
+    return 0
+
+
 def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
     """Report the snapshot's distance from the authority. See the module docstring."""
     authority = AUTHORITY if authority is None else Path(authority).resolve()
@@ -256,15 +409,20 @@ def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
 def main(argv: list[str]) -> int:
     args = list(argv)
     checking = "--check" in args
-    if checking:
-        args = [a for a in args if a != "--check"]
-    if len(args) > 1:
-        print(f"usage: {_RESYNC_COMMAND} [--check] [<path-to-wire-format-fixtures>]", file=sys.stderr)
+    declaring = "--declare" in args
+    args = [a for a in args if a not in ("--check", "--declare")]
+    if len(args) > 1 or (checking and declaring):
+        print(
+            f"usage: {_RESYNC_COMMAND} [--check | --declare] [<path-to-wire-format-fixtures>]",
+            file=sys.stderr,
+        )
         return 1
 
     source = Path(args[0]).resolve() if args else AUTHORITY
     if checking:
         return check(source)
+    if declaring:
+        return declare(source)
 
     dest = sync(source)
     recorded = recorded_commit()

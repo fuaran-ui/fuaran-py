@@ -32,6 +32,7 @@ from collections.abc import Sequence
 from dataclasses import replace as _replace
 
 from ..canonical import encode_value
+from ..model import Obj
 from ..schema import types as t
 from ..schema.types import (
     Accessibility,
@@ -63,6 +64,36 @@ def _num_binding(value: t.NumberInput) -> Binding:
 def _str_binding(value: t.StringInput) -> Binding:
     """A bare ``str`` becomes a ``Binding.Static``."""
     return t.Static(value) if isinstance(value, str) else value
+
+
+#: What ``fuaran.switch(cases=…)`` accepts: a built case, or the ``(selector, child)``
+#: pair whose selector is a literal ``match`` string or a ``when`` predicate binding.
+SwitchCaseInput = t.SwitchCase | tuple[str, UiNode] | tuple[Binding, UiNode] | tuple[Obj, UiNode]
+
+
+def _switch_case(entry: SwitchCaseInput) -> t.SwitchCase:
+    """Coerce one ``fuaran.switch`` case entry to a :class:`~fuaran_py.schema.types.SwitchCase`.
+
+    The selector's TYPE picks the wire member — a ``str`` is ``match``, a binding
+    is ``when`` — and anything else is refused by name here. Refusing matters more
+    than it looks: the pair used to be unpacked straight into ``match=``, so a
+    predicate binding passed as the selector was written to the string slot and
+    encoded there, producing a case no host can read and no error anyone can see.
+    """
+    if isinstance(entry, t.SwitchCase):
+        return entry
+    if not (isinstance(entry, tuple) and len(entry) == 2):
+        raise TypeError(f"a switch case is a (selector, child) pair or a SwitchCase, and this is neither: {entry!r}")
+    selector, child = entry
+    if isinstance(selector, str):
+        return t.SwitchCase(child=child, match=selector)
+    if isinstance(selector, (t.Static, t.State, t.Filter, t.Selection, t.Now, t.FormatBinding, t.Local, Obj)):
+        return t.SwitchCase(child=child, when=selector)
+    raise TypeError(
+        "a switch case selector is either a literal 'match' string (compared against the "
+        "switch's selector) or a Binding<bool> 'when' predicate (evaluated at render time), "
+        f"and {type(selector).__name__} is neither"
+    )
 
 
 #: The characters the display-string parse keeps; everything else is decoration.
@@ -152,9 +183,25 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         return t.FormatBinding(source, fmt, locale)
 
     @staticmethod
-    def local(initial_from: Binding, flush_on: t.LocalFlushTrigger) -> Binding:
-        """``Binding.Local`` — a component-scoped buffer (commit/parse/format are closures)."""
-        return t.Local(initial_from, flush_on)
+    def local(
+        initial_from: Binding,
+        flush_on: t.LocalFlushTrigger,
+        *,
+        commit_to: str | None = None,
+        codec: CellFormat | None = None,
+        on_commit: bool | None = None,
+    ) -> Binding:
+        """``Binding.Local`` — a component-scoped edit buffer (WIRE_FORMAT §3.3.3).
+
+        Two commit spellings, exactly one per buffer. Named nothing: the handler
+        spelling, ``onCommit``, which is what every call written before the
+        declarative half existed means and still means. Named ``commit_to``: the
+        State key the flush writes, optionally through a ``codec`` (only
+        ``format.number(...)`` — the buffer has to parse back what it renders).
+        Naming both is refused, because a document carrying both is a decode
+        refusal rather than a precedence question.
+        """
+        return t.Local(initial_from, flush_on, commit_to=commit_to, codec=codec, on_commit=on_commit)
 
 
 # ── Typed action entry points (the ``action`` namespace) ─────────────────────
@@ -1155,16 +1202,23 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
     def switch(  # noqa: A003
         id: str,  # noqa: A002
         *,
-        cases: list[tuple[str, UiNode]],
+        cases: list[SwitchCaseInput],
         default: UiNode,
         state_key: str | None = None,
         on: Binding | None = None,
     ) -> UiNode:
-        """Binding-selected conditional child (Phase 392 / 768). ``cases`` is a
-        list of ``(match_value, child)`` pairs; ``default`` renders when none
-        match. Give exactly one selector: the compact ``state_key``, or ``on``
-        (any ``Binding`` — e.g. ``binding.selection`` to follow the clicked row)."""
-        switch_cases = tuple(t.SwitchCase(match=m, child=child) for m, child in cases)
+        """Binding-selected conditional child (Phase 392 / 768). ``default``
+        renders when no case is taken. Give exactly one selector: the compact
+        ``state_key``, or ``on`` (any ``Binding`` — e.g. ``binding.selection`` to
+        follow the clicked row).
+
+        A case is a ``(selector, child)`` pair or a :class:`~fuaran_py.schema.types.SwitchCase`
+        built by hand. In the pair, a ``str`` selector is the ``match`` value
+        compared against the switch's selector; a ``Binding`` selector is the
+        ``when`` predicate (fuaran#1535), evaluated at render time and consulting
+        no selector at all — which is why ``switch-predicate-only`` carries an
+        empty ``state_key``."""
+        switch_cases = tuple(_switch_case(entry) for entry in cases)
         return _node(id, t.Switch(state_key, switch_cases, default, on), accessibility.none)
 
     @staticmethod

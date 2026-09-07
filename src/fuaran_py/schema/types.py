@@ -356,19 +356,74 @@ class FormatBinding:
 
 @dataclass(frozen=True)
 class Local:
-    """``Binding.Local`` — a component-scoped buffer; ``format``/``onCommit``/``parse`` are closures."""
+    """``Binding.Local`` — a component-scoped edit buffer, in either of its two
+    spellings (WIRE_FORMAT.md §3.3.3).
+
+    The buffer always carries ``flushOn`` and ``initialFrom``, and ``format`` /
+    ``parse`` are host closures that cross the wire as the sentinel. What differs
+    is the **commit destination**, and the two are mutually exclusive:
+
+    * the **handler** spelling — ``onCommit``, another closure sentinel. The
+      default, and what every pre-declarative call already means.
+    * the **declarative** spelling — ``commit_to``, the State key the flush
+      writes, optionally through a ``codec`` the buffer formats and re-parses
+      with. This is the half that survives the wire: a decoding host can honour
+      it, where the closure it can only see the sentinel of.
+
+    A document carrying both is a decode refusal (there is no precedence rule —
+    two hosts would write to different places from identical bytes), so it is
+    refused here at construction instead of being built and discovered later.
+    """
 
     initial_from: Binding
     flush_on: LocalFlushTrigger
+    #: The State key the flush writes — the declarative spelling. ``None`` leaves
+    #: the buffer on the handler spelling.
+    commit_to: str | None = None
+    #: The edit-buffer codec. Only :class:`NumberFormat` is admissible: the
+    #: buffer must PARSE BACK what it renders, and a locale-rendered format
+    #: (Currency / Date / RelativeTime / Duration) has no total inverse.
+    codec: CellFormat | None = None
+    #: Whether the host closure is the commit destination. ``None`` (the default)
+    #: means "whichever ``commit_to`` implies", so neither spelling has to name
+    #: the other; pass it explicitly only to state the pairing you want, which is
+    #: what makes an impossible pairing refusable rather than silently resolved.
+    on_commit: bool | None = None
+
+    def __post_init__(self) -> None:
+        if self.on_commit and self.commit_to is not None:
+            raise ValueError(
+                "Binding.Local takes exactly one commit destination, and 'on_commit' and "
+                "'commit_to' were both given — either 'on_commit' (a host closure, which "
+                "crosses the wire only as the closure sentinel) or 'commit_to' (the State "
+                "key the flush writes)"
+            )
+        if self.on_commit is False and self.commit_to is None:
+            raise ValueError(
+                "Binding.Local with on_commit=False commits nowhere — give it 'commit_to', "
+                "the State key the flush writes"
+            )
+        if self.codec is not None and not isinstance(self.codec, NumberFormat):
+            raise ValueError(
+                "Binding.Local 'codec' must be a format with a total, locale-independent "
+                f"inverse — only Number has one, and {type(self.codec).__name__} does not; "
+                "a buffer that renders one way and parses another cannot round-trip what "
+                "the reader typed"
+            )
+
+    def _commits_by_closure(self) -> bool:
+        return self.commit_to is None if self.on_commit is None else self.on_commit
 
     def to_wire(self) -> Value:
-        return Obj(
+        return _obj(
             "Local",
             {
-                "flushOn": _lower(self.flush_on),
+                "codec": self.codec,
+                "commitTo": self.commit_to,
+                "flushOn": self.flush_on,
                 "format": CLOSURE,
-                "initialFrom": _lower(self.initial_from),
-                "onCommit": CLOSURE,
+                "initialFrom": self.initial_from,
+                "onCommit": CLOSURE if self._commits_by_closure() else None,
                 "parse": CLOSURE,
             },
         )
@@ -2576,7 +2631,27 @@ class SwitchCase:
 
     child: UiNode
     match: str | None = None
-    when: Value | None = None
+    #: A ``Binding<bool>`` — typed (the ``binding`` namespace) or structural, since
+    #: several wire binding cases still have no typed constructor here.
+    when: Binding | Value | None = None
+
+    def __post_init__(self) -> None:
+        # The XOR is enforced HERE rather than left to the decoder, because a
+        # case built with neither used to reach the encoder as a bare
+        # ``{"child":…}`` — valid JSON, refused by every conformant decoder
+        # including this host's, and the author found out at the far end.
+        if self.match is not None and self.when is not None:
+            raise ValueError(
+                "Switch case carries both 'match' and 'when' — exactly one is allowed: "
+                "'match' (a literal string compared against the switch's selector) or "
+                "'when' (a Binding<bool> predicate evaluated at render time)"
+            )
+        if self.match is None and self.when is None:
+            raise ValueError(
+                "Switch case carries neither 'match' nor 'when' — give it a literal string "
+                "under 'match' (compared against the switch's selector), or a Binding<bool> "
+                "under 'when' (a predicate evaluated at render time, needing no selector)"
+            )
 
     def to_wire(self) -> Obj:
         # ``_obj`` drops ``None`` fields (wire rule 4) and lowers each value, so

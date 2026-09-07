@@ -18,8 +18,29 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
+from fuaran_py.dataframe.codec import encode_expr_value
+from fuaran_py.model import Arr, Obj
 from fuaran_py.schema import types as t
-from fuaran_py.ui import accessibility, action, binding, encode, fuaran, node, track
+from fuaran_py.ui import ParamDecl, accessibility, action, binding, encode, fuaran, lit, node, param, track
+
+
+def _expr_predicate() -> Obj:
+    """``switch-predicate``'s second case: a ``Binding.Expr`` over one param.
+
+    Assembled from the pieces the compute surface already carries — the expression
+    DSL for the ``ColExpr``, :class:`ParamDecl` for the ``params`` entry — because
+    the ``binding`` namespace has no ``Expr`` constructor of its own. That gap is
+    real and wider than the switch case (``Query`` / ``Computed`` / ``I18n`` /
+    ``Data`` are missing the same way); it is NOT what this test is about, and the
+    structural ``Obj`` is the ``Value``-typed ``when`` slot's ordinary escape.
+    """
+    return Obj(
+        "Expr",
+        {
+            "expr": encode_expr_value((param("itemCount") > lit(3)).colexpr),
+            "params": Arr([ParamDecl("itemCount", t.State("cart.itemCount", None)).to_wire()]),
+        },
+    )
 
 
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
@@ -398,6 +419,62 @@ def _authored() -> dict[str, t.UiNode]:
             label="Curator's commentary",
             transcript="The harbour was rebuilt twice: once after the storm of 1908, and again in 1953.",
         ),
+        # fuaran#1535 — a Switch case selects on a string `match` XOR a `when`
+        # predicate. Both spellings in one authored tree, so a constructor that
+        # dropped either would fail here rather than pass on the half it kept.
+        "switch-predicate": fuaran.switch(
+            "switch-predicate",
+            state_key="view",
+            cases=[
+                (
+                    binding.state("cart.empty", None),
+                    fuaran.markdown("switch-predicate-empty", "Your basket is empty"),
+                ),
+                (_expr_predicate(), fuaran.markdown("switch-predicate-many", "Plenty in your basket")),
+                ("summary", fuaran.markdown("switch-predicate-summary", "Summary view")),
+            ],
+            default=fuaran.markdown("switch-predicate-default", "A few things in your basket"),
+        ),
+        # The degenerate shape: every case is a predicate, so the selector is
+        # never read and the compact `stateKey` is the empty string.
+        "switch-predicate-only": fuaran.switch(
+            "switch-predicate-only",
+            state_key="",
+            cases=[
+                (
+                    binding.state("form.valid", None),
+                    fuaran.markdown("switch-predicate-only-ready", "Ready to send"),
+                )
+            ],
+            default=fuaran.markdown("switch-predicate-only-default", "Fill in the form to continue"),
+        ),
+        # WIRE_FORMAT §3.3.3 — `Binding.Local`'s DECLARATIVE half: the flush
+        # writes a State key (`commitTo`) through a codec with a total inverse,
+        # instead of calling a host closure (`onCommit`). The two are mutually
+        # exclusive on the wire, so the authoring surface has to be able to spell
+        # this one without emitting the other.
+        "form-local-declared": node.bare(
+            fuaran.form(
+                "form-local-declared",
+                submit_label="Save",
+                fields=[
+                    t.FormField(
+                        "unit-price",
+                        t.LiteralText("Unit price"),
+                        t.NumberField(
+                            binding.local(
+                                binding.state("order.unitPrice", 0),
+                                t.OnBlur(),
+                                commit_to="order.unitPrice",
+                                codec=format.number(2),
+                            ),
+                            on_change=False,
+                        ),
+                        False,
+                    )
+                ],
+            )
+        ),
         "format-bindings": fuaran.stack(
             "format-bindings",
             children=[
@@ -474,3 +551,73 @@ def test_aria_bearing_node_encodes_canonically() -> None:
     decoded = decode_node(wire)
     assert decoded.ok
     assert encode_node(decoded.value) == wire
+
+
+# ── The two silent drops the authoring surface used to make ──────────────────
+#
+# Both defects had the same shape: a wire member the codec decodes and the corpus
+# carries had no spelling in the smart constructor, so a tree that meant to state
+# it reached the encoder stating nothing — no error, wrong bytes. The parity-table
+# entries above are the positive half; these are the refusals, which are the half
+# a byte-comparison cannot make. Every message names the fields, because "invalid"
+# leaves the author guessing which of the two spellings they were supposed to pick.
+
+
+def _md(node_id: str) -> t.UiNode:
+    return fuaran.markdown(node_id, "body")
+
+
+def test_switch_case_refuses_both_match_and_when() -> None:
+    with pytest.raises(ValueError, match="'match'.*'when'"):
+        t.SwitchCase(child=_md("c"), match="summary", when=t.State("cart.empty", None))
+
+
+def test_switch_case_refuses_neither_match_nor_when() -> None:
+    """The one that used to encode silently: `{child}` alone is a case with no
+    condition, which no host can render — it is neither taken nor skippable."""
+    with pytest.raises(ValueError, match="'match'.*'when'"):
+        t.SwitchCase(child=_md("c"))
+
+
+def test_switch_refuses_a_case_selector_that_is_neither_a_string_nor_a_binding() -> None:
+    with pytest.raises(TypeError, match="'match'.*'when'"):
+        fuaran.switch("s", cases=[(3, _md("c"))], default=_md("d"), state_key="view")  # type: ignore[list-item]
+
+
+def test_switch_accepts_a_switch_case_directly() -> None:
+    """A case built by hand is a case: the constructor coerces the pair spellings
+    but never refuses the model it coerces to."""
+    tree = fuaran.switch(
+        "s",
+        cases=[t.SwitchCase(child=_md("c"), when=t.State("form.valid", None))],
+        default=_md("d"),
+        state_key="",
+    )
+    assert '"when":{"$type":"State","key":"form.valid"}' in encode(tree)
+
+
+def test_local_refuses_two_commit_destinations() -> None:
+    """`onCommit` + `commitTo` is a decode refusal (WIRE_FORMAT §3.3.3), so the
+    authoring surface refuses to build it rather than emitting an unreadable tree."""
+    with pytest.raises(ValueError, match="on_commit.*commit_to"):
+        binding.local(t.State("k", ""), t.OnBlur(), commit_to="order.total", on_commit=True)
+
+
+def test_local_refuses_a_declarative_buffer_with_no_commit_key() -> None:
+    with pytest.raises(ValueError, match="commit_to"):
+        binding.local(t.State("k", ""), t.OnBlur(), on_commit=False)
+
+
+def test_local_refuses_a_codec_with_no_total_inverse() -> None:
+    """Only `Number` has a locale-independent inverse; a `Currency` buffer would
+    format one way and parse another, which is the hole the codec member closes."""
+    with pytest.raises(ValueError, match="codec"):
+        binding.local(t.State("k", 0), t.OnBlur(), commit_to="k", codec=t.Currency("GBP"))
+
+
+def test_local_keeps_the_handler_spelling_by_default() -> None:
+    """The pre-existing calls do not move: no `commit_to` means the closure
+    sentinel, exactly as `form-local-1` and `form-local-debounce` carry it."""
+    wire = encode(fuaran.markdown("m", t.Bound(binding.local(t.State("salary", ""), t.OnBlur()))))
+    assert '"onCommit":"<closure>"' in wire
+    assert "commitTo" not in wire

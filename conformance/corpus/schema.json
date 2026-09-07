@@ -4137,6 +4137,43 @@
             "$type"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Confirm"
+            },
+            "onCancel": {
+              "$ref": "#/$defs/Action"
+            },
+            "onConfirm": {
+              "$ref": "#/$defs/Action"
+            },
+            "prompt": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "onConfirm",
+            "prompt"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Focus"
+            },
+            "nodeId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "nodeId"
+          ]
         }
       ]
     },

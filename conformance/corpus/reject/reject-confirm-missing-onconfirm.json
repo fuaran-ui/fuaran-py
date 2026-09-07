@@ -1,0 +1,1 @@
+{"id":"b-confirm","kind":{"$type":"Button","label":{"$type":"Literal","text":"Delete"},"onClick":{"$type":"Confirm","prompt":"Delete this order?"},"variant":"Primary"}}

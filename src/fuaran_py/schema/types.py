@@ -527,6 +527,62 @@ class Print:
         return Obj("Print", {})
 
 
+@dataclass(frozen=True)
+class Confirm:
+    """``Action.Confirm`` — ask the reader, then dispatch (fuaran#1537).
+
+    The second RECURSIVE action case after ``Chain``, and the first that
+    recurses into NAMED members rather than a list. ``on_cancel`` is omitted
+    from the wire when absent, and an absent cancel branch means *nothing
+    happens*: a host must not substitute one.
+
+    Confirmation is bounded at depth one — a ``Confirm`` reachable from either
+    continuation, through a ``Chain`` included, is refused at decode. And the
+    continuation is not a route around the dispatch gate: the dialogue is gated,
+    and on acceptance the branch re-enters the ordinary dispatch entry so it
+    meets its own gate and its own egress check.
+
+    A confirmation is never an authorisation. The answer comes from the client,
+    and a hostile client answers yes without asking anyone.
+    """
+
+    prompt: TextSource
+    on_confirm: Action
+    on_cancel: Action | None = None
+
+    def to_wire(self) -> Value:
+        # `_obj`, not a bare `Obj`: the prompt is a typed `TextSource` and has to
+        # be LOWERED, exactly as `WriteToClipboard`'s payload is. A `Literal`
+        # lowers to the bare JSON string. Keys sort to onCancel < onConfirm <
+        # prompt; `onCancel` rides only when present.
+        fields: dict[str, object] = {}
+        if self.on_cancel is not None:
+            fields["onCancel"] = self.on_cancel.to_wire()
+        fields["onConfirm"] = self.on_confirm.to_wire()
+        fields["prompt"] = self.prompt
+        return _obj("Confirm", fields)
+
+
+@dataclass(frozen=True)
+class Focus:
+    """``Action.Focus`` — move keyboard focus to an addressed node (fuaran#1537).
+
+    A bare string and never a ``TextSource``: it addresses a node in this
+    document, which the author wrote, so there is nothing here for a binding to
+    compute — the ``CommitLocal`` precedent.
+
+    What this does not claim: nothing about scrolling (a host may scroll as a
+    consequence of focusing, and this neither asks it to nor prevents it) and
+    nothing about selection. A node id that addresses nothing warns and moves
+    nothing.
+    """
+
+    node_id: str
+
+    def to_wire(self) -> Value:
+        return Obj("Focus", {"nodeId": self.node_id})
+
+
 FileReadEncoding = Literal["Text", "Base64", "DataUrl"]
 
 
@@ -541,7 +597,7 @@ class ReadFileBody:
         return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
 
 
-Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | Print | ReadFileBody
+Action = Chain | Dispatch | Navigate | SetState | Notify | WriteToClipboard | Print | Confirm | Focus | ReadFileBody
 
 
 # ── CellFormat (WIRE_FORMAT.md §3.3) ────────────────────────────────────────

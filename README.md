@@ -4,6 +4,11 @@ A **headless Python host of the Fuaran UI wire format** — a dependency-light,
 idiomatic-Python reference implementation of the canonical-JSON contract a Python
 AI orchestrator needs to read and write Fuaran UI trees.
 
+**Documentation:** [get started with Python](https://fuaran-ui.io/get-started/python) ·
+[Python authoring guide](https://fuaran-ui.io/guide/py/authoring) ·
+[fuaran-ui.io](https://fuaran-ui.io) (the language docs, all hosts) ·
+[fuaran-ui.live](https://fuaran-ui.live) (the playground)
+
 `fuaran-py` is a **sibling reference implementation**, not a transpile of any
 other host: it is built to the language-neutral wire-format specification
 (`WIRE_FORMAT.md`) and certified against the shared conformance corpus. Conformance

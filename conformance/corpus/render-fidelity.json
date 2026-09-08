@@ -374,22 +374,19 @@
           "element": "the toggle field's checkbox input",
           "role": "switch",
           "condition": "a `Toggle` field - the same boolean data as a checkbox, announced as on/off rather than checked",
-          "tier": "clientOnly",
-          "tierNote": "the server floor renders the field through its generic input arm and emits no role, where the FILTER twin emits one on both sides - a recorded asymmetry, not a claim that the floor is complete"
+          "tier": "bothPipelines"
         },
         {
           "element": "the segmented field's group container",
           "role": "radiogroup",
           "condition": "a `SegmentedChoice` field in `Horizontal` orientation; the `Vertical` form floors on native radio inputs and emits no hand-written role",
-          "tier": "clientOnly",
-          "tierNote": "the server floor renders the field through its generic input arm and emits no group role - the same asymmetry as the toggle above"
+          "tier": "bothPipelines"
         },
         {
           "element": "each segmented option button",
           "role": "radio",
           "condition": "a `SegmentedChoice` field in `Horizontal` orientation",
-          "tier": "clientOnly",
-          "tierNote": "the server floor emits no option buttons for a form-side segmented choice"
+          "tier": "bothPipelines"
         }
       ],
       "contract": "docs/SSR.md (Input - rendered inert)"

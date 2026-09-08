@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fuaran-py"
-version = "0.4.0"
+version = "0.5.0"
 description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -51,6 +51,13 @@ dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.16,<0.17", "jsonschema>=4.23", "hypot
 # The name matches the companion distribution's extra of the same shape, deliberately: two
 # packages naming the same thing differently is a question every reader has to answer twice.
 live-host = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
+
+[project.scripts]
+# The invocable entry point (fuaran#1617). Every verb is a thin wrapper over a
+# library call this host already ships; `validate` is at parity with the npm
+# `@fuaran-ui/cli validate` in exit code and stdout, so the two hosts'
+# get-started tracks read the same. See `src/fuaran_py/cli/core.py`.
+fuaran-py = "fuaran_py.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"

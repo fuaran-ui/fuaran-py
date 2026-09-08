@@ -1,0 +1,95 @@
+{
+  "note": [
+    "The pinned cross-host CLI contract for the one verb this host shares with the",
+    "TypeScript front-end. Each case names an argv, the exit code both CLIs return, and",
+    "the NORMALISED report both produce.",
+    "",
+    "Normalisation drops the diagnostic MESSAGE and keeps the code and the path. That is",
+    "deliberate and is the substantive claim: the wire contract fixes the error code",
+    "vocabulary and the $-rooted path, and every conformant host must agree on those; the",
+    "message is host-worded by design (the reference front-end's INVALID_JSON message",
+    "carries its own parser's expectation, which no other host could reproduce without",
+    "copying that parser). A diff over messages would fail on a difference the",
+    "specification licenses, and would have to be relaxed the first time it ran.",
+    "",
+    "'out' is the exact stdout of the plain (non-JSON) form where the two hosts agree on",
+    "it byte for byte, and null where they do not - which is only the case whose message",
+    "is host-worded. Where 'out' is null the exit code and the normalised report still",
+    "bind.",
+    "",
+    "tests/test_cli_parity.py checks this file BOTH ways: this host must satisfy it on",
+    "every run, and in a cross-host checkout with a built reference CLI the reference must",
+    "satisfy it too - so the pin cannot quietly rot into a description of one host."
+  ],
+  "reference": {
+    "package": "@fuaran-ui/cli",
+    "bin": "fuaran",
+    "version": "0.11.0",
+    "source": "fuaran-ts/packages/cli/src/run.ts",
+    "observed": "2026-09-08"
+  },
+  "outOfContract": [
+    "An unrecognised flag: the reference front-end skips it and validates anyway; this",
+    "host refuses with exit 2, on the reasoning the estate's other validator CLI uses (a",
+    "silently-ignored --json is a report the caller believes it asked for and did not",
+    "get). A deliberate divergence, so no case pins it."
+  ],
+  "cases": [
+    {
+      "name": "valid-node",
+      "fixture": "valid-node.json",
+      "argv": ["validate", "<fixture>"],
+      "exit": 0,
+      "out": "valid (node)\n",
+      "report": { "valid": true, "kind": "node", "diagnostics": [] }
+    },
+    {
+      "name": "missing-kind",
+      "fixture": "missing-kind.json",
+      "argv": ["validate", "<fixture>"],
+      "exit": 1,
+      "out": "invalid (node):\n  MISSING_FIELD at $.kind: missing required field 'kind'\n",
+      "report": {
+        "valid": false,
+        "kind": "node",
+        "diagnostics": [{ "code": "MISSING_FIELD", "path": "$.kind" }]
+      }
+    },
+    {
+      "name": "not-json",
+      "fixture": "not-json.json",
+      "argv": ["validate", "<fixture>"],
+      "exit": 1,
+      "out": null,
+      "report": {
+        "valid": false,
+        "kind": "node",
+        "diagnostics": [{ "code": "INVALID_JSON", "path": "$" }]
+      }
+    },
+    {
+      "name": "no-file",
+      "fixture": null,
+      "argv": ["validate"],
+      "exit": 2,
+      "out": "validate: a file is required.\n",
+      "report": null
+    },
+    {
+      "name": "unknown-verb",
+      "fixture": null,
+      "argv": ["wibble"],
+      "exit": 2,
+      "out": null,
+      "report": null
+    },
+    {
+      "name": "help",
+      "fixture": null,
+      "argv": ["help"],
+      "exit": 0,
+      "out": null,
+      "report": null
+    }
+  ]
+}

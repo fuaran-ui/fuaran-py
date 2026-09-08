@@ -56,6 +56,11 @@ fuaran-py/
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
 │   ├── op_stream/        # hash-chained provenance log: StreamEntry envelope + SHA-256 chain + in-memory sink + replay
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
+│   ├── cli/              # the `fuaran-py` console script (Phase 1617): validate / render /
+│   │                     #   export / corpus-sync, each a thin wrapper over a library call.
+│   │                     #   `validate` is at parity with the TS host's `fuaran validate` in
+│   │                     #   exit code and stdout; core.py records what parity means, and why
+│   │                     #   there is no `spec-hash` verb
 │   ├── ai_tools/         # AI-tools introspection: emittable-surface catalog + value-space + tool schemas + tree introspection + default-deny dispatch gate (Phase 237)
 │   ├── conformance/      # corpus round-trip smoke harness + certification bridge + the cross-host fuzz-sample exchange (Phase 236)
 │   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239),

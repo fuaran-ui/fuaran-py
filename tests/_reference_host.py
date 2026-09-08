@@ -93,3 +93,18 @@ def vacuous_gate_diagnosis() -> str | None:
         "nothing. If the reference host was renamed again, add the new spelling to REFERENCE_HOST_NAMES in "
         "tests/_reference_host.py; do not let the oracles skip."
     )
+
+
+def sibling_host_root(name: str) -> Path | None:
+    """A named sibling host's repo root, or ``None`` when it is not checked out.
+
+    The same upward walk :func:`reference_host_root` uses, generalised — the
+    cross-host oracles that compare against a host *other* than the F# reference
+    (the CLI parity check against ``fuaran-ts``) resolve it the same way rather
+    than deriving the estate root from some other artefact's location.
+    """
+    for directory in _search_roots():
+        candidate = directory / name
+        if candidate.is_dir():
+            return candidate
+    return None

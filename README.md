@@ -31,6 +31,7 @@ without a client runtime.
 | `fuaran_py.conformance` | A corpus round-trip smoke harness. |
 | `fuaran_py.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
 | `fuaran_py.runtime` | Interactive Pyodide client runtime — the in-browser mount + dispatch→apply→re-render loop, behind an injectable `BrowserDeps` seam. |
+| `fuaran_py.cli` | The `fuaran-py` console script — `validate` / `render` / `export` / `corpus-sync`, each a thin wrapper over the library call beside it. `validate` matches the TypeScript host's `fuaran validate` in exit code and printed verdict. See [Start here — from the command line](#start-here--from-the-command-line). |
 | `fuaran_py.client` | Typed client over the Fuaran generation endpoint — `FuaranClient.generate` + the `FuaranSession` turn loop (holds the tree → repair diffs). See [Generate](#generate-client-for-the-hosted-endpoint-optional) below and [examples/quickstart_client.py](examples/quickstart_client.py). |
 
 ## Install
@@ -42,7 +43,47 @@ pip install -e ".[dev]"   # editable + dev tooling (pytest / mypy / ruff)
 Requires CPython **3.12+**. The runtime codec has **no third-party dependencies** —
 it uses only the standard library.
 
-## Start here
+## Start here — from the command line
+
+Installing the package installs a `fuaran-py` command. Every verb is a thin
+wrapper over a library call below, so nothing here is a second implementation of
+anything:
+
+```bash
+pipx run fuaran-py validate tree.json        # -> valid (node)                exit 0
+fuaran-py validate tree.json --json          # -> the machine-readable report
+fuaran-py render tree.json > body.html       # -> server-HTML body fragment
+fuaran-py export tree.json --format markdown # -> a crawlable markdown document
+fuaran-py export tree.json --format email-document --subject "Weekly"
+fuaran-py corpus-sync --check                # (a checkout only) snapshot vs the authority
+```
+
+Exit codes are **0** the document is good, **1** it is not (or cannot be read),
+**2** a usage error — and for `validate` those codes and the printed verdict are
+the same as the TypeScript host's `npx @fuaran-ui/cli validate <file>`, so the two
+get-started tracks read the same. `tests/test_cli_parity.py` pins that agreement
+and, on a machine holding both hosts, re-checks it by running both CLIs over the
+same fixtures.
+
+Two things `validate` says that are worth reading:
+
+- **Its structural posture is `subset`, and it says so on a clean run too.** The
+  rule set is a documented subset of the reference tier's, so silence means "no
+  rule in this subset matched" and never "this tree is clean". The `--json` report
+  carries `posture` / `postureNote`; the plain form prints them to stderr.
+- **Structural findings do not move the exit code.** The exit code answers "did
+  this document decode", exactly as the reference front-end's does; findings ride
+  stderr (or the report's `findings` array) so a script's success test means the
+  same thing against either host.
+
+stdout carries the artefact — the verdict, the report, the HTML, the document —
+so every verb pipes; stderr carries the commentary.
+
+Rendering applies the [destination policy](#destination-policy--ambient-and-default-deny)
+at its default, which denies non-local destinations. A host wanting a wider
+posture declares one through the library; the CLI takes no flag for it.
+
+## Start here — from Python
 
 [`examples/getting_started.py`](examples/getting_started.py) is a six-lesson tour of
 what this language is for, and it runs:

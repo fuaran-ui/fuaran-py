@@ -555,9 +555,7 @@ def check_ceiling_recorded_never_enforced() -> None:
         "...and the count marker is absent when the count member is, so the two are recorded independently"
     )
 
-    ceiling_files = render(
-        fuaran.file_upload("ucf", label="Attach up to three", multiple=True, max_files=3)
-    )
+    ceiling_files = render(fuaran.file_upload("ucf", label="Attach up to three", multiple=True, max_files=3))
 
     assert 'data-fuaran-upload-max-files="declared"' in ceiling_files, (
         "a declared count ceiling is recorded on the same terms"
@@ -570,9 +568,7 @@ def check_ceiling_recorded_never_enforced() -> None:
     # declaring neither is byte-identical in render to what it always was.
     plain = render(fuaran.file_upload("ucp", label="Upload"))
 
-    assert "data-fuaran-upload-max-" not in plain, (
-        "an upload declaring no ceiling carries no ceiling marker at all"
-    )
+    assert "data-fuaran-upload-max-" not in plain, "an upload declaring no ceiling carries no ceiling marker at all"
     assert 'type="file"' in plain and 'type="file"' in ceiling_bytes, (
         "and a declared ceiling changes nothing about the control itself"
     )

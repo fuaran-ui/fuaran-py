@@ -2827,6 +2827,22 @@
       "description": "Input/FileUpload (Phase 1115 — drop target; acceptPaste OMITTED)"
     },
     {
+      "id": "upload-max-bytes-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-max-bytes-1.json",
+      "expectedFile": "nodes/upload-max-bytes-1.json",
+      "description": "Input/FileUpload (Phase 1548 — a declared per-file byte ceiling; maxFiles OMITTED)"
+    },
+    {
+      "id": "upload-max-files-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/upload-max-files-1.json",
+      "expectedFile": "nodes/upload-max-files-1.json",
+      "description": "Input/FileUpload (Phase 1548 — a declared selection-count ceiling on a multiple upload; maxBytes OMITTED)"
+    },
+    {
       "id": "upload-paste-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -4205,6 +4221,42 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.dropTarget",
       "description": "a FileUpload `dropTarget` of `\"true\"` — refused rather than coerced. The slot decides whether a whole INGRESS ROUTE exists, and it omits at `false`, so absence already spells the plain picker: a present wrong-typed value can only mean the emitter meant something it did not say. A lenient truthiness read would open a drop target on `\"no\"` and `\"false\"` alike, and the reader would find out by dropping a file into a control that never listened for it"
+    },
+    {
+      "id": "reject-upload-maxbytes-nonint",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-maxbytes-nonint.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.maxBytes",
+      "description": "a FileUpload `maxBytes` of `\"5242880\"` — a ceiling written as a string, refused rather than parsed. The member is a typed integer slot, and a host that read the digits out of a string would accept a bound no other host could, which is precisely the divergence a declared ceiling exists to remove"
+    },
+    {
+      "id": "reject-upload-maxbytes-nonpositive",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-maxbytes-nonpositive.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.maxBytes",
+      "description": "a FileUpload `maxBytes` of `0` — refused as firmly as a negative. A ceiling of zero is not a small ceiling; it is an upload that can accept no file at all, so the document describes a control that cannot exist. The author who means \"no ceiling\" omits the member, which is how the wire spells it"
+    },
+    {
+      "id": "reject-upload-maxfiles-nonint",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-maxfiles-nonint.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.maxFiles",
+      "description": "a FileUpload `maxFiles` of `3.5` — a fractional count, refused rather than truncated. §7.1 retired truncation at every typed integer slot, and this is the slot where it would be least visible: a host that read `3` would enforce a ceiling the document does not state, and the reader would find out by losing a file"
+    },
+    {
+      "id": "reject-upload-maxfiles-nonpositive",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-upload-maxfiles-nonpositive.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.maxFiles",
+      "description": "a FileUpload `maxFiles` of `0` — the count member's twin of the byte floor, vectored separately because it is a separate decoder arm. A multiple upload admitting zero files is a control with no reachable selection, which is the same defect as a zero byte ceiling and needs the same refusal"
     },
     {
       "id": "reject-wrongnodekind-sparkler",

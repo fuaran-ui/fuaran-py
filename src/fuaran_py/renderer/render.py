@@ -1987,6 +1987,12 @@ class Renderer:
         * `destination` needs a listener AND a sink, so this tier records only
           THAT one was declared and never WHICH — the id is the host's registry
           key and a static document is readable by anyone.
+        * `maxBytes` / `maxFiles` (fuaran#1548) degrade ENTIRELY, and for a
+          plainer reason than the destination's: HTML has no attribute for a
+          byte ceiling, and `multiple` is a boolean rather than a count, so
+          there is nothing a zero-JS document could enforce. Each is recorded as
+          READ and never by VALUE — nothing on this path can act on the number,
+          so emitting it would invite a reader to believe this tier enforces it.
         """
         label = element("span", [("class", "fuaran-file-upload-label")], escape_text(self._text(fields.get("label"))))
         control_attrs: list[tuple[str, str]] = [("class", "fuaran-file-upload-control"), ("type", "file")]
@@ -2006,6 +2012,14 @@ class Renderer:
             label_attrs.append(("data-fuaran-upload-paste", "declared"))
         if isinstance(fields.get("destination"), str):
             label_attrs.append(("data-fuaran-upload-destination", "declared"))
+        for member, marker in (("maxBytes", "max-bytes"), ("maxFiles", "max-files")):
+            ceiling = fields.get(member)
+            # `bool` is an `int` subclass in Python, so it is excluded
+            # explicitly — the same trap the decoder names at its own integer
+            # slot. A decoded tree cannot carry one here, and a marker that
+            # depended on that would be relying on a guarantee made elsewhere.
+            if isinstance(ceiling, int) and not isinstance(ceiling, bool):
+                label_attrs.append((f"data-fuaran-upload-{marker}", "declared"))
         return element("label", label_attrs, label + control)
 
     # ── visualisations ───────────────────────────────────────────────────────

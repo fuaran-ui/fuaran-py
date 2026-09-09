@@ -1022,6 +1022,39 @@ def _decode_upload_destination(value: object, path: str) -> Value:
     return text
 
 
+def _decode_upload_ceiling(name: str) -> Callable[[object, str], Value]:
+    """``FileUploadSpec.maxBytes`` / ``.maxFiles`` — a declared ceiling
+    (fuaran#1548).
+
+    Two rules compose, in this order, and the order is the content. The value
+    goes through the INTEGER-slot choke point first, so §7.1 decides the shape:
+    a fractional value is not truncated, a sentinel string is refused, and a
+    value beyond the signed 32-bit slot is a ``WRONG_TYPE`` naming the slot's
+    width rather than a number silently wrapped into one the author never wrote.
+    Only then does the POSITIVE floor decide the sign.
+
+    Zero is refused as firmly as a negative, on the ``SrcSetEntry.width`` rule
+    exactly: a ceiling of zero is not a small ceiling, it is a control that can
+    accept no file at all, so the document describes a control that cannot
+    exist. The author who means "no ceiling" OMITS the member — that is how this
+    wire spells it, and reading ``0`` as absence would be the coercion the rule
+    exists to refuse. The published schema says the same thing as ``minimum: 1``.
+    """
+
+    def dec(value: object, path: str) -> Value:
+        n = _integer_slot(value, path)
+        if not isinstance(n, int) or n <= 0:
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"{name} must be a POSITIVE integer ceiling, got {n}",
+                "JSON number (a positive integer ceiling)",
+            )
+        return n
+
+    return dec
+
+
 def _decode_tracks(value: object, path: str) -> object:
     """``MediaSpec.tracks`` — the MISSING-LIST-FIELD decode class again, on the
     ``Image.srcSet`` rule exactly (see :func:`_decode_srcset` for why absent,
@@ -2410,6 +2443,10 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("capture", False, _enum_decoder(CAPTURE_SOURCE, "capture")),
         # fuaran#1117 — the streamed destination.
         ("destination", False, _decode_upload_destination),
+        # fuaran#1548 — the two declared ceilings. Optional: absent declares no
+        # ceiling, which is the pre-1548 control and the wire identity.
+        ("maxBytes", False, _decode_upload_ceiling("maxBytes")),
+        ("maxFiles", False, _decode_upload_ceiling("maxFiles")),
     ],
     "List": [
         ("items", True, _decode_text_source_array),

@@ -1,0 +1,1 @@
+{"id":"up","kind":{"$type":"FileUpload","accept":["application/pdf"],"label":"Upload","maxBytes":"5242880","multiple":false,"onSelect":"<closure>"}}

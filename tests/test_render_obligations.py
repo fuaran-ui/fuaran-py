@@ -533,6 +533,51 @@ def check_picker_always_present() -> None:
     assert "Camera" not in camera.split("capture=")[1][:20], "…never the wire spelling, which is not a keyword"
 
 
+# ── The fuaran#1548 ceiling obligation ──────────────────────────────────────
+
+
+def check_ceiling_recorded_never_enforced() -> None:
+    # TWO claims in one, and the second is what a marker-emission test alone
+    # would miss: the marker records only THAT a ceiling was declared, so a host
+    # that put the NUMBER in the markup would pass an emission assertion while
+    # telling a reader this tier enforces a bound it cannot enforce at all.
+    # Nothing on this path can act on the number — HTML has no attribute for a
+    # byte ceiling, and `multiple` is a boolean rather than a count.
+    ceiling_bytes = render(fuaran.file_upload("ucb", label="Attach a scan", max_bytes=5_242_880))
+
+    assert 'data-fuaran-upload-max-bytes="declared"' in ceiling_bytes, (
+        "a declared byte ceiling is recorded, so the declaration is visibly read rather than dropped"
+    )
+    assert "5242880" not in ceiling_bytes, (
+        "...and its VALUE is nowhere in the markup - carrying it would claim an enforcement that is not there"
+    )
+    assert "data-fuaran-upload-max-files" not in ceiling_bytes, (
+        "...and the count marker is absent when the count member is, so the two are recorded independently"
+    )
+
+    ceiling_files = render(
+        fuaran.file_upload("ucf", label="Attach up to three", multiple=True, max_files=3)
+    )
+
+    assert 'data-fuaran-upload-max-files="declared"' in ceiling_files, (
+        "a declared count ceiling is recorded on the same terms"
+    )
+    assert "data-fuaran-upload-max-bytes" not in ceiling_files, (
+        "...and the byte marker is absent when the byte member is"
+    )
+
+    # The polarity, which is what makes the members additive: an upload
+    # declaring neither is byte-identical in render to what it always was.
+    plain = render(fuaran.file_upload("ucp", label="Upload"))
+
+    assert "data-fuaran-upload-max-" not in plain, (
+        "an upload declaring no ceiling carries no ceiling marker at all"
+    )
+    assert 'type="file"' in plain and 'type="file"' in ceiling_bytes, (
+        "and a declared ceiling changes nothing about the control itself"
+    )
+
+
 # ── The Phase 1119 modality obligation ──────────────────────────────────────
 
 
@@ -599,6 +644,7 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "Embed/sandbox-always-exactly-declared": check_embed_sandbox_always_exactly_declared,
     "Embed/refused-embed-source-omitted": check_refused_embed_source_omitted,
     "FileUpload/picker-always-present": check_picker_always_present,
+    "FileUpload/ceiling-recorded-never-enforced": check_ceiling_recorded_never_enforced,
     "Modal/aria-modal-only-when-blocking": check_aria_modal_only_when_blocking,
     "Tree/accessible-name-always": check_tree_accessible_name_always,
 }

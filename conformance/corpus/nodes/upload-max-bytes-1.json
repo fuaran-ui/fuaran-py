@@ -1,0 +1,1 @@
+{"id":"upload-max-bytes-1","kind":{"$type":"FileUpload","accept":["application/pdf"],"label":"Attach a scan","maxBytes":5242880,"multiple":false,"onSelect":"<closure>"}}

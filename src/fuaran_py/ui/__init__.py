@@ -1270,8 +1270,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         capture: t.CaptureSource | None = None,
         destination: str | None = None,
         on_select: bool = True,
+        max_bytes: int | None = None,
+        max_files: int | None = None,
     ) -> UiNode:
-        """The upload control, and its FOUR optional declarations.
+        """The upload control, and its SIX optional declarations.
 
         The first three are INGRESS ROUTES and each is ADDITIONAL: the picker and
         its label are emitted whatever is declared, because there is no keyboard
@@ -1284,6 +1286,14 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         selection: a NAME the host has registered with its own upload sink, never
         an address. Absent is the pre-1117 control — the selection reaches the
         handler and nothing leaves the client.
+
+        `max_bytes` and `max_files` are the fifth and sixth, and the first two
+        that constrain the SELECTION rather than routing it. `max_bytes` is PER
+        FILE, so a multiple upload wanting a total states both and declares
+        `max_bytes * max_files`; `max_files` is meaningful only alongside
+        `multiple`, since a single-file upload admits one file by construction.
+        Both are positive; absent declares no ceiling, which is the pre-1548
+        control, bounded only by whatever the host already enforces.
         """
         kind = t.FileUpload(
             _text(label),
@@ -1295,6 +1305,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             capture,
             destination,
             on_select,
+            max_bytes,
+            max_files,
         )
         return _node(id, kind, accessibility.file_upload)
 

@@ -2517,6 +2517,20 @@ class FileUpload:
     #: Phase 1576 — the selection handler. `True` by default so every pre-phase
     #: upload is byte-identical; `False` reaches the handler-less spelling.
     on_select: bool = True
+    #: fuaran#1548 — the largest single file this control accepts, in bytes. PER
+    #: FILE, not per selection: it bounds each file the reader picks, which is
+    #: what makes it the quantity the `file-read` route can be measured against
+    #: and what makes it meaningful on a single-file upload. Absent declares no
+    #: ceiling — the pre-1548 control, bounded only by whatever the host already
+    #: enforces. Positive-only, and a signed 32-bit integer like every typed
+    #: integer slot on this wire (WIRE_FORMAT §7.1).
+    max_bytes: int | None = None
+    #: fuaran#1548 — how many files this control accepts in one selection.
+    #: Absent declares no ceiling. Meaningful only alongside `multiple`: a
+    #: single-file upload admits one file by construction, so a ceiling there is
+    #: INERT rather than wrong, and is documented rather than refused.
+    #: Positive-only.
+    max_files: int | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2529,6 +2543,11 @@ class FileUpload:
                 "disabled": self.disabled,
                 "dropTarget": True if self.drop_target else None,
                 "label": self.label,
+                # fuaran#1548 — the two declared ceilings, ordinary optionals,
+                # so an upload declaring neither is byte-identical to what it
+                # always was.
+                "maxBytes": self.max_bytes,
+                "maxFiles": self.max_files,
                 "multiple": self.multiple,
                 "onSelect": CLOSURE if self.on_select else None,
             },

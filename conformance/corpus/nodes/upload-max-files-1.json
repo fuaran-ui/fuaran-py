@@ -1,0 +1,1 @@
+{"id":"upload-max-files-1","kind":{"$type":"FileUpload","accept":["image/*"],"label":"Attach up to three photographs","maxFiles":3,"multiple":true,"onSelect":"<closure>"}}

@@ -84,6 +84,10 @@
     {
       "id": "aria-modal-only-when-blocking",
       "meaning": "the aria-modal inertness claim is emitted for the blocking modality alone; a non-blocking anchored surface carries the dialog role without it, because the page behind it is genuinely still available"
+    },
+    {
+      "id": "ceiling-recorded-never-enforced",
+      "meaning": "each declared ceiling is recorded as read with a marker carrying no value, and an undeclared ceiling emits no marker at all - the value is withheld because nothing in this tier can act on it"
     }
   ],
   "kinds": [
@@ -298,7 +302,7 @@
     {
       "kind": "FileUpload",
       "sensitive": false,
-      "source": "the accept / multiple declarations, the label, and the two Phase 1115 ingress declarations (`dropTarget` / `acceptPaste`)",
+      "source": "the accept / multiple declarations, the label, the two Phase 1115 ingress declarations (`dropTarget` / `acceptPaste`) and the two Phase 1548 ceilings (`maxBytes` / `maxFiles`)",
       "fallback": "the file control with its classes and `disabled` state, carrying no event handlers. The ingress declarations degrade to the PLAIN PICKER: a drop needs a `drop` listener and a paste needs a `paste` one, and no CSS observes a drag, so a static host emits the control it always emitted and marks each declared gesture with a `data-fuaran-upload-drop` / `data-fuaran-upload-paste` attribute recording that the declaration was read - the marker is NOT coverage and nothing in this tier acts on it",
       "rich": {
         "class": "behavioural",
@@ -309,17 +313,24 @@
       "fixtures": [
         "nodes/upload-1.json",
         "nodes/upload-drop-1.json",
-        "nodes/upload-paste-1.json"
+        "nodes/upload-paste-1.json",
+        "nodes/upload-max-bytes-1.json",
+        "nodes/upload-max-files-1.json"
       ],
       "obligations": [
         {
           "id": "picker-always-present",
           "statement": "the `<input type=\"file\">` and its label are emitted whatever gestures the document declares - a drop zone is an ADDITIONAL route and never a replacement, which is what keeps the keyboard-accessible route intact and what makes the no-script floor a working upload rather than an inert box",
           "section": "WIRE_FORMAT.md 3.6.10"
+        },
+        {
+          "id": "ceiling-recorded-never-enforced",
+          "statement": "a declared `maxBytes` / `maxFiles` is marked read and NEVER carried by value, and an undeclared one is marked not at all - this tier can enforce neither ceiling, so a marker holding the number would claim an enforcement that is not there",
+          "section": "WIRE_FORMAT.md 3.6.23"
         }
       ],
       "intrinsic": [],
-      "contract": "Phase 1115; WIRE_FORMAT.md 3.6.10; docs/SSR.md (Input - rendered inert)"
+      "contract": "Phase 1115; Phase 1548; WIRE_FORMAT.md 3.6.10 + 3.6.23; docs/SSR.md (Input - rendered inert)"
     },
     {
       "kind": "Filters",

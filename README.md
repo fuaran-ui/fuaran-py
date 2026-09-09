@@ -1151,6 +1151,40 @@ byte), `2` the input set is missing. The runner itself is pinned by
 `tests/test_fuzz_exchange.py`, which drives it over real corpus payloads and
 asserts a deliberately corrupted sample is rejected.
 
+### The published capability manifest
+
+`conformance/host-capability-manifest.json` declares, per the wire specification's
+host-capability-manifest section, the set of wire constructs **this release can
+author** — its node kinds and its union cases, as dotted tokens keyed to the wire
+vocabulary. It exists so a harness that runs this host against the corpus can
+*compute* which fixtures it cannot be expected to reproduce, rather than keeping a
+hand-written list of fixture ids that is only as honest as its last
+re-measurement.
+
+```bash
+python -m fuaran_py.conformance.host_capability            # is the published artefact current?
+python -m fuaran_py.conformance.host_capability --write    # regenerate it
+```
+
+Three things about it are worth knowing before you read it:
+
+- **It is generated from this host's authoring model, never written by hand**, and
+  `tests/test_host_capability_manifest.py` fails when the committed artefact is
+  stale. The same file falsifies the generation rather than asserting it: removing
+  a kind from the model must remove exactly that kind's tokens.
+- **It declares what this host can WRITE, not what it accepts.** The decoder is
+  wider in places — it recognises cases the authoring surface has no spelling for
+  — and a manifest built from the decode side would claim constructs no document
+  from this host can contain.
+- **It says what it does not cover, and means it.** The per-field families are
+  declared uncovered, and two unions sit outside the declared scope, each with its
+  reason in the document. Absence inside an uncovered family is not a claim that
+  the host lacks something; it is this host declining to guess.
+
+A consumer must check `hostVersion` against the release it is actually running:
+the manifest describes one release, and applying it to another is exactly the
+stale claim it replaces, made harder to see because it looks computed.
+
 ## License
 
 Apache-2.0. See [LICENSE](LICENSE).

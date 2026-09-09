@@ -344,7 +344,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.write:
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(text, encoding="utf-8")
+        # LF explicitly: Python's text mode would write the platform separator, so a
+        # Windows regeneration and a POSIX one would differ in every line ending of a
+        # published artefact. The read below is text mode and would not notice; a
+        # consumer reading the bytes would.
+        out.write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {out}")
         return 0
 

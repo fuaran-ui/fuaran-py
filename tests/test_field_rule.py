@@ -80,6 +80,13 @@ def test_the_near_miss_refusal_names_what_the_silence_costs(spelling: str) -> No
     consequence says why the spelling matters. The trailing clause was the half
     this host omitted; pinning the whole string is what keeps the four hosts from
     drifting a word at a time.
+
+    Phase 1659 moved the vocabulary LABEL with the message it pins: the reference
+    hosts say ``the form vocabulary`` and this pin said ``the form field
+    vocabulary``. Two spellings of one didactic send two authors to two documents
+    for one defect, and a pinned test is exactly what keeps a divergence alive
+    once it exists — so the pin moves in the same commit as the message, or it
+    reverts it.
     """
     wire = _form(f'{{"id":"email","kind":{{"$type":"Text"}},"label":"Work email","{spelling}":{{}}}}')
     result = decode_node(wire)
@@ -87,7 +94,7 @@ def test_the_near_miss_refusal_names_what_the_silence_costs(spelling: str) -> No
     assert result.error.code == "WRONG_TYPE"
     assert result.error.path == f"$.kind.fields[0].{spelling}"
     assert result.error.message == (
-        f"'{spelling}' is not part of the form field vocabulary — it would be ignored, "
+        f"'{spelling}' is not part of the form vocabulary — it would be ignored, "
         "not honoured, and the field would accept anything"
     )
     assert result.error.expected_shape == "rule"

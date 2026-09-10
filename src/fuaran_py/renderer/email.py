@@ -62,7 +62,8 @@ from ..limits import MAX_NODE_DEPTH
 from ..model import Arr, Node, Obj, Value
 from . import markdown as _markdown
 from .bindings import (
-    BindingSources,
+    BindingSourcesLike,
+    as_sources,
     format_number,
     is_node_visible,
     render_text,
@@ -468,7 +469,7 @@ _HEADING_SCALE: Final = {
 class _EmailRenderer:
     """The per-render context: options, host binding sources, and the fragment registry."""
 
-    def __init__(self, options: EmailOptions, sources: BindingSources | None, fragments: dict[str, Node]) -> None:
+    def __init__(self, options: EmailOptions, sources: BindingSourcesLike | None, fragments: dict[str, Node]) -> None:
         self.options = options
         self.sources = sources
         self.fragments = fragments
@@ -716,8 +717,10 @@ class _EmailRenderer:
         # digest and the page it links to show the same case.
         state_key = fields.get("stateKey")
         current: object | None = None
-        if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
-            current = self.sources[state_key]
+        # Phase 1663 — the identity-keyed map is `values` on the widened record.
+        values = as_sources(self.sources).values
+        if isinstance(state_key, str) and state_key in values:
+            current = values[state_key]
         elif "on" in fields:
             # fuaran#1535 — the Phase-768 ``on`` form, resolved through the SCALAR
             # path exactly as the HTML renderer does, so this projection picks the
@@ -1344,7 +1347,7 @@ def lint(html: str) -> list[LintFinding]:
 
 def render_email(
     node: Node,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     options: EmailOptions = DEFAULT_EMAIL_OPTIONS,
 ) -> str:
     """Render a tree to an email-safe body fragment — the content column, ready to drop
@@ -1395,7 +1398,7 @@ def render_email(
 def render_email_document(
     node: Node,
     subject: str,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     options: EmailOptions = DEFAULT_EMAIL_OPTIONS,
 ) -> str:
     """A complete, sendable email document: doctype, the two meta tags every client wants,

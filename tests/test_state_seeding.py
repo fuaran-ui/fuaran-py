@@ -28,6 +28,7 @@ from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_py import decode_node
 from fuaran_py.model import Arr, Node, Obj
 from fuaran_py.renderer import collect_state_seeds, render_html, with_state_seeds
+from fuaran_py.renderer.bindings import BindingSources
 
 SEEDED_PAIR = "shared-source-seeded-pair"
 _BADGE_OPEN = 'class="fuaran-badge fuaran-badge-info">'
@@ -143,9 +144,17 @@ def test_rule2_the_host_value_wins_over_the_seed() -> None:
     tree = decode(metric("m", "users", '"defaultValue":7,'))
 
     merged = with_state_seeds(tree, {"users": 99})
-    assert merged == {"users": 99}, "the seed overrode the host's own value"
+    assert merged.values == {"users": 99}, "the seed overrode the host's own value"
 
-    assert with_state_seeds(tree, None) == {"users": 7}, "the seed did not reach a caller that named nothing"
+    assert with_state_seeds(tree, None).values == {"users": 7}, "the seed did not reach a caller that named nothing"
+
+    # Phase 1663 — the two HOST members ride through the seeding pass untouched.
+    # Seeding lays tree-declared values under the caller's; it has no business
+    # with the caller's clock or locale, and a merge written as a dict splat over
+    # the old flat type would have dropped both silently.
+    with_clock = BindingSources(now="2026-08-02T06:59:24Z", locale="en-GB")
+    seeded = with_state_seeds(tree, with_clock)
+    assert (seeded.now, seeded.locale) == (with_clock.now, with_clock.locale), "seeding dropped a host member"
 
     # The caller's own mapping is never mutated: a host may reuse one across
     # renders, and a pass that wrote into it would leak the first tree's

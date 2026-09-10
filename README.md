@@ -467,6 +467,66 @@ every string-to-DOM seam (URLs, markdown, attributes) is sanitised. The host own
 the document shell (`<html>` / `<head>` / the `<link>` to the stylesheet); the
 renderer emits the body fragment only.
 
+### Binding sources — the host's values, its clock and its locale (**BREAKING in 0.6.0**)
+
+`BindingSources` was a bare `dict[str, object]`. From **0.6.0** it is a frozen
+record with three members, and the host clock is the reason:
+
+```python
+from fuaran_py.renderer.bindings import BindingSources
+
+sources = BindingSources(
+    values={"selected-row": "inv-2291"},  # what the dict used to be, whole
+    now="2026-08-02T06:59:24Z",  # the host instant, ISO-8601 UTC
+    locale="en-GB",  # the ambient BCP-47 tag
+)
+body = render_html(tree, sources)
+```
+
+**A bare mapping is still accepted** and normalises to `BindingSources(values=…)`,
+so `render_html(tree, {"selected-row": "inv-2291"})` reads exactly as before. What
+does not carry over is code that *constructed* the type by annotation or that
+indexed a `BindingSources` value directly — `sources["k"]` is now
+`sources.values["k"]`.
+
+**`values`** is unchanged in meaning: a `State` key, a `Query` or `Filter` name, a
+`Selection` nodeId → the host's resolved value, doubling as the compute-parameter
+store.
+
+**`now`** is what `Binding.Now` and `Format.Since` resolve against, and it is the
+member this release exists for — before it, both rendered nothing here. The clock
+lives in the host, never on the wire and never read during resolution: resolve it
+**once** per render pass and hold it, or two `Now` slots in one tree can disagree,
+and a replayed op-stream re-supplies the instant it recorded so a replay
+reproduces the original render instead of drifting to replay-time "now". A
+declared `grain` truncates it *before* anything projects it — `Minute` gives
+`2026-08-02T06:59:00Z`, `Hour` gives `2026-08-02T06:00:00Z`, `Day` gives
+`2026-08-02`.
+
+The default `now=""` means **this host furnishes no clock**, and the slot then
+resolves to *absence* — an empty text slot, an em-dash in a numeric one.
+Deliberately loud: a relative time computed against an invented "now" is a
+confidently wrong answer, and a raw epoch integer where a reader expects "3 hours
+ago" is worse. (It is not the `WireSurvivabilityError` channel — the document is
+answerable, the host simply furnished nothing, which is the same fact as an
+unwritten `Query`.)
+
+**`locale`** is the tag a `LocaleSource.Ambient` reads; `""` means the runtime
+default. The `Format` cases this host renders — `Since`, `RelativeTime`,
+`Duration` — are locale-**independent** by declaration (unit glyphs and English
+words, not CLDR forms), so they consult no tag. The four that are not
+(`Number` / `Currency` / `Percent` / `Date`) resolve to absence here, exactly as
+they did before: their text comes out of a locale database, a stdlib-only host has
+no canonical answer to give, and the corpus's render-text family enumerates that
+exclusion with its reason. `resolve_locale_tag(binding, sources)` is the public
+seam for a host that wants to render them itself with `babel` or `Intl` — the
+`Explicit`-wins precedence is the seam's rule, not each caller's.
+
+Conformance for all of the above is the corpus's **render-text family**
+(`render-text.json`, named by the manifest's `renderText` pointer): every vector
+pins a fixture, the host sources, and the exact text this host must produce.
+`tests/test_render_text_corpus.py` is this host's leg.
+
 ### Destination policy — ambient, and default-deny
 
 The scheme floor answers *is this URL safe to have*. It does not answer *is this

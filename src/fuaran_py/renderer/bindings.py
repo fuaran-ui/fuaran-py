@@ -29,15 +29,198 @@ error is raised rather than returned — see :exc:`WireSurvivabilityError`.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from typing import cast
 
 from ..compute import ComputeErr, ComputeOk, evaluate_transform
 from ..model import Arr, Obj, Value
 
-# A host-supplied binding source: maps a binding key (e.g. a Query name) to a
-# resolved value. Empty by default — the headless baseline resolves `Static`
-# bindings with no host input.
-type BindingSources = dict[str, object]
+
+@dataclass(frozen=True)
+class BindingSources:
+    """What the host furnishes a render pass (Phase 1663).
+
+    Three members, and the reference host's shape with its four identity-keyed
+    maps collapsed into the one this host carries:
+
+    * ``values`` — the identity-keyed map that WAS this whole type: a ``State``
+      key, a ``Query`` or ``Filter`` name, a ``Selection`` nodeId → the host's
+      resolved value. It doubles as the compute-parameter store, exactly as
+      before.
+    * ``now`` — the host instant as an **ISO-8601 UTC** string
+      (``2026-08-02T06:59:24Z``), for ``Binding.Now`` and ``Format.Since``.
+    * ``locale`` — the ambient BCP-47 tag a ``LocaleSource.Ambient`` reads.
+
+    **The clock lives HERE, never on the wire and never read during
+    resolution.** That is what keeps a tree a pure value: a replayed op-stream
+    re-supplies the instant it recorded, so a replay reproduces the original
+    render instead of drifting to whatever "now" means at replay time. Resolve
+    it ONCE per render pass and hold it for the whole pass, or two ``Now`` slots
+    in one tree can disagree.
+
+    ``now = ""`` is the identity default and means **this host furnishes no
+    clock**: the slot resolves to ABSENCE, which a text slot renders as the
+    empty string and a numeric slot as the em-dash. Deliberately loud — a host
+    that forgets the instant must not silently render a plausible wrong date,
+    and a relative time computed against an invented "now" is worse than a
+    visible blank. It is NOT the :exc:`WireSurvivabilityError` channel: the
+    document is answerable, the host simply furnished nothing, which is the same
+    fact as an unwritten ``Query``.
+
+    ``locale = ""`` is the identity default meaning "the runtime default
+    locale". Every rendering this host produces for the locale-independent
+    ``Format`` cases (``Since`` / ``RelativeTime`` / ``Duration``) ignores the
+    tag by design — those are unit glyphs and English words, not CLDR-driven
+    forms — so the member exists for the cases a locale-aware host renders and
+    this one declines (see :func:`_format_projection`).
+    """
+
+    values: Mapping[str, object] = field(default_factory=dict)
+    now: str = ""
+    locale: str = ""
+
+    def merged_with(self, extra: Mapping[str, object]) -> BindingSources:
+        """This record with ``extra`` layered over ``values``; the two scalars ride along."""
+        return replace(self, values={**self.values, **extra})
+
+
+#: What a caller may PASS where binding sources are wanted. A bare mapping is
+#: accepted and normalised to ``BindingSources(values=mapping)`` — a boundary
+#: coercion rather than a second design, because a bare mapping can mean nothing
+#: else and this host is published. Every function below normalises through
+#: :func:`as_sources` on entry, so nothing downstream sees the union.
+type BindingSourcesLike = BindingSources | Mapping[str, object]
+
+
+def as_sources(sources: BindingSourcesLike | None) -> BindingSources:
+    """Normalise a caller's argument to a :class:`BindingSources`.
+
+    ``None`` is the headless baseline (no values, no clock, no locale) — the
+    same thing it has always meant here.
+    """
+    if sources is None:
+        return BindingSources()
+    if isinstance(sources, BindingSources):
+        return sources
+    return BindingSources(values=sources)
+
+
+# ── The host instant: grain truncation, epoch conversion, the Since reduction ─
+#
+# Phase 1663 — the three shared reductions the reference host keeps above its
+# own pipeline split, transcribed. All three are pure functions of their
+# arguments and consult no clock: the instant is always the caller's.
+
+#: ``(prefix length, suffix)`` per ``TimeGrain``. ``Second`` is the identity and
+#: is absent by construction — a grain the map does not carry truncates nothing,
+#: which is the right answer for the identity and for a token this host does not
+#: recognise.
+_GRAIN_TRUNCATION: dict[str, tuple[int, str]] = {
+    "Minute": (16, ":00Z"),
+    "Hour": (13, ":00:00Z"),
+    "Day": (10, ""),
+}
+
+
+def truncate_to_grain(grain: str, instant: str) -> str:
+    """``instant`` truncated to ``grain`` (``Second`` / ``Minute`` / ``Hour`` / ``Day``).
+
+    An instant too short to slice is returned as it came: a partial instant is
+    already at or below the requested grain, and inventing digits to fill it
+    would be a wrong answer rather than a coarse one.
+    """
+    slicing = _GRAIN_TRUNCATION.get(grain)
+    if slicing is None:
+        return instant
+    length, suffix = slicing
+    return instant[:length] + suffix if len(instant) >= length else instant
+
+
+def epoch_seconds_of_instant(instant: str) -> float | None:
+    """Whole Unix-epoch seconds for a canonical instant, or ``None``.
+
+    Deliberately tolerant of what follows the seconds (a fractional part, a
+    ``Z``, an offset suffix) and deliberately INTOLERANT of a missing or
+    non-numeric date: truncating to a grain leaves ``YYYY-MM-DDTHH:MM:00Z`` and
+    ``YYYY-MM-DD``, both of which must parse, and anything shorter is not an
+    instant at all. ``None`` is surfaced as unresolved by the caller, never as
+    an invented instant.
+
+    Proleptic-Gregorian integer arithmetic (Howard Hinnant's
+    ``days_from_civil``), not :mod:`datetime`, so this host and every other
+    agree to the second on dates outside the platform's calendar range.
+    """
+
+    def digits(start: int, length: int) -> int | None:
+        if len(instant) < start + length:
+            return None
+        chunk = instant[start : start + length]
+        return int(chunk) if chunk.isdigit() and chunk.isascii() else None
+
+    year, month, day = digits(0, 4), digits(5, 2), digits(8, 2)
+    if year is None or month is None or day is None:
+        return None
+    if year < 1 or not (1 <= month <= 12) or not (1 <= day <= 31):
+        return None
+    hours = digits(11, 2) or 0
+    minutes = digits(14, 2) or 0
+    seconds = digits(17, 2) or 0
+    y = year - 1 if month <= 2 else year
+    era = (y if y >= 0 else y - 399) // 400
+    yoe = y - era * 400
+    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
+    doe = yoe * 365 + yoe // 4 - yoe // 100 + doy
+    days = era * 146097 + doe - 719468
+    return float(days) * 86400.0 + float(hours * 3600 + minutes * 60 + seconds)
+
+
+#: Seconds in one ``RelativeTimeUnit``. ``Month`` and ``Year`` are the mean
+#: Gregorian lengths — FIXED constants rather than calendar arithmetic, because
+#: "2 months ago" is a rounded human phrase and a calendar-exact answer would
+#: make the same delta read differently depending on which months it spanned, on
+#: hosts that must agree to the byte.
+_RELATIVE_UNIT_SECONDS: dict[str, float] = {
+    "Second": 1.0,
+    "Minute": 60.0,
+    "Hour": 3600.0,
+    "Day": 86400.0,
+    "Week": 604800.0,
+    "Month": 2629746.0,
+    "Year": 31556952.0,
+}
+
+#: The auto-selection ladder: the largest unit whose length does not exceed the
+#: magnitude of the delta. Ordered coarsest-threshold-last.
+_SINCE_LADDER: tuple[tuple[float, str], ...] = (
+    (60.0, "Second"),
+    (3600.0, "Minute"),
+    (86400.0, "Hour"),
+    (604800.0, "Day"),
+    (2629746.0, "Week"),
+    (31556952.0, "Month"),
+)
+
+
+def since_unit_and_count(declared: str | None, delta_seconds: float) -> tuple[str, float]:
+    """The ``Format.Since`` reduction: a signed second-delta → ``(unit, count)``.
+
+    ``declared is None`` is the AUTO-SELECTION request (not a default): the unit
+    is the largest whose length does not exceed the magnitude, from the fixed
+    ladder above. The count TRUNCATES toward zero rather than rounding, so 3599
+    seconds is "59 minutes" and never "1 hour" — the ladder and the count then
+    agree at every boundary, which rounding would break exactly at the point a
+    reader is most likely to check.
+    """
+    unit = declared
+    if unit is None:
+        magnitude = abs(delta_seconds)
+        unit = "Year"
+        for threshold, candidate in _SINCE_LADDER:
+            if magnitude < threshold:
+                unit = candidate
+                break
+    return unit, float(int(delta_seconds / _RELATIVE_UNIT_SECONDS.get(unit, 1.0)))
 
 
 class WireSurvivabilityError(Exception):
@@ -67,7 +250,7 @@ DECODED_COMPUTED_MESSAGE = (
 )
 
 
-def render_text(text: Value, sources: BindingSources | None = None) -> str:
+def render_text(text: Value, sources: BindingSourcesLike | None = None) -> str:
     """Resolve a decoded text-source to a plain (un-escaped) string.
 
     ``Literal`` → its text; ``Bound`` → the resolved source or ``""``; ``I18n``
@@ -93,7 +276,7 @@ def render_text(text: Value, sources: BindingSources | None = None) -> str:
     return ""
 
 
-def resolve_binding(binding: Value, sources: BindingSources | None = None) -> object | None:
+def resolve_binding(binding: Value, sources: BindingSourcesLike | None = None) -> object | None:
     """Resolve a decoded binding to its value, or ``None`` if not resolvable.
 
     ``Static`` → its embedded value; ``State`` / ``Query`` / ``Filter`` /
@@ -134,6 +317,32 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
             # that distinction, and it is total in the only sense available: this
             # arm never answers.
             raise WireSurvivabilityError(DECODED_COMPUTED_MESSAGE)
+        if binding.tag == "Now":
+            # Phase 1663 — the host-furnished instant. The clock is NOT read
+            # here: ``sources.now`` was resolved once, host-side, for the whole
+            # render pass, which is what makes a replayed op-stream reproduce its
+            # original render instead of drifting to replay-time "now".
+            #
+            # An unset instant is ABSENCE (``None``), so the slot renders its
+            # empty surface. Deliberately loud — a host that forgets to furnish
+            # the clock must not silently render a plausible wrong date.
+            #
+            # The declared GRAIN truncates the instant BEFORE anything projects
+            # it. Before, not after: a ``Transform`` param projecting this into
+            # ``dateDiffDays`` reads only the leading ``YYYY-MM-DD``, so the
+            # truncation has to be upstream of every projection or it is not the
+            # document's declaration at all. Absent grain is ``Second``, the
+            # identity.
+            instant = as_sources(sources).now
+            if not instant:
+                return None
+            grain = binding.fields.get("grain")
+            return truncate_to_grain(grain, instant) if isinstance(grain, str) else instant
+        if binding.tag == "Format":
+            # Phase 1663 — the locale-aware numeric projection. Only the
+            # locale-INDEPENDENT cases render here; see ``_format_projection``
+            # for which, and why the rest resolve to absence on this host.
+            return _format_projection(binding, sources)
         # `State` keys on `key`; `Query` / `Filter` key on `name`; `Selection`
         # keys on `nodeId` (0.2.0 — the accessor sentinel is off the wire, the
         # name/id IS the lookup key).
@@ -142,8 +351,9 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
             key = binding.fields.get("name")
         if key is None:
             key = binding.fields.get("nodeId")
-        if sources and isinstance(key, str) and key in sources:
-            return sources[key]
+        values = as_sources(sources).values
+        if isinstance(key, str) and key in values:
+            return values[key]
         # Phase 629 — an unwritten `Selection` / `Filter` (or a `State` with no
         # host value) resolves to its declared default: resolution-time
         # defaulting IS the preselected mechanism, no store seeding.
@@ -152,7 +362,7 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
     return None
 
 
-def resolve_display_string(binding: Value, sources: BindingSources | None = None) -> str | None:
+def resolve_display_string(binding: Value, sources: BindingSourcesLike | None = None) -> str | None:
     """Resolve a binding in a DISPLAY (scalar) slot to its display-string form, or ``None``.
 
     The twin of the Rust host's ``try_scalar_string``: a ``Transform`` or an
@@ -244,11 +454,11 @@ def _expr_as_transform(expr_binding: Obj) -> Obj:
     return Obj("Transform", fields)
 
 
-def _transform_state(sources: BindingSources | None) -> dict[str, object]:
-    return dict(sources) if sources else {}
+def _transform_state(sources: BindingSourcesLike | None) -> dict[str, object]:
+    return dict(as_sources(sources).values)
 
 
-def resolve_source(source: Value, sources: BindingSources | None = None) -> object | None:
+def resolve_source(source: Value, sources: BindingSourcesLike | None = None) -> object | None:
     """Resolve a data-bearing node's ``source`` slot to a row collection.
 
     A ``Transform`` binding evaluates through the certified compute evaluator to
@@ -318,7 +528,7 @@ def _trailing_global_count(transform: Obj) -> bool:
 _ScalarOutcome = tuple[str, object]
 
 
-def _scalar_cell(transform: Obj, sources: BindingSources | None) -> _ScalarOutcome:
+def _scalar_cell(transform: Obj, sources: BindingSourcesLike | None) -> _ScalarOutcome:
     result = evaluate_transform(transform, _transform_state(sources))
     if isinstance(result, ComputeErr):
         return ("error", None)
@@ -336,7 +546,7 @@ def _scalar_cell(transform: Obj, sources: BindingSources | None) -> _ScalarOutco
     return ("error", None)  # >1 row — ambiguous
 
 
-def resolve_scalar_text(binding: Value, sources: BindingSources | None = None) -> str | None:
+def resolve_scalar_text(binding: Value, sources: BindingSourcesLike | None = None) -> str | None:
     """Resolve a binding in a **text scalar slot** to a plain string, or ``None``
     when unresolved / ambiguous (the caller renders ``""``). A ``Transform``
     resolves to its 1×1 result cell; every other binding resolves as
@@ -353,7 +563,7 @@ def resolve_scalar_text(binding: Value, sources: BindingSources | None = None) -
     return str(resolved) if resolved is not None else None
 
 
-def resolve_scalar_number(binding: Value, sources: BindingSources | None = None) -> float | None:
+def resolve_scalar_number(binding: Value, sources: BindingSourcesLike | None = None) -> float | None:
     """Resolve a binding in a **numeric scalar slot** to a float, or ``None`` when
     unresolved / ambiguous / non-numeric (the caller renders the em-dash). A
     ``Transform`` resolves to its 1×1 result cell (coerced numerically); every
@@ -374,7 +584,7 @@ def resolve_scalar_number(binding: Value, sources: BindingSources | None = None)
     return None
 
 
-def resolve_scalar_bool(binding: Value, sources: BindingSources | None = None) -> bool | None:
+def resolve_scalar_bool(binding: Value, sources: BindingSourcesLike | None = None) -> bool | None:
     """Resolve a binding in a **boolean scalar slot**, or ``None`` when
     unresolved / ambiguous / non-boolean (fuaran#1535).
 
@@ -409,7 +619,7 @@ def resolve_scalar_bool(binding: Value, sources: BindingSources | None = None) -
 # because they are the same two rules the other four hosts state.
 
 
-def is_node_visible(visible: Value | None, sources: BindingSources | None = None) -> bool:
+def is_node_visible(visible: Value | None, sources: BindingSourcesLike | None = None) -> bool:
     """THE rule for whether a node reaches the output at all (WIRE_FORMAT §3.1).
 
     A node is removed ONLY on a resolved ``False``. An absent predicate, an
@@ -437,7 +647,7 @@ def is_node_visible(visible: Value | None, sources: BindingSources | None = None
 
 
 def select_switch_case(
-    cases: Value | None, selector: str | None, sources: BindingSources | None = None
+    cases: Value | None, selector: str | None, sources: BindingSourcesLike | None = None
 ) -> Value | None:
     """First-match-wins case selection over BOTH kinds of case (fuaran#1535).
 
@@ -539,6 +749,75 @@ def format_relative_english(unit: str, value: float) -> str:
     return f"{magnitude} {plural} ago" if n < 0 else f"in {magnitude} {plural}"
 
 
+#: The ``Format`` cases this host renders (Phase 1663). Locale-INDEPENDENT by
+#: declaration: ``Duration`` is unit glyphs and English words with exact
+#: cross-pipeline parity, and the relative-time pair reduces to ``(unit, count)``
+#: through the one shared ladder and then phrases it in the deterministic English
+#: form — the fallback tier. The four cases NOT here (``Number`` / ``Currency`` /
+#: ``Percent`` / ``Date``) take their text from a locale database, so a
+#: stdlib-only host has no canonical answer to give and resolves them to absence
+#: exactly as it did before this seam existed. The corpus's render-text family
+#: enumerates that exclusion with its reason.
+_LOCALE_INDEPENDENT_FORMATS = frozenset({"Duration", "RelativeTime", "Since"})
+
+
+def resolve_locale_tag(binding: Value, sources: BindingSourcesLike | None = None) -> str | None:
+    """The BCP-47 tag a ``Binding.Format`` renders under, or ``None``.
+
+    ``LocaleSource.Explicit`` pins its own tag; ``LocaleSource.Ambient`` reads
+    the host's :attr:`BindingSources.locale`, whose ``""`` identity default means
+    "the runtime default locale". The resolution rule is the SEAM's rather than
+    each caller's, which is why this is public: a host that wants to render the
+    locale-dependent ``Format`` cases itself — with ``babel``, or ``Intl`` under
+    Pyodide — needs the tag the document asked for, and must not re-derive the
+    precedence.
+    """
+    if not isinstance(binding, Obj) or binding.tag != "Format":
+        return None
+    locale = binding.fields.get("locale")
+    if not isinstance(locale, Obj):
+        return None
+    if locale.tag == "Explicit":
+        tag = locale.fields.get("tag")
+        return tag if isinstance(tag, str) else None
+    if locale.tag == "Ambient":
+        return as_sources(sources).locale
+    return None
+
+
+def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str | None:
+    """``Binding.Format`` in a slot: its numeric source projected to a string.
+
+    Renders the locale-independent cases and resolves every other to absence —
+    see :data:`_LOCALE_INDEPENDENT_FORMATS`. ``Since`` is the one case whose
+    text is a function of the HOST INSTANT as well as of its source, so the
+    delta is taken here, where the instant lives, and the phrasing helpers stay
+    pure projections of their arguments.
+    """
+    fmt = binding.fields.get("format")
+    if not isinstance(fmt, Obj) or not isinstance(fmt.tag, str) or fmt.tag not in _LOCALE_INDEPENDENT_FORMATS:
+        return None
+    value = resolve_scalar_number(binding.fields.get("source"), sources)
+    if value is None:
+        return None
+    if fmt.tag == "Duration":
+        return format_duration(str(fmt.fields.get("unit")), str(fmt.fields.get("style")), value)
+    if fmt.tag == "RelativeTime":
+        return format_relative_english(str(fmt.fields.get("unit")), value)
+    # ``Since``. The source is read as an instant in whole Unix-epoch seconds
+    # (``Date``'s convention) and the sign follows ``Intl.RelativeTimeFormat``'s:
+    # negative is the past. An unset or unreadable host instant is ABSENCE, for
+    # exactly the reason ``Binding.Now`` gives — a relative time computed against
+    # an invented "now" is a plausible wrong answer, which is worse than a
+    # visible placeholder.
+    now_epoch = epoch_seconds_of_instant(as_sources(sources).now)
+    if now_epoch is None:
+        return None
+    declared = fmt.fields.get("unit")
+    unit, count = since_unit_and_count(declared if isinstance(declared, str) else None, value - now_epoch)
+    return format_relative_english(unit, count)
+
+
 def format_number(fmt: Value, value: object) -> str:
     """Format a numeric value through a decoded ``CellFormat`` (mirrors F# ``formatNumber``)."""
     try:
@@ -575,18 +854,17 @@ def format_number(fmt: Value, value: object) -> str:
         # Phase 819 — the English form IS the canonical cell rendering.
         return format_relative_english(str(fields.get("unit")), num)
     if tag == "Since":
-        # Phase 1533 — ``Format.Since`` renders the delta between its source
-        # instant and THE HOST'S OWN instant, and this host furnishes none: its
-        # binding sources are a flat identity-keyed map, and ``Now`` has no
-        # identity key, so there is nowhere for the instant to live. That is a
-        # deliberate reduction of this renderer's surface (it carries no locale
-        # either) rather than an oversight of this phase — the codec above
-        # round-trips ``Since`` faithfully, which is the conformance obligation.
-        #
-        # The empty string, NOT the plain number: an epoch integer rendered
-        # where a reader expects "3 hours ago" is a silently wrong answer, and
-        # the empty string is the surface every unresolvable binding already
-        # gets here.
+        # Phase 1663 — ``Format.Since`` now RENDERS on this host, through
+        # :func:`_format_projection`, where the host instant
+        # (:attr:`BindingSources.now`) lives. This arm is the CELL vocabulary's,
+        # and ``CellFormat`` carries no ``Since`` case, so it is unreachable from
+        # the wire: the decoder refuses the tag in a cell position. It is kept
+        # because this function is public and a caller may hand it a hand-built
+        # tag, and its answer is the honest one for a function with no sources —
+        # the empty string, NOT the plain number, because an epoch integer
+        # rendered where a reader expects "3 hours ago" is a silently wrong
+        # answer. A caller that wants the phrase resolves the binding rather
+        # than the format.
         return ""
     # Date / Custom: structural — fall back to the plain numeric form.
     return _plain_number(num)

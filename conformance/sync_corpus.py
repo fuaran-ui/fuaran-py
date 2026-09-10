@@ -6,7 +6,7 @@ The authoritative corpus lives in the workspace repo at ``../wire-format-fixture
 (relative to this repo's root — the canonical side-by-side workspace layout). F#
 is the sole generator (``--emit-corpus``); this script clean-copies the
 certification payload set (``manifest.json``, ``schema.json``,
-``render-fidelity.json``, ``nodes/``, ``ops/``, ``reject/``, ``lenient/``,
+``render-fidelity.json``, ``render-text.json``, ``nodes/``, ``ops/``, ``reject/``, ``lenient/``,
 ``envelope/``, ``elicitation/``, ``markdown/``) into this repo's
 ``conformance/corpus/`` snapshot. The ``conformance/`` tooling subdirectory of
 the authority (its in-house cross-host gate) is intentionally NOT copied, and
@@ -153,7 +153,7 @@ _COPIES_NOTE = (
 
 # The core certification families — the Node/TreeOp/reject/lenient/envelope set
 # the schema + cross-host runner certify. Mirrors sync-corpus.mjs exactly.
-_FILES = ("manifest.json", "schema.json", "render-fidelity.json")
+_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json")
 _DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")

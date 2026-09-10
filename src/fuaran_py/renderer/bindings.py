@@ -363,14 +363,37 @@ def resolve_binding(binding: Value, sources: BindingSourcesLike | None = None) -
 
 
 def resolve_display_string(binding: Value, sources: BindingSourcesLike | None = None) -> str | None:
-    """Resolve a binding to its display-string form, or ``None``.
+    """Resolve a binding in a DISPLAY (scalar) slot to its display-string form, or ``None``.
 
-    The twin of the Rust host's ``try_string``: :func:`resolve_binding` for the
-    value, then the display form — strings as-is, numbers in the deterministic
-    canonical layout, bools as ``true`` / ``false``. A structured value has no
-    display form and yields ``None``, so a caller never renders a container into
-    a text position.
+    The twin of the Rust host's ``try_scalar_string``: a ``Transform`` or an
+    ``Expr`` resolves to its 1x1 result cell, and every other binding case goes
+    through :func:`resolve_binding` then the display form — strings as-is,
+    numbers in the deterministic canonical layout, bools as ``true`` / ``false``.
+    A structured value has no display form and yields ``None``, so a caller never
+    renders a container into a text position.
+
+    **Phase 1665 added the scalar dispatch, and it is a defect fix rather than a
+    widening.** A display slot is a scalar slot by definition, and this function's
+    one caller is the accessibility trait's name slot (``_a11y_name``), which the
+    wire specifies as an ordinary ``Binding[str]``. Routing it through
+    :func:`resolve_binding` alone meant a ``Transform`` yielding the one cell an
+    author obviously meant — "name this region after what is in it" — resolved to
+    the rows list, which has no display form, so this host emitted no
+    ``aria-label`` at all. The reference host and the erased host each got it
+    wrong differently (a caught cast error; the rows array in the attribute), and
+    on the one trait with no visible output none of the three was reported.
+
+    The non-Transform path is deliberately NOT delegated to
+    :func:`resolve_scalar_text`: that function stringifies with ``str()``, which
+    spells a bool ``True``, where every host's display form spells it ``true``.
+    The two coercions are different functions on purpose and this slot needs this
+    one.
     """
+    if _is_expr(binding) or _is_transform(binding):
+        assert isinstance(binding, Obj)
+        transform = _expr_as_transform(binding) if _is_expr(binding) else binding
+        tag, value = _scalar_cell(transform, sources)
+        return _cell_value_to_text(value) if tag == "resolved" else None
     resolved = resolve_binding(binding, sources)
     if resolved is None:
         return None

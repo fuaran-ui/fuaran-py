@@ -135,12 +135,17 @@ def _field_rule_attrs(rule: Value, control_tag: str | None) -> list[tuple[str, s
 def _a11y_name(value: Value, sources: BindingSourcesLike | None) -> str | None:
     """Resolve an accessibility name slot to its display string.
 
-    The canonical form is a ``Binding[str]``, resolved through the host sources
-    (``Static`` inline, every keyed case from the map, an unwritten
-    ``Selection`` / ``Filter`` from its declared ``defaultValue``) and rendered
-    by the same display form the text slots use — so a number or bool reaching a
-    name slot reads the way it reads everywhere else, and a structured value
-    yields ``None``.
+    The canonical form is a ``Binding[str]``, resolved through the SCALAR path
+    (Phase 1665) exactly as every other display slot is: a ``Transform`` or an
+    ``Expr`` yields its 1x1 result cell, and every other case reads the host
+    sources (``Static`` inline, every keyed case from the map, an unwritten
+    ``Selection`` / ``Filter`` / ``State`` from its declared ``defaultValue``)
+    and is rendered by the same display form the text slots use — so a number or
+    bool reaching a name slot reads the way it reads everywhere else, and a
+    structured value yields ``None``. WIRE_FORMAT's accessibility-trait render
+    obligations state the rule; the corpus pins it with
+    ``nodes/a11y-wrapper-transform-label`` and the ``behaviour`` vectors in
+    ``a11y-contract.json``.
 
     A BARE STRING is ALSO accepted, deliberately, as a LENIENT SHORTHAND: it is
     NOT canonical wire and no encoder emits it. It is kept because this host's

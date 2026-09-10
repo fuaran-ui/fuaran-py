@@ -1,0 +1,1 @@
+{"id":"text-i18n-mixed-args-1","kind":{"$type":"Markdown","text":{"$type":"I18n","args":{"currency":"GBP","total":{"$type":"State","defaultValue":1250.5,"key":"invoiceTotal"},"year":2026},"key":"invoice.summary"}}}

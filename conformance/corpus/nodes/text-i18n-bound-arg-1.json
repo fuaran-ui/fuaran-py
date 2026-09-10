@@ -1,0 +1,1 @@
+{"id":"text-i18n-bound-arg-1","kind":{"$type":"Markdown","text":{"$type":"I18n","args":{"count":{"$type":"State","key":"cartCount"}},"key":"cart.remaining"}}}

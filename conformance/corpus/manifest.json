@@ -581,6 +581,14 @@
       "description": "§5 — a `null` State.defaultValue is the null SPELLING OF ABSENCE and normalises to the omitted key, not to the slot's typed empty. The `initialValue` alias carrying null takes the same arm. The typed-empty read-compat belongs to `Static.value` (`lenient-null-static-options`); at a collection slot a declared `[]` is a claim the seeding rule reads, and normalising absence into it fabricates one (Phase 1656)"
     },
     {
+      "id": "lenient-1661-i18n-arg-tagged-static",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1661-i18n-arg-tagged-static.json",
+      "expectedFile": "lenient/lenient-1661-i18n-arg-tagged-static.expected.json",
+      "description": "§5 — a `{\"$type\":\"Static\",\"value\":v}` I18n argument is decode-accepted and normalises to the BARE value, which is why the widening from a JVal bag to a Binding<JVal> bag moves no shipped byte. A valueless `Static` is already canonical and stays tagged: absence is structural and has no bare spelling (Phase 1661)"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -2205,6 +2213,14 @@
       "description": "Display/Image (Phase 1080 — three-candidate srcSet, authored descending)"
     },
     {
+      "id": "limit-expr-nodes-pipeline-at-max",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
+      "expectedFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
+      "description": "§21.8 max expression nodes, on the PIPELINE surface — a `derive` step whose expression carries EXACTLY the limit (512 ColExpr nodes: one `coalesce` over 511 column references). Rule 1: every conformant host MUST decode this; its past-the-bound twins are `reject-limit-expr-nodes-derive` / `-filter` / `-transform-bypass`. Wide rather than deep on purpose, so the vector isolates the node bound from the syntactic-depth bound (Fuaran-UI Phase 1662)"
+    },
+    {
       "id": "limit-node-depth-at-max",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2755,6 +2771,22 @@
       "inputFile": "nodes/tabs-explicit-1.json",
       "expectedFile": "nodes/tabs-explicit-1.json",
       "description": "Layout/Tabs (explicit headers + tags + activeTag)"
+    },
+    {
+      "id": "text-i18n-bound-arg-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/text-i18n-bound-arg-1.json",
+      "expectedFile": "nodes/text-i18n-bound-arg-1.json",
+      "description": "Display/Markdown (Phase 1661 — an i18n argument that is a binding)"
+    },
+    {
+      "id": "text-i18n-mixed-args-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/text-i18n-mixed-args-1.json",
+      "expectedFile": "nodes/text-i18n-mixed-args-1.json",
+      "description": "Display/Markdown (Phase 1661 — one i18n bag carrying both argument arms)"
     },
     {
       "id": "toast-1",
@@ -3365,6 +3397,24 @@
       "description": "'validation' near-miss on a FormField — the canonical key is 'rule' (Phase 864)"
     },
     {
+      "id": "reject-i18n-arg-binding-missing-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-i18n-arg-binding-missing-key.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text.args.count.key",
+      "description": "an I18n arg naming a KNOWN binding case with its required member missing — the arg decodes as a binding, so the binding's own refusal applies at the arg's path"
+    },
+    {
+      "id": "reject-i18n-arg-unknown-binding-case",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-i18n-arg-unknown-binding-case.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.text.args.count.$type",
+      "description": "an I18n arg object carrying an unrecognised $type — the inspection reads it as a binding and refuses, rather than falling back to the literal arm"
+    },
+    {
       "id": "reject-image-expandable-nonbool",
       "kind": "reject",
       "decoder": "node",
@@ -3543,6 +3593,33 @@
       "expectedErrorCode": "INVALID_JSON",
       "expectedPath": "$",
       "description": "§20.2 row 2 — content after the root value. §1 makes a wire artefact a single JSON document; two hosts refused this and three accepted it, which is a framing ambiguity rather than a tolerance. Twin: the `markdown-1` node fixture (drop everything after the root object)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-derive",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-derive.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].expr",
+      "description": "§21.8 max expression nodes — a `derive` step's expression ONE node past the limit (513). LIMIT_EXCEEDED at the path of the offending `expr` member, so an author is told which STEP to come back under; refused at decode rather than left to be a budget each host's evaluator discovers differently (Fuaran-UI Phase 1662)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-filter",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-filter.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].pred",
+      "description": "§21.8 max expression nodes — a `filter` step's PREDICATE one node past the limit (513). The second arm: `filter` and `derive` are separate branches of the step decoder on every host, so a host that bounded one and left the other open would pass a corpus carrying only the `derive` vector (Fuaran-UI Phase 1662)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-transform-bypass",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-transform-bypass.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].expr",
+      "description": "§21.8 — THE BYPASS that motivated Phase 1662, recorded as a reject. The expression is `param`-leafed and its params are bound, so it is exactly what a `Binding.Expr` would carry and exactly what `Binding.Expr` refuses at 513 nodes; wrapping it in a Transform `derive` step escaped the bound on all five hosts until now. Refusing it is what makes §21.8 a bound on EVERY expression a decoded document can name rather than on one binding case"
     },
     {
       "id": "reject-limit-json-depth",

@@ -2197,6 +2197,14 @@
       "description": "Display/Image (Phase 1080 — three-candidate srcSet, authored descending)"
     },
     {
+      "id": "limit-expr-nodes-pipeline-at-max",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
+      "expectedFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
+      "description": "§21.8 max expression nodes, on the PIPELINE surface — a `derive` step whose expression carries EXACTLY the limit (512 ColExpr nodes: one `coalesce` over 511 column references). Rule 1: every conformant host MUST decode this; its past-the-bound twins are `reject-limit-expr-nodes-derive` / `-filter` / `-transform-bypass`. Wide rather than deep on purpose, so the vector isolates the node bound from the syntactic-depth bound (Fuaran-UI Phase 1662)"
+    },
+    {
       "id": "limit-node-depth-at-max",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3518,6 +3526,33 @@
       "expectedErrorCode": "INVALID_JSON",
       "expectedPath": "$",
       "description": "§20.2 row 2 — content after the root value. §1 makes a wire artefact a single JSON document; two hosts refused this and three accepted it, which is a framing ambiguity rather than a tolerance. Twin: the `markdown-1` node fixture (drop everything after the root object)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-derive",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-derive.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].expr",
+      "description": "§21.8 max expression nodes — a `derive` step's expression ONE node past the limit (513). LIMIT_EXCEEDED at the path of the offending `expr` member, so an author is told which STEP to come back under; refused at decode rather than left to be a budget each host's evaluator discovers differently (Fuaran-UI Phase 1662)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-filter",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-filter.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].pred",
+      "description": "§21.8 max expression nodes — a `filter` step's PREDICATE one node past the limit (513). The second arm: `filter` and `derive` are separate branches of the step decoder on every host, so a host that bounded one and left the other open would pass a corpus carrying only the `derive` vector (Fuaran-UI Phase 1662)"
+    },
+    {
+      "id": "reject-limit-expr-nodes-transform-bypass",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-expr-nodes-transform-bypass.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.source.pipeline[0].expr",
+      "description": "§21.8 — THE BYPASS that motivated Phase 1662, recorded as a reject. The expression is `param`-leafed and its params are bound, so it is exactly what a `Binding.Expr` would carry and exactly what `Binding.Expr` refuses at 513 nodes; wrapping it in a Transform `derive` step escaped the bound on all five hosts until now. Refusing it is what makes §21.8 a bound on EVERY expression a decoded document can name rather than on one binding case"
     },
     {
       "id": "reject-limit-json-depth",

@@ -1384,6 +1384,47 @@ def _expr_walk(expr: object, seen: list[str], counter: list[int]) -> bool:
     return saw_col
 
 
+def _check_pipeline_expr_bound(pipeline: Value, path: str) -> None:
+    """Phase 1662 - §21.8's node bound over the expressions a ``Binding.Transform``
+    PIPELINE embeds.
+
+    ``MAX_EXPR_NODES`` bounded ``Binding.Expr`` alone until now, which made it
+    bypassable by wrapping the expression in a Transform: a ``derive``'s
+    expression and a ``filter``'s predicate reach the same evaluator and carried
+    no ceiling on any host.
+
+    ``filter`` and ``derive`` are the whole surface - the only pipeline steps
+    carrying an expression; a ``join`` / ``union`` / ``intersect`` / ``except``
+    operand is a data source (embedded table or named ref), never another
+    pipeline - so there is no recursive axis to descend.
+
+    Same budget, counted per EMBEDDED EXPRESSION, refused with ``LIMIT_EXCEEDED``
+    at the path of the offending ``pred`` / ``expr`` member so an author is told
+    which STEP to come back under. The first breach wins. Reads the ENCODED step
+    values, which is the one form both the live-source and snapshot arms produce.
+    """
+    if not isinstance(pipeline, Arr):
+        return
+    for i, step in enumerate(pipeline.items):
+        if not isinstance(step, Obj):
+            continue
+        slot = "pred" if step.tag == "filter" else "expr" if step.tag == "derive" else None
+        if slot is None:
+            continue
+        expr = step.fields.get(slot)
+        if expr is None:
+            continue
+        counter = [0]
+        _expr_walk(expr, [], counter)
+        if counter[0] > MAX_EXPR_NODES:
+            _fail(
+                LIMIT_EXCEEDED,
+                f"{path}.pipeline[{i}].{slot}",
+                f"expression exceeds the maximum of {MAX_EXPR_NODES} expression nodes (WIRE_FORMAT 21.8)",
+                f"at most {MAX_EXPR_NODES} ColExpr nodes in one pipeline expression",
+            )
+
+
 def _decode_expr_binding(obj: dict[str, object], path: str) -> Value:
     """Phase 1534 - ``Binding.Expr``: one ``ColExpr`` evaluated against its params
     alone (WIRE_FORMAT §3.3.2).
@@ -1599,6 +1640,10 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     else:
         source_raw = _normalise_transform_source(source_raw_orig)
         source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
+    # Phase 1662 - §21.8's expression-node bound over the pipeline's own embedded
+    # expressions, at DECODE and not at validation: a document that decodes must
+    # not be able to name an unbounded evaluation.
+    _check_pipeline_expr_bound(pipeline, path)
     fields: dict[str, Value] = {}
     if "params" in obj:
         raw_params = obj["params"]

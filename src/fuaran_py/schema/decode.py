@@ -3842,7 +3842,9 @@ FORM_FIELD_NEAR_MISSES: tuple[tuple[str, str], ...] = (
 )
 
 #: What the silence costs at this position, appended to the refusal message — the same
-#: shape as ``A11Y_NEAR_MISS_CONSEQUENCE``, and pinned to the reference hosts' wording.
+#: shape as ``A11Y_NEAR_MISS_CONSEQUENCE``, and pinned to the reference hosts' wording,
+#: as is the ``form`` vocabulary label the call site passes (Phase 1659 — this host and
+#: ``fuaran-rs`` both said ``form field``, and both moved).
 #: A near-missed rule slot does not merely go unread: the field still renders, and it
 #: constrains nothing at all.
 FORM_FIELD_NEAR_MISS_CONSEQUENCE = ", and the field would accept anything"
@@ -3972,7 +3974,14 @@ def _decode_form(obj: dict, path: str) -> Obj:
             fobj = _expect_object(fld, fpath)
             # The near-miss check runs BEFORE the rule decode, so a field carrying
             # both `validation` and a well-formed `rule` still names the ignored key.
-            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form field", FORM_FIELD_NEAR_MISS_CONSEQUENCE)
+            # The vocabulary LABEL is `form`, not `form field` — Phase 1659. The
+            # reference hosts say "is not part of the form vocabulary" and this host
+            # said "the form field vocabulary": terser, not wrong, and invisible to
+            # every gate, because an op-side reject fixture pins the code and the path
+            # and never the prose. A didactic message that reads differently on two
+            # hosts sends two authors to two documents for one defect, which is the
+            # whole failure `message-parity.json` exists to prevent one level up.
+            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form", FORM_FIELD_NEAR_MISS_CONSEQUENCE)
             id_raw, id_present = _alias_get(fobj, "id", ("name",))
             if not id_present:
                 _fail(MISSING_FIELD, f"{fpath}.id", "missing required field 'id'")

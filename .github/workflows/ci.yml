@@ -70,7 +70,7 @@ jobs:
       run:
         working-directory: fuaran-py
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: fuaran-py
 
@@ -79,7 +79,7 @@ jobs:
       # point of giving it a single home. Pinning here would let this host drift
       # from the spec without anything going red.
       - name: Check out the wire-format conformance corpus
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
@@ -110,7 +110,7 @@ jobs:
       # above gives: pinning would let this host drift from the reference
       # without anything going red.
       - name: Check out the F# reference host (render-parity oracles)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: fuaran-ui/fuaran-dotnet
           path: fuaran-dotnet

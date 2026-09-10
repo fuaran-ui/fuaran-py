@@ -9,12 +9,43 @@ offline snapshot + drift guard is a follow-up.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 
+#: Names the authoritative corpus root explicitly, for a checkout whose directory
+#: depth is not the canonical side-by-side one — a git worktree, say. The same
+#: escape ``conformance/sync_corpus.py`` already takes as a positional argument,
+#: and the same variable the estate's other hosts read.
+#:
+#: Without it a worktree resolves no authority, falls back to the bundled
+#: snapshot, and every drift guard keyed on the authority SKIPS — so a snapshot
+#: that has fallen behind looks exactly like one that is current. That is the
+#: shape this whole module's fallback is careful about everywhere else.
+#:
+#: A value naming a directory with no ``manifest.json`` is REFUSED, never
+#: ignored: falling back to the snapshot would restore the silent skip the
+#: override was set to remove.
+CORPUS_ROOT_ENV = "FUARAN_WIRE_FIXTURES"
+
+
+def _declared_authority() -> Path | None:
+    declared = os.environ.get(CORPUS_ROOT_ENV)
+    if not declared:
+        return None
+    candidate = Path(declared).expanduser()
+    if not (candidate / "manifest.json").is_file():
+        raise RuntimeError(
+            f"{CORPUS_ROOT_ENV}={declared!r} does not name a conformance corpus (no manifest.json under it). "
+            "Point it at the corpus root, or unset it — it is refused rather than ignored, because falling "
+            "back to the bundled snapshot would silently restore the skip the override was set to remove."
+        )
+    return candidate.resolve()
+
+
 # tests/_corpus.py → tests → fuaran-py → Fuaran-UI → wire-format-fixtures
-AUTHORITY_ROOT = Path(__file__).resolve().parents[2] / "wire-format-fixtures"
+AUTHORITY_ROOT = _declared_authority() or Path(__file__).resolve().parents[2] / "wire-format-fixtures"
 # The committed offline snapshot (conformance/sync_corpus.py) — used when the
 # authority is absent (a standalone fuaran-py checkout), so the suite is
 # runnable without the side-by-side workspace. tests/test_corpus_sync.py pins

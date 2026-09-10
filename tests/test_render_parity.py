@@ -23,6 +23,7 @@ as a failure rather than a skip — see that module, and
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
 import pytest
 
@@ -35,29 +36,68 @@ from fuaran_py.renderer import render_html
 # is checked out. Resolution walks up from THIS repo's root (not from the corpus,
 # whose own location varies with the snapshot fallback) — see _reference_host.
 _REFERENCE_HOST_ROOT = reference_host_root()
-_REFERENCE_RENDERER_SOURCES = (
-    ("Fuaran.UI.Renderer.Server", "Render.fs"),
-    ("Fuaran.UI.Renderer", "Render.fs"),
-    ("Fuaran.UI.Renderer.Core", "Theme.fs"),
-    # Phase 525 — the Drawing SVG class vocabulary (fuaran-drawing*) lives here.
-    ("Fuaran.UI.Renderer.Core", "DrawingSvg.fs"),
-    # Phase 207 — the per-kind class/id BUILDER vocabulary. The composition
-    # prefixes that used to sit inline in the two `Render.fs` files
-    # (`fuaran-custom-`, `fuaran-badge-`, …) are now spelled only in this module,
-    # so a source list without it extracts an oracle missing every prefix — which
-    # is what the non-triviality guard below caught.
-    ("Fuaran.UI.Renderer.Core", "Css.fs"),
-    # fuaran#1130 — the rating control's own class family (`fuaran-rating-hit`,
-    # the star fill classes) is spelled in its own client-tier module.
-    ("Fuaran.UI.Renderer", "RatingControl.fs"),
-)
-_REFERENCE_RENDERER_FILES = (
-    []
-    if _REFERENCE_HOST_ROOT is None
-    else [_REFERENCE_HOST_ROOT / "src" / project / name for project, name in _REFERENCE_RENDERER_SOURCES]
-)
+
+#: The reference renderer PROJECTS. The vocabulary is DERIVED from every ``.fs``
+#: under each — never a hand-kept file list (Phase 1654, fuaran#1139).
+#:
+#: A hand-kept list is the thing that failed. It named four files; the reference
+#: then factored its class spellings into ``Renderer.Core/Css.fs`` (whose own
+#: header says it exists so a class spelled inline in several places can no
+#: longer drift — the anti-drift refactor broke the drift detector), into
+#: ``Renderer/Runtime.fs`` and ``Renderer.Server/Registry.fs`` for the
+#: ``fuaran-custom-`` composition, and into ``Renderer/RatingControl.fs``. Each
+#: was appended one incident later, which resets the clock rather than closing
+#: the class. A project glob cannot go stale that way: a new module inside these
+#: projects is read the day it lands.
+#:
+#: ``*.Tests`` projects are excluded — a test's expectation string is not the
+#: reference's own spelling, and admitting them would let an oracle be satisfied
+#: by an assertion about the very drift it is checking for.
+_REFERENCE_RENDERER_PROJECT_PREFIX = "Fuaran.UI.Renderer"
+
+
+def _reference_renderer_files() -> list[Path]:
+    if _REFERENCE_HOST_ROOT is None:
+        return []
+    src = _REFERENCE_HOST_ROOT / "src"
+    if not src.is_dir():
+        return []
+    projects = sorted(
+        d
+        for d in src.iterdir()
+        if d.is_dir() and d.name.startswith(_REFERENCE_RENDERER_PROJECT_PREFIX) and not d.name.endswith(".Tests")
+    )
+    return sorted(p for project in projects for p in project.rglob("*.fs"))
+
+
+_REFERENCE_RENDERER_FILES = _reference_renderer_files()
 
 _CLASS_TOKEN = re.compile(r"fuaran-[a-zA-Z0-9-]*")
+_FS_BLOCK_COMMENT = re.compile(r"\(\*.*?\*\)", re.S)
+_FS_LINE_COMMENT = re.compile(r"//.*?$", re.M)
+
+#: A prefix this short admits everything the emitted-class scan can produce, so
+#: extracting one silently turns the whole oracle into a tautology. See
+#: :func:`test_reference_vocabulary_admits_no_degenerate_prefix`.
+_DEGENERATE_PREFIXES = frozenset({"fuaran-"})
+
+
+def _strip_fs_comments(text: str) -> str:
+    """Drop F# comments before extracting class tokens.
+
+    **This is what stops the oracle being vacuous, and it was not merely tidiness**
+    (Phase 1654). The reference's doc comments legitimately contain prose about
+    the vocabulary — a markup example spelling ``class="fuaran-icon
+    fuaran-{kind}-icon"``, a sentence about "every ``fuaran-``-shaped token" — and
+    the bare ``fuaran-`` those yield was extracted as a composition PREFIX. A
+    prefix of ``fuaran-`` matches every class the emitted-class scan collects, by
+    construction, so the parity assertion below passed for any string whatsoever.
+
+    Stripping comments is the narrow fix and the degenerate-prefix guard below is
+    the general one; both are kept, because the guard is what will catch the next
+    way a too-short prefix gets in.
+    """
+    return _FS_LINE_COMMENT.sub("", _FS_BLOCK_COMMENT.sub("", text))
 
 
 def _reference_vocabulary() -> tuple[frozenset[str], frozenset[str]]:
@@ -70,7 +110,7 @@ def _reference_vocabulary() -> tuple[frozenset[str], frozenset[str]]:
     exact: set[str] = set()
     prefixes: set[str] = set()
     for path in _REFERENCE_RENDERER_FILES:
-        for token in _CLASS_TOKEN.findall(path.read_text(encoding="utf-8")):
+        for token in _CLASS_TOKEN.findall(_strip_fs_comments(path.read_text(encoding="utf-8"))):
             (prefixes if token.endswith("-") else exact).add(token)
     return frozenset(exact), frozenset(prefixes)
 
@@ -98,20 +138,31 @@ def test_reference_host_resolves_in_a_cross_host_checkout() -> None:
     assert diagnosis is None, diagnosis
 
 
-def test_reference_renderer_sources_are_all_present_when_the_host_is() -> None:
-    """A resolved host with a moved source file must fail, not skip.
+def test_reference_renderer_projects_are_found_when_the_host_is() -> None:
+    """A resolved host that yields NO renderer sources must fail, not skip.
 
-    ``reference_renderer_required`` is an all-or-nothing gate, so an F# project or
-    file rename would take the whole oracle offline in the same silent way the
-    directory rename did. Naming the missing paths keeps that a one-line fix.
+    The source set is derived, so a moved FILE can no longer take the oracle
+    offline — that whole failure mode is gone with the literal. What is still
+    reachable is a moved or renamed PROJECT: rename ``Fuaran.UI.Renderer.Core``
+    and the glob quietly returns a smaller set, and rename every one of them and
+    it returns nothing at all, at which point ``reference_renderer_required``
+    skips the entire gate. This test never skips on a resolved host.
     """
     if _REFERENCE_HOST_ROOT is None:
         pytest.skip("no F# reference host checked out (the cross-host guard covers the wrong-path case)")
-    missing = [str(p) for p in _REFERENCE_RENDERER_FILES if not p.is_file()]
-    assert not missing, (
-        f"the F# reference host resolved at {_REFERENCE_HOST_ROOT} but these vocabulary sources are missing: "
-        f"{missing}. Update _REFERENCE_RENDERER_SOURCES to the new paths — leaving them stale silently "
-        "disables the whole class-vocabulary parity gate."
+    assert _REFERENCE_RENDERER_FILES, (
+        f"the F# reference host resolved at {_REFERENCE_HOST_ROOT} but no `.fs` sources were found under any "
+        f"src/{_REFERENCE_RENDERER_PROJECT_PREFIX}* project. If the renderer projects were renamed, update "
+        "_REFERENCE_RENDERER_PROJECT_PREFIX — an empty source set silently disables the whole "
+        "class-vocabulary parity gate."
+    )
+    # A floor on the project COUNT, so losing one project to a rename is a red
+    # rather than a quietly narrower oracle. Four ship today
+    # (Renderer, Renderer.Core, Renderer.Server, Renderer.Web).
+    projects = {p.relative_to(_REFERENCE_HOST_ROOT / "src").parts[0] for p in _REFERENCE_RENDERER_FILES}
+    assert len(projects) >= 4, (
+        f"only {sorted(projects)} resolved as reference renderer projects; the oracle reads fewer sources "
+        "than it did. A project rename narrows the vocabulary silently — that is how this gate drifted before."
     )
 
 
@@ -144,7 +195,56 @@ def test_reference_vocabulary_is_non_trivial() -> None:
     exact, prefixes = _reference_vocabulary()
     assert len(exact) > 50
     assert "fuaran-node" in exact
+    # Still spelled — at `Fuaran.UI.Renderer/Runtime.fs`, which the retired
+    # hand-kept file list did not name. Do NOT relax this to accommodate an
+    # extractor that stopped finding it: that reading was tried on the 1139 py
+    # leg and was wrong, and relaxing it deletes a correct check.
     assert "fuaran-custom-" in prefixes
+
+
+@reference_renderer_required
+def test_reference_vocabulary_admits_no_degenerate_prefix() -> None:
+    """The oracle must not contain a prefix that admits everything.
+
+    **This is the assertion that would have caught the vacuity, and nothing else
+    did** (Phase 1654). Every guard around it measured the vocabulary's SIZE —
+    ">50 exact classes", "``fuaran-node`` is present", "``fuaran-custom-`` is
+    present" — and a vocabulary can be large, correct in every named member, and
+    still admit every possible input, because one over-broad prefix subsumes the
+    lot. The bare ``fuaran-`` was extracted from the reference's own doc comments
+    for as long as those comments have existed, and under it
+    ``test_emitted_classes_are_in_reference_vocabulary`` below passed for any
+    string beginning ``fuaran-``: the parity lock was reporting success while
+    checking nothing.
+
+    A size guard cannot see that, in principle and not just in this instance —
+    which is why this test asks the opposite question: not "is the oracle big
+    enough" but "can the oracle still say no".
+    """
+    _, prefixes = _reference_vocabulary()
+    degenerate = sorted(prefixes & _DEGENERATE_PREFIXES)
+    assert not degenerate, (
+        f"the extracted prefix set contains {degenerate}, which admits every class this host can emit — "
+        "the parity assertion is a tautology while it is there. It comes from prose (a doc-comment markup "
+        "example, or a sentence about the vocabulary) leaking into the extraction; check _strip_fs_comments "
+        "still covers the comment form the reference used."
+    )
+
+
+@reference_renderer_required
+def test_the_parity_oracle_can_refuse_a_class_the_reference_never_spells() -> None:
+    """The go-red proof for the assertion below, run in-process.
+
+    A parity lock that has silently gone vacuous looks exactly like one that is
+    passing, so the falsifier is worth a test of its own rather than a comment
+    claiming the check works.
+    """
+    exact, prefixes = _reference_vocabulary()
+    invented = "fuaran-a-class-the-reference-host-does-not-spell"
+    assert invented not in exact and not any(invented.startswith(p) for p in prefixes), (
+        "the oracle admits an invented class, so it admits anything — see "
+        "test_reference_vocabulary_admits_no_degenerate_prefix for the mechanism."
+    )
 
 
 def test_drawing_label_rotation_anchors_at_the_label_position() -> None:

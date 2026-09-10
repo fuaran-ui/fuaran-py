@@ -428,15 +428,41 @@ def _prune_and_substitute(
     pipeline: list[Transform],
     env: dict[str, Cell],
     list_env: dict[str, list[Cell]] | None = None,
+    unbound: set[str] | None = None,
 ) -> list[Transform]:
-    """Substitute bound LIST params, drop filters referencing an unbound param, then
-    substitute bound scalar params.
+    """Substitute bound LIST params, drop filters naming a DECLARED-but-unresolved
+    param, then substitute bound scalar params.
 
     The ORDER is the rule (Phase 610): a substituted ``InParam`` becomes an ``InList``
-    and so names no param at all, while an unbound one survives naming its own and is
+    and so names no param at all, while an unresolved one survives naming its own and is
     caught by the prune — one rule, both param kinds. A name bound to the *other* kind
     counts as bound here, so its surviving hole is NOT pruned and reaches the evaluator's
-    strict ``UNBOUND_PARAM`` rather than being silently dropped."""
+    strict ``UNBOUND_PARAM`` rather than being silently dropped.
+
+    **The prune keys on ``unbound`` — the DECLARED names that failed to resolve — and
+    not on the complement of the resolved env** (Phase 1654, normalising to the F#/TS
+    reading). The two agree on every well-formed document and differ on exactly one
+    shape: a filter naming a param that appears in NO ``params`` entry at all.
+
+    * Under the complement rule this host used, that name is "not bound", so the filter
+      is PRUNED — the grid silently shows unfiltered rows.
+    * Under the declared-set rule the reference pair uses, the name was never declared,
+      so it is not unresolved either; the filter survives and reaches the evaluator's
+      strict ``UNBOUND_PARAM``.
+
+    The reference reading is right, and not merely normative-because-two-hosts-agree.
+    Leniency here has a stated purpose — an unset filter chip means "no constraint" —
+    and it is a statement about a control the document DECLARED and the host could not
+    resolve. A name with no declaration is not an unset control; it is a document that
+    refers to something that does not exist, which is a defect, and answering a defect
+    with silently-unfiltered rows is the worst of the available answers: the caller sees
+    plausible data. No corpus fixture reaches this shape (every fixture is well-formed),
+    which is exactly why it went unnoticed and why it would have surfaced first as a
+    cross-host disagreement rather than as a failure anywhere.
+
+    ``unbound`` defaults to the complement of the resolved names, preserving the old
+    behaviour for a caller that cannot distinguish the two sets — but the one caller in
+    this package passes the declared set, and a new caller that cannot should ask why."""
     list_env = list_env or {}
     if list_env:
         pipeline = substitute_list_params(pipeline, list_env)
@@ -444,8 +470,10 @@ def _prune_and_substitute(
     out: list[Transform] = []
     for step in pipeline:
         if isinstance(step, Filter):
-            if _expr_param_names(step.pred) - bound:
-                continue  # unbound-param filter → no constraint (host leniency)
+            names = _expr_param_names(step.pred)
+            unresolved = (names - bound) if unbound is None else (names & unbound)
+            if unresolved:
+                continue  # declared-but-unset filter → no constraint (host leniency)
             out.append(Filter(_substitute_expr(step.pred, env)))
         elif isinstance(step, Derive):
             out.append(Derive(step.name, _substitute_expr(step.expr, env)))
@@ -555,6 +583,11 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
 
     env: dict[str, Cell] = {}
     list_env: dict[str, list[Cell]] = {}
+    # The DECLARED names that did not resolve. This is what the prune keys on, and it is
+    # deliberately not the complement of `env` — see `_prune_and_substitute`. A name that
+    # appears in no `params` entry is neither bound nor unbound: it is undeclared, and
+    # only the reference pair's strict refusal is a truthful answer to it.
+    unbound: set[str] = set()
     params = transform.fields.get("params")
     if isinstance(params, Arr):
         for entry in params.items:
@@ -570,8 +603,12 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
                         # Phase 610 — a LIST param resolves by SUBSTITUTION, so it never
                         # enters the scalar env.
                         list_env[name] = resolution.cells
+                    else:
+                        # `unbound`, and the EMPTY list selection, which is unbound rather
+                        # than an empty membership set (the reference records the same).
+                        unbound.add(name)
 
-    effective = _prune_and_substitute(pipe.value, env, list_env)
+    effective = _prune_and_substitute(pipe.value, env, list_env, unbound)
     result = eval_pipeline(effective, src.value.table)
     if not result.ok:
         return ComputeErr(result.error)

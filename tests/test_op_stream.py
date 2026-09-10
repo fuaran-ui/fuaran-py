@@ -349,6 +349,53 @@ def test_sink_rejects_duplicate_sequence() -> None:
         sink.append(r)
 
 
+def test_sink_rejects_a_duplicate_BELOW_the_head_sequence() -> None:
+    """The discriminator for the plausible wrong duplicate guard (Phase 1654).
+
+    The guard was an O(n) scan of the whole log per append. Indexing it is
+    correct, but only against the set of sequences PRESENT — an index of the
+    maximum alone (which the sink already keeps, for ``latest_sequence`` and
+    ``head``) would admit a re-append of any sequence below the head, which is
+    exactly what a gap-fill or a replayed partial batch offers. That admission
+    would be an overwrite in a sink whose stated contract is that it refuses
+    them, and the append would look entirely successful.
+    """
+    sink = InMemorySink()
+
+    def _rec(sequence: int) -> OpRecord:
+        return OpRecord(
+            stream_id="s",
+            sequence=sequence,
+            previous_hash=GENESIS_PREVIOUS_HASH,
+            hash=f"h{sequence}",
+            op=Obj("RemoveNode", {"target": f"n{sequence}"}),
+            actor=HumanActor("u"),
+            timestamp_unix_seconds=1700000000,
+        )
+
+    for sequence in (1, 2, 3):
+        sink.append(_rec(sequence))
+    assert sink.latest_sequence("s") == 3
+
+    with pytest.raises(ValueError, match="duplicate"):
+        sink.append(_rec(2))
+    assert len(sink.replay("s", 0, 99)) == 3
+
+    # And the guard is per stream, not global — the same sequence on a second
+    # stream is an ordinary append.
+    other = OpRecord(
+        stream_id="t",
+        sequence=2,
+        previous_hash=GENESIS_PREVIOUS_HASH,
+        hash="h2t",
+        op=Obj("RemoveNode", {"target": "n2"}),
+        actor=HumanActor("u"),
+        timestamp_unix_seconds=1700000000,
+    )
+    sink.append(other)
+    assert sink.latest_sequence("t") == 2
+
+
 # ── Compare-and-append — concurrent writers ──────────────────────────────────
 
 

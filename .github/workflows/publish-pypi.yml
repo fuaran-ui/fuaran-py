@@ -24,6 +24,35 @@
 #     CI passed can be behind it minutes later when the tag is cut; the first v0.1.0 tag failed
 #     that way, deep inside `test_corpus_sync`, and had to be withdrawn and re-cut. Refusing up
 #     front makes the failure read as what it is — a stale snapshot, not a broken host.
+#
+# ── THE STEP A RELEASE OFTEN NEEDS AND NOTHING ELSE ASKS FOR: the no-op re-sync ──────────
+#
+# The drift refusal above compares the authority COMMIT the snapshot records against the
+# authority's HEAD, and nothing else. It is deliberately not a payload diff: the authority is
+# a REPOSITORY, and a snapshot that cannot say which revision of it was copied cannot answer
+# "is this current" at all — only "do these bytes happen to match today's", which is a
+# different and weaker claim. `conformance/corpus/snapshot.json` is what carries the answer.
+#
+# The cost of that choice, which is real and lands on the person cutting a tag: a corpus
+# commit touching NO bundled fixture — a README edit, a doc pointer, a change under
+# `conformance/` or `dag/` or any path the sync does not copy — still moves the authority's
+# HEAD, so the recorded commit no longer equals it and this job refuses, with the snapshot's
+# payload byte-for-byte correct. The refusal is accurate ("your snapshot was taken from an
+# older revision") and reads as alarming ("the corpus moved and you did not adopt it").
+#
+# So the recipe is: BEFORE cutting a `v*` tag, run
+#
+#     python conformance/sync_corpus.py
+#
+# and commit whatever it writes — frequently `conformance/corpus/snapshot.json` alone. That
+# is a legitimate, expected commit and not a workaround; it is the snapshot recording which
+# revision of the authority it was last checked against. Run it even when you are confident
+# no fixture changed: confirming it costs one command, and discovering it costs a withdrawn
+# tag (the version cannot simply be re-tagged — `skip-existing` is absent above, on purpose).
+#
+# Do NOT "fix" this by making `--check` diff the payload instead. That would report a stale
+# snapshot as current whenever the authority's change happened to miss the copied set, which
+# is precisely the state a release must not be able to enter unknowingly.
 name: publish-pypi
 
 on:

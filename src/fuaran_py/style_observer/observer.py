@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from typing import Any
@@ -30,6 +31,31 @@ from .flags import (
 from .manifest_flags import per_node_flags
 
 Subscriber = Callable[[str, StyleObservation], None]
+
+_LOG = logging.getLogger(__name__)
+
+
+def _notify(subscribers: list[Subscriber], node_id: str, obs: StyleObservation) -> None:
+    """Emit to every subscriber; a throwing one is REPORTED, then stepped over.
+
+    Isolation is the requirement — one host's broken callback must not stop the
+    observation reaching the others, and must not propagate out of the
+    ``MutationObserver`` callback that drove the read. Silence is not. A swallowed
+    exception here is a host bug with no symptom at all: the flags simply stop
+    arriving at one subscriber while every other signal says the observer is
+    working, and the only evidence that a question was asked is the absence of an
+    answer nobody is watching for.
+
+    ``logging`` is what makes it visible without changing the contract, and it is
+    stdlib, so the host's stdlib-only posture is untouched. Under Pyodide the
+    last-resort handler's stderr write reaches the browser console, which is where
+    a client-side host would look for it anyway.
+    """
+    for sub in subscribers:
+        try:
+            sub(node_id, obs)
+        except Exception:  # noqa: BLE001 — a throwing subscriber must not poison siblings.
+            _LOG.exception("style observer subscriber raised for node %r; continuing", node_id)
 
 
 def _with_manifest(manifest: ThemeManifest | None, obs: StyleObservation) -> StyleObservation:
@@ -56,11 +82,7 @@ class InMemoryStyleObserver:
         return _with_manifest(self._manifest, to_style_observation(self._options, node_id, inp))
 
     def _emit(self, node_id: str, obs: StyleObservation) -> None:
-        for sub in self._subscribers:
-            try:
-                sub(node_id, obs)
-            except Exception:  # noqa: BLE001 — a throwing subscriber must not poison siblings.
-                pass
+        _notify(self._subscribers, node_id, obs)
 
     def register_fixture(self, node_id: str, inp: StyleInput, parent: str | None = None) -> None:
         """Register or replace a fixture; fires an initial emission unconditionally."""
@@ -269,11 +291,7 @@ class BrowserStyleObserver:
         initial = previous is None
         self._last_flags[node_id] = obs.flags
         if initial or not self._options.emit_on_flag_change_only or not flags_equal(obs.flags, previous or []):
-            for sub in self._subscribers:
-                try:
-                    sub(node_id, obs)
-                except Exception:  # noqa: BLE001
-                    pass
+            _notify(self._subscribers, node_id, obs)
 
     def refresh_all(self, root_id: str) -> None:
         """Re-read every node under ``root_id`` and emit changed observations."""
@@ -282,11 +300,7 @@ class BrowserStyleObserver:
             initial = previous is None
             self._last_flags[obs.node_id] = obs.flags
             if initial or not self._options.emit_on_flag_change_only or not flags_equal(obs.flags, previous or []):
-                for sub in self._subscribers:
-                    try:
-                        sub(obs.node_id, obs)
-                    except Exception:  # noqa: BLE001
-                        pass
+                _notify(self._subscribers, obs.node_id, obs)
 
     def connect(self, root_id: str) -> None:
         """Wire a live ``MutationObserver`` (Pyodide-only) that re-derives on class/style/tone mutations."""

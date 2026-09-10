@@ -702,46 +702,65 @@ class Renderer:
         return element("div", [("class", "fuaran-layout-stepper")], numbers + body)
 
     def _modal(self, node: Node, fields: dict[str, Value]) -> str:
-        # Overlay render-fidelity contract (server half): the overlay is ALWAYS
-        # emitted (no portal), positioned + z-indexed by CSS; closed = the
-        # `hidden` attribute. role="dialog" + aria-modal — byte-identical structure
-        # to the client renderer so hydration finds the DOM it expects.
+        """The overlay's two MODALITIES, which are two class families and not one.
+
+        Overlay render-fidelity contract (server half): the surface is ALWAYS
+        emitted (no portal, ever, in either modality), positioned by CSS; closed
+        is the ``hidden`` attribute rather than omission.
+
+        **The two modalities do not share markup, and reading them as one shape
+        with a modifier class is the mistake this host made** (Phase 1654; found
+        by making the class-vocabulary parity oracle non-vacuous, which is how a
+        divergence in a family the stylesheet already styles had gone unseen).
+
+        - A **blocking modal** is a scrim (``fuaran-modal-overlay``) wrapping a
+          dialog (``fuaran-modal-dialog``), which claims ``aria-modal="true"``.
+        - A **popover** carries the ``fuaran-popover`` family and **no scrim
+          element at all** — the page behind it is genuinely still available, so
+          there is nothing to cover, and the anchor declaration rides the OUTER
+          element as ``data-fuaran-popover-anchor``, recording that the id was
+          read. It carries the dialog role WITHOUT ``aria-modal``: that is the
+          INERTNESS claim, and emitting it here tells assistive technology the
+          rest of the page is unreachable when it is not (fuaran#1119).
+
+        The class names are the reference host's, exactly, because the byte-copied
+        reference stylesheet styles those and nothing else — a popover under the
+        modal family renders unstyled and a ``fuaran-popover-overlay`` scrim is a
+        class no stylesheet in the estate has a rule for.
+        """
         is_open = resolve_binding(fields.get("open"), self.sources) is True
+        popover = fields.get("modality") == "Popover"
+        prefix = "fuaran-popover" if popover else "fuaran-modal"
+
         parts: list[str] = []
         heading = fields.get("heading")
         if heading is not None:
-            parts.append(text_element("h2", [("class", "fuaran-modal-heading")], self._text(heading)))
+            parts.append(text_element("h2", [("class", f"{prefix}-heading")], self._text(heading)))
         if fields.get("dismissable") is True:
             parts.append(
                 text_element(
                     "button",
-                    [("class", "fuaran-modal-dismiss"), ("type", "button"), ("aria-label", "Close")],
+                    [("class", f"{prefix}-dismiss"), ("type", "button"), ("aria-label", "Close")],
                     "×",
                 )
             )
-        parts.append(element("div", [("class", "fuaran-modal-body")], self._children_html(fields)))
-        # fuaran#1119 — `aria-modal` is the INERTNESS claim, and it is emitted for
-        # the BLOCKING modality alone. A non-blocking anchored surface carries the
-        # dialog role WITHOUT it, because the page behind it is genuinely still
-        # available; a host emitting it there tells assistive technology the rest
-        # of the page is unreachable when it is not.
-        blocking = fields.get("modality") != "Popover"
-        dialog_attrs: list[tuple[str, str]] = [
-            ("class", "fuaran-modal-dialog" if blocking else "fuaran-modal-dialog fuaran-popover"),
+        parts.append(element("div", [("class", f"{prefix}-body")], self._children_html(fields)))
+
+        surface_attrs: list[tuple[str, str]] = [
+            ("class", "fuaran-popover-surface" if popover else "fuaran-modal-dialog"),
             ("role", "dialog"),
         ]
-        if blocking:
-            dialog_attrs.append(("aria-modal", "true"))
-        anchor = fields.get("anchor")
-        if isinstance(anchor, str):
-            dialog_attrs.append(("data-fuaran-anchor", anchor))
-        dialog = element("div", dialog_attrs, "".join(parts))
-        overlay_attrs: list[tuple[str, str]] = [
-            ("class", "fuaran-modal-overlay" if blocking else "fuaran-modal-overlay fuaran-popover-overlay")
-        ]
+        if not popover:
+            surface_attrs.append(("aria-modal", "true"))
+        surface = element("div", surface_attrs, "".join(parts))
+
+        outer_attrs: list[tuple[str, str]] = [("class", "fuaran-popover" if popover else "fuaran-modal-overlay")]
         if not is_open:
-            overlay_attrs.append(("hidden", ""))
-        return element("div", overlay_attrs, dialog)
+            outer_attrs.append(("hidden", ""))
+        anchor = fields.get("anchor")
+        if popover and isinstance(anchor, str):
+            outer_attrs.append(("data-fuaran-popover-anchor", anchor))
+        return element("div", outer_attrs, surface)
 
     def _scroll_area(self, node: Node, fields: dict[str, Value]) -> str:
         axis = {"Horizontal": "horizontal", "Both": "both"}.get(str(fields.get("orientation")), "vertical")

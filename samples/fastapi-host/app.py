@@ -37,6 +37,7 @@ then open http://127.0.0.1:14140/. See README.md (incl. the equivalent Django vi
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 import time
 from collections.abc import Callable
@@ -53,6 +54,10 @@ from fuaran_py.renderer import reference_css_path, render_html
 #: body member, for the reason the endpoint itself gives: a body is the thing
 #: most likely to be logged wholesale by an intermediary.
 SECRET_HEADER = "X-Sample-Secret"
+
+#: A decode failure is the one thing this route refuses on that the CALLER
+#: cannot fix and the OPERATOR can, so it is the one refusal that is logged.
+_LOG = logging.getLogger(__name__)
 
 #: Long enough for any real authoring prompt, short enough that a scripted
 #: caller cannot make each request expensive.
@@ -220,6 +225,21 @@ def create_app(client: FuaranClient | None = None, policy: Policy | None = None)
                 # a 200, which the page rendered as an empty panel and the caller
                 # recorded as a successful turn - while still holding the tree
                 # that could not be decoded, so every later repair built on it.
+                #
+                # The structured error goes to the SERVER LOG and not into the
+                # response, and the split is deliberate. The operator is the one
+                # who can act on `$.kind.value` / MISSING_FIELD - it names which
+                # endpoint emitted what - while the caller can only retry, so
+                # returning the path would leak the deployment's internals to
+                # whoever can reach the route in exchange for nothing. Logging it
+                # is what keeps this a diagnosable failure rather than an opaque
+                # 502 that recurs with no evidence anywhere.
+                _LOG.error(
+                    "generate: the endpoint produced a tree this host could not decode (%s at %s: %s)",
+                    decoded.error.code,
+                    decoded.error.path,
+                    decoded.error.message,
+                )
                 return _refuse(
                     502,
                     "MALFORMED_TREE",

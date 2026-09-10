@@ -1649,6 +1649,55 @@ def _decode_children(value: object, path: str) -> Value:
     return Arr([_decode_node_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
 
 
+def _decode_closure_slot(_value: object, _path: str) -> Value:
+    """A ``fn``-typed slot — PRESENCE-ONLY, normalising to the ``<closure>`` sentinel.
+
+    The IDL declares these slots ``{"$type":"fn", "wire":"<closure>"}``: a host
+    closure whose BEHAVIOUR cannot cross the wire at all, so the only thing the
+    bytes can say is whether the emitter had one. The reference host reads exactly
+    that — a present key of ANY value reconstructs an inert placeholder, an absent
+    key stays absent — and re-encodes the sentinel whatever came in.
+
+    So this decoder deliberately does not type its input, and normalising is the
+    parity point rather than a tidy-up: left structural, this host re-encoded
+    whatever it was handed, so a document spelling ``"onSelect": 42`` round-tripped
+    as ``42`` here and as ``"<closure>"`` at the reference. Identical for every
+    well-formed document, since the only spelling an emitter produces is the
+    sentinel itself.
+    """
+    return "<closure>"
+
+
+def _decode_string_list(value: object, path: str) -> Value:
+    """An array of plain strings, each refused by index (the reference's shape)."""
+    arr = _expect_array(value, path)
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_tab_header(value: object, path: str) -> Value:
+    """One ``TabHeader`` — ``label`` required (``TextSource``), ``icon`` / ``disabled`` optional.
+
+    A record nested one level inside an ARRAY, which is the position a host walking
+    elements with a looser walker than its records gets wrong: before this, every
+    member of every header decoded structurally, so a non-string ``icon`` or a
+    header with no ``label`` at all round-tripped byte-perfectly.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {"label": _decode_text_source(_require(obj, "label", path), f"{path}.label")}
+    if "icon" in obj:
+        # A BARE string, matching the reference (`decodeIconSource` is
+        # `requireString`) and every other icon slot in this host.
+        fields["icon"] = _expect_string(obj["icon"], f"{path}.icon")
+    if "disabled" in obj:
+        fields["disabled"] = _decode_binding_bool(obj["disabled"], f"{path}.disabled")
+    return Obj(None, fields)
+
+
+def _decode_tab_headers(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_tab_header(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
 def _decode_switch_case(value: object, path: str) -> Value:
     # One Switch case (Phase 392): ``{"child":<Node>,"match":<string>}``.
     #
@@ -2562,13 +2611,11 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     # Tabs / Stepper carry the language's only two ``Binding<int>`` slots, and
     # had no typed schema at all — so the whole kind reached the structural
-    # pass-through and `activeIndex: true` decoded happily. These entries are
-    # DELIBERATELY MINIMAL: they type the numeric slot and nothing else, leaving
-    # every other key (`children`, `tabHeaders`, `tabTags`, `activeTag`,
-    # `onSelect`, …) to the same structural preservation it had before, so the
-    # blast radius is the slot this phase is about. Requiredness follows the
-    # reference host: `activeIndex` is optional (`tryField`), `activeStep`
-    # required (`requireField`).
+    # pass-through and `activeIndex: true` decoded happily. Phase 1064 typed the
+    # numeric slot and nothing else, DELIBERATELY: the blast radius was the slot
+    # that phase was about, and it recorded the rest as residue. Requiredness
+    # follows the reference host: `activeIndex` is optional (`tryField`),
+    # `activeStep` required (`requireField`).
     # `children` was added to both after the audit above: minimal is not the same
     # as blind, and leaving a node-valued position structural is the one omission
     # that costs more than it saves.
@@ -2579,13 +2626,38 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # spelling a SECOND canonical form. `Stepper.activeStep` is deliberately NOT
     # given the same treatment — it is IDL-`required`, not omit-at-default, and
     # this decoder must not invent a rule the artefact does not state.
+    #
+    # Phase 1654 — the 1064 residue: BOTH SPECS ARE NOW COMPLETE against the
+    # corpus IDL's `kinds` entry for each, every member typed to the reference
+    # host's own reading (`JsonDecode.fs`'s `"Tabs"` / `"Stepper"` arms):
+    #   * `orientation` — omit-at-default `Horizontal`, the ordinary §3.6 enum
+    #     treatment, with the `Row`/`Column` aliases every other orientation slot
+    #     in this host accepts;
+    #   * `tabHeaders` — an array of records whose `label` is REQUIRED, so a
+    #     header with no label is now a `MISSING_FIELD` rather than a document
+    #     that round-trips perfectly and renders an unnamed tab;
+    #   * `tabTags` — an array of plain strings, refused by index;
+    #   * `activeTag` — the tag-side selection, a `Binding<string>`; the second
+    #     way a `Tabs` is live, which the validator already reads;
+    #   * `onSelect` / `onSelectTag` — `fn` slots, presence-only and normalised
+    #     to the sentinel (see `_decode_closure_slot`).
+    # `Stepper` gains the one member it was missing (`onSelect`). Nothing here
+    # invents a rule the IDL does not state — a member's requiredness, its
+    # omit-at-default and its type all come from that artefact.
     "Tabs": [
         ("activeIndex", False, _omit_default_binding_static_int(0)),
         ("children", True, _decode_children),
+        ("orientation", False, _omit_default_enum(ORIENTATION, ORIENTATION_ALIASES, "Horizontal", "Orientation")),
+        ("tabHeaders", False, _decode_tab_headers),
+        ("tabTags", False, _decode_string_list),
+        ("activeTag", False, _decode_binding_string),
+        ("onSelect", False, _decode_closure_slot),
+        ("onSelectTag", False, _decode_closure_slot),
     ],
     "Stepper": [
         ("activeStep", True, _decode_binding_int),
         ("children", True, _decode_children),
+        ("onSelect", False, _decode_closure_slot),
     ],
     # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
     # field schema, because it re-nests `layout` and role-validates.

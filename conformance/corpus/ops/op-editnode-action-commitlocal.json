@@ -1,0 +1,1 @@
+{"$type":"EditNode","newKind":{"$type":"Button","label":"Apply","onClick":{"$type":"CommitLocal","nodeId":"salary-input"},"variant":"Primary"},"target":"btn-apply"}

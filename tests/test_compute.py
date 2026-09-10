@@ -94,6 +94,35 @@ def test_param_filter_pruned_when_unbound() -> None:
 
 
 @corpus_required
+def test_a_filter_naming_an_UNDECLARED_param_is_refused_not_pruned() -> None:
+    """Phase 1654 — the prune is about DECLARED-but-unset, never about undeclared.
+
+    Take the parameterised fixture and delete its ``params`` entry, leaving the
+    filter still naming ``dept``. Every corpus fixture is well-formed, so no
+    fixture reaches this shape and nothing else in the suite distinguishes the
+    two readings — which is why this host and the reference pair disagreed here
+    unnoticed, and why the disagreement would have surfaced first as two hosts
+    rendering different rows rather than as a failure anywhere.
+
+    The pruning answer is the dangerous one: it shows the caller the UNFILTERED
+    table, which looks like data. Leniency exists for an unset filter control
+    the document declared; a name the document never declared is a defect, and
+    the strict ``UNBOUND_PARAM`` is the only truthful answer to it.
+    """
+    node = _decode("grid-transform-param.json")
+    source = node.kind.fields["source"]
+    assert isinstance(source, Obj)
+    undeclared = Obj(source.tag, {k: v for k, v in source.fields.items() if k != "params"})
+    assert "params" not in undeclared.fields, "the fixture must have LOST its declaration for this to test anything"
+
+    result = evaluate_transform(undeclared, {})
+    assert not isinstance(result, ComputeOk), (
+        f"a filter naming an undeclared param must not silently show unfiltered rows; got {result}"
+    )
+    assert result.error.code == UNBOUND_PARAM
+
+
+@corpus_required
 @pytest.mark.parametrize(
     ("dept", "expected"),
     [("eng", [{"dept": "eng", "amount": 100}]), ("sales", [{"dept": "sales", "amount": 90}])],

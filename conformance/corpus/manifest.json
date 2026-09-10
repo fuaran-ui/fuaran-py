@@ -2,6 +2,7 @@
   "version": 1,
   "schema": "schema.json",
   "idl": "idl.json",
+  "renderFidelity": "render-fidelity.json",
   "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. See fuaran-dotnet/docs/WIRE_FORMAT.md.",
   "kinds": [
     "Badge",
@@ -2865,6 +2866,14 @@
       "inputFile": "ops/op-editnode.json",
       "expectedFile": "ops/op-editnode.json",
       "description": "EditNode"
+    },
+    {
+      "id": "op-editnode-action-commitlocal",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-editnode-action-commitlocal.json",
+      "expectedFile": "ops/op-editnode-action-commitlocal.json",
+      "description": "EditNode-action-commitlocal"
     },
     {
       "id": "op-insertchild",

@@ -11,8 +11,9 @@ A node decomposes into independent **facets**, each merged on its own:
 
 * ``kind`` — the node's own kind-fields (children + style + state + accessibility
   neutralised in the canonical probe).
-* ``style.{tone,weight,emphasis,role,voice}`` — the ``SemanticStyle`` sub-fields,
-  merged *independently* (A's tone + B's voice auto-blend on the same node).
+* ``style.{tone,weight,emphasis,role,voice,direction}`` — the ``SemanticStyle``
+  sub-fields, merged *independently* (A's tone + B's voice auto-blend on the same
+  node).
 * ``state`` — the ``StateBehaviour`` block.
 * ``accessibility`` — the ``Accessibility`` block.
 * ``children`` — the ordered child-id list (structural).
@@ -46,7 +47,17 @@ from .canonical import encode_value, escape_string
 from .model import Arr, Node, Obj, Value
 
 # SemanticStyle sub-field defaults (an absent style ⟺ all of these; §3.1).
-_STYLE_DEFAULTS: dict[str, str] = {"emphasis": "Normal", "tone": "Default", "weight": "Standard"}
+_STYLE_DEFAULTS: dict[str, str] = {
+    "emphasis": "Normal",
+    "tone": "Default",
+    "weight": "Standard",
+    # Phase 1472 added `direction` to `SemanticStyle`; Phase 1647's
+    # `merge-refusal-concurrent-direction` vector is what made its absence here
+    # observable. It is the one member of the record that is NOT presentational —
+    # `ltr` against `rtl` is a disagreement about what the text SAYS — so silently
+    # blending it would be worse than for any of its neighbours.
+    "direction": "auto",
+}
 _FACET_EXTRAS = ("style", "state", "accessibility")
 
 
@@ -389,8 +400,24 @@ def _merge_style(
         _style_field(a, "voice"),
         _style_field(b, "voice"),
     )
+    direction = _pick_field(
+        conflicts,
+        res,
+        node_id,
+        "style.direction",
+        _style_field(base, "direction"),
+        _style_field(a, "direction"),
+        _style_field(b, "direction"),
+    )
     # Absent ⟺ all-default: omit the whole style facet so it encodes byte-identically.
-    if tone == "Default" and weight == "Standard" and emphasis == "Normal" and role is None and voice is None:
+    if (
+        tone == "Default"
+        and weight == "Standard"
+        and emphasis == "Normal"
+        and role is None
+        and voice is None
+        and direction == "auto"
+    ):
         return None
     # Phase 460 — each sub-field is omitted-when-default (WIRE_FORMAT §3.6), matching
     # the decoder/encoder so the blended style re-encodes to its byte-minimal form.
@@ -405,6 +432,8 @@ def _merge_style(
         fields["role"] = role
     if voice is not None:
         fields["voice"] = voice
+    if direction != "auto":
+        fields["direction"] = direction
     return Obj(None, fields)
 
 

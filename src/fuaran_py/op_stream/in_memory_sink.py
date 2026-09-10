@@ -41,6 +41,16 @@ class InMemorySink:
         #: Chain hash at ``_max_sequence[stream_id]`` — maintained on append
         #: alongside it (see :meth:`_append_locked`).
         self._heads: dict[str, str] = {}
+        #: Every sequence present per stream, so the duplicate guard on append is
+        #: O(1) rather than a scan of the whole log.
+        #:
+        #: ``_max_sequence`` cannot serve this. A duplicate is not only a re-append
+        #: of the HEAD: a caller filling a gap, or replaying a partially-applied
+        #: batch, re-offers a sequence BELOW the maximum, and comparing against the
+        #: maximum would admit it silently — an overwrite in a sink whose whole
+        #: contract is that it rejects them. The membership set is the smallest
+        #: structure that answers the question actually being asked.
+        self._sequences: dict[str, set[int]] = {}
         self._lock = threading.Lock()
 
     # ── OpStreamSink ─────────────────────────────────────────────────────────
@@ -90,12 +100,14 @@ class InMemorySink:
         two call paths.
         """
         bucket = self._streams.setdefault(record.stream_id, [])
-        if any(r.sequence == record.sequence for r in bucket):
+        seen = self._sequences.setdefault(record.stream_id, set())
+        if record.sequence in seen:
             raise ValueError(
                 f"InMemorySink: duplicate (stream_id={record.stream_id!r}, "
                 f"sequence={record.sequence}) — sinks reject overwrites."
             )
         bucket.append(record)
+        seen.add(record.sequence)
         if record.sequence > self._max_sequence.get(record.stream_id, 0):
             self._max_sequence[record.stream_id] = record.sequence
             self._heads[record.stream_id] = record.hash

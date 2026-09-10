@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -25,6 +26,31 @@ from .flags import (
 )
 
 Subscriber = Callable[[str, LayoutObservation], None]
+
+_LOG = logging.getLogger(__name__)
+
+
+def _notify(subscribers: list[Subscriber], node_id: str, obs: LayoutObservation) -> None:
+    """Emit to every subscriber; a throwing one is REPORTED, then stepped over.
+
+    Isolation is the requirement — one host's broken callback must not stop the
+    observation reaching the others, and must not propagate into the DOM callback
+    that drove the read. Silence is not. A swallowed exception here is a host bug
+    with no symptom at all: the flags simply stop arriving at one subscriber while
+    every other signal says the observer is working, and the only evidence that a
+    question was even asked is the absence of an answer nobody is watching for.
+
+    ``logging`` is what makes it visible without changing the contract: a host that
+    configures no logging sees the last-resort handler's message on stderr, and one
+    that configures logging routes it wherever its other diagnostics go. This
+    module gains no dependency — ``logging`` is stdlib, which the host's
+    stdlib-only posture requires.
+    """
+    for sub in subscribers:
+        try:
+            sub(node_id, obs)
+        except Exception:  # noqa: BLE001 — a throwing subscriber must not poison siblings.
+            _LOG.exception("layout observer subscriber raised for node %r; continuing", node_id)
 
 
 # ── InMemoryLayoutObserver ─────────────────────────────────────────────────────
@@ -43,11 +69,7 @@ class InMemoryLayoutObserver:
         return to_layout_observation(self._options, node_id, inp)
 
     def _emit(self, node_id: str, obs: LayoutObservation) -> None:
-        for sub in self._subscribers:
-            try:
-                sub(node_id, obs)
-            except Exception:  # noqa: BLE001 — a throwing subscriber must not poison siblings.
-                pass
+        _notify(self._subscribers, node_id, obs)
 
     def register_fixture(self, node_id: str, inp: LayoutInput, parent: str | None = None) -> None:
         """Register or replace a fixture; fires an initial emission unconditionally."""
@@ -223,8 +245,4 @@ class BrowserLayoutObserver:
         initial = previous is None
         self._last_flags[node_id] = obs.flags
         if initial or not self._options.emit_on_flag_change_only or not flags_equal(obs.flags, previous or []):
-            for sub in self._subscribers:
-                try:
-                    sub(node_id, obs)
-                except Exception:  # noqa: BLE001
-                    pass
+            _notify(self._subscribers, node_id, obs)

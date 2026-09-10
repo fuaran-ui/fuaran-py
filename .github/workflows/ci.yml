@@ -93,6 +93,33 @@ jobs:
       - name: Assert the corpus is where the tests resolve it
         run: test -f ../wire-format-fixtures/manifest.json
 
+      # ── The reference host, for the render-parity oracles ────────────────────
+      # The class-vocabulary parity lock and the reference-stylesheet byte-copy
+      # check read the F# reference host's own sources. Before this step those
+      # oracles SKIPPED here — this job was a single-host checkout, which is the
+      # one shape in which skipping is honest, and the note further down said so
+      # at length. Honest is not the same as useful: the drift they exist to
+      # catch was therefore visible only on a maintainer's workspace checkout,
+      # so a stale oracle looked valid everywhere a machine actually ran it, and
+      # the one that mattered had gone vacuous for months.
+      #
+      # Sparse: only the renderer projects are read (the vocabulary derivation
+      # globs `src/Fuaran.UI.Renderer*`, and the stylesheet lives under one of
+      # them), so the checkout stays small. The repo is PUBLIC — anonymous, no
+      # token — and deliberately UNPINNED, for the reason the corpus checkout
+      # above gives: pinning would let this host drift from the reference
+      # without anything going red.
+      - name: Check out the F# reference host (render-parity oracles)
+        uses: actions/checkout@v4
+        with:
+          repository: fuaran-ui/fuaran-dotnet
+          path: fuaran-dotnet
+          sparse-checkout: src/Fuaran.UI.Renderer*
+          sparse-checkout-cone-mode: false
+
+      - name: Assert the reference host is where the oracles resolve it
+        run: test -d ../fuaran-dotnet/src/Fuaran.UI.Renderer.Core
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
@@ -153,15 +180,16 @@ jobs:
           echo
           echo "ALSO NOT GATED HERE — inert rather than quarantined (see the skip"
           echo "summary that -rs prints under each test run below):"
-          echo "  - the reference-renderer parity tests read the reference host's source"
-          echo "    from a sibling checkout this workflow does not make, so they skip."
-          echo "    A skip here does NOT mean the path they look in is right: it was"
-          echo "    wrong for months (the host was renamed) and this note read as the"
-          echo "    explanation. What proves the path now is"
-          echo "    test_reference_host_resolves_in_a_cross_host_checkout, which never"
-          echo "    skips and fails in any checkout that HAS sibling hosts but no"
-          echo "    reference host. It passes here because this job is genuinely a"
-          echo "    single-host checkout — the one shape in which skipping is honest."
+          echo "  - NOTHING, on the reference-renderer parity axis, as of Phase 1654."
+          echo "    This job now checks the F# reference host out beside the corpus, so"
+          echo "    the class-vocabulary parity lock and the stylesheet byte-copy check"
+          echo "    GATE here rather than skipping. They used to skip, honestly and"
+          echo "    uselessly: this was a single-host checkout, which is the one shape in"
+          echo "    which skipping is right, and the consequence was that the oracle ran"
+          echo "    only on a maintainer's workspace checkout. It had been VACUOUS for"
+          echo "    months when that was finally measured — admitting every possible"
+          echo "    class through one over-broad prefix extracted from a doc comment —"
+          echo "    and no run anywhere would have said so."
           echo "  - the FastAPI sample-host tests, on the rows that install [dev] ALONE."
           echo "    fastapi is a sample-only dependency, so the skip there is honest and is"
           echo "    itself the evidence that this package is dependency-light. The [dev,live-host]"

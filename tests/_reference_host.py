@@ -27,7 +27,23 @@ This mirrors the Rust host's ``REFERENCE_HOST_NAMES`` + deliberate panic.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+
+#: Names the F# reference host's repo root explicitly, for a checkout whose
+#: directory depth is not the canonical side-by-side one — a git worktree, or a
+#: CI job that checks the sibling out somewhere of its own choosing.
+#:
+#: The upward walk below cannot resolve either shape: a worktree at
+#: ``<workspace>/wt/<n>/`` has no host among its ancestors, so the oracles read as
+#: "genuinely standalone" and skip — which is the silent-vacuous-green state this
+#: module exists to prevent, arriving through the one door it did not cover.
+#:
+#: A value naming something that is not a reference host is REFUSED, never
+#: ignored. Falling back to the walk would make the override unfalsifiable: a
+#: typo'd path would silently restore exactly the skip it was set to remove, and
+#: the run would look identical to one where it worked.
+REFERENCE_HOST_ENV = "FUARAN_REFERENCE_HOST"
 
 #: Every directory name the F# reference host has shipped under, newest first.
 #: Renamed ``fuaran`` → ``fuaran-dotnet``; accepting both means a rename in
@@ -51,10 +67,23 @@ def _search_roots() -> list[Path]:
 def reference_host_root() -> Path | None:
     """The F# reference host's repo root, or ``None`` when it is not checked out.
 
-    Probes for a ``src/`` directory under each accepted spelling, walking up from
-    this repo's own root, so a side-by-side workspace resolves at the first step
-    and a nested layout still resolves.
+    :data:`REFERENCE_HOST_ENV` wins when set, and is refused rather than ignored
+    when it names something that is not a host. Otherwise this probes for a
+    ``src/`` directory under each accepted spelling, walking up from this repo's
+    own root, so a side-by-side workspace resolves at the first step and a nested
+    layout still resolves.
     """
+    declared = os.environ.get(REFERENCE_HOST_ENV)
+    if declared:
+        candidate = Path(declared).expanduser()
+        if not (candidate / "src").is_dir():
+            raise RuntimeError(
+                f"{REFERENCE_HOST_ENV}={declared!r} does not name an F# reference host "
+                f"(no `src/` directory under it). Point it at the host's repo root, or unset it — it is "
+                "refused rather than ignored, because a fallback here would silently restore the very "
+                "skip the override was set to remove."
+            )
+        return candidate.resolve()
     for directory in _search_roots():
         for name in REFERENCE_HOST_NAMES:
             candidate = directory / name

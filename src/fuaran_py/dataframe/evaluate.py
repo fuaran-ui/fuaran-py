@@ -52,6 +52,7 @@ from .model import (
     GroupBy,
     InList,
     InParam,
+    IsNull,
     Join,
     Limit,
     Lit,
@@ -446,6 +447,15 @@ def _eval_expr(cols: Schema, row: Row, e: ColExpr) -> Result[Cell, EvalError]:  
             if order == 0:
                 return Ok(cell_bool(True))
         return Ok(NULL) if saw_null else Ok(cell_bool(False))
+    if isinstance(e, IsNull):
+        # TOTAL, and that is the point of the verb rather than an exception to the
+        # three-valued rule the operators around it follow: `IsNull` is how a pipeline
+        # ASKS about nullity, so it must always answer. It yields `Bool true` for a null
+        # subject and `Bool false` otherwise, and it NEVER yields null — a null answer
+        # would be unusable, since the only way to test it would be another `IsNull`.
+        # Both reference hosts state exactly this at their own arms; matched here.
+        r = _eval_expr(cols, row, e.expr)
+        return r if not r.ok else Ok(cell_bool(is_null(r.value)))
     if isinstance(e, InParam):
         # A LIST param resolves by SUBSTITUTION before evaluation (the compute layer's
         # `substitute_list_params` rewrites it to the literal `InList` form). One that

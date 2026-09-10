@@ -89,6 +89,22 @@ snapshot that matched the authority when CI ran can be behind it minutes later
 when the tag is cut — which is exactly what happened to the first ``v0.1.0``
 tag, whose publish run failed the gated ``test_corpus_sync`` after the authority
 moved twice. The distance is recomputed on the tagged tree, before that run.
+
+**The comparison is by COMMIT, never by payload, and that has a cost worth
+knowing before you cut a tag.** A corpus commit touching none of the copied
+families — a README edit, a doc pointer, anything under a path ``sync`` does not
+copy — still moves the authority's HEAD, so the recorded commit stops equalling
+it and the release path refuses while the snapshot's bytes are correct. The
+remedy is a **no-op re-sync**: run ``python conformance/sync_corpus.py`` and
+commit what it writes, often ``corpus/snapshot.json`` alone. That commit is the
+snapshot recording which revision it was last checked against, and it is an
+ordinary part of the release recipe rather than a workaround for one.
+
+The alternative — diffing the payload instead — was considered and is refused.
+The authority is a REPOSITORY, so "these bytes happen to match today's" is a
+weaker claim than "this was taken from that revision", and it reads a snapshot
+as current whenever the authority's change happened to miss the copied set. That
+is the one state a release must not be able to enter without knowing.
 """
 
 from __future__ import annotations
@@ -403,6 +419,15 @@ def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
 
     print(f"{headline} (authority {head}, snapshot {snapshot_sha})", file=sys.stderr)
     print(f"re-sync and commit the snapshot: {_RESYNC_COMMAND}", file=sys.stderr)
+    # The commonest instance, said out loud so it is not read as a fixture change
+    # that this host has failed to adopt: the comparison is by COMMIT, so an
+    # authority commit touching none of the copied families lands here with the
+    # payload already correct, and the re-sync writes only the sentinel.
+    print(
+        "  (this compares the authority COMMIT, not the payload — an authority commit touching no bundled "
+        "fixture lands here too, and the re-sync then rewrites only corpus/snapshot.json)",
+        file=sys.stderr,
+    )
     return 2
 
 

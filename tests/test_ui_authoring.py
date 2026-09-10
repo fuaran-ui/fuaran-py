@@ -1967,6 +1967,24 @@ def _authored() -> dict[str, t.UiNode]:
                 )
             ),
         ),
+        # TextSource.I18n args that carry a BINDING (2, Phase 1661) — the slot is
+        # discriminated by inspection, so a plain value rides bare (the literal
+        # arm) and a `Binding` rides as its own `$type` object. The mixed bag is
+        # the one that matters: a host reading the discriminator off the BAG
+        # rather than off each ARGUMENT passes both single-arm fixtures.
+        "text-i18n-bound-arg-1": fuaran.markdown(
+            "text-i18n-bound-arg-1",
+            binding.i18n("cart.remaining", count=binding.state("cartCount", None)),
+        ),
+        "text-i18n-mixed-args-1": fuaran.markdown(
+            "text-i18n-mixed-args-1",
+            binding.i18n(
+                "invoice.summary",
+                currency="GBP",
+                total=binding.state("invoiceTotal", 1250.5),
+                year=2026,
+            ),
+        ),
         # Action.Call (3) — all three reachable shapes: the handler spelling, the
         # two declarative targets, and neither.
         "call-into": node.bare(

@@ -200,9 +200,15 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         return _invoke_record(capability_id, **args)
 
     @staticmethod
-    def i18n(key: str, **args: t.Value) -> t.TextSource:
+    def i18n(key: str, **args: t.Value | Binding) -> t.TextSource:
         """``TextSource.I18n`` — a catalog key the reading host resolves in the
         reader's locale, with placeholder values.
+
+        Since Phase 1661 a placeholder value may be a ``Binding`` as well as a
+        plain JSON value: the wire slot is discriminated by inspection, a plain
+        value riding bare and a binding riding as its own ``$type`` object, so
+        ``count=binding.state("cartCount", 0)`` reads the store where
+        ``year=1908`` writes a literal.
 
         On the ``binding`` namespace rather than a namespace of its own because
         it is where an author looks for "a value the host resolves", which is

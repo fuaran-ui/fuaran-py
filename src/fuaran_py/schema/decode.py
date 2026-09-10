@@ -430,16 +430,66 @@ def _decode_text_source(value: object, path: str) -> Value:
     if tag == "Literal":
         return _expect_string(_require(obj, "text", path), f"{path}.text")
     if tag == "I18n":
-        # I18n args are structured JVal positions (rule 12: no null) — the
-        # structural pass-through goes null-strict, rejecting at the null's
-        # exact path (`$.….args.<name>`), byte-behaviour otherwise unchanged.
-        return _from_json_strict(value, path)
+        # Phase 1661 — an `I18n` argument is a ``Binding<JSON>`` discriminated BY
+        # INSPECTION (§5), so `args` now has two readings and needs a decoder.
+        # Every OTHER member keeps the structural rule-12 pass-through it had, so
+        # `key`'s bytes and refusals are untouched.
+        #
+        # The pass-through could not stay for `args`: it validates nothing, so a
+        # bound argument's own refusals (an unrecognised `$type`, a known case
+        # missing a required member) went unraised here while the typed hosts
+        # refused the same document — and a tagged `Static` was re-emitted
+        # tagged where they collapse it to the bare value. Both are divergences
+        # this widening would have manufactured.
+        fields: dict[str, Value] = {}
+        for member, raw in obj.items():
+            if member == "$type":
+                continue
+            member_path = f"{path}.{member}"
+            fields[member] = (
+                _decode_i18n_args(raw, member_path) if member == "args" else _from_json_strict(raw, member_path)
+            )
+        return Obj("I18n", fields)
     # Bound — decode the wrapped binding so it picks up the same normalisation
     # (accessor sentinels dropped, aliases folded) as any bare-Binding slot.
     # NOT null-strict — a Bound binding may carry a Static whose obj-erased
     # value is null (the deliberate §5 opaque-seam exception).
     binding = _decode_binding(_require(obj, "binding", path), f"{path}.binding")
     return Obj("Bound", {"binding": binding})
+
+
+def _decode_i18n_args(value: object, path: str) -> Value:
+    """A ``TextSource.I18n`` argument bag — discriminated BY INSPECTION (§5, Phase 1661).
+
+    An object carrying a ``$type`` member is a BINDING and decodes as one; every
+    other JSON value is the LITERAL argument, decoded rule-12 strict (a null
+    rejects at the null's own path — ``reject-null-i18n-arg`` pins it) and
+    emitted BARE, which is why every literal-args document ever emitted is
+    byte-identical across the widening.
+
+    A ``Static`` argument is read here rather than through :func:`_decode_binding`,
+    because the two spellings of a literal must agree. A missing or null ``value``
+    is Phase 677's structural absence and stays ``{"$type":"Static"}`` — absence
+    has no bare spelling; a PRESENT value collapses to the bare form and takes
+    the same strict decoder as the bare spelling, since one payload position
+    under two spellings cannot have two null postures.
+    """
+    obj = _expect_object(value, path)
+    out: dict[str, Value] = {}
+    for name, arg in obj.items():
+        arg_path = f"{path}.{name}"
+        if isinstance(arg, dict) and "$type" in arg:
+            if arg.get("$type") == "Static":
+                raw = arg.get("value")
+                if "value" not in arg or raw is None:
+                    out[name] = Obj("Static", {})
+                else:
+                    out[name] = _from_json_strict(raw, f"{arg_path}.value")
+            else:
+                out[name] = _decode_binding(arg, arg_path)
+        else:
+            out[name] = _from_json_strict(arg, arg_path)
+    return Obj(None, out)
 
 
 def _decode_binding(value: object, path: str) -> Value:

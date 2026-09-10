@@ -6221,7 +6221,8 @@
       "type": "object",
       "properties": {
         "rows": {
-          "type": "integer"
+          "type": "integer",
+          "maximum": 10000
         }
       },
       "required": [

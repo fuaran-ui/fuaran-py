@@ -2213,6 +2213,14 @@
       "description": "§21 max node depth — a tree at EXACTLY the limit (24 levels). Rule 1: every conformant host MUST decode this; refusing it is non-conformance, not conservatism"
     },
     {
+      "id": "limit-skeleton-rows-at-max",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/limit-skeleton-rows-at-max.json",
+      "expectedFile": "nodes/limit-skeleton-rows-at-max.json",
+      "description": "§21.9 max skeleton rows — a Skeleton at EXACTLY the limit (10 000 rows). Rule 1: every conformant host MUST decode this. Its past-the-bound twin is `reject-limit-skeleton-rows`"
+    },
+    {
       "id": "limit-tree-item-depth-at-max",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3571,6 +3579,15 @@
       "expectedErrorCode": "LIMIT_EXCEEDED",
       "expectedPath": "$",
       "description": "§21.5 the op axis — 25 nested TreeOp.Batch. Counted separately from the node axis; the syntactic bound only LOOKS like cover for it"
+    },
+    {
+      "id": "reject-limit-skeleton-rows",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-skeleton-rows.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$.kind.rows",
+      "description": "§21.9 max skeleton rows — a 32-bit-VALID value past the bound. LIMIT_EXCEEDED and never WRONG_TYPE: §7.1 decides the slot's type first and admits this value, so the refusal is about the work the document names and not about what the slot can hold"
     },
     {
       "id": "reject-limit-tree-item-depth",

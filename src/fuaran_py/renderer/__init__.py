@@ -29,12 +29,30 @@ gets none. A host declares a wider posture by name, as a keyword argument::
 
 The policy vocabulary is re-exported here so declaring one needs no submodule
 import; :mod:`fuaran_py.renderer.egress` carries the full model.
+
+**Binding resolution has an error channel, and it can reach a caller of
+:func:`render_html`** (Phase 1667). A slot the document asks for that no decoded
+tree can ever answer — a ``Binding.Computed``, whose whole payload is a host
+closure that crosses the wire as ``"<closure>"`` — raises
+:exc:`~fuaran_py.renderer.bindings.WireSurvivabilityError` rather than resolving
+to the slot's empty state, because an empty slot reads as an answer.
+WIRE_FORMAT §5 states the rule; :data:`DECODED_COMPUTED_MESSAGE` is the sentence
+every host carries, and it names the cases that DO cross the wire::
+
+    from fuaran_py.renderer import WireSurvivabilityError, render_html
+
+    try:
+        body = render_html(tree)
+    except WireSurvivabilityError as e:
+        # e names the remedy: Binding.Expr / Transform / State
+        ...
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
+from .bindings import DECODED_COMPUTED_MESSAGE, WireSurvivabilityError
 from .egress import (
     DENY_NON_LOCAL_EGRESS,
     PERMISSIVE_EGRESS,
@@ -99,6 +117,7 @@ from .notebook import (  # noqa: E402  — append-only re-export at module foot
 )
 
 __all__ = [
+    "DECODED_COMPUTED_MESSAGE",
     "DEFAULT_EMAIL_OPTIONS",
     "DEFAULT_MARKDOWN_OPTIONS",
     "DENY_NON_LOCAL_EGRESS",
@@ -115,6 +134,7 @@ __all__ = [
     "MarkdownOptions",
     "Renderer",
     "UnscopableCss",
+    "WireSurvivabilityError",
     "allow_origin",
     "collect_state_seeds",
     "display_html",

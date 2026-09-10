@@ -18,6 +18,12 @@ ambiguity, ``0`` for a trailing global ``count`` over an empty frame). A
 ``Selection`` / ``Filter`` binding with no host value resolves to its declared
 ``defaultValue`` (Phase 629), so preselected master-detail renders resolved.
 The evaluator itself is untouched — this module is render wiring over it.
+
+**The seam has an ERROR channel (Phase 1667).** Resolution answers a value,
+ABSENCE (``None`` — the slot's empty state), or an ERROR: the document asked for
+something no decoded tree can answer, and there is no value that could stand in
+without being read as an answer. Python's error channel is an exception, so the
+error is raised rather than returned — see :exc:`WireSurvivabilityError`.
 """
 
 from __future__ import annotations
@@ -32,6 +38,33 @@ from ..model import Arr, Obj, Value
 # resolved value. Empty by default — the headless baseline resolves `Static`
 # bindings with no host input.
 type BindingSources = dict[str, object]
+
+
+class WireSurvivabilityError(Exception):
+    """A DECODED host-only projection a reader tried to run (Phase 1667).
+
+    It exists because the alternative — answering absence — is indistinguishable
+    from a real answer at the slot: an unresolved ``Query`` and a
+    ``Binding.Computed`` whose whole payload erased on the wire both used to
+    resolve ``None`` here, and the second is not a slot that has no value yet, it
+    is a slot that can never have one.
+
+    Raised BY the resolution seam and caught by nobody in this package except
+    the two predicate seams whose own rule is to render anyway
+    (:func:`is_node_visible`, :func:`select_switch_case`). So a headless caller
+    asking the seam sees the error, and a caller of :func:`render_html` sees it
+    propagate rather than receiving a page with a plausible hole in it.
+    """
+
+
+# The one message a decoded ``Binding.Computed`` carries — byte-identical to the
+# reference host's, so every host renders the same sentence and a test can pin
+# it. A constant rather than a literal at the raise site for exactly that
+# reason.
+DECODED_COMPUTED_MESSAGE = (
+    "Binding.Computed has no wire projection (decoded from a '<closure>' sentinel)"
+    " — use Binding.Expr / Transform / State"
+)
 
 
 def render_text(text: Value, sources: BindingSources | None = None) -> str:
@@ -69,6 +102,9 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
     for ``Selection``, the 0.2.0 pre-selected-filter gap for ``Filter``, the
     always-present ``State`` default) — matching the F#/TS ``BindingResolver``.
     Otherwise ``None`` (the F# SSR "NotResolved" branch).
+
+    :raises WireSurvivabilityError: for a decoded ``Computed`` (Phase 1667) —
+        the ERROR channel, which is a third outcome beside a value and absence.
     """
     if isinstance(binding, Obj):
         if binding.tag == "Static":
@@ -84,22 +120,20 @@ def resolve_binding(binding: Value, sources: BindingSources | None = None) -> ob
         if binding.tag == "Computed":
             # A decoded ``Computed`` has nothing to compute WITH: the case's whole
             # payload is a host closure and it crosses the wire as
-            # ``"<closure>"``. It resolves to nothing, and this arm is explicit
-            # rather than a fall-through so it stays that way — the case carries
-            # no ``key`` / ``name`` / ``nodeId`` today, so the lookup below misses
-            # and the answer is the same, but a future member named like one of
-            # those would silently turn a host-only computation into a resolved
-            # value.
+            # ``"<closure>"``. WIRE_FORMAT §5 therefore says it resolves to an
+            # ERROR naming its replacements, never to a value — and Phase 1667
+            # gave this seam the channel to say so. This arm is explicit rather
+            # than a fall-through so it stays that way: the case carries no
+            # ``key`` / ``name`` / ``nodeId`` today, but a future member named
+            # like one of those would otherwise turn a host-only computation into
+            # a resolved value through the lookup below.
             #
-            # KNOWN LIMIT, stated rather than implied: this seam has no error
-            # channel — it answers ``object | None``, and ``None`` is the slot's
-            # empty state — so a Python host renders the empty state where the F#
-            # and TypeScript hosts render an error naming
-            # ``Binding.Expr`` / ``Transform`` / ``State`` as the replacement.
-            # That is strictly better than the silent DEFAULT those hosts used to
-            # produce, and strictly worse than the error they now do; closing it
-            # is a widening of this function's return type through every caller.
-            return None
+            # It RAISES rather than returning a sentinel because ``None`` here
+            # already means the slot has no value YET, and a slot that can never
+            # have one is a different fact. An exception is Python's channel for
+            # that distinction, and it is total in the only sense available: this
+            # arm never answers.
+            raise WireSurvivabilityError(DECODED_COMPUTED_MESSAGE)
         # `State` keys on `key`; `Query` / `Filter` key on `name`; `Selection`
         # keys on `nodeId` (0.2.0 — the accessor sentinel is off the wire, the
         # name/id IS the lookup key).
@@ -365,6 +399,14 @@ def is_node_visible(visible: Value | None, sources: BindingSources | None = None
     Note this takes the SLOT rather than the node, because this package's node
     model carries envelope traits in an untyped ``extras`` map and a caller
     already holding the slot should not have to reconstruct a node to ask.
+
+    "Errored" above means the compute evaluator could not produce a single cell —
+    the renderer failing to answer the question, which is what the leniency is
+    for. It does NOT cover :exc:`WireSurvivabilityError` (Phase 1667), which
+    propagates: that is the document asking a question no decoded tree can
+    answer, and it is reported rather than rendered around. The failure this
+    asymmetry protects against is content disappearing INVISIBLY, and a raised
+    error is the opposite of invisible.
     """
     if visible is None:
         return True
@@ -386,6 +428,8 @@ def select_switch_case(
     That is the OPPOSITE default from :func:`is_node_visible`, and deliberately
     so: falling through here lands on a ``default`` branch the author wrote, so
     no content disappears — whereas a node with no verdict has no fallback.
+    "Errored" carries the same reading it does there: the evaluator could not
+    answer, not :exc:`WireSurvivabilityError`, which propagates.
 
     Returns the selected case's ``child``, or ``None`` for the default.
     """

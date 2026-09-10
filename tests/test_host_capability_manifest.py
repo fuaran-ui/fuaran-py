@@ -24,6 +24,7 @@ import functools
 import json
 import operator
 import typing
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -34,7 +35,35 @@ from fuaran_py.conformance import host_capability as hc
 from fuaran_py.model import Obj
 from fuaran_py.schema import types as real_types
 
-PUBLISHED = hc._default_output()
+# The published artefact and the snapshot beside it are REPOSITORY files, so they are
+# located from the test tree — the idiom `_corpus.py` already uses — and never from the
+# imported module. `hc._default_output()` / `hc._snapshot_authority()` walk four parents up
+# from `host_capability.py`, which lands on the repo root only in a src-layout CHECKOUT: CI
+# installs this package non-editably (`pip install ".[dev]"`), so under it those helpers
+# resolve `<sys.prefix>/lib/pythonX.Y/conformance/…` and every assertion below died with
+# `FileNotFoundError`. The helpers are right for what they are for — `python -m … --write`,
+# which is only ever run from a checkout — so the fix belongs on this side of the boundary.
+# Resolving the artefact here also makes the gate measure what it means: the bytes committed
+# in THIS repository against what the INSTALLED host's model generates.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+PUBLISHED = _REPO_ROOT / "conformance" / "host-capability-manifest.json"
+
+
+def _published_snapshot_authority() -> str | None:
+    """The corpus commit this repo's bundled snapshot records, or ``None`` when there is none.
+
+    The repo-located twin of ``hc._snapshot_authority()``; see the note above for why the
+    module-located one cannot answer under a non-editable install. Provenance only — the
+    generation reads no corpus.
+    """
+    snapshot = _REPO_ROOT / "conformance" / "corpus" / "snapshot.json"
+    if not snapshot.is_file():
+        return None
+    try:
+        recorded = json.loads(snapshot.read_text(encoding="utf-8")).get("authorityCommit")
+    except (OSError, ValueError):  # pragma: no cover — a torn snapshot is not a generation failure
+        return None
+    return recorded if isinstance(recorded, str) else None
 
 
 def _authoring_stub(**overrides: object) -> SimpleNamespace:
@@ -65,7 +94,7 @@ BASELINE = set(hc.build()["tokens"])
 def test_the_published_manifest_is_current() -> None:
     """The gate's whole job: a manifest regenerated from the model must equal the committed bytes."""
     assert PUBLISHED.is_file(), f"{PUBLISHED} is missing — run: python -m {hc.GENERATOR} --write"
-    expected = hc.render(hc.build(corpus_authority=hc._snapshot_authority()))
+    expected = hc.render(hc.build(corpus_authority=_published_snapshot_authority()))
     assert PUBLISHED.read_text(encoding="utf-8") == expected, (
         f"{PUBLISHED} is stale — run: python -m {hc.GENERATOR} --write"
     )

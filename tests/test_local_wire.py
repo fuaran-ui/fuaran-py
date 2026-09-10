@@ -11,7 +11,9 @@ so its half of that finding is two things:
 * the two refusals the declarative members bring — a codec case with no total
   inverse, and two commit destinations at once — each of which structure alone
   cannot make;
-* the guarantee that a decoded ``Computed`` never resolves to a value.
+* the guarantee that a decoded ``Computed`` resolves to an ERROR naming its
+  replacements (Phase 1667 gave this host's seam the channel; before it, only the
+  negative half — never a value — could be asserted).
 
 ``test_reject.py`` already runs both refusal fixtures out of the shared corpus,
 which is the cross-host parity leg. What is asserted HERE is the pairing that a
@@ -21,7 +23,10 @@ neighbour that would otherwise let a refuse-everything decoder pass.
 
 from __future__ import annotations
 
+import pytest
+
 from fuaran_py.model import Obj
+from fuaran_py.renderer import DECODED_COMPUTED_MESSAGE, WireSurvivabilityError, render_html
 from fuaran_py.renderer.bindings import resolve_binding
 from fuaran_py.schema.decode import decode_node
 from fuaran_py.schema.encode import encode_node
@@ -94,17 +99,62 @@ def test_either_destination_alone_decodes() -> None:
     assert decode_node(_DECLARED).ok  # commitTo alone
 
 
-def test_a_decoded_computed_never_resolves_to_a_value() -> None:
-    """The finding, from this host's end.
+def test_a_decoded_computed_resolves_to_an_error_naming_its_replacements() -> None:
+    """The finding, from this host's end — Phase 1667.
 
     A decoded ``Computed`` has nothing to compute with — its whole payload is a
-    closure that crosses the wire as ``"<closure>"`` — so it must not answer the
-    slot's zero. This host's resolution seam has no error channel (it answers a
-    value or ``None``), so the assertion available here is the negative one: no
-    value, of any kind, ever.
+    closure that crosses the wire as ``"<closure>"`` — so WIRE_FORMAT §5 says it
+    resolves to an ERROR naming its replacements, never to a value. Until 1667
+    this seam had no error channel and answered ``None``, the slot's empty state:
+    the negative half held (no ``0`` / ``""`` / ``False`` ever) while the
+    positive half — the reader is TOLD, and told the remedy — did not.
+
+    Go-red: against the pre-1667 seam nothing is raised and this fails on the
+    first line.
     """
     computed = Obj("Computed", {})
-    assert resolve_binding(computed) is None
-    # ... and not even when the host furnishes a bag of sources whose keys a
-    # fall-through lookup might otherwise have matched.
-    assert resolve_binding(computed, {"fn": "anything", "key": 0, "name": "", "nodeId": False}) is None
+
+    with pytest.raises(WireSurvivabilityError) as raised:
+        resolve_binding(computed)
+
+    assert str(raised.value) == DECODED_COMPUTED_MESSAGE
+    assert "Binding.Expr" in str(raised.value), "and it names the case that replaced it"
+
+    # ... and it still errors when the host furnishes a bag of sources whose keys
+    # a fall-through lookup might otherwise have matched, which is the negative
+    # half restated: no value of any kind, ever.
+    with pytest.raises(WireSurvivabilityError):
+        resolve_binding(computed, {"fn": "anything", "key": 0, "name": "", "nodeId": False})
+
+
+def test_a_decoded_computed_in_a_metric_slot_errors_the_render() -> None:
+    """The rendering end of the same rule.
+
+    The fixture that used to render the empty state: a ``Metric`` whose value is
+    a decoded ``Computed`` put an em-dash on the page, indistinguishable from a
+    metric whose query has not answered yet. The error now reaches the caller of
+    :func:`render_html` instead — Python's channel for "this document asked a
+    question no decoded tree can answer" — so nothing plausible is printed.
+    """
+    metric = (
+        '{"id":"m","kind":{"$type":"Metric","emphasis":"Normal","format":{"$type":"None"},'
+        '"label":{"$type":"Literal","text":"Revenue"},"value":{"$type":"Computed","fn":"<closure>"},'
+        '"tone":"Default","weight":"Standard"}}'
+    )
+    decoded = decode_node(metric)
+    assert decoded.ok, "the document is well-formed and must decode"
+
+    with pytest.raises(WireSurvivabilityError) as raised:
+        render_html(decoded.value)
+
+    assert str(raised.value) == DECODED_COMPUTED_MESSAGE
+
+
+def test_every_other_binding_still_resolves() -> None:
+    """The go-red half of the two above.
+
+    A change that made EVERY binding raise would satisfy both of them and break
+    the host. Two shapes that must keep answering: a value, and absence.
+    """
+    assert resolve_binding(Obj("Static", {"value": 41.0})) == 41.0
+    assert resolve_binding(Obj("Query", {"name": "sales"})) is None

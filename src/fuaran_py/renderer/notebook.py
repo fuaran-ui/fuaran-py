@@ -63,7 +63,7 @@ from functools import lru_cache
 
 from ..model import Arr, Node, Obj, Value
 from ..schema.encode import encode_node
-from .bindings import BindingSources
+from .bindings import BindingSourcesLike
 from .egress import DENY_NON_LOCAL_EGRESS, EgressPolicy
 from .render import render_html
 
@@ -351,7 +351,7 @@ def summary_line(node: Node) -> str:
 
 def display_html(
     node: Node,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
 ) -> str:
     """The ``text/html`` representation: the scoped stylesheet plus the render, wrapped.
@@ -370,7 +370,7 @@ def mimebundle(
     include: Iterable[str] | None = None,
     exclude: Iterable[str] | None = None,
     *,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
 ) -> dict[str, str]:
     """The Jupyter display bundle for a decoded tree.

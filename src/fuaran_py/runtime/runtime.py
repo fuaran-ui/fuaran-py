@@ -23,7 +23,7 @@ from ..compute import ComputeResult, ComputeState, evaluate_tree
 from ..model import Arr, Node, Obj, Value
 from ..ops import ApplyErr, ApplyResult, apply
 from ..renderer import render_html
-from ..renderer.bindings import BindingSources
+from ..renderer.bindings import BindingSourcesLike, as_sources
 from ..renderer.egress import DENY_NON_LOCAL_EGRESS, EgressPolicy
 from ..result import Ok
 
@@ -132,7 +132,7 @@ class FuaranRuntime:
         self,
         tree: Node,
         on_event: EventHandler | None = None,
-        sources: BindingSources | None = None,
+        sources: BindingSourcesLike | None = None,
         deps: BrowserDeps | None = None,
         events: tuple[str, ...] = ("click",),
         compute_state: ComputeState | None = None,
@@ -189,7 +189,10 @@ class FuaranRuntime:
     def render(self) -> str:
         """The current body-fragment HTML (the same string :meth:`mount` writes)."""
         if self._compute_state:
-            merged: BindingSources = {**(self._sources or {}), **self._compute_state}
+            # Phase 1663 — layering compute state over the identity-keyed map
+            # carries the host instant and the ambient locale along with it,
+            # which a dict splat over the old flat type could not have done.
+            merged = as_sources(self._sources).merged_with(self._compute_state)
             return render_html(self._tree, merged, self._egress_policy)
         return render_html(self._tree, self._sources, self._egress_policy)
 

@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "$id": "https://fuaran.dev/wire-format/v1/render-text.json",
+  "description": "The Fuaran render-TEXT conformance family (WIRE_FORMAT.md 13). Each vector is (fixture, pinned sources, expected text): `fixture` + `nodeId` + `slot` name a committed node fixture and the text slot inside it, `sources` PINS the host instant (`now`, an ISO-8601 UTC string; `\"\"` means this host furnishes no clock), the ambient BCP-47 locale (`locale`; `\"\"` means the runtime default) and the identity-keyed host value map (`values`), and `expectedText` is the text every conformant host must produce for that slot. The sources are pinned because that is what makes the family checkable at all: a `Binding.Now` slot rendered against the machine's own clock has no expected text. `expectedText` is the FALLBACK-tier render (13 tier 2) - the deterministic, non-Intl text a no-JS reader, a crawler, an email client or a non-browser host receives. `slotVocabulary` is CLOSED, so a host can report a slot it has no reader for rather than silently accept one it cannot name; `excluded` enumerates the slots the family deliberately does NOT pin, each with the reason - those are the legitimately-differing tier, where an Intl-backed host and a stdlib-only host produce different bytes for the same input and both are correct. Generated from the reference host's own resolver, which PROVES every vector before this file is written. See WIRE_FORMAT.md 13.",
+  "slotVocabulary": [
+    {
+      "slot": "Fact.value",
+      "meaning": "the `value` TextSource of a `Fact` — the figure beside its label"
+    },
+    {
+      "slot": "Markdown.text",
+      "meaning": "the `text` TextSource of a `Markdown` node — its raw source before the GFM render (§14)"
+    }
+  ],
+  "excluded": [
+    {
+      "slot": "Format.Currency",
+      "fixture": "nodes/format-bindings.json",
+      "nodeId": "fmt-currency",
+      "reason": "the symbol, its placement and the negative form are all CLDR data; a stdlib-only host can only emit the ISO code beside the amount"
+    },
+    {
+      "slot": "Format.Date",
+      "fixture": "nodes/format-bindings.json",
+      "nodeId": "fmt-date",
+      "reason": "a date STYLE (`Short` / `Medium` / `Long` / `Full`) names a locale's own pattern, so the rendered text is the locale database's answer by construction"
+    },
+    {
+      "slot": "Format.Number",
+      "fixture": "nodes/format-bindings.json",
+      "nodeId": "fmt-number",
+      "reason": "the digit grouping and decimal separator come from the locale database: `Intl.NumberFormat` on a browser host, `CultureInfo` on .NET, a hand-rolled fixed-point form on a stdlib-only host. All three are correct for their target and none is canonical"
+    },
+    {
+      "slot": "Format.Percent",
+      "fixture": "nodes/format-bindings.json",
+      "nodeId": "fmt-percent",
+      "reason": "same locale database as `Format.Number`, plus the locale-specific position of the percent sign and the space before it"
+    }
+  ],
+  "vectors": [
+    {
+      "id": "now-grain-day",
+      "fixture": "nodes/now-grain.json",
+      "nodeId": "asof-day",
+      "slot": "Fact.value",
+      "sources": {
+        "now": "2026-08-02T06:59:24Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "2026-08-02",
+      "description": "grain `Day` truncates to the bare civil date — the form a day-delta over the instant reads"
+    },
+    {
+      "id": "now-grain-hour",
+      "fixture": "nodes/now-grain.json",
+      "nodeId": "asof-hour",
+      "slot": "Fact.value",
+      "sources": {
+        "now": "2026-08-02T06:59:24Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "2026-08-02T06:00:00Z",
+      "description": "grain `Hour` truncates minutes and seconds"
+    },
+    {
+      "id": "now-grain-minute",
+      "fixture": "nodes/now-grain.json",
+      "nodeId": "asof-minute",
+      "slot": "Fact.value",
+      "sources": {
+        "now": "2026-08-02T06:59:24Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "2026-08-02T06:59:00Z",
+      "description": "grain `Minute` truncates the seconds field to `00` and keeps the `Z`"
+    },
+    {
+      "id": "now-grain-second",
+      "fixture": "nodes/now-environment-binding.json",
+      "nodeId": "today-fact",
+      "slot": "Fact.value",
+      "sources": {
+        "now": "2026-08-02T06:59:24Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "2026-08-02T06:59:24Z",
+      "description": "a grain-less `Binding.Now` reads the host instant verbatim — `Second` is the identity grain, so no truncation"
+    },
+    {
+      "id": "now-no-host-clock",
+      "fixture": "nodes/now-environment-binding.json",
+      "nodeId": "today-fact",
+      "slot": "Fact.value",
+      "sources": {
+        "now": "",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "",
+      "description": "a host that furnishes no instant resolves the slot to ABSENCE, which a text slot renders as the empty string — never an invented date"
+    },
+    {
+      "id": "relative-time-declared-unit",
+      "fixture": "nodes/format-bindings.json",
+      "nodeId": "fmt-relative",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "3 days ago",
+      "description": "`RelativeTime` reads a signed count of its declared unit directly from the source, so it needs no host instant; the fixture's `LocaleSource.Explicit \"en-US\"` does not change the fallback text"
+    },
+    {
+      "id": "since-auto-unit-future",
+      "fixture": "nodes/format-since.json",
+      "nodeId": "since-auto",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "2023-11-14T21:13:20Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "in 1 hour",
+      "description": "a source AHEAD of the host instant is a positive delta and reads forward; the sign convention is `Intl.RelativeTimeFormat`'s, so negative is the past"
+    },
+    {
+      "id": "since-auto-unit-past",
+      "fixture": "nodes/format-since.json",
+      "nodeId": "since-auto",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "2023-11-15T01:13:20Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "3 hours ago",
+      "description": "`Since` with no declared unit auto-selects from the §4b threshold ladder: a 10800-second past delta lands on `Hour`, and the count truncates toward zero"
+    },
+    {
+      "id": "since-auto-unit-zero",
+      "fixture": "nodes/format-since.json",
+      "nodeId": "since-auto",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "2023-11-14T22:13:20Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "this second",
+      "description": "a zero delta is `this second` at the auto-selected `Second` unit — a distinct rendering from absence, which is the point of pinning it"
+    },
+    {
+      "id": "since-declared-unit",
+      "fixture": "nodes/format-since.json",
+      "nodeId": "since-declared-hour",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "2023-11-16T22:13:20Z",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "48 hours ago",
+      "description": "a DECLARED unit overrides the ladder: two days at unit `Hour` is 48 hours, not 2 days. The binding's `LocaleSource.Explicit \"en-GB\"` is pinned by the fixture and does not change the fallback text, which is exactly what makes this vector locale-independent"
+    },
+    {
+      "id": "since-no-host-clock",
+      "fixture": "nodes/format-since.json",
+      "nodeId": "since-auto",
+      "slot": "Markdown.text",
+      "sources": {
+        "now": "",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "",
+      "description": "no host instant means no delta to render, so the slot resolves to ABSENCE — never the raw epoch source, which reads as a confidently wrong answer"
+    }
+  ]
+}

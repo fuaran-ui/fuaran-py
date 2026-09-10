@@ -1140,6 +1140,14 @@
       "description": "Accessibility (Phase 955 — State-bound label + hidden, mixed-case custom role doc-pageFooter, off)"
     },
     {
+      "id": "a11y-wrapper-transform-label",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-wrapper-transform-label.json",
+      "expectedFile": "nodes/a11y-wrapper-transform-label.json",
+      "description": "Accessibility (Phase 1665 — a Transform-bound accessible name, read through the SCALAR path)"
+    },
+    {
       "id": "action-confirm",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3067,6 +3075,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.accessibility.hidden",
       "description": "accessibility.hidden bare scalar of the wrong type — §3.6 leniency is about SHAPE, not type (Phase 955)"
+    },
+    {
+      "id": "reject-a11y-label-nonstring",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-a11y-label-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.label",
+      "description": "accessibility.label bare scalar of the wrong type — the name slot's twin of the hidden vector above; §3.6 leniency is about SHAPE, not type (Phase 1665)"
     },
     {
       "id": "reject-a11y-labelledby-nonstring",

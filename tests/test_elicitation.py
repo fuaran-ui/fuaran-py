@@ -1,6 +1,6 @@
 """Conformance + unit tests for the §18 elicitation artefact.
 
-Certifies :mod:`fuaran_py.elicitation` against the shared ``elicitation-*`` corpus
+Certifies :mod:`fuaran_ui.elicitation` against the shared ``elicitation-*`` corpus
 families (envelope round-trip, outcome round-trip, structured rejects, answer
 accept/reject) and mirrors the Go ``elicitation`` package's unit behaviour.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.elicitation import (
+from fuaran_ui.elicitation import (
     ANSWER_OUT_OF_SPACE,
     ANSWER_TYPE_MISMATCH,
     UNDECLARED_FIELD,

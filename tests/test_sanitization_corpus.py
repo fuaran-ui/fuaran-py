@@ -21,8 +21,8 @@ from typing import Any
 
 import pytest
 
-from fuaran_py.renderer.markdown import to_html
-from fuaran_py.renderer.sanitize import (
+from fuaran_ui.renderer.markdown import to_html
+from fuaran_ui.renderer.sanitize import (
     is_allowed_extra_attribute_key,
     is_safe_extra_attribute_value,
     sanitize_markdown_html,

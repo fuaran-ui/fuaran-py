@@ -18,12 +18,12 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py.canonical import encode_value
-from fuaran_py.dataframe.codec import encode_expr_value
-from fuaran_py.dataframe.model import ApplyFn
-from fuaran_py.model import Arr, Obj
-from fuaran_py.schema import types as t
-from fuaran_py.ui import (
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.dataframe.codec import encode_expr_value
+from fuaran_ui.dataframe.model import ApplyFn
+from fuaran_ui.model import Arr, Obj
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import (
     Expr,
     Frame,
     ParamDecl,
@@ -252,7 +252,7 @@ def _overview_panel() -> t.UiNode:
     """``composite-tabs-panels``'s first tab — a ``Card``-role box with a GRID
     layout, which ``fuaran.card`` cannot reach (it fixes the layout), so the
     record is built directly. That is the intended escape hatch, not a gap: the
-    smart constructors are the common shapes, and :class:`~fuaran_py.schema.types.Box`
+    smart constructors are the common shapes, and :class:`~fuaran_ui.schema.types.Box`
     is the whole of what the wire allows."""
     return t.UiNode(
         "overview-panel",
@@ -313,7 +313,7 @@ def _selected(field: str, default: str) -> t.Selection:
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
 # so the import-time module body stays readable.
 def _authored() -> dict[str, t.UiNode]:
-    from fuaran_py.ui import format
+    from fuaran_ui.ui import format
 
     metric_1 = node.bare(
         fuaran.metric(
@@ -2110,7 +2110,7 @@ def test_ergonomic_coercions() -> None:
 def test_aria_bearing_node_encodes_canonically() -> None:
     """A node that *keeps* its injected ARIA still encodes to canonical JSON and
     survives a decode→encode round-trip byte-stably (the conformance invariant)."""
-    from fuaran_py import decode_node, encode_node
+    from fuaran_ui import decode_node, encode_node
 
     tree = fuaran.metric("m", label="Revenue", value=1, format=None)
     wire = encode(tree)
@@ -2319,8 +2319,8 @@ def test_a_handler_less_control_over_a_state_slot_is_LIVE_not_inert() -> None:
     what carries the interaction. The falsifier is the same control over a
     `Static` value, which genuinely cannot act — without it this test would pass
     on a validator that had stopped checking."""
-    from fuaran_py import decode_node
-    from fuaran_py.validator import validate_node
+    from fuaran_ui import decode_node
+    from fuaran_ui.validator import validate_node
 
     def findings(tree: object) -> list[str]:
         decoded = decode_node(encode(tree))  # type: ignore[arg-type]

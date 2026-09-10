@@ -4,7 +4,7 @@ Run it::
 
     python examples/quickstart_terse_dashboard.py
 
-``fuaran_py.ui.quick`` is the terse, notebook-grade layer over the id-first authoring
+``fuaran_ui.ui.quick`` is the terse, notebook-grade layer over the id-first authoring
 surface: **title-first, records-in, ids derived**. A data scientist holding
 ``df.to_dict("records")`` names the dashboard, hands over the rows, and gets a Fuaran
 tree — no ids to invent, no per-kind defaults to remember, no second encoder.
@@ -16,7 +16,7 @@ here imports a third-party dependency. Swap the two for ``pd.read_csv(...)`` and
 
 The second half of the script is the point that terseness alone would miss. The ids are
 **derived** from each node's kind and label, so re-running the cell over fresh numbers
-produces the *same* ids — and :func:`fuaran_py.ops.diff` then yields a short, typed op
+produces the *same* ids — and :func:`fuaran_ui.ops.diff` then yields a short, typed op
 script against the nodes whose contents moved, rather than a wholesale rebuild. A host
 that applies that script patches the rendered page; one that re-decodes a tree with
 fresh ids throws the page away and starts again.
@@ -24,11 +24,11 @@ fresh ids throws the page away and starts again.
 
 from __future__ import annotations
 
-from fuaran_py import decode_node
-from fuaran_py.ops import diff
-from fuaran_py.schema.types import UiNode
-from fuaran_py.ui import encode, quick
-from fuaran_py.validator import validate_node
+from fuaran_ui import decode_node
+from fuaran_ui.ops import diff
+from fuaran_ui.schema.types import UiNode
+from fuaran_ui.ui import encode, quick
+from fuaran_ui.validator import validate_node
 
 # What a dataframe hands you: `df.to_dict("records")`.
 JANUARY: list[dict[str, object]] = [

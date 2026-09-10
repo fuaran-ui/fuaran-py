@@ -3,8 +3,15 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "fuaran-py"
-version = "0.6.0"
+# The DISTRIBUTION is `fuaran-ui` and the import package is `fuaran_ui`; the REPOSITORY is
+# still `fuaran-ui/fuaran-py` and does not move (see the URLs below). Registry names carry
+# the domain and drop the language — every other tier already reads that way
+# (`Fuaran.UI.*`, `@fuaran-ui/*`, the `fuaran-ui` crate, `io.fuaran:fuaran-ui`) — while a
+# repo rename would cost redirects, CI checkouts and corpus resolvers for no
+# consumer-visible gain. The `fuaran-py` project on PyPI is left exactly as it stands:
+# never re-tagged, never published to again.
+name = "fuaran-ui"
+version = "0.7.0"
 description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -26,7 +33,7 @@ dependencies = []   # dependency-light: the codec uses only the Python standard 
 [project.optional-dependencies]
 # Dev-only tooling. The runtime codec stays standard-library-only (see CLAUDE.md);
 # jsonschema (the schema-validity conformance leg) and hypothesis (generative
-# cross-host parity) are test dependencies, never imported by src/fuaran_py.
+# cross-host parity) are test dependencies, never imported by src/fuaran_ui.
 # ruff floors at 0.16 and caps below 0.17. From 0.16 `ruff format` also formats
 # python inside markdown code blocks; that arrived through an unpinned CI install
 # and changed the gate with no commit (README.md went red 2026-08-27 while local
@@ -44,7 +51,7 @@ dev = ["pytest>=8", "mypy>=1.11", "ruff>=0.16,<0.17", "jsonschema>=4.23", "hypot
 # It is an extra rather than a `requirements.txt` beside the sample for one reason: a sample whose
 # dependencies are declared somewhere the test suite does not read is a sample CI never runs. That
 # was this repo's own state — `tests/test_fastapi_host.py` skipped on every CI run, for a year, in
-# a job that reported green. With the extra, `pip install "fuaran-py[live-host]"` both starts the
+# a job that reported green. With the extra, `pip install "fuaran-ui[live-host]"` both starts the
 # server and turns the smoke test from skipped into gated, and the matrix row that installs `dev`
 # alone still proves the suite skips cleanly when FastAPI is absent — the other half of the claim.
 #
@@ -56,15 +63,22 @@ live-host = ["fastapi>=0.110", "uvicorn>=0.29", "httpx>=0.27"]
 # The invocable entry point (fuaran#1617). Every verb is a thin wrapper over a
 # library call this host already ships; `validate` is at parity with the npm
 # `@fuaran-ui/cli validate` in exit code and stdout, so the two hosts'
-# get-started tracks read the same. See `src/fuaran_py/cli/core.py`.
-fuaran-py = "fuaran_py.cli:main"
+# get-started tracks read the same. See `src/fuaran_ui/cli/core.py`.
+fuaran-ui = "fuaran_ui.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/fuaran-ui/fuaran-py"
 Repository = "https://github.com/fuaran-ui/fuaran-py"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/fuaran_py"]
+packages = ["src/fuaran_ui"]
+
+[tool.hatch.build.targets.sdist]
+# `placeholder/` holds the bare-name `fuaran` distribution (see placeholder/pyproject.toml).
+# It is its own project root inside this repository, so it is excluded here to keep a second
+# pyproject.toml out of the `fuaran-ui` sdist, where a build backend has no business finding
+# one. The wheel never saw it — `packages` above already scopes that.
+exclude = ["/placeholder"]
 
 [tool.ruff]
 line-length = 120
@@ -75,7 +89,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.mypy]
 python_version = "3.12"
-files = ["src/fuaran_py"]
+files = ["src/fuaran_ui"]
 ignore_missing_imports = true
 warn_unused_ignores = false
 check_untyped_defs = true

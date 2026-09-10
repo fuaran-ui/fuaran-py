@@ -1,6 +1,6 @@
-# Authoring Fuaran trees in Python (`fuaran_py.ui`)
+# Authoring Fuaran trees in Python (`fuaran_ui.ui`)
 
-`fuaran_py.ui` is the **ergonomic, typed authoring surface** – the Python analogue
+`fuaran_ui.ui` is the **ergonomic, typed authoring surface** – the Python analogue
 of `@fuaran-ui/ui` (TypeScript) and `Fuaran.UI` (F#). A Python developer builds a
 Fuaran UI tree with smart constructors that inject per-kind defaults and ARIA, and
 `encode` serialises it to canonical JSON **byte-identically** to the shared
@@ -15,7 +15,7 @@ wire-format corpus.
 ## Quickstart
 
 ```python
-from fuaran_py.ui import fuaran, binding, action, format, node, encode
+from fuaran_ui.ui import fuaran, binding, action, format, node, encode
 
 tree = fuaran.dashboard(
     "root",
@@ -101,16 +101,16 @@ styled = node.with_voice("Display", node.with_role("Data", fuaran.markdown("h", 
 busy = node.on_loading(fuaran.skeleton("ph", 3), fuaran.metric("m", label="X", value=1))
 ```
 
-## The terse layer (`fuaran_py.ui.quick`) — title-first, records-in, ids derived
+## The terse layer (`fuaran_ui.ui.quick`) — title-first, records-in, ids derived
 
 Everything above is **id-first**: the first positional argument is the node id, because
 an app shell, a fragment library or a golden fixture wants ids it chose and can address
-later. A notebook cell wants the opposite. `fuaran_py.ui.quick` is a thin layer *over*
+later. A notebook cell wants the opposite. `fuaran_ui.ui.quick` is a thin layer *over*
 these constructors — same per-kind defaults, same ARIA injection, same `encode` — that
 takes a title and a list of records and derives the ids:
 
 ```python
-from fuaran_py.ui import quick
+from fuaran_ui.ui import quick
 
 rows = df.to_dict("records")  # or any list of dicts
 totals = df.groupby("region")["revenue"].sum().sort_values(ascending=False).to_dict()
@@ -133,7 +133,7 @@ app = quick.dashboard(
 | `quick.grid(records, columns=…, labels=…)` | a list of records; columns default to their keys |
 | `quick.chart(records, x=…, y=…, kind=…)` | a list of records + the field names |
 
-`grid` and `chart` build the embedded frame through the shipped `fuaran_py.ui.frame(...)`
+`grid` and `chart` build the embedded frame through the shipped `fuaran_ui.ui.frame(...)`
 Compute surface, so the rows travel as canonical columnar data with an empty
 pipeline — which is also the one shape the pre-emit validator can ground a chart's
 field references against. Everything returned is an ordinary `UiNode`: mix the two
@@ -159,12 +159,12 @@ Three properties follow:
 - **Changed data moves no id at all.** Values, trends and rows never feed the
   derivation.
 
-That is what makes a re-run *patchable*. `fuaran_py.ops.diff` over two runs of the
+That is what makes a re-run *patchable*. `fuaran_ui.ops.diff` over two runs of the
 same cell yields a short, typed op script against the nodes whose contents changed —
 `UpdateProp` and `EditNode`, never a `RemoveNode` / `InsertChild` rebuild:
 
 ```python
-from fuaran_py.ops import diff
+from fuaran_ui.ops import diff
 
 before, after = build(january), build(february)
 diff(before.to_wire(), after.to_wire())  # 5 ops for the dashboard above; [] if nothing changed
@@ -197,10 +197,10 @@ is [`../examples/quickstart_terse_dashboard.py`](../examples/quickstart_terse_da
 ## Displaying a tree inline (Jupyter, JupyterLab, VS Code, marimo)
 
 A tree evaluated as the last expression of a cell **renders in place**, with no
-import beyond `fuaran_py`:
+import beyond `fuaran_ui`:
 
 ```python
-from fuaran_py.ui import quick
+from fuaran_ui.ui import quick
 
 quick.dashboard(
     "Regional revenue",
@@ -221,11 +221,11 @@ understands:
 
 | Media type | What it is |
 |---|---|
-| `text/html` | the shipped server renderer's output (`fuaran_py.renderer.render_html`), wrapped in a container with the reference stylesheet inlined once per output and rewritten to apply only inside it |
+| `text/html` | the shipped server renderer's output (`fuaran_ui.renderer.render_html`), wrapped in a container with the reference stylesheet inlined once per output and rewritten to apply only inside it |
 | `application/vnd.fuaran.ui+json` | the canonical wire JSON, as the bytes `encode_node` produced — a string, not a re-serialised object, so byte-identity survives the trip |
 | `text/plain` | a one-line summary, for a terminal REPL or a diff of a recorded notebook. `repr()` is still the full structural view |
 
-`fuaran_py.renderer.mimebundle(node, …)` is the same thing as a function, if you
+`fuaran_ui.renderer.mimebundle(node, …)` is the same thing as a function, if you
 want to hand a bundle to something yourself; `display_html(node, …)` is the HTML
 half alone. Both take the `sources` and `egress_policy` keywords `render_html`
 takes, which is how a notebook declares a wider destination posture — by name,
@@ -253,14 +253,14 @@ boundary is more useful than the summary:
 
 What is cheap today is that re-running an *unchanged* cell yields a byte-identical
 tree, because `quick` derives ids from labels rather than positions — so
-`fuaran_py.ops.diff` across two runs is the short typed op script an in-place patch
+`fuaran_ui.ops.diff` across two runs is the short typed op script an in-place patch
 would eventually carry (see [Derived ids](#derived-ids--the-discipline) above).
 
 A worked notebook, committed with its recorded outputs, is
 [`../examples/notebook_display.ipynb`](../examples/notebook_display.ipynb); its
 header carries the one command that re-records it.
 
-## Parameter-bound controls (`fuaran_py.ui.control`)
+## Parameter-bound controls (`fuaran_ui.ui.control`)
 
 A dashboard built from the layers above is read-only: the numbers are baked in at
 authoring time and a reader can only look at them. A **control** makes it answer back.
@@ -269,7 +269,7 @@ re-derives the rows when the slot changes — with no Python present, because th
 `Transform` and its parameters are ordinary wire data:
 
 ```python
-from fuaran_py.ui import col, control, frame, fuaran, node, param, quick
+from fuaran_ui.ui import col, control, frame, fuaran, node, param, quick
 
 region = control.select("region", options=col("region").unique(), source=frame(rows))
 
@@ -335,7 +335,7 @@ is what every tree written before them already meant.
 **No handler is what ARMS the write-back default.** A closure cannot cross the wire, so a
 control declaring one describes changes that go somewhere the document cannot reach; a
 control declaring none writes its own slot, and that single fact is what makes an exported
-file interactive rather than merely pretty. It is why `fuaran_py.ui.control`'s
+file interactive rather than merely pretty. It is why `fuaran_ui.ui.control`'s
 constructors have always passed `on_change=False`.
 
 **No value is a BOUND control, not an empty one.** A decoder synthesises the context's
@@ -444,8 +444,8 @@ those records were *narrower* than the wire, these kinds were *absent* — `enco
 `.to_wire()` root, so an omitted kind is not awkward to author, it is unauthorable.
 
 ```python
-from fuaran_py.schema import types as t
-from fuaran_py.ui import fuaran
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import fuaran
 
 fuaran.drawing(
     "revenue",
@@ -495,8 +495,8 @@ miss: `encode` lowers whatever it is handed, so a case outside its union is not 
 it is simply unwritable.
 
 ```python
-from fuaran_py.schema import types as t
-from fuaran_py.ui import action, binding, fuaran, node
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import action, binding, fuaran, node
 
 binding.query("orders")  # {"$type":"Query","name":"orders"}
 binding.query("orders", "status", "region")  # ... plus "dependsOn":["status","region"]
@@ -519,7 +519,7 @@ wire, so a query says what to ask for and nothing about what comes back.
 `Binding` (a value source) and `Action` (an effect), because the wire shape is the same in
 both positions. Arguments are `(addr, value)` pairs of **strings**; an argument's real
 type lives in the capability's own `Signature`, which validates the parsed value on the
-host that owns the body (`fuaran_py.ui.capability`). An id the registry does not know is
+host that owns the body (`fuaran_ui.ui.capability`). An id the registry does not know is
 refused there, and the SHAPE is refused before that by the dispatch gate — `Invoke` is a
 gated effect, so a host that has permitted nothing runs nothing.
 

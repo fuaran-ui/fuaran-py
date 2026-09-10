@@ -9,7 +9,7 @@ The three refusals all happen BEFORE the SDK call, which is why the transport
 double asserts it was never invoked: a guard that refuses after the turn has
 already paid for it.
 
-Skips when ``fastapi`` is not installed (``fuaran-py`` itself stays
+Skips when ``fastapi`` is not installed (``fuaran-ui`` itself stays
 standard-library-only; FastAPI is a sample-only dependency).
 """
 
@@ -28,8 +28,8 @@ pytest.importorskip("httpx", reason="httpx is required by fastapi.testclient")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from fuaran_py.client import FuaranClient  # noqa: E402
-from fuaran_py.ui import encode, fuaran, node  # noqa: E402
+from fuaran_ui.client import FuaranClient  # noqa: E402
+from fuaran_ui.ui import encode, fuaran, node  # noqa: E402
 
 TREE = encode(node.bare(fuaran.markdown("md-1", "hello")))
 SECRET = "s3cret-shared-with-the-page"

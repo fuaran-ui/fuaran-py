@@ -22,10 +22,10 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py import decode_node
-from fuaran_py.ai_tools import walk_nodes
-from fuaran_py.schema.decode import KNOWN_KINDS
-from fuaran_py.validator import validate_node
+from fuaran_ui import decode_node
+from fuaran_ui.ai_tools import walk_nodes
+from fuaran_ui.schema.decode import KNOWN_KINDS
+from fuaran_ui.validator import validate_node
 
 
 def _node_ids(value: object) -> list[str]:

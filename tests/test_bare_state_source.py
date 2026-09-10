@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py import decode_node, encode_node
+from fuaran_ui import decode_node, encode_node
 
 BARE = '{"$type":"State","key":"members"}'
 EMPTY_ARRAY = '{"$type":"State","defaultValue":[],"key":"members"}'

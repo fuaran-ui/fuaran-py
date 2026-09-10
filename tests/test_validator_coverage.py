@@ -24,7 +24,7 @@ from pathlib import Path
 
 import pytest
 
-_SRC = Path(__file__).resolve().parents[1] / "src" / "fuaran_py" / "validator" / "validate.py"
+_SRC = Path(__file__).resolve().parents[1] / "src" / "fuaran_ui" / "validator" / "validate.py"
 _DECL = Path(__file__).resolve().parents[1] / "validator-coverage.json"
 
 # A code in a `Finding(...)` constructor position — the codes this host can RAISE.

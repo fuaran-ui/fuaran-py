@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fuaran_py.style_observer import (
+from fuaran_ui.style_observer import (
     BLACK,
     DEFAULT_OPTIONS,
     TRANSPARENT,

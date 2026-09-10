@@ -30,10 +30,10 @@ from dataclasses import dataclass
 import pytest
 
 from _corpus import MERGE_CORPUS_ROOT, merge_corpus_required, merge_fixtures, merge_refusal_fixtures
-from fuaran_py import decode_node, encode_node
-from fuaran_py.canonical import escape_string
-from fuaran_py.merge import encode_envelope, merge_3way
-from fuaran_py.model import Arr, Node, Obj
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.canonical import escape_string
+from fuaran_ui.merge import encode_envelope, merge_3way
+from fuaran_ui.model import Arr, Node, Obj
 
 
 def _read(rel: str) -> str:

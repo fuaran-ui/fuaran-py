@@ -3,8 +3,8 @@
 This repo is the **Python host of the Fuaran UI language** — a **co-equal sibling
 to the F# (`Fuaran.UI`) and TypeScript (`@fuaran-ui/*`) tiers**, not merely a
 codec. The target identity is a full authoring + rendering host: an ergonomic
-`fuaran_py.ui` smart-constructor authoring surface (roadmap Phase 278), a tree-op
-apply engine (279), a server-HTML renderer (`fuaran_py.renderer`, Phase 239 —
+`fuaran_ui.ui` smart-constructor authoring surface (roadmap Phase 278), a tree-op
+apply engine (279), a server-HTML renderer (`fuaran_ui.renderer`, Phase 239 —
 shipped) plus an interactive Pyodide client runtime (280), all conformant to the
 shared wire format. What ships **today** is the floor: the canonical-JSON codec
 (`decode_node` / `encode_node` / `decode_op` / `encode_op`), a pre-emit validator,
@@ -21,6 +21,31 @@ reason to make it a lesser, codec-only kind of artefact than F#/TS.
 
 This repo sits alongside the `fuaran` (F#) and `fuaran-ts` (TypeScript) tiers as a co-equal
 conformant host. Cross-repo development conventions (port allocation, formatting, language-baseline pinning) live at the maintainers' workspace level and are not shipped here.
+
+## Names — distribution, import, repository (Phase 1694, 2026-09-10)
+
+Three names, and only two of them moved:
+
+| | |
+|---|---|
+| PyPI distribution | **`fuaran-ui`** — `pip install fuaran-ui` |
+| import package | **`fuaran_ui`** — `from fuaran_ui.ui import fuaran` |
+| console script | **`fuaran-ui`** |
+| repository | **`fuaran-ui/fuaran-py`** — unchanged |
+| host id (capability manifest, refusal reports, `HOST_ID`) | **`fuaran-py`** — unchanged, it names the repo |
+
+Registry names carry the DOMAIN and drop the LANGUAGE, because the language is
+redundant on a registry that only holds that language — every other tier already
+reads that way (`Fuaran.UI.*`, `@fuaran-ui/*`, the `fuaran-ui` crate,
+`io.fuaran:fuaran-ui`, the `FuaranUI*` Swift targets). Repo names stay: the org
+disambiguates them, and a rename costs redirects, CI checkouts, corpus resolvers
+and `workspace.json` for no consumer-visible gain. So a `fuaran-py` you find in
+this repo is either the repository, a path, or the host id, and is correct; a
+`fuaran_py` is not, and is a defect.
+
+The `fuaran-py` PROJECT on PyPI is left exactly as it stands — never re-tagged,
+never published to again. Its releases stay downloadable, because a live demo page
+and three CI workflows still install them by exact version.
 
 ## Posture
 
@@ -48,7 +73,7 @@ F#-10/.NET-10 pinning.
 
 ```
 fuaran-py/
-├── src/fuaran_py/
+├── src/fuaran_ui/
 │   ├── canonical.py      # the canonical-JSON encoder (number form, key sort, escaping)
 │   ├── model.py          # the structural typed tree (Node / Obj / Arr)
 │   ├── result.py         # Ok / Err + the six DecodeError codes
@@ -56,7 +81,7 @@ fuaran-py/
 │   ├── ops/              # decode_op / encode_op over the 11-op TreeOp algebra
 │   ├── op_stream/        # hash-chained provenance log: StreamEntry envelope + SHA-256 chain + in-memory sink + replay
 │   ├── validator/        # pre-emit, default-deny-by-shape structural validator
-│   ├── cli/              # the `fuaran-py` console script (Phase 1617): validate / render /
+│   ├── cli/              # the `fuaran-ui` console script (Phase 1617): validate / render /
 │   │                     #   export / corpus-sync, each a thin wrapper over a library call.
 │   │                     #   `validate` is at parity with the TS host's `fuaran validate` in
 │   │                     #   exit code and stdout; core.py records what parity means, and why
@@ -131,7 +156,7 @@ other cannot:
   `encode(decode(encode x)) == encode x`. This host's canonical form is a fixed
   point. Self-consistency only: a misreading of the spec that this host applies
   *consistently* passes it every time.
-- **Cross-host** — `fuaran_py.conformance.fuzz_exchange`, the fuzz-sample
+- **Cross-host** — `fuaran_ui.conformance.fuzz_exchange`, the fuzz-sample
   exchange. Another host emits its canonical bytes for generated trees into
   `<dir>/fsharp/`; this module decodes + re-encodes each through the Python codec,
   asserts byte-identity, and writes **this** host's canonical output to
@@ -149,7 +174,7 @@ The exchange's directory names (`fsharp` / `python`) are a cross-repo contract
 with the sibling's `--check-fuzz-samples <dir> <host>` argument; renaming either
 side silently un-wires it.
 
-### Decoder robustness fuzz (`fuaran_py.conformance.decoder_fuzz` + `tests/test_decoder_fuzz.py`)
+### Decoder robustness fuzz (`fuaran_ui.conformance.decoder_fuzz` + `tests/test_decoder_fuzz.py`)
 
 A third generative floor, and the only one aimed at inputs a conformant emitter would never produce.
 The refusal contract — decoding is TOTAL, so a malformed or hostile input yields a structured typed
@@ -160,7 +185,7 @@ imagination.
 - **The bounded run IS the PR gate.** It landed in the suite `pytest` already runs, so no workflow
   change was needed and none can silently switch it off.
 - **The long run is a CLI**, and it writes its own machine-readable record:
-  `python -m fuaran_py.conformance.decoder_fuzz --long --iterations 250000 --evidence <file>`.
+  `python -m fuaran_ui.conformance.decoder_fuzz --long --iterations 250000 --evidence <file>`.
 - **The go-red self-test is permanent, and so is its inverse.** Five mutants, one per invariant, plus
   a pin that each is PARTIAL — a mutant that broke every input would make the harness look sensitive
   while testing nothing.
@@ -179,13 +204,13 @@ imagination.
   determinism", landed PROPOSED and not yet ratified; crash-freedom on them is in scope, agreement
   is not.
 
-`fuaran_py.conformance.refusal_report` is the companion emitter: this host's refusal class for every
+`fuaran_ui.conformance.refusal_report` is the companion emitter: this host's refusal class for every
 reject fixture, as JSON, for a cross-host runner that compares the hosts to each other rather than
 each to the corpus in isolation.
 
 ## Renderer (Phase 239)
 
-`fuaran_py.renderer.render_html` walks a decoded `Node` tree and emits a
+`fuaran_ui.renderer.render_html` walks a decoded `Node` tree and emits a
 **body-fragment HTML string** carrying the reference `fuaran-*` class vocabulary,
 so the byte-copied stylesheet styles it exactly as the F#/TS hosts style their
 output. Server semantics mirror the F# SSR precedent: no runtime, no dispatch
@@ -230,7 +255,7 @@ not enforceable server-side, so it is at most a data attribute and never a claim
 
 Two disciplines keep it honest:
 
-- **Reference-CSS byte-copy.** `src/fuaran_py/renderer/content/fuaran-reference.css`
+- **Reference-CSS byte-copy.** `src/fuaran_ui/renderer/content/fuaran-reference.css`
   is a byte-for-byte copy of the F# canonical
   (`../fuaran-dotnet/src/Fuaran.UI.Renderer/content/fuaran-reference.css`). A test
   (`test_render_parity` / the byte-identical check) fails if the copy drifts when
@@ -244,14 +269,14 @@ Two disciplines keep it honest:
   absent. **A new `NodeKind` / variant that changes the emitted class vocabulary
   updates the renderer here in the same move that updates the codec.**
 
-Sanitisation matches the F#/TS posture (`fuaran_py.renderer.sanitize` ports
+Sanitisation matches the F#/TS posture (`fuaran_ui.renderer.sanitize` ports
 `Sanitize.fs`): URL-scheme default-deny, `data-*`/`aria-*` attribute allowlist,
 markdown escaped-first then swept. The `Custom` host-renderer registry is a host
 trust boundary — the baseline ships no registry seam, so `Custom` renders an
 inert labelled placeholder.
 
 **Destination policy is AMBIENT on the render context, and defaults to deny.**
-`Renderer.egress_policy` (`fuaran_py.renderer.egress`, the port of the reference
+`Renderer.egress_policy` (`fuaran_ui.renderer.egress`, the port of the reference
 host's destination-policy section) is consulted by every `href` / `src` the
 renderer emits — the `Link` node's `href` under the `HYPERLINK` class, the
 `Image` node's `src` under `MEDIA`, and the whole markdown body through
@@ -280,7 +305,7 @@ Three disciplines follow, and the third is the one that decays quietly:
 The README's "Destination policy" section carries the host-facing contract and
 the four declared shape differences from the reference host.
 
-### Notebook display (`fuaran_py.renderer.notebook`)
+### Notebook display (`fuaran_ui.renderer.notebook`)
 
 `UiNode` and `Node` implement `_repr_mimebundle_`, so a tree evaluated as the last
 expression of a notebook cell renders inline. The rich-display protocol is a
@@ -376,14 +401,14 @@ one. They hand out geometry, never markup decisions.
 
 ## Op-stream (hash chain)
 
-`fuaran_py.op_stream` is the Python host of the op-stream **hash-chained provenance
+`fuaran_ui.op_stream` is the Python host of the op-stream **hash-chained provenance
 log** — the twin of the F# and TypeScript op-stream tiers. A stream's applied
 `TreeOp` edits are an append-only sequence of `OpRecord` envelopes; a host-side
 SHA-256 chain (`sha256(previousHash | payload)`) links them so the stream is
 tamper-evident. The pre-image is byte-identical across hosts: the versioned
 `StreamEntry` envelope leads with `{"v":2,…}` (the chain format version folded in
 first), wrapped in the canonical delimited `{"seq":…,"actor":…,"op":…}` payload,
-with the op encoded by the shared `fuaran_py.ops.encode_op` + `fuaran_py.canonical`
+with the op encoded by the shared `fuaran_ui.ops.encode_op` + `fuaran_ui.canonical`
 (never a re-implemented encoder). The module is **stdlib-only** — unlike the
 Fable-constrained hosts it uses `hashlib.sha256` directly.
 
@@ -399,7 +424,7 @@ Fable-constrained hosts it uses `hashlib.sha256` directly.
 
 ## Computed-style observer + theme manifest
 
-`fuaran_py.style_observer` is the Python twin of `Fuaran.UI.StyleObserver`: it
+`fuaran_ui.style_observer` is the Python twin of `Fuaran.UI.StyleObserver`: it
 reads back a rendered tree's resolved computed styles and derives a fixed
 vocabulary of resolved-style flags (contrast-below-AA, invisible-text,
 accent-indistinct, plus the four manifest-aware checks) the semantic-state channel
@@ -415,7 +440,7 @@ JSON encode is **byte-identical** to the F# and TypeScript hosts.
   tests inject a fake DOM). `connect()` wires a live `MutationObserver`
   (Pyodide-only) so a theme toggle re-derives automatically.
 
-`fuaran_py.theme_manifest` is the Python twin of `Fuaran.UI.ThemeManifest`: a
+`fuaran_ui.theme_manifest` is the Python twin of `Fuaran.UI.ThemeManifest`: a
 DTCG-compatible token model + semantic role bindings + quantified invariants
 (per-role contrast floors, 60-30-10 usage budgets, motion voice). It is the
 contract the observer's manifest-aware tier (`per_node_flags` /

@@ -1,6 +1,6 @@
 """Conformance + unit tests for the §15 wire versioning envelope.
 
-Certifies :mod:`fuaran_py.envelope` against the shared ``envelope-*`` corpus
+Certifies :mod:`fuaran_ui.envelope` against the shared ``envelope-*`` corpus
 family (round-trip byte-identical; Foreign hard-refuse) and mirrors the Go
 ``wire/envelope_test`` negotiation behaviour case-for-case.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.envelope import (
+from fuaran_ui.envelope import (
     BEHIND,
     CURRENT,
     FOREIGN,

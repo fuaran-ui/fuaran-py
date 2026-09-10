@@ -29,8 +29,8 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py.result import Ok
-from fuaran_py.schema import decode_node, encode_node
+from fuaran_ui.result import Ok
+from fuaran_ui.schema import decode_node, encode_node
 
 _CHILD = '{"id":"p1","kind":{"$type":"Markdown","text":"one"}}'
 

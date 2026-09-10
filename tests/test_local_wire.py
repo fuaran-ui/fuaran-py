@@ -25,11 +25,11 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py.model import Obj
-from fuaran_py.renderer import DECODED_COMPUTED_MESSAGE, WireSurvivabilityError, render_html
-from fuaran_py.renderer.bindings import resolve_binding
-from fuaran_py.schema.decode import decode_node
-from fuaran_py.schema.encode import encode_node
+from fuaran_ui.model import Obj
+from fuaran_ui.renderer import DECODED_COMPUTED_MESSAGE, WireSurvivabilityError, render_html
+from fuaran_ui.renderer.bindings import resolve_binding
+from fuaran_ui.schema.decode import decode_node
+from fuaran_ui.schema.encode import encode_node
 
 _DEBOUNCE = (
     '{"id":"form-local-debounce","kind":{"$type":"Form","fields":[{"id":"email-input",'

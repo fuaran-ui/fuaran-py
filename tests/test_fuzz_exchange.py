@@ -1,6 +1,6 @@
 """The cross-host fuzz-sample exchange runner (Leg F) — its own regression floor.
 
-``fuaran_py.conformance.fuzz_exchange`` is the mechanism that consumes another
+``fuaran_ui.conformance.fuzz_exchange`` is the mechanism that consumes another
 host's generated canonical samples and emits this host's, so the converse leg can
 check them. The exchange itself needs a live F# emitter and is therefore driven by
 hand (see the module docstring); these tests pin the *runner* — that it detects a
@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.conformance.fuzz_exchange import HOST, SOURCE_HOST, main, run
+from fuaran_ui.conformance.fuzz_exchange import HOST, SOURCE_HOST, main, run
 
 
 def _seed(samples_dir: Path, *, nodes: int = 4, ops: int = 4) -> Path:

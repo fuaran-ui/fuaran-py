@@ -22,7 +22,7 @@ import inspect
 import json
 from collections.abc import Mapping
 
-from fuaran_py.client import (
+from fuaran_ui.client import (
     SURFACE_VERSION,
     AccessDenied,
     AppliedOp,
@@ -37,7 +37,7 @@ from fuaran_py.client import (
     parse_turn_response,
     to_wire_body,
 )
-from fuaran_py.ui import encode, fuaran, node
+from fuaran_ui.ui import encode, fuaran, node
 
 TREE_JSON = encode(node.bare(fuaran.markdown("md-1", "hello")))
 OP_JSON = '{"$type": "RemoveNode", "target": "md-1"}'

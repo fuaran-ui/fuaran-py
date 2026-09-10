@@ -1,4 +1,4 @@
-"""The ``fuaran-py`` console script's own behaviour.
+"""The ``fuaran-ui`` console script's own behaviour.
 
 Cross-host parity lives next door in ``test_cli_parity.py``; what is pinned here
 is everything this host owns alone — the verbs the reference front-end has no
@@ -12,7 +12,7 @@ import json
 import tomllib
 from pathlib import Path
 
-from fuaran_py.cli import POSTURE, dispatch, main
+from fuaran_ui.cli import POSTURE, dispatch, main
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cli_parity"
 VALID = str(FIXTURES / "valid-node.json")
@@ -23,15 +23,15 @@ def test_the_console_script_is_declared_and_points_at_the_entry_point() -> None:
     """The packaging contract for the entry point itself.
 
     A CLI nothing installs is a library function with a docstring about being a
-    CLI; this is the one assertion that the wheel actually grows a ``fuaran-py``
+    CLI; this is the one assertion that the wheel actually grows a ``fuaran-ui``
     command, and that it names an importable callable.
     """
     root = Path(__file__).resolve().parent.parent
     with (root / "pyproject.toml").open("rb") as handle:
         pyproject = tomllib.load(handle)
     scripts = pyproject["project"].get("scripts", {})
-    assert scripts.get("fuaran-py") == "fuaran_py.cli:main", (
-        f"pyproject.toml must declare [project.scripts] fuaran-py = 'fuaran_py.cli:main' — it declares {scripts!r}"
+    assert scripts.get("fuaran-ui") == "fuaran_ui.cli:main", (
+        f"pyproject.toml must declare [project.scripts] fuaran-ui = 'fuaran_ui.cli:main' — it declares {scripts!r}"
     )
     assert callable(main)
 
@@ -175,7 +175,7 @@ def test_spec_hash_is_absent_and_the_absence_is_explained() -> None:
     assert result.code == 2
     assert 'unknown command "spec-hash"' in result.out
 
-    import fuaran_py.cli.core as core
+    import fuaran_ui.cli.core as core
 
     assert core.__doc__ is not None
     assert "spec-hash" in core.__doc__
@@ -189,7 +189,7 @@ def test_help_and_no_argument_both_print_the_usage_at_exit_zero() -> None:
     for argv in ([], ["help"], ["--help"], ["-h"]):
         result = dispatch(list(argv))
         assert result.code == 0, argv
-        assert result.out.startswith("fuaran-py"), argv
+        assert result.out.startswith("fuaran-ui"), argv
 
 
 def test_an_unreadable_file_is_the_document_failing_not_a_usage_error(tmp_path: Path) -> None:

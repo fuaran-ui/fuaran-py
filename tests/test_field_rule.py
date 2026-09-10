@@ -28,10 +28,10 @@ import re
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node, encode_node, validate_node
-from fuaran_py.renderer import render_html
-from fuaran_py.schema import types as t
-from fuaran_py.ui import binding, encode, fuaran, rule
+from fuaran_ui import decode_node, encode_node, validate_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import binding, encode, fuaran, rule
 
 
 def _form(field: str) -> str:

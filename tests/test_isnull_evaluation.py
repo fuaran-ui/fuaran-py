@@ -18,7 +18,7 @@ the totality claim is what the last test pins.
 
 from __future__ import annotations
 
-from fuaran_py.dataframe import (
+from fuaran_ui.dataframe import (
     Cast,
     Cell,
     Coalesce,
@@ -32,7 +32,7 @@ from fuaran_py.dataframe import (
     Table,
     eval_pipeline,
 )
-from fuaran_py.dataframe.model import NULL
+from fuaran_ui.dataframe.model import NULL
 
 
 def _table() -> Table:

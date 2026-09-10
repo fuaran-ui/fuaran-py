@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-The `fuaran_py` package is pre-1.0. Security fixes are applied to the latest released `0.x` version on the
+The `fuaran_ui` package is pre-1.0. Security fixes are applied to the latest released `0.x` version on the
 `main` branch. Older pre-releases are not maintained.
 
 ## Scope

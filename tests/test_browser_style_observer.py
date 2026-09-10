@@ -8,7 +8,7 @@ plain CPython — the same injectable-deps discipline the TS browser observer us
 
 from __future__ import annotations
 
-from fuaran_py.style_observer import (
+from fuaran_ui.style_observer import (
     BLACK,
     WHITE,
     BrowserDeps,
@@ -18,7 +18,7 @@ from fuaran_py.style_observer import (
     TokenResolutionFailed,
     rgb,
 )
-from fuaran_py.theme_manifest import ManifestToken, RoleBinding, ThemeManifest, ToneRole
+from fuaran_ui.theme_manifest import ManifestToken, RoleBinding, ThemeManifest, ToneRole
 
 
 def _deps(dom: dict[str, StyleInput], tree: dict[str, list[str]] | None = None) -> BrowserDeps:

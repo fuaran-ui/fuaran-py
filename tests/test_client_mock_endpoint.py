@@ -16,8 +16,8 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 
-from fuaran_py.client import AccessDenied, FuaranClient, FuaranSession, Produced, TurnFailed
-from fuaran_py.ui import encode, fuaran, node
+from fuaran_ui.client import AccessDenied, FuaranClient, FuaranSession, Produced, TurnFailed
+from fuaran_ui.ui import encode, fuaran, node
 
 FIRST_TREE = encode(node.bare(fuaran.markdown("md-1", "hello")))
 SECOND_TREE = encode(node.bare(fuaran.markdown("md-1", "renamed")))

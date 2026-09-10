@@ -26,8 +26,8 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.ops import decode_op, encode_op
-from fuaran_py.schema import decode_node, encode_node
+from fuaran_ui.ops import decode_op, encode_op
+from fuaran_ui.schema import decode_node, encode_node
 
 jsonschema = pytest.importorskip(
     "jsonschema",

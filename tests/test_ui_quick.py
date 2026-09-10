@@ -28,12 +28,12 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py import decode_node, encode_node
-from fuaran_py.ops import diff
-from fuaran_py.schema import types as t
-from fuaran_py.schema.types import UiNode
-from fuaran_py.ui import encode, quick
-from fuaran_py.validator import validate_node
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.ops import diff
+from fuaran_ui.schema import types as t
+from fuaran_ui.schema.types import UiNode
+from fuaran_ui.ui import encode, quick
+from fuaran_ui.validator import validate_node
 
 # The gallery's dataset, as a dataframe hands it over.
 ROWS: list[dict[str, object]] = [
@@ -265,8 +265,8 @@ def test_a_re_run_of_the_gallery_cell_over_fresh_data_is_a_short_op_script() -> 
 
 def test_the_re_run_script_actually_reproduces_the_new_tree() -> None:
     """The bound above is worthless if the script is short because it is wrong."""
-    from fuaran_py.canonical import encode_value
-    from fuaran_py.ops import apply
+    from fuaran_ui.canonical import encode_value
+    from fuaran_ui.ops import apply
 
     before, after = gallery_cell(ROWS).to_wire(), gallery_cell(MOVED).to_wire()
     current = before

@@ -25,10 +25,10 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.model import Arr, Node, Obj
-from fuaran_py.renderer import collect_state_seeds, render_html, with_state_seeds
-from fuaran_py.renderer.bindings import BindingSources
+from fuaran_ui import decode_node
+from fuaran_ui.model import Arr, Node, Obj
+from fuaran_ui.renderer import collect_state_seeds, render_html, with_state_seeds
+from fuaran_ui.renderer.bindings import BindingSources
 
 SEEDED_PAIR = "shared-source-seeded-pair"
 _BADGE_OPEN = 'class="fuaran-badge fuaran-badge-info">'

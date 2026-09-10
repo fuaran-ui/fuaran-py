@@ -14,7 +14,7 @@ import json
 
 import pytest
 
-from fuaran_py import decode_node, encode_node
+from fuaran_ui import decode_node, encode_node
 
 # The four cases the Python `ACTION_CASES` set previously omitted, in
 # representative canonical-ish wire shapes (decoded structurally after the

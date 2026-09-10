@@ -1,6 +1,6 @@
 """Phase 279 — the tree-op apply engine folds every op with F#/TS-parity semantics.
 
-Base trees are authored with the typed surface (`fuaran_py.ui`), the op is the
+Base trees are authored with the typed surface (`fuaran_ui.ui`), the op is the
 canonical corpus fixture (decoded through the real `decode_op`), and the result is
 checked by re-encoding the new tree and comparing to a separately-authored expected
 tree — so a pass proves the apply fold produces the same canonical tree the other
@@ -13,16 +13,16 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node, encode_node
-from fuaran_py.model import Arr, Node, Obj
-from fuaran_py.ops import apply, decode_op
-from fuaran_py.ops.apply import ApplyErr, Ok
-from fuaran_py.schema import types as t
-from fuaran_py.ui import binding, encode, fuaran, node
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.model import Arr, Node, Obj
+from fuaran_ui.ops import apply, decode_op
+from fuaran_ui.ops.apply import ApplyErr, Ok
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import binding, encode, fuaran, node
 
 
 def _full_metric(node_id: str = "metric-1", *, label: str = "Revenue", source: t.Binding | None = None) -> t.UiNode:
-    from fuaran_py.ui import format
+    from fuaran_ui.ui import format
 
     return node.bare(
         fuaran.metric(

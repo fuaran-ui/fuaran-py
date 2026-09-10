@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.bindings import BindingSources
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.bindings import BindingSources
 
 
 def _wrapper(section: str, sources: BindingSources | None = None) -> str:

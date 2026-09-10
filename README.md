@@ -1,4 +1,4 @@
-# fuaran-py
+# fuaran-ui
 
 A **headless Python host of the Fuaran UI wire format** — a dependency-light,
 idiomatic-Python reference implementation of the canonical-JSON contract a Python
@@ -9,7 +9,7 @@ AI orchestrator needs to read and write Fuaran UI trees.
 [fuaran-ui.io](https://fuaran-ui.io) (the language docs, all hosts) ·
 [fuaran-ui.live](https://fuaran-ui.live) (the playground)
 
-`fuaran-py` is a **sibling reference implementation**, not a transpile of any
+`fuaran-ui` is a **sibling reference implementation**, not a transpile of any
 other host: it is built to the language-neutral wire-format specification
 (`WIRE_FORMAT.md`) and certified against the shared conformance corpus. Conformance
 to the spec is the contract; idiomatic Python is the deliverable. The **core is
@@ -21,18 +21,18 @@ without a client runtime.
 
 | Module | Role |
 |---|---|
-| `fuaran_py.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. Its terse sibling `fuaran_py.ui.quick` is the notebook shape — title-first, records-in, ids derived. See [docs/AUTHORING.md](docs/AUTHORING.md), [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py) and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py). |
-| `fuaran_py.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
-| `fuaran_py.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops), plus the [placement helpers](#placement-helpers--fuaran_pyopsplacement) — placed insert / move / nudge and the clone verbs, which emit only those 11 ops. |
-| `fuaran_py.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
-| `fuaran_py.validator` | A pre-emit, default-deny-by-shape structural validator. |
-| `fuaran_py.op_stream` | The hash-chained provenance log — the `StreamEntry` envelope, a host-side SHA-256 chain, an in-memory sink, and replay. Reproduces the committed cross-host chain hashes byte-for-byte. |
-| `fuaran_py.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
-| `fuaran_py.conformance` | A corpus round-trip smoke harness. |
-| `fuaran_py.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
-| `fuaran_py.runtime` | Interactive Pyodide client runtime — the in-browser mount + dispatch→apply→re-render loop, behind an injectable `BrowserDeps` seam. |
-| `fuaran_py.cli` | The `fuaran-py` console script — `validate` / `render` / `export` / `corpus-sync`, each a thin wrapper over the library call beside it. `validate` matches the TypeScript host's `fuaran validate` in exit code and printed verdict. See [Start here — from the command line](#start-here--from-the-command-line). |
-| `fuaran_py.client` | Typed client over the Fuaran generation endpoint — `FuaranClient.generate` + the `FuaranSession` turn loop (holds the tree → repair diffs). See [Generate](#generate-client-for-the-hosted-endpoint-optional) below and [examples/quickstart_client.py](examples/quickstart_client.py). |
+| `fuaran_ui.ui` | The ergonomic, typed **authoring** surface — smart constructors over a typed per-kind model (`fuaran.metric(...)`, `binding.static(...)`, `format.currency(...)`), plus the **polars-like Compute authoring** API (`frame(...).filter(col("x") > 0).group_by(...).agg(...)`) that emits canonical `Transform` JSON. Its terse sibling `fuaran_ui.ui.quick` is the notebook shape — title-first, records-in, ids derived. See [docs/AUTHORING.md](docs/AUTHORING.md), [examples/quickstart_reactive_data_app.py](examples/quickstart_reactive_data_app.py) and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py). |
+| `fuaran_ui.schema` | The typed tree + `decode_node` / `encode_node` (canonical Node codec); `schema.types` is the typed per-kind authoring model. |
+| `fuaran_ui.ops` | The `TreeOp` algebra: `decode_op` / `encode_op` + `apply(op, tree)` (the reducer over all 11 ops), plus the [placement helpers](#placement-helpers--fuaran_uiopsplacement) — placed insert / move / nudge and the clone verbs, which emit only those 11 ops. |
+| `fuaran_ui.dataframe` | The Compute-layer columnar strand — the typed `Cell`/`Column`/`Table`/`DataSource` model + the serializable `Transform`/`ColExpr` algebra, a byte-exact canonical codec, and a pure reference evaluator certified byte-identical to the reference over the parity fixtures. |
+| `fuaran_ui.validator` | A pre-emit, default-deny-by-shape structural validator. |
+| `fuaran_ui.op_stream` | The hash-chained provenance log — the `StreamEntry` envelope, a host-side SHA-256 chain, an in-memory sink, and replay. Reproduces the committed cross-host chain hashes byte-for-byte. |
+| `fuaran_ui.canonical` | The canonical-JSON encoder (key sort, number form, escaping). |
+| `fuaran_ui.conformance` | A corpus round-trip smoke harness. |
+| `fuaran_ui.renderer` | Optional server-HTML renderer (`render_html`) + the byte-copied reference stylesheet. |
+| `fuaran_ui.runtime` | Interactive Pyodide client runtime — the in-browser mount + dispatch→apply→re-render loop, behind an injectable `BrowserDeps` seam. |
+| `fuaran_ui.cli` | The `fuaran-ui` console script — `validate` / `render` / `export` / `corpus-sync`, each a thin wrapper over the library call beside it. `validate` matches the TypeScript host's `fuaran validate` in exit code and printed verdict. See [Start here — from the command line](#start-here--from-the-command-line). |
+| `fuaran_ui.client` | Typed client over the Fuaran generation endpoint — `FuaranClient.generate` + the `FuaranSession` turn loop (holds the tree → repair diffs). See [Generate](#generate-client-for-the-hosted-endpoint-optional) below and [examples/quickstart_client.py](examples/quickstart_client.py). |
 
 ## Install
 
@@ -45,17 +45,17 @@ it uses only the standard library.
 
 ## Start here — from the command line
 
-Installing the package installs a `fuaran-py` command. Every verb is a thin
+Installing the package installs a `fuaran-ui` command. Every verb is a thin
 wrapper over a library call below, so nothing here is a second implementation of
 anything:
 
 ```bash
-pipx run fuaran-py validate tree.json        # -> valid (node)                exit 0
-fuaran-py validate tree.json --json          # -> the machine-readable report
-fuaran-py render tree.json > body.html       # -> server-HTML body fragment
-fuaran-py export tree.json --format markdown # -> a crawlable markdown document
-fuaran-py export tree.json --format email-document --subject "Weekly"
-fuaran-py corpus-sync --check                # (a checkout only) snapshot vs the authority
+pipx run fuaran-ui validate tree.json        # -> valid (node)                exit 0
+fuaran-ui validate tree.json --json          # -> the machine-readable report
+fuaran-ui render tree.json > body.html       # -> server-HTML body fragment
+fuaran-ui export tree.json --format markdown # -> a crawlable markdown document
+fuaran-ui export tree.json --format email-document --subject "Weekly"
+fuaran-ui corpus-sync --check                # (a checkout only) snapshot vs the authority
 ```
 
 Exit codes are **0** the document is good, **1** it is not (or cannot be read),
@@ -108,7 +108,7 @@ and only when you set `ANTHROPIC_API_KEY` (or pass `--key`).
 ## Use
 
 ```python
-from fuaran_py import decode_node, encode_node, decode_op, encode_op
+from fuaran_ui import decode_node, encode_node, decode_op, encode_op
 
 result = decode_node('{"id":"a","kind":{"$type":"Markdown","text":{"$type":"Literal","text":"hi"}}}')
 if result.ok:
@@ -134,13 +134,13 @@ built rather than measured after.
 
 ## Author (ergonomic, typed)
 
-`fuaran_py.ui` is the Python analogue of `@fuaran-ui/ui` / `Fuaran.UI` — smart
+`fuaran_ui.ui` is the Python analogue of `@fuaran-ui/ui` / `Fuaran.UI` — smart
 constructors over a typed per-kind model, with per-kind defaults + ARIA injection.
 A human developer authors a tree the same way an F#/TS developer does; `encode`
 serialises it byte-identically to the corpus.
 
 ```python
-from fuaran_py.ui import fuaran, format, encode
+from fuaran_ui.ui import fuaran, format, encode
 
 tree = fuaran.dashboard(
     "root",
@@ -157,12 +157,12 @@ format itself, for every host. Full guide: [docs/AUTHORING.md](docs/AUTHORING.md
 
 ### …and terser, from a notebook
 
-`fuaran_py.ui.quick` is a thin layer over those constructors for the case where the
+`fuaran_ui.ui.quick` is a thin layer over those constructors for the case where the
 data arrives as records and the ids do not matter to you: **title-first, records-in,
 ids derived**.
 
 ```python
-from fuaran_py.ui import quick
+from fuaran_ui.ui import quick
 
 app = quick.dashboard(
     "Regional revenue",
@@ -173,20 +173,20 @@ app = quick.dashboard(
 ```
 
 Ids are derived from each node's kind and label and hashed, so re-running the same
-cell produces the same ids — and `fuaran_py.ops.diff` between two runs is then a
+cell produces the same ids — and `fuaran_ui.ops.diff` between two runs is then a
 short, typed op script a host can *apply* to the rendered page rather than a
-rebuild. See [docs/AUTHORING.md](docs/AUTHORING.md#the-terse-layer-fuaran_pyuiquick--title-first-records-in-ids-derived)
+rebuild. See [docs/AUTHORING.md](docs/AUTHORING.md#the-terse-layer-fuaran_uiuiquick--title-first-records-in-ids-derived)
 and [examples/quickstart_terse_dashboard.py](examples/quickstart_terse_dashboard.py).
 
 ### …and it can answer back
 
-`fuaran_py.ui.control` declares a state slot; a pipeline reads that slot through
+`fuaran_ui.ui.control` declares a state slot; a pipeline reads that slot through
 `param(name)`; and a host re-derives the rows when the slot changes — a `Transform` and
 its parameters are ordinary wire data, so this happens wherever the tree is rendered and
 needs no Python there.
 
 ```python
-from fuaran_py.ui import col, control, frame, param
+from fuaran_ui.ui import col, control, frame, param
 
 region = control.select("region", options=col("region").unique(), source=frame(rows))
 fr = frame(rows).filter(col("region").eq(param("region"))).bind(region)
@@ -196,17 +196,17 @@ fr = frame(rows).filter(col("region").eq(param("region"))).bind(region)
 default (WIRE_FORMAT §24.4), an unseeded one is an absent constraint rather than a zero,
 and a parameter no control fills is refused when the binding is lowered rather than
 silently dropped in a browser. See
-[docs/AUTHORING.md](docs/AUTHORING.md#parameter-bound-controls-fuaran_pyuicontrol).
+[docs/AUTHORING.md](docs/AUTHORING.md#parameter-bound-controls-fuaran_uiuicontrol).
 
 ### …and every handler and value is optional
 
 A control's **handler** and its **value** are each optional on the wire, and the two
-absences say different things a host acts on. Every constructor in `fuaran_py.ui` can
+absences say different things a host acts on. Every constructor in `fuaran_ui.ui` can
 now reach both, where several used to hard-code one:
 
 ```python
-from fuaran_py.ui import binding, fuaran
-from fuaran_py.schema import types as t
+from fuaran_ui.ui import binding, fuaran
+from fuaran_ui.schema import types as t
 
 # No handler: the renderer's write-back default arms, so the control writes its own slot.
 t.TextField(binding.state("profileName", ""), on_change=False)
@@ -238,8 +238,8 @@ Several records reached fewer slots than the wire declares, so a document every 
 host can read had no spelling here at all. They now carry the whole set:
 
 ```python
-from fuaran_py.schema import types as t
-from fuaran_py.ui import fuaran, node
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import fuaran, node
 
 # A grid's DECLARATIVE behaviours — each names a host State key, which is what makes
 # the affordance survive the wire where a closure cannot.
@@ -310,8 +310,8 @@ The codec has decoded all three for a long time; what it did not have was a *spe
 written from Python at all — thirteen corpus fixtures were readable and unwritable.
 
 ```python
-from fuaran_py.schema import types as t
-from fuaran_py.ui import fuaran, encode
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import fuaran, encode
 
 # Placed geometry: a closed shape vocabulary, no raw SVG. Geometry is STATIC —
 # a chart lowering hands over concrete coordinates — and only DrawStyle binds.
@@ -375,8 +375,8 @@ invocation, an endpoint call, an AI-tool dispatch and a localised caption were a
 readable and unwritable.
 
 ```python
-from fuaran_py.schema import types as t
-from fuaran_py.ui import action, binding, fuaran, node
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import action, binding, fuaran, node
 
 # A value the HOST resolves, re-run when a named dependency changes.
 fuaran.grid(
@@ -452,8 +452,8 @@ host styles it. This is what makes a Python web host (e.g. FastAPI) render Fuara
 chrome end-to-end.
 
 ```python
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html, reference_css_path
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html, reference_css_path
 
 result = decode_node(wire_json)
 if result.ok:
@@ -473,7 +473,7 @@ renderer emits the body fragment only.
 record with three members, and the host clock is the reason:
 
 ```python
-from fuaran_py.renderer.bindings import BindingSources
+from fuaran_ui.renderer.bindings import BindingSources
 
 sources = BindingSources(
     values={"selected-row": "inv-2291"},  # what the dict used to be, whole
@@ -551,7 +551,7 @@ site having remembered to ask.
 A host that means to reach off-origin declares it, by name:
 
 ```python
-from fuaran_py.renderer import (
+from fuaran_ui.renderer import (
     DENY_NON_LOCAL_EGRESS,
     EgressClass,
     HostSuffix,
@@ -693,7 +693,7 @@ and not the rule slot's.
 
 ### Chart lowering coverage
 
-`fuaran_py.charts` lowers a resolved `Chart` to a canonical `Drawing` subtree
+`fuaran_ui.charts` lowers a resolved `Chart` to a canonical `Drawing` subtree
 (first-party inline SVG, headless included), byte-identical to the shared
 `chart-lowering/*` goldens the reference implementation generates. Lowered
 arms: **Bar** (grouped + stacked), **Line**, **Area** (overlaid + stacked
@@ -737,7 +737,7 @@ A `Sparkline` whose `source` resolves to a series is **drawn**, server-side, as
 first-party inline SVG — byte-identical to the shared `sparkline-lowering/*`
 goldens the reference implementation generates. Before this it was a placeholder:
 this renderer emitted an em-dash and never read the series at all. The geometry
-comes from `fuaran_py.charts.try_lower_sparkline`, which produces a canonical
+comes from `fuaran_ui.charts.try_lower_sparkline`, which produces a canonical
 `Drawing` kind, and the markup from the same builder the `Drawing` node uses — so
 there is no second sparkline renderer to drift.
 
@@ -781,8 +781,8 @@ page a browser paints and a client hydrates; these two are the other things a de
 can be, from the same bytes:
 
 ```python
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_markdown, render_email_document
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_markdown, render_email_document
 
 tree = decode_node(wire_json).value
 
@@ -802,8 +802,8 @@ about what a number is.
 Neither target can execute anything, so each kind needs an answer to a question the browser
 renderer never asks: *what does this become when nothing runs?* Each projection declares one,
 per canonical wire kind, in a `SCOPE` table alongside the code —
-`fuaran_py.renderer.document.SCOPE` and `fuaran_py.renderer.email.SCOPE`, four dispositions
-from `fuaran_py.renderer.projection`:
+`fuaran_ui.renderer.document.SCOPE` and `fuaran_ui.renderer.email.SCOPE`, four dispositions
+from `fuaran_ui.renderer.projection`:
 
 | Disposition | Meaning |
 |---|---|
@@ -834,7 +834,7 @@ reading pane fits), a webfont-free font stack, and the destination policy. An em
 with a theme engine is a CSS framework, and the client fragmentation this exists to survive is
 what defeats one.
 
-`fuaran_py.renderer.lint(html)` is the falsifiable half of "email-safe". The client-matrix
+`fuaran_ui.renderer.lint(html)` is the falsifiable half of "email-safe". The client-matrix
 question cannot be answered offline and it does not pretend to: it scans for constructs the
 matrix is *known* to break on — flexbox, grid, positioning, `<style>`, `<script>`, controls,
 `<svg>`, `<iframe>`, and an apostrophe entity inside a style attribute. A clean lint is not a
@@ -844,7 +844,7 @@ certificate; a dirty one is proof of the opposite, and that asymmetry is worth a
 
 Markdown is what a tree becomes when it has to be read, diffed, committed, pasted into an issue
 or indexed by something that will never run JavaScript. The output stays inside §14's own IN
-bucket — CommonMark core plus GFM tables — so `fuaran_py.renderer.markdown.to_html`, the
+bucket — CommonMark core plus GFM tables — so `fuaran_ui.renderer.markdown.to_html`, the
 renderer this host already certifies against the shared corpus, is a valid reader of it.
 
 `MarkdownOptions.charts` is the one place that loop does not close, and it is a choice rather
@@ -891,14 +891,14 @@ half a second implementation would agree with.
 
 ## Run (interactive, optional)
 
-Under **Pyodide** (CPython-on-WASM), `fuaran_py.runtime` adds the live loop the F#
+Under **Pyodide** (CPython-on-WASM), `fuaran_ui.runtime` adds the live loop the F#
 (Fable) and TypeScript (React) hosts provide: mount a decoded tree, wire DOM events
 to a host update function, fold the returned `TreeOp`s through `apply`, and
 re-render — reusing the renderer (markup + class vocabulary) and the apply engine
 (op semantics), never a parallel copy.
 
 ```python
-from fuaran_py.runtime import counter_runtime
+from fuaran_ui.runtime import counter_runtime
 
 counter_runtime().mount("fuaran-root")  # clicking "+1" re-renders the count
 ```
@@ -919,9 +919,9 @@ record on success); `replay_stream` folds a stream back into a tree; `verify_cha
 proves integrity.
 
 ```python
-from fuaran_py import decode_node
-from fuaran_py.model import Obj
-from fuaran_py.op_stream import InMemorySink, PersistContext, apply_and_persist, verify_chain
+from fuaran_ui import decode_node
+from fuaran_ui.model import Obj
+from fuaran_ui.op_stream import InMemorySink, PersistContext, apply_and_persist, verify_chain
 
 sink = InMemorySink()
 ctx = PersistContext(stream_id="doc-1", user_id="alice")
@@ -947,7 +947,7 @@ the tree. So `apply_to` and `replay_stream` fold only the successes by default, 
 a chain carrying a refusal replays cleanly:
 
 ```python
-from fuaran_py.op_stream import replay_stream
+from fuaran_ui.op_stream import replay_stream
 
 replay_stream(sink, "doc-1", tree)  # accepted records only
 replay_stream(sink, "doc-1", tree, include_refused=True)  # the literal fold
@@ -972,7 +972,7 @@ record of it was lost).
 compare-and-append:
 
 ```python
-from fuaran_py.op_stream import Appended, StaleHead
+from fuaran_ui.op_stream import Appended, StaleHead
 
 expected = sink.head("doc-1")  # the chain head, or GENESIS_PREVIOUS_HASH
 outcome = sink.append_if(record, expected)  # built against `expected`
@@ -1000,13 +1000,13 @@ recorded here rather than in a `STABILITY.md` it does not have.
 
 The **Fuaran generation endpoint** is a paid, stateless, bring-your-own-key
 (BYOK) HTTPS surface: it takes a prompt (+ an optional current tree) and returns
-a new canonical wire-format tree. `fuaran_py.client` is a thin, typed,
+a new canonical wire-format tree. `fuaran_ui.client` is a thin, typed,
 stdlib-only layer over it that collapses the integration to **call, hold the
 tree, repair**:
 
 ```python
 import os
-from fuaran_py.client import FuaranClient, FuaranSession, Produced
+from fuaran_ui.client import FuaranClient, FuaranSession, Produced
 
 client = FuaranClient(
     "https://<your-endpoint>/generate",
@@ -1086,7 +1086,7 @@ Pick the placement by who can see the calling environment:
   for exactly this), so the BYOK key never reaches the calling environment.
 
 The contract this client is built against is stamped
-`fuaran_py.client.SURFACE_VERSION`; a produced result echoes the live surface's
+`fuaran_ui.client.SURFACE_VERSION`; a produced result echoes the live surface's
 version, and `is_surface_version_compatible(echoed)` tells you whether the
 shape is one this client understands (major-version check).
 
@@ -1095,7 +1095,7 @@ shape is one this client understands (major-version check).
 The encoder reproduces the canonical float layout directly — it does **not**
 delegate number or key formatting to `json.dumps`, whose output would not match.
 CPython's shortest `repr(float)` yields the same significant digits as the other
-hosts; `fuaran_py.canonical.format_finite_double` re-lays-out those digits into the
+hosts; `fuaran_ui.canonical.format_finite_double` re-lays-out those digits into the
 canonical fixed-point/scientific form (the cross-host divergence zone — large
 exponents, sign padding, `-0` collapse — is pinned by the corpus float fixtures).
 
@@ -1131,13 +1131,13 @@ filter to the schema is an open question, recorded here rather than implied clos
 This host declares no stability policy yet (pre-1.0), so the change is recorded
 here rather than in a `STABILITY.md` it does not have.
 
-## Placement helpers — `fuaran_py.ops.placement`
+## Placement helpers — `fuaran_ui.ops.placement`
 
 The section above leaves every caller deriving the sibling permutation itself. That
-derivation is shipped once, in `fuaran_py.ops.placement`:
+derivation is shipped once, in `fuaran_ui.ops.placement`:
 
 ```python
-from fuaran_py.ops import After, Last, Target, duplicate_op, move_op, nudge_op, place_op
+from fuaran_ui.ops import After, Last, Target, duplicate_op, move_op, nudge_op, place_op
 
 place_op(tree, child, Target("sidebar", After("filters")))  # placed insert
 move_op(tree, "chart", Target("main", Last()))  # placed move
@@ -1174,7 +1174,7 @@ Two behaviours are worth knowing before you rely on them:
 
 ## Conformance
 
-`fuaran-py` round-trips the shared wire-format corpus byte-for-byte and surfaces
+`fuaran-ui` round-trips the shared wire-format corpus byte-for-byte and surfaces
 the canonical reject code + path for every malformed fixture. Run the smoke
 harness:
 
@@ -1192,9 +1192,9 @@ often conflated:
 
 - **Within-host** (`tests/test_generative_parity.py`) — over ≥1000 `hypothesis`
   generated trees, `encode(decode(encode x)) == encode x`: this host's canonical
-  form is a fixed point. It proves `fuaran-py` is *self-consistent*, and it runs
+  form is a fixed point. It proves `fuaran-ui` is *self-consistent*, and it runs
   under a plain `pytest` with no other toolchain.
-- **Cross-host** (`fuaran_py.conformance.fuzz_exchange`) — one host's canonical
+- **Cross-host** (`fuaran_ui.conformance.fuzz_exchange`) — one host's canonical
   bytes are checked by a *different* host's codec, in both directions. That is
   the whole value of it: a shared misreading of the spec is invisible to any
   within-host property and shows up here immediately.
@@ -1203,7 +1203,7 @@ The cross-host exchange needs a sibling host's emitter, so it is driven by hand:
 
 ```bash
 # emit the other host's canonical samples into <dir>/fsharp/, then:
-python -m fuaran_py.conformance.fuzz_exchange <dir>   # decode + re-encode + write <dir>/python/
+python -m fuaran_ui.conformance.fuzz_exchange <dir>   # decode + re-encode + write <dir>/python/
 ```
 
 Exit `0` all samples agree, `1` a divergence (named, with the first differing
@@ -1222,8 +1222,8 @@ hand-written list of fixture ids that is only as honest as its last
 re-measurement.
 
 ```bash
-python -m fuaran_py.conformance.host_capability            # is the published artefact current?
-python -m fuaran_py.conformance.host_capability --write    # regenerate it
+python -m fuaran_ui.conformance.host_capability            # is the published artefact current?
+python -m fuaran_ui.conformance.host_capability --write    # regenerate it
 ```
 
 Three things about it are worth knowing before you read it:

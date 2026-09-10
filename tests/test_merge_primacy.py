@@ -1,4 +1,4 @@
-"""Phase 521 — the human-primacy DAG merge layer (``fuaran_py.merge``).
+"""Phase 521 — the human-primacy DAG merge layer (``fuaran_ui.merge``).
 
 The author-agnostic wire-host merge (:func:`merge_3way`) is certified against the
 shared ``merge-conformance/`` corpus by ``test_merge_conformance.py``. This suite
@@ -12,8 +12,8 @@ conflict shape, determinism, and order-independence.
 
 from __future__ import annotations
 
-from fuaran_py.canonical import encode_value
-from fuaran_py.merge import (
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.merge import (
     CONCURRENT_EDIT,
     KEEP_BASE,
     KEEP_PRIMARY,
@@ -28,7 +28,7 @@ from fuaran_py.merge import (
     merge3_way_with_author,
     merge_3way,
 )
-from fuaran_py.model import Arr, Node, Obj
+from fuaran_ui.model import Arr, Node, Obj
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@
 ``TextSource.I18n`` become authorable from Python.
 
 The decoder has carried all five for a long time; what the typed model did not
-have was a MEMBERSHIP. ``fuaran_py.ui.encode`` needs a ``.to_wire()`` root, so a
+have was a MEMBERSHIP. ``fuaran_ui.ui.encode`` needs a ``.to_wire()`` root, so a
 binding or action case absent from the typed unions has no spelling — and one of
 them shows exactly why membership rather than lowering is the thing being fixed:
 ``Invoke`` already lowered to the right bytes from ``ui.capability``, and both its
@@ -40,13 +40,13 @@ import typing
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node, encode_node
-from fuaran_py.ai_tools import DispatchGate, is_gated_effect
-from fuaran_py.canonical import encode_value
-from fuaran_py.model import Arr, Node, Obj
-from fuaran_py.schema import types as t
-from fuaran_py.ui import action, binding, encode
-from fuaran_py.ui.capability import (
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.ai_tools import DispatchGate, is_gated_effect
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.model import Arr, Node, Obj
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import action, binding, encode
+from fuaran_ui.ui.capability import (
     CapabilityRegistry,
     InvokeError,
     any_string,
@@ -186,7 +186,7 @@ def test_the_invoke_record_has_one_definition() -> None:
     records emitting one wire shape is the drift class the corpus cannot catch,
     because both would pass every byte test right up until one of them changed.
     """
-    from fuaran_py.ui import capability as cap
+    from fuaran_ui.ui import capability as cap
 
     assert cap.Invoke is t.Invoke
     assert cap.InvokeArg is t.InvokeArg

@@ -21,9 +21,9 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT
-from fuaran_py import decode_node, encode_node
-from fuaran_py.model import Node
-from fuaran_py.renderer import (
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.model import Node
+from fuaran_ui.renderer import (
     DEFAULT_EMAIL_OPTIONS,
     EmailOptions,
     MarkdownOptions,
@@ -33,17 +33,17 @@ from fuaran_py.renderer import (
     render_html,
     render_markdown,
 )
-from fuaran_py.renderer import document as doc
-from fuaran_py.renderer import email as digest
-from fuaran_py.renderer import markdown as gfm
-from fuaran_py.renderer.projection import (
+from fuaran_ui.renderer import document as doc
+from fuaran_ui.renderer import email as digest
+from fuaran_ui.renderer import markdown as gfm
+from fuaran_ui.renderer.projection import (
     behavioural_wire_kinds,
     duplicate_kinds,
     missing_kinds,
     unknown_kinds,
 )
-from fuaran_py.ui import binding, node
-from fuaran_py.ui import fuaran as F
+from fuaran_ui.ui import binding, node
+from fuaran_ui.ui import fuaran as F
 
 _FIDELITY = CORPUS_ROOT / "render-fidelity.json"
 

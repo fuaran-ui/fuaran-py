@@ -1,7 +1,7 @@
 """Phase 1579 — the Python host authors ``Drawing``, ``Fact`` and ``Mount``.
 
 The decoder has recognised all three since the parity pass; what it did not have
-was a SPELLING. ``fuaran_py.ui.encode`` requires a ``.to_wire()`` root, so a node
+was a SPELLING. ``fuaran_ui.ui.encode`` requires a ``.to_wire()`` root, so a node
 kind the typed model omits cannot be written at all from Python — not narrowly,
 not clumsily, not at all — and thirteen corpus fixtures were therefore reachable
 by decode and unreachable by authoring.
@@ -29,11 +29,11 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
-from fuaran_py.schema import encode_node
-from fuaran_py.schema import types as t
-from fuaran_py.ui import encode, fuaran
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.schema import encode_node
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import encode, fuaran
 from test_render_parity import _emitted_classes, _reference_vocabulary, reference_renderer_required
 from test_ui_authoring import _authored
 

@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from fuaran_py.client import FuaranClient, FuaranSession, Produced
+from fuaran_ui.client import FuaranClient, FuaranSession, Produced
 
 client = FuaranClient(
     os.environ["FUARAN_ENDPOINT"],

@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.conformance import run_fixture
+from fuaran_ui.conformance import run_fixture
 
 
 @corpus_required

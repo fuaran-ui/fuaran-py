@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import json
 
-from fuaran_py.canonical import encode_value
-from fuaran_py.schema import decode_node, encode_node
-from fuaran_py.schema import types as t
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.schema import decode_node, encode_node
+from fuaran_ui.schema import types as t
 
 
 def _column(kind: dict) -> str:

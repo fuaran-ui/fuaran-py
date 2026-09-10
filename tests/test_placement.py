@@ -4,7 +4,7 @@ Two obligations, stated as properties over generated trees and never as a re-der
 of the engine's logic:
 
 1. **No false permit** — every op a helper emits is accepted by
-   :func:`~fuaran_py.ops.apply.apply`, and the applied tree exhibits the placement's
+   :func:`~fuaran_ui.ops.apply.apply`, and the applied tree exhibits the placement's
    declared order (the moved / inserted node sits exactly where the ``Placement`` said,
    with the other siblings' order preserved).
 2. **No false refuse** — every helper rejection corresponds to an apply-side rejection of
@@ -16,7 +16,7 @@ in the target tree (including ids held in non-structural positions), the clone i
 structurally equal to its source modulo ids, and a paste preserves non-colliding ids
 while remapping colliding ones.
 
-Base trees are authored with the typed surface (:mod:`fuaran_py.ui`) and decoded through
+Base trees are authored with the typed surface (:mod:`fuaran_ui.ui`) and decoded through
 the real node codec, so every fixture is a genuinely wire-valid tree rather than a
 hand-assembled model that only the helpers ever see.
 """
@@ -27,13 +27,13 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from fuaran_py import decode_node
-from fuaran_py.model import Arr, Node, Obj
-from fuaran_py.ops import apply
-from fuaran_py.ops.apply import (
+from fuaran_ui import decode_node
+from fuaran_ui.model import Arr, Node, Obj
+from fuaran_ui.ops import apply
+from fuaran_ui.ops.apply import (
     CHILDLESS_KIND as APPLY_CHILDLESS_KIND,
 )
-from fuaran_py.ops.apply import (
+from fuaran_ui.ops.apply import (
     DUPLICATE_NODE_ID,
     KIND_MISMATCH,
     ORDERING_MISMATCH,
@@ -43,13 +43,13 @@ from fuaran_py.ops.apply import (
     _find_layout_parent,
     _layout_children,
 )
-from fuaran_py.ops.apply import (
+from fuaran_ui.ops.apply import (
     NODE_NOT_FOUND as APPLY_NODE_NOT_FOUND,
 )
-from fuaran_py.ops.apply import (
+from fuaran_ui.ops.apply import (
     PARENT_NOT_FOUND as APPLY_PARENT_NOT_FOUND,
 )
-from fuaran_py.ops.placement import (
+from fuaran_ui.ops.placement import (
     CANNOT_NUDGE_ROOT,
     CHILDLESS_KIND,
     DUPLICATE_ID,
@@ -77,9 +77,9 @@ from fuaran_py.ops.placement import (
     place_op,
     sequential_ids,
 )
-from fuaran_py.result import Ok
-from fuaran_py.schema import types as t
-from fuaran_py.ui import encode, fuaran, node
+from fuaran_ui.result import Ok
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import encode, fuaran, node
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 

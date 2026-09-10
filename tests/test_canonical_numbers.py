@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py.canonical import format_finite_double
+from fuaran_ui.canonical import format_finite_double
 
 CASES = [
     # divergence zone (these are exactly the metric-float-* corpus values)
@@ -41,7 +41,7 @@ def test_format_finite_double(value: float, expected: str) -> None:
 
 
 def test_specials_encode_as_quoted_sentinels() -> None:
-    from fuaran_py.canonical import encode_value
+    from fuaran_ui.canonical import encode_value
 
     assert encode_value(float("nan")) == '"NaN"'
     assert encode_value(float("inf")) == '"Infinity"'

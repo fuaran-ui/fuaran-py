@@ -21,8 +21,8 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
 
 pytestmark = corpus_required
 

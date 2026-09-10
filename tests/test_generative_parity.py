@@ -1,7 +1,7 @@
 """Generative cross-host parity (WIRE_FORMAT.md §11.1 Legs C/D analogue, Stage 5).
 
 The fixed corpus pins named traps; ``hypothesis`` reaches the *generated*
-tree-space it can't enumerate. Over arbitrary trees built from the ``fuaran_py.ui``
+tree-space it can't enumerate. Over arbitrary trees built from the ``fuaran_ui.ui``
 authoring surface — with values drawn from the **cross-host-safe subspace** (finite
 numbers, full-unicode strings) — this asserts the Python codec is self-consistent:
 
@@ -15,7 +15,7 @@ The F# → Py / Py → F# *fuzz-sample exchange* (Legs F/G) needs the F#-side
 (outside this host's cross-section) — that cross-repo leg is deferred; this suite
 delivers the in-host generative floor.
 
-``hypothesis`` is a dev-only dependency (never imported by ``src/fuaran_py``).
+``hypothesis`` is a dev-only dependency (never imported by ``src/fuaran_ui``).
 """
 
 from __future__ import annotations
@@ -26,10 +26,10 @@ hypothesis = pytest.importorskip("hypothesis", reason="hypothesis (dev extra) dr
 from hypothesis import given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
 
-from fuaran_py.schema import decode_node, encode_node  # noqa: E402
-from fuaran_py.schema import types as t  # noqa: E402
-from fuaran_py.ui import action, binding, encode, fuaran  # noqa: E402
-from fuaran_py.ui import node as node_ops  # noqa: E402 — `node` is a test parameter name below
+from fuaran_ui.schema import decode_node, encode_node  # noqa: E402
+from fuaran_ui.schema import types as t  # noqa: E402
+from fuaran_ui.ui import action, binding, encode, fuaran  # noqa: E402
+from fuaran_ui.ui import node as node_ops  # noqa: E402 — `node` is a test parameter name below
 
 # ── The cross-host-safe value subspace (WIRE_FORMAT.md §5) ───────────────────
 # Non-empty ids (empty → EMPTY_NODE_ID); strings span quotes / backslash / control

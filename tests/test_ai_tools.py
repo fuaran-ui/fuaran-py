@@ -1,4 +1,4 @@
-"""Phase 237 — the fuaran_py.ai_tools introspection surface.
+"""Phase 237 — the fuaran_ui.ai_tools introspection surface.
 
 Asserts the emitted schemas match the typed surface (no drift from the codec),
 round-trips a representative agent-driven emission through the Phase 234 codec,
@@ -10,11 +10,11 @@ from __future__ import annotations
 import typing
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py import ai_tools
-from fuaran_py.schema import decode_node
-from fuaran_py.schema import types as t
-from fuaran_py.schema.decode import ACTION_CASES, BINDING_CASES, KNOWN_KINDS, TEXT_SOURCE_CASES
-from fuaran_py.ui import binding, encode, fuaran
+from fuaran_ui import ai_tools
+from fuaran_ui.schema import decode_node
+from fuaran_ui.schema import types as t
+from fuaran_ui.schema.decode import ACTION_CASES, BINDING_CASES, KNOWN_KINDS, TEXT_SOURCE_CASES
+from fuaran_ui.ui import binding, encode, fuaran
 
 # ── The catalog matches the codec's own recognised-case sets (no drift) ───────
 
@@ -140,13 +140,13 @@ def test_gate_rejects_unknown_and_malformed_shapes() -> None:
     gate = ai_tools.DispatchGate.permitting("Navigate")
     assert not gate.authorize_shape("NotARealAction").allowed
     # a non-discriminated object is refused
-    from fuaran_py.model import Obj
+    from fuaran_ui.model import Obj
 
     assert not gate.authorize(Obj(None, {})).allowed
 
 
 def test_gate_authorizes_decoded_action_object() -> None:
-    from fuaran_py.model import Obj
+    from fuaran_ui.model import Obj
 
     gate = ai_tools.DispatchGate.permitting("Navigate")
     assert gate.authorize(Obj("Navigate", {"route": "/home"})).allowed

@@ -12,9 +12,9 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py.ui import encode, invoke, node
-from fuaran_py.ui import fuaran as F
-from fuaran_py.ui.capability import (
+from fuaran_ui.ui import encode, invoke, node
+from fuaran_ui.ui import fuaran as F
+from fuaran_ui.ui.capability import (
     CapabilityRegistry,
     InvokeError,
     any_string,
@@ -65,7 +65,7 @@ def test_unknown_capability_and_double_register() -> None:
 @corpus_required
 def test_authored_metric_invoke_matches_corpus() -> None:
     """``Binding.Invoke`` as a Metric source, authored end-to-end, matches the fixture."""
-    from fuaran_py.ui import format
+    from fuaran_ui.ui import format
 
     expected = (CORPUS_ROOT / "nodes" / "metric-invoke.json").read_text(encoding="utf-8").rstrip("\n")
     metric = node.bare(

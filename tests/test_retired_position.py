@@ -19,8 +19,8 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py.ops import decode_op
-from fuaran_py.result import WRONG_TYPE, Err
+from fuaran_ui.ops import decode_op
+from fuaran_ui.result import WRONG_TYPE, Err
 
 
 @pytest.mark.parametrize(
@@ -60,7 +60,7 @@ def test_retired_position_outranks_a_missing_required_field() -> None:
 
 
 def test_positionless_form_round_trips() -> None:
-    from fuaran_py.ops import encode_op
+    from fuaran_ui.ops import encode_op
 
     current = '{"$type":"MoveNode","newParentId":"q","target":"n"}'
     result = decode_op(current)

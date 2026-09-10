@@ -37,8 +37,8 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT
-from fuaran_py import decode_node
-from fuaran_py.schema.encode import encode_node
+from fuaran_ui import decode_node
+from fuaran_ui.schema.encode import encode_node
 
 #: ``idl.json`` is not part of the bundled snapshot payload, so this file needs
 #: the authority (or a snapshot that has grown it). Skipping is honest here for

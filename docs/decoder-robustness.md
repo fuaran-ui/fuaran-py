@@ -12,7 +12,7 @@ Regenerate it with the command below from the repository root, replacing `<seed>
 committed record names the seed it was produced with, so the same stream can be replayed):
 
 ```
-python -m fuaran_py.conformance.decoder_fuzz --long --iterations 250000 --seed <seed> --evidence docs/decoder-robustness.json
+python -m fuaran_ui.conformance.decoder_fuzz --long --iterations 250000 --seed <seed> --evidence docs/decoder-robustness.json
 ```
 
 The bounded form of the same leg runs on every pull request with a fixed seed. The five

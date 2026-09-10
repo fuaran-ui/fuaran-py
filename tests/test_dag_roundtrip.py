@@ -19,10 +19,10 @@ import json
 import pytest
 
 from _corpus import DAG_CORPUS_ROOT, dag_corpus_required, dag_fixtures
-from fuaran_py import DagOpRecord, DagResultEnvelope, decode_dag_record, encode_dag_record
-from fuaran_py.conformance import run_fixture
-from fuaran_py.model import Obj
-from fuaran_py.op_stream import AgentActor, HumanActor
+from fuaran_ui import DagOpRecord, DagResultEnvelope, decode_dag_record, encode_dag_record
+from fuaran_ui.conformance import run_fixture
+from fuaran_ui.model import Obj
+from fuaran_ui.op_stream import AgentActor, HumanActor
 
 
 @dag_corpus_required

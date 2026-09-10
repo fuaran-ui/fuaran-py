@@ -1,4 +1,4 @@
-"""The certification-kit stdio bridge (fuaran_py.conformance.bridge).
+"""The certification-kit stdio bridge (fuaran_ui.conformance.bridge).
 
 Proves the bridge the JS adapter (``wire-format-fixtures/conformance/
 fuaran-py.adapter.mjs``) shells is correct: over the corpus, its ``decodeNode`` /
@@ -7,7 +7,7 @@ the canonical reject code/path — so the kit report (Leg via the JS bridge) and
 the native ``pytest`` harness certify the *same* codec and cannot disagree.
 
 The full-corpus legs drive ``handle()`` in-process (fast); a subprocess smoke
-test exercises the actual ``python -m fuaran_py.conformance.bridge`` stdio path
+test exercises the actual ``python -m fuaran_ui.conformance.bridge`` stdio path
 the adapter uses.
 """
 
@@ -20,7 +20,7 @@ import sys
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
-from fuaran_py.conformance.bridge import handle
+from fuaran_ui.conformance.bridge import handle
 
 
 def _canon(text: str) -> str:
@@ -72,14 +72,14 @@ def test_bridge_unknown_op_is_reported() -> None:
 
 @corpus_required
 def test_bridge_subprocess_stdio_path() -> None:
-    """The actual `python -m fuaran_py.conformance.bridge` stdio path the .mjs adapter shells."""
+    """The actual `python -m fuaran_ui.conformance.bridge` stdio path the .mjs adapter shells."""
     fixtures = fixtures_of("node-round-trip")
     assert fixtures, "expected at least one node-round-trip fixture"
     fixture = fixtures[0]
     input_text = (CORPUS_ROOT / fixture["inputFile"]).read_text(encoding="utf-8")
 
     proc = subprocess.run(
-        [sys.executable, "-m", "fuaran_py.conformance.bridge"],
+        [sys.executable, "-m", "fuaran_ui.conformance.bridge"],
         input=json.dumps({"op": "encodeNode", "input": input_text}),
         capture_output=True,
         text=True,

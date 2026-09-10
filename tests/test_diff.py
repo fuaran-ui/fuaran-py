@@ -1,4 +1,4 @@
-"""Phase 520 — the tree-op diff engine (``fuaran_py.ops.diff``).
+"""Phase 520 — the tree-op diff engine (``fuaran_ui.ops.diff``).
 
 The correctness contract is the **round-trip law**, the same invariant every host
 shares (F# ``TreeOpDiff``, the sibling engines):
@@ -22,11 +22,11 @@ from pathlib import Path
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node, encode_node
-from fuaran_py.model import Arr, Node, Obj
-from fuaran_py.ops import apply, decode_op, diff, diff_batched, encode_op
-from fuaran_py.ops.apply import ApplyErr
-from fuaran_py.result import Ok
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.model import Arr, Node, Obj
+from fuaran_ui.ops import apply, decode_op, diff, diff_batched, encode_op
+from fuaran_ui.ops.apply import ApplyErr
+from fuaran_ui.result import Ok
 
 _NODES_DIR = CORPUS_ROOT / "nodes"
 

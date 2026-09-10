@@ -1,6 +1,6 @@
 """Chart → Drawing lowering — cross-host byte-parity (Phase 534, S4).
 
-The Python lowering (:mod:`fuaran_py.charts`) must reproduce the shared
+The Python lowering (:mod:`fuaran_ui.charts`) must reproduce the shared
 ``wire-format-fixtures/chart-lowering/*`` goldens byte-for-byte — the same
 fixtures the F# reference (``Fuaran.UI.Charts.lower``) and the TypeScript host
 certify against. Each case ships an ``<name>.input.json`` (the neutral ChartSpec
@@ -20,7 +20,7 @@ from _corpus import CORPUS_ROOT, corpus_available
 # The Phase-882 calendar is a NORMATIVE cross-host spec (§4h), so its properties
 # are asserted directly rather than inferred from pixel positions — which means
 # reaching for the module-private helpers that implement it.
-from fuaran_py.charts import (
+from fuaran_ui.charts import (
     ChartSpec,
     _choose_temporal_step,
     _civil_from_days,
@@ -37,8 +37,8 @@ from fuaran_py.charts import (
     lower,
     lower_node,
 )
-from fuaran_py.model import Arr, Obj
-from fuaran_py.schema.encode import encode_node
+from fuaran_ui.model import Arr, Obj
+from fuaran_ui.schema.encode import encode_node
 
 _CHART_LOWERING_DIR = CORPUS_ROOT / "chart-lowering"
 
@@ -188,8 +188,8 @@ def test_lowering_is_order_independent(name: str) -> None:
 def test_headless_chart_renders_real_inline_svg() -> None:
     # A Chart node with resolved embedded rows renders as first-party inline SVG
     # (via the lowering), not the client-hydration placeholder (Phase 534 wiring).
-    from fuaran_py.model import Arr, Node, Obj
-    from fuaran_py.renderer import render_html
+    from fuaran_ui.model import Arr, Node, Obj
+    from fuaran_ui.renderer import render_html
 
     rows = Arr(
         [
@@ -237,8 +237,8 @@ _SSR_NODE_FIXTURES: dict[str, tuple[str, ...]] = {
 
 @pytest.mark.parametrize("name", sorted(_SSR_NODE_FIXTURES))
 def test_ssr_bridge_carries_declared_wire_fields(name: str) -> None:
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     path = CORPUS_ROOT / "nodes" / f"{name}.json"
     if not path.is_file():
@@ -256,8 +256,8 @@ def test_ssr_bridge_passes_all_declared_chart_fields() -> None:
     # field-name fallbacks and the format is Percent, so each assertion fails
     # individually if its field is dropped by the bridge (a corpus fixture
     # whose declared titles coincide with the fallbacks cannot catch that).
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     wire = json.dumps(
         {
@@ -300,8 +300,8 @@ def test_ssr_bridge_carries_non_literal_text_sources() -> None:
     # name was silently replaced by the capitalised column name, which is what
     # makes the second assertion below the discriminating one — the fallback
     # standing IS the old behaviour, and it reads as a perfectly ordinary chart.
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     bound = {"$type": "Bound", "binding": {"$type": "Static", "value": "Resolved at render time"}}
     wire = json.dumps(
@@ -342,8 +342,8 @@ def test_ssr_bridge_passes_legend_position() -> None:
     # same node with the declaration stripped; and an explicit `"None"`
     # suppresses the legend, so the series labels a two-series default legend
     # would draw must be absent.
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
@@ -401,8 +401,8 @@ def test_ssr_bridge_passes_data_labels() -> None:
     # `120` and `150` are the bar values, and they appear as text ONLY as data
     # labels — the axis ticks of this chart are 0/50/100/150, so `>150<` alone
     # would be ambiguous and `>120<` is the one that is not.
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
@@ -771,8 +771,8 @@ def test_ssr_bridge_passes_x_scale() -> None:
     # The bridge half. Positive control first: with the declaration stripped the
     # axis is a band one and falls back to the capitalised field name as its x
     # title; declared, the title is suppressed and the labels read as dates.
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
@@ -824,7 +824,7 @@ def test_ssr_bridge_passes_x_scale() -> None:
 
 
 def _summary(spec: ChartSpec, rows: list[dict[str, object]]) -> str:
-    from fuaran_py.charts import lower
+    from fuaran_ui.charts import lower
 
     # 0.2.0 — the bare JSON string IS the canonical TextSource.Literal form.
     desc = lower(spec, rows).fields.get("description")
@@ -879,7 +879,7 @@ def test_summary_series_folding_and_clamp() -> None:
 def test_refused_pie_announces_nothing() -> None:
     # A refused pie draws no geometry and no legend, because either would be a
     # claim about data the drawing declined to show. A summary is the same claim.
-    from fuaran_py.charts import lower
+    from fuaran_ui.charts import lower
 
     refused = lower(
         ChartSpec(kind="Pie", x_field="slice", y_fields=("a", "b")),
@@ -893,8 +893,8 @@ def test_drawing_root_announces_its_description() -> None:
     # it, and `<desc>` is not uniformly mapped to the accessible description — so
     # the root composes title + description into `aria-label`, the accessible NAME
     # every assistive technology announces. Byte-parity with the F# builder.
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     def render_drawing(title: str | None, description: str | None) -> str:
         kind: dict[str, object] = {

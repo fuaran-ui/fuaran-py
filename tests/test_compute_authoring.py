@@ -15,9 +15,9 @@ from pathlib import Path
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py.dataframe import eval_pipeline
-from fuaran_py.ui import col, encode, frame, lit, node, transform, when
-from fuaran_py.ui import fuaran as F
+from fuaran_ui.dataframe import eval_pipeline
+from fuaran_ui.ui import col, encode, frame, lit, node, transform, when
+from fuaran_ui.ui import fuaran as F
 
 # The grid-transform pipeline, authored once (the headline example).
 GRID_FRAME = (
@@ -39,8 +39,8 @@ def test_transform_json_matches_corpus_source() -> None:
     fixture = json.loads((CORPUS_ROOT / "nodes" / "grid-transform.json").read_text(encoding="utf-8"))
     expected_source = fixture["kind"]["source"]
     # Re-encode the fixture's own Transform binding canonically for a stable comparison.
-    from fuaran_py.canonical import encode_value
-    from fuaran_py.model import from_json
+    from fuaran_ui.canonical import encode_value
+    from fuaran_ui.model import from_json
 
     expected = encode_value(from_json(expected_source))
     assert GRID_FRAME.to_transform_json() == expected
@@ -75,7 +75,7 @@ def test_expression_dsl_builds_algebra() -> None:
         .filter(~col("flag").eq(lit(False)))
     )
     # round-trips through the canonical codec (decode == author)
-    from fuaran_py.dataframe import decode_pipeline, encode_pipeline
+    from fuaran_ui.dataframe import decode_pipeline, encode_pipeline
 
     wire = fr.to_pipeline_json()
     decoded = decode_pipeline(wire)
@@ -100,7 +100,7 @@ def test_join_and_window_author() -> None:
 
 def test_static_artifact_round_trips_through_evaluator() -> None:
     """The emitted pipeline JSON decodes + evaluates to the same preview (the artifact contract)."""
-    from fuaran_py.dataframe import Embedded, decode_pipeline, decode_source
+    from fuaran_ui.dataframe import Embedded, decode_pipeline, decode_source
 
     src = decode_source(_source_json(GRID_FRAME))
     pipe = decode_pipeline(GRID_FRAME.to_pipeline_json())
@@ -108,13 +108,13 @@ def test_static_artifact_round_trips_through_evaluator() -> None:
     rerun = eval_pipeline(pipe.value, src.value.table)
     assert rerun.ok
     preview = GRID_FRAME.collect()
-    from fuaran_py.dataframe import encode_source
+    from fuaran_ui.dataframe import encode_source
 
     assert encode_source(Embedded(rerun.value)) == encode_source(Embedded(preview))
 
 
 def _source_json(fr) -> str:  # type: ignore[no-untyped-def]
-    from fuaran_py.dataframe import encode_source
+    from fuaran_ui.dataframe import encode_source
 
     return encode_source(fr.source)
 

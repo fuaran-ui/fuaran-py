@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from fuaran_py.dataframe import (
+from fuaran_ui.dataframe import (
     Embedded,
     decode_pipeline,
     decode_source,

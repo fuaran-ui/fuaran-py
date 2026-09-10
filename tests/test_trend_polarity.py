@@ -22,10 +22,10 @@ from pathlib import Path
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node, encode_node
-from fuaran_py.ops import apply, decode_op
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.theme import trend_sentiment
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.ops import apply, decode_op
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.theme import trend_sentiment
 
 _FIXTURE = "nodes/metric-inverted-polarity.json"
 
@@ -208,7 +208,7 @@ def test_the_aria_label_sits_on_the_glyph_not_the_trend_element() -> None:
 def test_the_authoring_surface_can_express_the_polarity() -> None:
     """A codec-only adoption would leave this host behind the tiers it is
     co-equal with — a Python author could decode the slot and not write it."""
-    from fuaran_py.ui import encode, fuaran
+    from fuaran_ui.ui import encode, fuaran
 
     wire = encode(fuaran.metric("m", label="Avg wait", value=80, trend=-0.0734, trend_polarity="LowerIsBetter"))
     assert '"trendPolarity":"LowerIsBetter"' in wire
@@ -221,7 +221,7 @@ def test_the_authoring_surface_can_express_the_polarity() -> None:
 def test_the_value_space_offers_the_polarity_to_an_agent() -> None:
     """The AI-tools projection is derived from the typed enum, so an agent is
     never offered the reserved case the decoder refuses."""
-    from fuaran_py import ai_tools
+    from fuaran_ui import ai_tools
 
     assert ai_tools.value_space()["TrendPolarity"] == ["HigherIsBetter", "LowerIsBetter"]
 
@@ -233,7 +233,7 @@ def test_the_three_sentiment_classes_are_styled() -> None:
     """The base rule painted the trend ``success`` unconditionally before this
     phase, so a modifier class the stylesheet does not carry would leave the
     render neutral in every direction — the same defect, differently spelled."""
-    css = Path(__file__).resolve().parents[1] / "src" / "fuaran_py" / "renderer" / "content" / "fuaran-reference.css"
+    css = Path(__file__).resolve().parents[1] / "src" / "fuaran_ui" / "renderer" / "content" / "fuaran-reference.css"
     text = css.read_text(encoding="utf-8")
     for cls in ("improving", "regressing", "unchanged", "glyph"):
         assert f".fuaran-metric-trend-{cls}" in text

@@ -13,9 +13,9 @@ import zlib
 
 import pytest
 
-from fuaran_py.model import Obj
-from fuaran_py.schema import decode_node
-from fuaran_py.teleport import (
+from fuaran_ui.model import Obj
+from fuaran_ui.schema import decode_node
+from fuaran_ui.teleport import (
     BUDGET_QR_COMFORTABLE,
     DIGEST_MISMATCH,
     INVALID_ENVELOPE,

@@ -1,0 +1,42 @@
+# Defensive placeholder for the bare PyPI name `fuaran`. The real distribution is
+# `fuaran-ui` (repository `fuaran-py`): `pip install fuaran-ui`. This package exports
+# nothing and will never gain an API; it exists so the unqualified name cannot be taken
+# by an unrelated project and mistaken for the Fuaran UI wire-format host for Python.
+# Mirrors the unscoped npm name `fuaran` and the bare `fuaran` crate, both held the same
+# way beside `@fuaran-ui/*` and `fuaran-ui`.
+#
+# PEP 541 tolerates a held name that POINTS SOMEWHERE REAL and refuses an empty squat, so
+# README.md is load-bearing rather than decoration: it names the real distribution, the
+# import, the repository and the docs. Do not reduce it to a stub.
+#
+# This directory sits inside the `fuaran-ui` distribution's repository and is its own
+# project root — the parent's `[tool.hatch.build]` excludes it from both the wheel and the
+# sdist, so building `fuaran-ui` never sees this file.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fuaran"
+version = "0.0.0"
+description = "Placeholder for the bare name. The Fuaran UI wire-format host for Python is the `fuaran-ui` distribution — `pip install fuaran-ui`."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Andrew J. Willshire", email = "andrew@fuaran.com" }]
+keywords = ["fuaran", "placeholder"]
+classifiers = [
+  "Development Status :: 7 - Inactive",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Topic :: Software Development :: Libraries",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/fuaran-ui/fuaran-py"
+Repository = "https://github.com/fuaran-ui/fuaran-py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fuaran"]

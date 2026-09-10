@@ -13,10 +13,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from fuaran_py import decode_node
-from fuaran_py.model import Obj
-from fuaran_py.runtime import BrowserDeps, FuaranRuntime, counter_runtime, counter_tree
-from fuaran_py.ui import encode, fuaran
+from fuaran_ui import decode_node
+from fuaran_ui.model import Obj
+from fuaran_ui.runtime import BrowserDeps, FuaranRuntime, counter_runtime, counter_tree
+from fuaran_ui.ui import encode, fuaran
 
 # ── A minimal fake DOM (the BrowserDeps the runtime drives) ──────────────────
 
@@ -72,7 +72,7 @@ def _decoded(tree_uinode: object) -> object:
 
 def test_module_imports_under_plain_cpython() -> None:
     """The package must import with no `js` / Pyodide present (import-guarded seam)."""
-    import fuaran_py.runtime as runtime_pkg
+    import fuaran_ui.runtime as runtime_pkg
 
     assert hasattr(runtime_pkg, "FuaranRuntime")
 

@@ -16,8 +16,8 @@ role on a non-interactive container with the interactive element inside it.
 
 from __future__ import annotations
 
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
 
 # The canonical wire form of a named ARIA role is the lower-case ARIA string
 # ("link"), which is what every host's encoder emits. This fixture said "Link"

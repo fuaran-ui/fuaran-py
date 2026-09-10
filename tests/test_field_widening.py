@@ -33,11 +33,11 @@ import math
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_email, render_html, render_markdown
-from fuaran_py.schema import types as t
-from fuaran_py.ui import encode, fuaran, node
-from fuaran_py.validator import validate_node
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_email, render_html, render_markdown
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import encode, fuaran, node
+from fuaran_ui.validator import validate_node
 
 # ── The omission rule, per record ────────────────────────────────────────────
 #
@@ -176,7 +176,7 @@ def test_an_empty_annotation_list_is_not_the_same_document_as_no_list() -> None:
 
 def test_the_three_annotation_members_lower_to_their_wire_tags() -> None:
     """The union is CLOSED at three, and each lowers to the tag the lowering
-    dispatches on (``fuaran_py.charts`` reads ``ReferenceLine`` / ``EventMarker``
+    dispatches on (``fuaran_ui.charts`` reads ``ReferenceLine`` / ``EventMarker``
     / ``RangeBand`` straight off the tag)."""
     assert t.ReferenceLine(140, "Target").to_wire().tag == "ReferenceLine"  # type: ignore[union-attr]
     assert t.EventMarker(t.AnnotationCategory("Q3")).to_wire().tag == "EventMarker"  # type: ignore[union-attr]

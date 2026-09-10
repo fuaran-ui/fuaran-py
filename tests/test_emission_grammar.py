@@ -29,9 +29,9 @@ from __future__ import annotations
 
 import json
 
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.sanitize import (
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.sanitize import (
     CSS_REFUSAL_ATTRIBUTE,
     is_safe_css_value,
     sanitize_css_value,

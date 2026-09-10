@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py.renderer.egress import (
+from fuaran_ui.renderer.egress import (
     ALL_EGRESS_CLASSES,
     DENY_NON_LOCAL_EGRESS,
     EGRESS_REFUSAL_ATTRIBUTE,
@@ -277,7 +277,7 @@ def test_a_refusal_record_never_carries_the_path_or_query() -> None:
 
 
 def test_refusal_attribute_survives_the_extra_attribute_gate() -> None:
-    from fuaran_py.renderer.sanitize import is_allowed_extra_attribute_key
+    from fuaran_ui.renderer.sanitize import is_allowed_extra_attribute_key
 
     assert is_allowed_extra_attribute_key(EGRESS_REFUSAL_ATTRIBUTE)
 
@@ -299,7 +299,7 @@ def test_has_non_local_egress() -> None:
 
 
 def test_scheme_floor_refusal_keeps_its_own_answer_in_the_renderer() -> None:
-    from fuaran_py.renderer.markdown import to_html_with_egress
+    from fuaran_ui.renderer.markdown import to_html_with_egress
 
     # The floor's refusal is a DIFFERENT FACT from a policy refusal: bare
     # `about:blank`, no marker, exactly as it has rendered since Phase 292.
@@ -308,7 +308,7 @@ def test_scheme_floor_refusal_keeps_its_own_answer_in_the_renderer() -> None:
 
 
 def test_marker_is_emitted_last_after_every_existing_attribute() -> None:
-    from fuaran_py.renderer.markdown import to_html_with_egress
+    from fuaran_ui.renderer.markdown import to_html_with_egress
 
     out = to_html_with_egress(DENY_NON_LOCAL_EGRESS, '![alt text](https://evil.example/p.png "Caption")')
     assert out == (
@@ -318,7 +318,7 @@ def test_marker_is_emitted_last_after_every_existing_attribute() -> None:
 
 
 def test_email_autolink_emits_original_bytes_when_permitted() -> None:
-    from fuaran_py.renderer.markdown import to_html, to_html_with_egress
+    from fuaran_ui.renderer.markdown import to_html, to_html_with_egress
 
     # The `mailto:` is the RENDERER's, so the policy is asked about the
     # destination the renderer is about to emit — but on acceptance the original
@@ -328,7 +328,7 @@ def test_email_autolink_emits_original_bytes_when_permitted() -> None:
 
 
 def test_policy_is_threaded_not_global() -> None:
-    from fuaran_py.renderer.markdown import to_html_with_egress
+    from fuaran_ui.renderer.markdown import to_html_with_egress
 
     # Two renders under different policies must not affect one another — the
     # reason the policy is a parameter rather than module state.
@@ -352,8 +352,8 @@ _COLLECTOR = "https://collector.example/x?s=secret"
 
 def _render_default(wire: str) -> str:
     """Render through the DEFAULT entry point, naming no policy at all."""
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     result = decode_node(wire)
     assert result.ok, getattr(result, "error", result)
@@ -455,8 +455,8 @@ def test_same_origin_destinations_still_render_unchanged_by_default() -> None:
 
 
 def test_a_declared_policy_admits_the_host_by_name() -> None:
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import render_html
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import render_html
 
     result = decode_node(_image_wire("https://cdn.example/logo.png"))
     assert result.ok, getattr(result, "error", result)
@@ -474,9 +474,9 @@ def test_a_declared_policy_admits_the_host_by_name() -> None:
 def test_interactive_runtime_render_is_policy_checked_too() -> None:
     """The client surface is if anything the sharper case — a re-render re-issues
     every `<img src>` fetch — so the runtime carries the same default."""
-    from fuaran_py import decode_node
-    from fuaran_py.renderer import PERMISSIVE_EGRESS as _PERMISSIVE
-    from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+    from fuaran_ui import decode_node
+    from fuaran_ui.renderer import PERMISSIVE_EGRESS as _PERMISSIVE
+    from fuaran_ui.runtime import BrowserDeps, FuaranRuntime
 
     # `render()` touches no DOM, but the constructor resolves its browser deps —
     # so an inert stand-in keeps this a headless test rather than a Pyodide one.

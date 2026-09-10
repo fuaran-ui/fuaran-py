@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from fuaran_py import decode_node, validate_node
-from fuaran_py.model import Arr, Node, Obj
+from fuaran_ui import decode_node, validate_node
+from fuaran_ui.model import Arr, Node, Obj
 
 
 def test_clean_tree_has_no_findings() -> None:

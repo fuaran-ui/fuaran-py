@@ -17,15 +17,15 @@ from __future__ import annotations
 
 import json
 
-from fuaran_py.limits import (
+from fuaran_ui.limits import (
     MAX_ARRAY_LENGTH,
     MAX_JSON_DEPTH,
     MAX_NODE_DEPTH,
     MAX_STRING_LENGTH,
 )
-from fuaran_py.ops.decode import decode_op
-from fuaran_py.result import CODES, INVALID_JSON, LIMIT_EXCEEDED
-from fuaran_py.schema.decode import decode_node
+from fuaran_ui.ops.decode import decode_op
+from fuaran_ui.result import CODES, INVALID_JSON, LIMIT_EXCEEDED
+from fuaran_ui.schema.decode import decode_node
 
 _BOX_OPEN = (
     '{"id":"n","kind":{"$type":"Box","role":"Group",'

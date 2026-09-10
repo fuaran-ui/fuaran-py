@@ -1,9 +1,23 @@
-# Publish fuaran-py to PyPI on a version tag, via PyPI Trusted Publishing (OIDC — no stored token).
+# Publish fuaran-ui to PyPI on a version tag, via PyPI Trusted Publishing (OIDC — no stored token).
+#
+# THE PROJECT IS `fuaran-ui`; THE REPOSITORY IS STILL `fuaran-py`. Registry names carry the
+# domain and drop the language (`Fuaran.UI.*`, `@fuaran-ui/*`, the `fuaran-ui` crate,
+# `io.fuaran:fuaran-ui`), while repo names stay — `fuaran-ui/fuaran-py` is disambiguated by the
+# org, and renaming it would cost redirects, CI checkouts, corpus resolvers and `workspace.json`
+# for no consumer-visible gain.
+#
+# THE `fuaran-py` PROJECT ON PYPI IS LEFT EXACTLY AS IT STANDS (operator decision, 2026-09-10).
+# Its releases up to 0.5.0 remain downloadable and must remain so — a public demo page and three
+# CI workflows still install them by exact version. It is never re-tagged and never published to
+# again; there is no deprecation shim, because nothing has ever consumed it as a dependency.
 #
 # Trigger: a `v*` tag push only. A branch push reaches no publish job.
-# Prerequisites (one-time, on pypi.org): register this repository as the project's trusted
-# publisher — owner `fuaran-ui`, repository `fuaran-py`, workflow `publish-pypi.yml`,
-# environment `pypi` — then create the `pypi` environment on this repository.
+# Prerequisites (one-time, on pypi.org): register a PENDING PUBLISHER for the NEW project —
+# project `fuaran-ui`, owner `fuaran-ui`, repository `fuaran-py`, workflow `publish-pypi.yml`,
+# environment `pypi` — then create the `pypi` environment on this repository. The registration
+# that named project `fuaran-py` does NOT carry over: a trusted-publisher policy is scoped to a
+# project name, so the first `fuaran-ui` tag fails at the OIDC exchange until the new pending
+# publisher exists. That is the right failure — loud, and before any artefact is uploaded.
 # The tag must equal the version in pyproject.toml; the gate below refuses otherwise, so a
 # mistyped tag never publishes a mismatched release.
 #

@@ -2,7 +2,7 @@
 
 The codec adopted the ``Toggle`` form-field kind, the ``Now`` binding, and the
 ``Switch`` ``on`` binding selector; these tests pin the *authoring* surface
-(:mod:`fuaran_py.schema.types` + the ``fuaran_py.ui`` namespaces) to the same
+(:mod:`fuaran_ui.schema.types` + the ``fuaran_ui.ui`` namespaces) to the same
 vocabulary: every construct lowers to canonical bytes, survives a decode →
 re-encode round-trip byte-stably, and the ``Switch`` selector honours the
 Phase 768 collapse rule (a default-free ``State`` keeps the compact ``stateKey``
@@ -13,10 +13,10 @@ from __future__ import annotations
 
 import pytest
 
-from fuaran_py import decode_node, encode_node
-from fuaran_py.canonical import encode_value
-from fuaran_py.schema import types as t
-from fuaran_py.ui import binding, encode, fuaran, node
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import binding, encode, fuaran, node
 
 
 def _roundtrips(wire: str) -> None:

@@ -29,8 +29,8 @@ import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
 from _reference_host import reference_host_root, vacuous_gate_diagnosis
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
 
 # The reference renderer sources, relative to whichever spelling of the F# host
 # is checked out. Resolution walks up from THIS repo's root (not from the corpus,

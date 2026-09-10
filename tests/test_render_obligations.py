@@ -26,7 +26,7 @@ than from a hand list beside it. Three consequences, which are the whole point:
 
 Every checker asserts in EMITTED HTML through this host's render path. A checker
 that inspected the typed tree would be re-stating the type system; the obligations
-are claims about output. The trees are authored through ``fuaran_py.ui`` and taken
+are claims about output. The trees are authored through ``fuaran_ui.ui`` and taken
 through the canonical wire (``encode`` → ``decode_node``) before rendering, which
 is the only path this host's renderer accepts — and means each checker asserts
 against a tree that has survived the codec, not one built beside it.
@@ -48,8 +48,8 @@ from pathlib import Path
 import pytest
 
 from _corpus import CORPUS_ROOT
-from fuaran_py import decode_node
-from fuaran_py.render_fidelity import (
+from fuaran_ui import decode_node
+from fuaran_ui.render_fidelity import (
     Asserted,
     ObligationOutcome,
     ObligationReport,
@@ -60,10 +60,10 @@ from fuaran_py.render_fidelity import (
     report_obligations,
     unasserted_obligations,
 )
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.egress import DENY_NON_LOCAL_EGRESS, PERMISSIVE_EGRESS, EgressPolicy
-from fuaran_py.schema import types as t
-from fuaran_py.ui import encode, fuaran, track
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.egress import DENY_NON_LOCAL_EGRESS, PERMISSIVE_EGRESS, EgressPolicy
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import encode, fuaran, track
 
 # ── Locating the artefact ────────────────────────────────────────────────────
 #

@@ -26,15 +26,15 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT
-from fuaran_py import decode_node
-from fuaran_py.schema.encode import encode_node
+from fuaran_ui import decode_node
+from fuaran_ui.schema.encode import encode_node
 
 _IDL = CORPUS_ROOT / "idl.json"
 idl_required = pytest.mark.skipif(not _IDL.is_file(), reason=f"corpus idl.json not found at {_IDL}")
 
 
 def _decoded_members(tag: str) -> set[str]:
-    from fuaran_py.schema.decode import KIND_SCHEMAS  # noqa: PLC0415 — test-only introspection
+    from fuaran_ui.schema.decode import KIND_SCHEMAS  # noqa: PLC0415 — test-only introspection
 
     return {entry[0] for entry in KIND_SCHEMAS[tag]}
 

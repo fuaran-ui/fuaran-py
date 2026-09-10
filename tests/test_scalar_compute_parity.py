@@ -19,10 +19,10 @@ from collections.abc import Callable
 from typing import Any
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.model import Node
-from fuaran_py.renderer import render_html
-from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+from fuaran_ui import decode_node
+from fuaran_ui.model import Node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.runtime import BrowserDeps, FuaranRuntime
 
 
 def _decode(name: str) -> Node:
@@ -108,8 +108,8 @@ def test_scalar_law_is_loud_on_ambiguity() -> None:
     # The 1×1 law: a >1-row result in a scalar slot is a loud miss (renders
     # absence — never a silent first cell). The scalar-transform grid's source
     # (empty pipeline, 3 rows) in a text slot resolves to nothing, not "TCK-2041".
-    from fuaran_py.renderer.bindings import _scalar_cell  # noqa: PLC0415
-    from fuaran_py.schema import decode_node as _dn
+    from fuaran_ui.renderer.bindings import _scalar_cell  # noqa: PLC0415
+    from fuaran_ui.schema import decode_node as _dn
 
     # A Transform whose result is 3 rows × 3 cols → ambiguous → ("error", None).
     text = (CORPUS_ROOT / "nodes" / "scalar-transform-composition.json").read_text(encoding="utf-8")

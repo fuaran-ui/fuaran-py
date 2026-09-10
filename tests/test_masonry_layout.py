@@ -30,12 +30,12 @@ of the normative CSS in a place nothing regenerates.
 
 from __future__ import annotations
 
-from fuaran_py import decode_node, encode_node
-from fuaran_py.model import Obj
-from fuaran_py.ops import apply
-from fuaran_py.ops.apply import ApplyErr
-from fuaran_py.renderer.theme import kind_class
-from fuaran_py.ui import encode, fuaran
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.model import Obj
+from fuaran_ui.ops import apply
+from fuaran_ui.ops.apply import ApplyErr
+from fuaran_ui.renderer.theme import kind_class
+from fuaran_ui.ui import encode, fuaran
 
 
 def _box(layout_json: str) -> str:

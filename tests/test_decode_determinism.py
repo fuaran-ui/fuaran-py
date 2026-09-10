@@ -25,18 +25,18 @@ import threading
 
 import pytest
 
-from fuaran_py.client.wire import _parse_json
-from fuaran_py.dag import decode_dag_record
-from fuaran_py.dataframe.codec import decode_pipeline, decode_source
-from fuaran_py.elicitation import decode_elicitation
-from fuaran_py.envelope import decode_envelope
-from fuaran_py.limits import MAX_NODE_DEPTH, MAX_STRING_LENGTH
-from fuaran_py.ops.decode import decode_op
-from fuaran_py.result import INVALID_JSON, LIMIT_EXCEEDED
-from fuaran_py.schema.decode import decode_node
-from fuaran_py.shapeguard import check_shape, load_bounded
-from fuaran_py.teleport import _json_loads as decode_teleport_envelope
-from fuaran_py.theme_manifest.decode import decode as decode_theme
+from fuaran_ui.client.wire import _parse_json
+from fuaran_ui.dag import decode_dag_record
+from fuaran_ui.dataframe.codec import decode_pipeline, decode_source
+from fuaran_ui.elicitation import decode_elicitation
+from fuaran_ui.envelope import decode_envelope
+from fuaran_ui.limits import MAX_NODE_DEPTH, MAX_STRING_LENGTH
+from fuaran_ui.ops.decode import decode_op
+from fuaran_ui.result import INVALID_JSON, LIMIT_EXCEEDED
+from fuaran_ui.schema.decode import decode_node
+from fuaran_ui.shapeguard import check_shape, load_bounded
+from fuaran_ui.teleport import _json_loads as decode_teleport_envelope
+from fuaran_ui.theme_manifest.decode import decode as decode_theme
 
 # ── §20.2: the rows, at the guard rather than through one decoder ────────────
 #

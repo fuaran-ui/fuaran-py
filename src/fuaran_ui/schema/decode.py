@@ -1,0 +1,4371 @@
+"""Decode canonical wire JSON into the structural model (WIRE_FORMAT.md §3, §6-§8).
+
+``decode_node`` validates the node envelope, the ``kind`` discriminator, and —
+for the implemented node kinds — every required field, surfacing the six
+canonical :mod:`fuaran_ui.result` codes with ``$``-rooted paths. Node kinds that
+are recognised by the wire spec but not yet given a typed schema here are
+accepted structurally (pass-through), so the codec round-trips the full corpus
+while typed validation is filled in incrementally. An unrecognised kind is a
+``WRONG_NODE_KIND``.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from collections.abc import Callable
+from contextvars import ContextVar
+from typing import cast
+
+from ..limits import MAX_EXPR_NODES, MAX_NODE_DEPTH, MAX_NODES, MAX_SKELETON_ROWS
+from ..model import Arr, Node, Obj, Value, from_json
+from ..result import (
+    EMPTY_NODE_ID,
+    LIMIT_EXCEEDED,
+    MISSING_FIELD,
+    UNKNOWN_DU_CASE,
+    WRONG_NODE_KIND,
+    WRONG_TYPE,
+    DecodeError,
+    DecodeResult,
+    Err,
+    Ok,
+)
+from ..shapeguard import check_shape, load_bounded
+
+# ── Reserved unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ───────────
+OPAQUE = "<opaque>"
+"""A ``Binding.Static`` payload the encoder cannot decompose (the §5 obj-erased seam)."""
+
+
+class _Fail(Exception):
+    """Internal short-circuit carrying a :class:`DecodeError`."""
+
+    def __init__(self, error: DecodeError) -> None:
+        self.error = error
+
+
+def _fail(code: str, path: str, message: str, expected: str | None = None) -> None:
+    raise _Fail(DecodeError(code, path, message, expected))
+
+
+# ── Primitive expectations ─────────────────────────────────────────────────
+
+
+def _unwrap_static_envelope(value: object) -> object:
+    """Lenient AI-ingest (WIRE_FORMAT §3.6, generalised): a ``Static`` envelope
+    wrapped around a PLAIN scalar unwraps before the scalar readers — the
+    inverse of the bare-scalar-in-Binding-slot confusion, applied at every
+    plain-scalar position in one place (mirrors the F# ``unwrapStaticEnvelope``).
+    Objects that are not a well-formed Static envelope pass through untouched
+    and fail with the normal error."""
+    if isinstance(value, dict) and value.get("$type") == "Static" and "value" in value:
+        return value["value"]
+    return value
+
+
+def _expect_object(value: object, path: str) -> dict:
+    if not isinstance(value, dict):
+        _fail(WRONG_TYPE, path, f"expected an object at {path}")
+    return value  # type: ignore[return-value]
+
+
+def _expect_string(value: object, path: str) -> str:
+    value = _unwrap_static_envelope(value)
+    if not isinstance(value, str):
+        _fail(WRONG_TYPE, path, f"expected a string at {path}")
+    return value  # type: ignore[return-value]
+
+
+#: The width of every typed integer slot this format declares (§7.1).
+INT_SLOT_MIN = -2147483648
+INT_SLOT_MAX = 2147483647
+
+#: Where INTEGER IDENTITY stops in an untyped rule-12 payload position (§2
+#: rule 5). A different question from the slot width above, and answered by a
+#: different number: this one is the range in which every host's number
+#: representation agrees exactly, so a token inside it canonicalises the same
+#: way everywhere and a token outside it does not.
+PAYLOAD_INT_MAX = 9007199254740991
+
+
+def _integer_slot(value: object, path: str) -> int:
+    """The §7.1 integer-slot accept set, in one place.
+
+    A typed integer slot admits a JSON number that is finite, has **no
+    fractional part**, and lies within the signed 32-bit range. ``2.0`` decodes
+    as ``2``; ``2.5``, ``1e10``, ``1e400``, a §7 sentinel string, ``"banana"``
+    and ``true`` are each a ``WRONG_TYPE``.
+
+    This host previously answered the same question in two different ways —
+    a bare integer position refused ``2.0`` outright while a ``Binding<int>``
+    slot truncated ``2.5`` to ``2`` — so the two were reconciled here rather
+    than separately. §7.1 takes the accepting half of the first and the refusing
+    half of the second: ``2.0`` and ``2`` denote the same integer, and ``2.5``
+    denotes something an integer slot cannot hold.
+
+    ``bool`` is tested first because it is an ``int`` subclass in Python, so
+    ``True`` would otherwise satisfy the numeric test and decode as ``1``.
+    """
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(WRONG_TYPE, path, f"expected an integer at {path}")
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected a finite integer at {path} — an integer slot has no non-finite form",
+                "a finite integral number within the signed 32-bit range",
+            )
+        if value != int(value):
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected an integer at {path}, but the value has a fractional part "
+                "— an integer slot holds no fraction, and truncating it would discard a value the author typed",
+                "a finite integral number within the signed 32-bit range",
+            )
+        value = int(value)
+    if not (INT_SLOT_MIN <= cast(int, value) <= INT_SLOT_MAX):
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"the value at {path} is outside the signed 32-bit range a typed integer slot can hold "
+            f"({INT_SLOT_MIN} … {INT_SLOT_MAX})",
+            "a finite integral number within the signed 32-bit range",
+        )
+    return cast(int, value)
+
+
+def _expect_int(value: object, path: str) -> int:
+    return _integer_slot(value, path)
+
+
+def _expect_bool(value: object, path: str) -> bool:
+    value = _unwrap_static_envelope(value)
+    if not isinstance(value, bool):
+        _fail(WRONG_TYPE, path, f"expected a boolean at {path}")
+    return value  # type: ignore[return-value]
+
+
+def _expect_array(value: object, path: str) -> list:
+    if not isinstance(value, list):
+        _fail(WRONG_TYPE, path, f"expected an array at {path}")
+    return value  # type: ignore[return-value]
+
+
+def _require(obj: dict, key: str, path: str) -> object:
+    if key not in obj:
+        _fail(MISSING_FIELD, f"{path}.{key}", f"missing required field '{key}'")
+    return obj[key]
+
+
+def _dispatch(obj: dict, path: str, valid: frozenset[str], code_unknown: str = UNKNOWN_DU_CASE) -> str:
+    """Read + validate a ``$type`` discriminator, returning the case name."""
+    if "$type" not in obj:
+        _fail(MISSING_FIELD, f"{path}.$type", "missing $type discriminator")
+    tag = obj["$type"]
+    if not isinstance(tag, str):
+        _fail(WRONG_TYPE, f"{path}.$type", "$type must be a string")
+    if tag not in valid:
+        _fail(
+            code_unknown,
+            f"{path}.$type",
+            f"unrecognised case '{tag}'",
+            "one of: " + ", ".join(sorted(valid)),
+        )
+    return tag  # type: ignore[return-value]
+
+
+def _enum(value: object, path: str, allowed: frozenset[str], name: str) -> str:
+    if not isinstance(value, str):
+        _fail(WRONG_TYPE, path, f"{name} must be a string")
+    if value not in allowed:
+        _fail(
+            UNKNOWN_DU_CASE,
+            path,
+            f"unrecognised {name} '{value}'",
+            "one of: " + ", ".join(sorted(allowed)),
+        )
+    return value  # type: ignore[return-value]
+
+
+def _enum_aliased(value: object, path: str, allowed: frozenset[str], aliases: dict[str, str], name: str) -> str:
+    """Decode a bare-string enum, accepting the WIRE_FORMAT §3.6 lenient-ingest aliases.
+
+    Decode-only: the canonical DU-case names always win (they are in ``allowed``, so
+    the alias table is only consulted for a non-canonical input); the encoder never
+    emits an alias, and a re-encode normalises to the canonical case name. An input
+    that is neither canonical nor a curated alias still fails ``UNKNOWN_DU_CASE``.
+    """
+    if not isinstance(value, str):
+        _fail(WRONG_TYPE, path, f"{name} must be a string")
+    if value in allowed:
+        return value  # type: ignore[return-value]
+    if value in aliases:
+        return aliases[value]
+    _fail(
+        UNKNOWN_DU_CASE,
+        path,
+        f"unrecognised {name} '{value}'",
+        "one of: " + ", ".join(sorted(allowed)),
+    )
+    return value  # type: ignore[return-value]  # unreachable — _fail raises
+
+
+# ── Bare-string enum vocabularies (WIRE_FORMAT.md §3.5) ─────────────────────
+
+# The legal `ToneVariant` names in declaration order, extracted because two positions now
+# teach them — a `tone` field and (Phase 750) a `TonedPill` tone-map value. A second inline
+# copy is exactly how one of them comes to name six tones. `TONE` derives from it, so the
+# membership test and the taught vocabulary cannot drift.
+TONE_NAMES = ("Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info")
+TONE = frozenset(TONE_NAMES)
+WEIGHT = frozenset({"Compact", "Standard", "Spacious"})
+EMPHASIS = frozenset({"Quiet", "Normal", "Loud"})
+TEXT_ANCHOR = frozenset({"Start", "Middle", "End"})
+ORIENTATION = frozenset({"Vertical", "Horizontal"})
+BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical", "Info"})
+HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
+STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
+FONT_VOICE = frozenset({"Default", "Display", "Structural"})
+LIVE_REGION = frozenset({"polite", "assertive", "off"})
+IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
+# fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). All
+# three are CLOSED TOKEN vocabularies, never CSS values: `aspectRatio` names one
+# of four ratios and carries no number, pair or stylesheet spelling ("16 / 9",
+# "16:9", 1.7778), because admitting an arbitrary ratio would put an
+# author-supplied value in a style attribute — the free-form escape this format
+# does not have. Each is omitted at its identity default on BOTH boundaries.
+IMAGE_FIT = frozenset({"Natural", "Cover", "Contain"})
+IMAGE_ASPECT = frozenset({"Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"})
+IMAGE_LOADING = frozenset({"Eager", "Lazy"})
+# fuaran#1076 — the `MediaKind` variant set (WIRE_FORMAT §3.6.6), CLOSED at two.
+# `$type`-discriminated rather than a bare enum, so an unknown case reports at
+# `<path>.$type`; a third surface is an ADDITION later, never a spelling a
+# decoder may guess at today.
+MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
+# fuaran#1110 — the `TrackKind` set (WIRE_FORMAT §3.6.6), CLOSED at four and a
+# BARE enum rather than a `$type`-discriminated case, so an unknown spelling
+# reports at the slot itself. `metadata` is deliberately NOT a member: its cues
+# are rendered by no user agent and read only by script, so a declarative
+# document naming it would state an intent no conformant host could honour
+# without leaving the vocabulary. A fifth kind is an ADDITION later, never a
+# spelling a decoder may guess at today.
+TRACK_KIND = frozenset({"Subtitles", "Captions", "Descriptions", "Chapters"})
+# fuaran#1111 — the sandbox relaxations an `Embed` may request, CLOSED at four.
+# The empty list is TOTAL DENIAL and is the identity, so the shortest embed
+# document is the fully-sandboxed one and every relaxation is named.
+EMBED_PERMISSION = frozenset({"AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"})
+# fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
+# A BARE enum, so an unknown token reports at the member's own path with no
+# `.$type` suffix. There is no display-capture case and there will not be one by
+# widening this: a screen capture reaches every window the reader has open
+# rather than one device behind the picker.
+CAPTURE_SOURCE = frozenset({"Camera", "Microphone"})
+# fuaran#1119 — the modal's modality. `Blocking` is the identity and omits.
+MODALITY_KIND = frozenset({"Blocking", "Popover"})
+# fuaran#1536 — which browsing context an `Action.Navigate` lands in. A BARE
+# enum; `Self` is the identity and omits. Two cases and NO lenient spelling:
+# HTML's `_self` / `_blank` / `_parent` / `_top` are not accepted as aliases,
+# because two of them are frame-busting gestures a hosted tree must not be able
+# to ask for and accepting the two harmless ones would teach an emitter that the
+# HTML vocabulary is the one in force here.
+NAVIGATE_TARGET = frozenset({"Self", "Blank"})
+# fuaran#1472 — the declared base direction, LOWER-CASE on the wire because that
+# is the spelling the isolation is ultimately expressed in. `auto` is the
+# identity and omits at it; an unrecognised token is REFUSED and never coerced to
+# it, since a document that meant `rtl` and misspelled it would otherwise render
+# as reordered digits with nothing said anywhere.
+TEXT_DIRECTION = frozenset({"auto", "ltr", "rtl"})
+#: fuaran#1130 — the canonical `#rrggbb` form and nothing else. Deliberately
+#: STRICT: a native colour input holds exactly this, so `#fff`, `rebeccapurple`,
+#: `rgb(0 0 0)` and an alpha channel all name a colour the control could never
+#: carry. Case is ACCEPTED and never rewritten.
+_HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
+SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
+DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
+MATH_DISPLAY = frozenset({"Inline", "Block"})
+BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
+BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Masonry", "Auto"})  # Phase 390; Masonry §3.6.7
+BUTTON_VARIANT = frozenset({"Primary", "Secondary", "Tertiary", "Destructive"})
+LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render strategy
+# Phase 819 — the Duration / RelativeTime format enums (shared by CellFormat
+# and the Binding.Format vocabulary).
+DURATION_UNIT = frozenset({"Seconds", "Minutes", "Hours"})
+DURATION_STYLE = frozenset({"Compact", "Clock", "Long"})
+RELATIVE_TIME_UNIT = frozenset({"Second", "Minute", "Hour", "Day", "Week", "Month", "Year"})
+# Phase 1533 — the resolution a ``Binding.Now`` declares for the host-furnished
+# instant. A strict SUBSET of RELATIVE_TIME_UNIT: ``Week`` / ``Month`` / ``Year``
+# are refused rather than quietly accepted, because this is a truncation of a
+# calendar instant and those three have no truncation every host agrees on
+# (which weekday starts a week; which calendar).
+TIME_GRAIN = frozenset({"Second", "Minute", "Hour", "Day"})
+ICON_SIZE = frozenset({"Small", "Medium", "Large"})  # Phase 821 — the Icon display kind
+# fuaran#867 — `Metric.trendPolarity`: which direction of movement is an
+# improvement. `Neutral` is RESERVED and deliberately NOT a case — that is the
+# whole reason the slot is a two-case enum rather than an `inverted: bool`, since
+# a later admission is then a bare-string addition and not a type replacement.
+TREND_POLARITY = frozenset({"HigherIsBetter", "LowerIsBetter"})
+
+# ── Lenient-ingest enum aliases (WIRE_FORMAT.md §3.6, decode-only) ──────────
+# The encoder never emits an alias; a re-encode normalises to the canonical DU
+# case name. Canonical values always win (they are in the enum's `allowed` set,
+# so the alias table is only consulted for a non-canonical input). `StyleWeight`
+# is deliberately NOT aliased — `Bold`/`Heavy` is font-weight intent, but the
+# language's `weight` means density (Compact|Standard|Spacious).
+TONE_ALIASES = {"Positive": "Success", "Danger": "Critical", "Negative": "Critical", "Neutral": "Default"}
+EMPHASIS_ALIASES = {"Strong": "Loud", "Bold": "Loud", "Subtle": "Quiet", "Muted": "Quiet"}
+HEADING_VARIANT_ALIASES = {"Default": "Standard"}
+BADGE_VARIANT_ALIASES = {"Default": "Neutral", "Danger": "Critical"}
+BUTTON_VARIANT_ALIASES = {"Danger": "Destructive"}
+ORIENTATION_ALIASES = {"Row": "Horizontal", "row": "Horizontal", "Column": "Vertical", "column": "Vertical"}
+
+# 0.2.0 cross-vocabulary coercion (2026-07-19 sweep, both directions): the
+# `emphasis` name collides across two vocabularies — the style ENUM
+# (Quiet|Normal|Loud) on SemanticStyle/Metric and the behavioural BOOL on
+# Fact/LabelValueRow. A bool in the enum slot projects one-to-one
+# (true ⇒ Loud, false ⇒ Normal); the enum (and its §3.6 aliases) in the bool
+# slot projects Loud/Strong/Bold ⇒ true, Normal/Quiet/Subtle/Muted ⇒ false.
+_EMPHASIS_TRUE = frozenset({"Loud", "Strong", "Bold"})
+_EMPHASIS_FALSE = frozenset({"Normal", "Quiet", "Subtle", "Muted"})
+
+TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
+# The Compute-layer binding cases are recognised so a data-bound node's source round-trips
+# byte-exactly: ``Transform`` (the dataframe-pipeline source) + the ``Data`` embedded-source
+# and ``Invoke`` capability bindings. They decode *structurally* (validated discriminator, fields
+# preserved) — the same pass-through every non-``Static`` binding case takes here. A fully typed
+# ``Invoke`` decode (capabilityId + typed args) lands with the capability/invoke wire surface.
+BINDING_CASES = frozenset(
+    {
+        "Static",
+        "Query",
+        "Filter",
+        "Selection",
+        "State",
+        "Computed",
+        "Now",
+        "I18n",
+        "Local",
+        "Format",
+        "Data",
+        "Transform",
+        "Expr",
+        "Invoke",
+    }
+)
+CELL_FORMAT_CASES = frozenset(
+    {"None", "Number", "Currency", "Percent", "SignificantDigits", "Date", "Duration", "RelativeTime", "Custom"}
+)
+
+# Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2). A kind not in
+# this set is WRONG_NODE_KIND; a kind in this set but absent from KIND_SCHEMAS is
+# accepted structurally.
+KNOWN_KINDS = frozenset(
+    {
+        # Layout
+        "Box",  # Phase 390 — the unified container
+        "SplitPanel",
+        "Tabs",
+        "Stepper",
+        "SummaryList",
+        "Disclosure",
+        "Modal",
+        "ScrollArea",
+        # Display
+        "Heading",
+        "Markdown",
+        "Metric",
+        "Fact",
+        "Badge",
+        "Sparkline",
+        "Callout",
+        "Progress",
+        "Skeleton",
+        "Icon",  # Phase 821 — the standalone icon-only display kind
+        "LabelValueRow",
+        "Link",
+        "Image",
+        "Media",  # fuaran#1076 — the playback surface (Video | Audio)
+        "Embed",  # fuaran#1111 — the sandboxed third-party browsing context
+        "Tree",  # fuaran#1120 — recursive disclosure with tree semantics
+        "List",
+        "Toast",
+        "CodeBlock",
+        "Math",
+        "Drawing",
+        # Input
+        "Form",
+        "Button",
+        "FileUpload",
+        "Select",
+        "Filters",
+        # Visualisation
+        "DataGrid",
+        "Chart",
+        "Map",
+        # Structural
+        "Custom",
+        "ErrorBoundary",
+        "Switch",
+        "FragmentDecl",
+        "FragmentRef",
+        "Mount",
+    }
+)
+
+
+# ── Nested-position decoders ───────────────────────────────────────────────
+
+
+def _decode_text_source(value: object, path: str) -> Value:
+    # 0.2.0 — the bare JSON string IS the canonical `TextSource.Literal` form;
+    # the `{"$type":"Literal","text":…}` envelope stays decode-accepted (§16)
+    # and normalises down to the bare string on re-encode.
+    if isinstance(value, str):
+        return value
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, TEXT_SOURCE_CASES)
+    if tag == "Literal":
+        return _expect_string(_require(obj, "text", path), f"{path}.text")
+    if tag == "I18n":
+        # Phase 1661 — an `I18n` argument is a ``Binding<JSON>`` discriminated BY
+        # INSPECTION (§5), so `args` now has two readings and needs a decoder.
+        # Every OTHER member keeps the structural rule-12 pass-through it had, so
+        # `key`'s bytes and refusals are untouched.
+        #
+        # The pass-through could not stay for `args`: it validates nothing, so a
+        # bound argument's own refusals (an unrecognised `$type`, a known case
+        # missing a required member) went unraised here while the typed hosts
+        # refused the same document — and a tagged `Static` was re-emitted
+        # tagged where they collapse it to the bare value. Both are divergences
+        # this widening would have manufactured.
+        fields: dict[str, Value] = {}
+        for member, raw in obj.items():
+            if member == "$type":
+                continue
+            member_path = f"{path}.{member}"
+            fields[member] = (
+                _decode_i18n_args(raw, member_path) if member == "args" else _from_json_strict(raw, member_path)
+            )
+        return Obj("I18n", fields)
+    # Bound — decode the wrapped binding so it picks up the same normalisation
+    # (accessor sentinels dropped, aliases folded) as any bare-Binding slot.
+    # NOT null-strict — a Bound binding may carry a Static whose obj-erased
+    # value is null (the deliberate §5 opaque-seam exception).
+    binding = _decode_binding(_require(obj, "binding", path), f"{path}.binding")
+    return Obj("Bound", {"binding": binding})
+
+
+def _decode_i18n_args(value: object, path: str) -> Value:
+    """A ``TextSource.I18n`` argument bag — discriminated BY INSPECTION (§5, Phase 1661).
+
+    An object carrying a ``$type`` member is a BINDING and decodes as one; every
+    other JSON value is the LITERAL argument, decoded rule-12 strict (a null
+    rejects at the null's own path — ``reject-null-i18n-arg`` pins it) and
+    emitted BARE, which is why every literal-args document ever emitted is
+    byte-identical across the widening.
+
+    A ``Static`` argument is read here rather than through :func:`_decode_binding`,
+    because the two spellings of a literal must agree. A missing or null ``value``
+    is Phase 677's structural absence and stays ``{"$type":"Static"}`` — absence
+    has no bare spelling; a PRESENT value collapses to the bare form and takes
+    the same strict decoder as the bare spelling, since one payload position
+    under two spellings cannot have two null postures.
+    """
+    obj = _expect_object(value, path)
+    out: dict[str, Value] = {}
+    for name, arg in obj.items():
+        arg_path = f"{path}.{name}"
+        if isinstance(arg, dict) and "$type" in arg:
+            if arg.get("$type") == "Static":
+                raw = arg.get("value")
+                if "value" not in arg or raw is None:
+                    out[name] = Obj("Static", {})
+                else:
+                    out[name] = _from_json_strict(raw, f"{arg_path}.value")
+            else:
+                out[name] = _decode_binding(arg, arg_path)
+        else:
+            out[name] = _from_json_strict(arg, arg_path)
+    return Obj(None, out)
+
+
+def _decode_binding(value: object, path: str) -> Value:
+    # §3.6 lenient shape coercion: a bare JSON array or scalar where a Binding
+    # is expected is `Static` with that value (every Binding case is a
+    # `$type`-discriminated object, so an array/scalar can only mean Static).
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": from_json(value)})
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
+    if tag == "Static":
+        # Phase 677 — absence is structural: a MISSING `value` means the binding
+        # carries none, and the legacy `"value": null` spelling normalises to the
+        # same thing (§16 shorthand). Neither emits a key on re-encode.
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
+            return Obj("Static", {})
+        return Obj("Static", {"value": from_json(raw)})
+    if tag == "Bound":
+        # Phase 633 — the `TextSource.Bound` wrapper convention transferred to a
+        # bare-Binding slot unwraps one-to-one: decode the inner binding in place.
+        return _decode_binding(_require(obj, "binding", path), f"{path}.binding")
+    return _normalise_binding_obj(obj, path)
+
+
+# ── Typed Binding.Static positions (WIRE_FORMAT.md §"Typed Static payloads", Phase 429) ─
+#
+# A handful of ``Binding.Static`` positions carry a *typed* payload rather than the
+# ``"<opaque>"`` obj-erased seam: a Select/Choice/Filter options list, a scalar
+# string option, a string list, a Sparkline float series, a Map marker list. The
+# encoder emits the typed form; the decoder mirrors it, and — crucially —
+# *normalises* the two legacy inputs each such position may still carry:
+#
+#   * a legacy ``"value":"<opaque>"`` sentinel (the pre-429 obj-erased placeholder), and
+#   * a legacy ``"value":null`` (the pre-429 ``box []`` / ``box None`` null-reference form),
+#
+# into the typed form the corpus now expects, so a round-trip is byte-stable AND
+# value-faithful. The normalisation is per-position (the ``lenient-opaque-static-*``
+# / ``lenient-null-static-*`` fixtures pin each). fuaran#665 added Chart/DataGrid
+# ROWS to this family (see :func:`_decode_grid_source`), leaving only genuinely
+# host-typed payloads (Mount inputs, ``PropValue.Native``) on the residual
+# ``"<opaque>"`` seam and the plain ``_decode_binding`` above.
+
+
+def _typed_static_binding(
+    value: object,
+    path: str,
+    on_typed: Callable[[object, str], Value],
+    on_opaque: Value,
+    on_null: Value,
+    *,
+    typed_default: bool = False,
+) -> Value:
+    """Decode a ``Binding`` whose ``Static`` payload is a typed position.
+
+    ``Static`` normalises per the three input forms (typed / ``"<opaque>"`` /
+    ``null``); a bare array/scalar coerces to ``Static`` (§3.6) and a ``Bound``
+    wrapper unwraps (Phase 633); every other binding case passes through
+    structurally (validated discriminator), exactly as :func:`_decode_binding`.
+
+    ``typed_default`` extends the same normalisation to the *other* value-carrying
+    binding arm — ``State``/``Selection``'s ``defaultValue`` — which the reference
+    hosts route through the slot's typed parser too. Opt-in per slot rather than
+    global: only the rows slot (fuaran#665) has a fixture pinning it, and flipping
+    the pre-429 typed slots onto it is a behaviour change of its own.
+    """
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": on_typed(value, path)})
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
+    if tag == "Static":
+        # Phase 677 — a MISSING `value` and an explicit `null` both mean "no
+        # payload" and share the slot's `on_null` normalisation. Where that
+        # normalisation is itself absence (`on_null=None`, e.g. the string slot)
+        # the key is omitted entirely; where the slot has a typed empty (options
+        # normalise to `[]`) that empty is emitted, so "no selection" and
+        # "selected nothing" stay distinguishable.
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
+            normalised = on_null
+        elif raw == OPAQUE:
+            normalised = on_opaque
+        else:
+            normalised = on_typed(raw, f"{path}.value")
+        return Obj("Static", {} if normalised is None else {"value": normalised})
+    if tag == "Bound":
+        return _typed_static_binding(
+            _require(obj, "binding", path),
+            f"{path}.binding",
+            on_typed,
+            on_opaque,
+            on_null,
+            typed_default=typed_default,
+        )
+    if typed_default:
+
+        def _default(raw: object, p: str) -> Value:
+            return on_opaque if raw == OPAQUE else on_typed(raw, p)
+
+        return _normalise_binding_obj(obj, path, on_default=_default)
+    return _normalise_binding_obj(obj, path)
+
+
+def _decode_binding_scalar(value: object, path: str, expect: Callable[[object, str], Value], what: str) -> Value:
+    """A ``Binding<str>`` / ``Binding<bool>`` slot — the typed SCALAR positions.
+
+    Written out rather than routed through :func:`_typed_static_binding` for one
+    reason: an absent / ``null`` ``Static`` payload at a scalar slot is a REFUSAL
+    on the reference host (``requireString``/``requireBool`` reject ``JNull``),
+    and that helper's ``on_null`` parameter can only normalise, never refuse.
+
+    §3.6's bare-scalar coercion is about SHAPE — every ``Binding`` case is a
+    ``$type``-discriminated object, so a bare scalar can only mean ``Static`` —
+    and the slot's own ``'T`` still governs the VALUE. Without the type check
+    ``{"hidden": "yes"}`` decoded happily with its value preserved, which is why
+    this host answered none of the corpus's a11y reject vectors.
+
+    The non-``Static`` arms keep the untyped ``defaultValue`` handling the
+    pre-429 typed slots already have (see :func:`_typed_static_binding`'s
+    ``typed_default`` note): routing those onto the slot parser is a separate
+    behaviour change with no fixture pinning it.
+    """
+    if isinstance(value, list) or isinstance(value, (str, int, float, bool)):
+        return Obj("Static", {"value": expect(value, path)})
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BINDING_CASES | {"Bound"})
+    if tag == "Static":
+        raw = obj.get("value")
+        if "value" not in obj or raw is None:
+            _fail(WRONG_TYPE, f"{path}.value", f"expected {what} at {path}.value")
+        return Obj("Static", {"value": expect(raw, f"{path}.value")})
+    if tag == "Bound":
+        return _decode_binding_scalar(_require(obj, "binding", path), f"{path}.binding", expect, what)
+    return _normalise_binding_obj(obj, path)
+
+
+def _decode_binding_string(value: object, path: str) -> Value:
+    return _decode_binding_scalar(value, path, _expect_string, "a string")
+
+
+def _decode_binding_bool(value: object, path: str) -> Value:
+    return _decode_binding_scalar(value, path, _expect_bool, "a boolean")
+
+
+def _decode_binding_float(value: object, path: str) -> Value:
+    """A ``Binding<float>`` slot — §7's FLOAT accept set at a binding position.
+
+    Same machinery as the string/bool slots above, and deliberately so: §3.6's
+    bare-scalar coercion decides only that a bare scalar can only mean ``Static``
+    — the slot's own ``'T`` still governs the VALUE — so both arms (the
+    ``{"$type":"Static","value":X}`` envelope AND the bare scalar) route through
+    :func:`_decode_number`, which is the one place the accept set is written down.
+    """
+    return _decode_binding_scalar(value, path, _decode_number, "a number")
+
+
+def _decode_binding_int(value: object, path: str) -> Value:
+    """A ``Binding<int>`` slot — §7's INTEGER accept set at a binding position.
+
+    Its parser is :func:`_decode_integer`, NOT :func:`_decode_number`: the two
+    numeric slot classes accept different sets, and routing both through one
+    parser is precisely the defect this pair exists to prevent.
+    """
+    return _decode_binding_scalar(value, path, _decode_integer, "an integer")
+
+
+def _decode_select_option(value: object, path: str) -> Value:
+    """A single SelectOption record: ``{"label":<TextSource>,"value":"<str>"}``.
+
+    §3.6 lenient shape coercion: a bare JSON string ``"A"`` is the HTML
+    ``<select>`` prior and coerces to ``{"label":"A","value":"A"}``."""
+    if isinstance(value, str):
+        return Obj(None, {"label": value, "value": value})
+    obj = _expect_object(value, path)
+    label = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    opt_value = _expect_string(_require(obj, "value", path), f"{path}.value")
+    return Obj(None, {"label": label, "value": opt_value})
+
+
+def _decode_select_option_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_select_option(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_select_options(value: object, path: str) -> Value:
+    # `<opaque>` → a tagged one-element placeholder; `null` → the empty typed array.
+    opaque_placeholder = Arr([Obj(None, {"label": OPAQUE, "value": OPAQUE})])
+    return _typed_static_binding(value, path, _decode_select_option_array, opaque_placeholder, Arr([]))
+
+
+def _decode_binding_string_opt(value: object, path: str) -> Value:
+    # `<opaque>` → the scalar sentinel string; `null` → null (a genuine `None` option).
+    return _typed_static_binding(value, path, lambda v, p: _expect_string(v, p), OPAQUE, None)
+
+
+def _decode_string_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_string_list(value: object, path: str) -> Value:
+    # `<opaque>` → a one-element placeholder list; `null` → the empty typed array.
+    return _typed_static_binding(value, path, _decode_string_array, Arr([OPAQUE]), Arr([]))
+
+
+def _decode_float_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_number(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_float_seq(value: object, path: str) -> Value:
+    # Both `<opaque>` and `null` → the empty typed array (a seq has no placeholder element).
+    return _typed_static_binding(value, path, _decode_float_array, Arr([]), Arr([]))
+
+
+def _decode_map_marker(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    label = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    lat = _decode_number(_require(obj, "latitude", path), f"{path}.latitude")
+    lon = _decode_number(_require(obj, "longitude", path), f"{path}.longitude")
+    return Obj(None, {"label": label, "latitude": lat, "longitude": lon})
+
+
+def _decode_marker_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_map_marker(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_binding_marker_seq(value: object, path: str) -> Value:
+    # Both `<opaque>` and `null` → the empty typed array.
+    return _typed_static_binding(value, path, _decode_marker_array, Arr([]), Arr([]))
+
+
+def _decode_cell_format(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, CELL_FORMAT_CASES)
+    if tag == "Duration":
+        # Phase 819 — trendable duration cells: raw float counts `unit`s,
+        # rendered per `style`. Both fields required, typed against the closed
+        # enums (the canonical encoder emits alphabetical: style before unit).
+        unit = _enum(_require(obj, "unit", path), f"{path}.unit", DURATION_UNIT, "DurationUnit")
+        style = _enum(_require(obj, "style", path), f"{path}.style", DURATION_STYLE, "DurationStyle")
+        return Obj("Duration", {"style": style, "unit": unit})
+    if tag == "RelativeTime":
+        # Phase 819 — cell-vocabulary parity with `Format.RelativeTime`.
+        unit = _enum(_require(obj, "unit", path), f"{path}.unit", RELATIVE_TIME_UNIT, "RelativeTimeUnit")
+        return Obj("RelativeTime", {"unit": unit})
+    return from_json(value)
+
+
+GUEST_CHANNEL_DIRECTION = frozenset({"OutOnly", "TwoWay"})
+
+
+def _decode_guest_channel(value: object, path: str) -> Value:
+    """Mount's guest channel: ``direction`` is a closed DU (OutOnly | TwoWay);
+    ``messageShape`` is an optional string riding on TwoWay."""
+    obj = _expect_object(value, path)
+    direction = _expect_string(_require(obj, "direction", path), f"{path}.direction")
+    if direction not in GUEST_CHANNEL_DIRECTION:
+        _fail(
+            UNKNOWN_DU_CASE,
+            f"{path}.direction",
+            f"unknown channel direction '{direction}'",
+            "OutOnly | TwoWay",
+        )
+    result: dict[str, Value] = {"direction": direction}
+    if "messageShape" in obj:
+        result["messageShape"] = _expect_string(obj["messageShape"], f"{path}.messageShape")
+    return Obj(None, result)
+
+
+def _decode_json_passthrough(value: object, path: str) -> Value:
+    # Structural pass-through WITHOUT null-strictness — for positions that can
+    # legitimately carry a §5 obj-erased opaque seam (Mount inputs embed whole
+    # node trees, whose Binding.Static values may be null).
+    return from_json(value)
+
+
+def _from_json_strict(value: object, path: str) -> Value:
+    """``from_json`` for structured JVal positions (rule 12: the wire model has
+    no null). A JSON null at ANY depth rejects as ``WRONG_TYPE`` at the null's
+    exact path — matching the F# reference (``jsonToJValStrict``) and the
+    corpus ``reject-null-*`` fixtures. The plain ``from_json`` stays available
+    for the §5 obj-erased opaque seams (``Binding.Static.value``), where a
+    boxed null legitimately occurs."""
+    if value is None:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "null is not representable in the Fuaran wire model — omit the field instead",
+            "any JSON value except null (rule 12: the wire model has no null)",
+        )
+    if isinstance(value, bool) or isinstance(value, (float, str)):
+        return value
+    if isinstance(value, int):
+        # §2 rule 5 — integer identity in a rule-12 payload position stops at
+        # +/-(2^53-1), the range every host holds exactly. Beyond it a decoder
+        # MUST take the token as a double and accept the rounding: keeping
+        # Python's arbitrary-precision int would give this host a tree, and
+        # canonical bytes, that no other host can produce from the same
+        # document.
+        return value if -PAYLOAD_INT_MAX <= value <= PAYLOAD_INT_MAX else float(value)
+    if isinstance(value, list):
+        return Arr([_from_json_strict(item, f"{path}[{i}]") for i, item in enumerate(value)])
+    if isinstance(value, dict):
+        tag = value.get("$type")
+        if isinstance(tag, str):
+            return Obj(
+                tag,
+                {k: _from_json_strict(v, f"{path}.{k}") for k, v in value.items() if k != "$type"},
+            )
+        return Obj(None, {k: _from_json_strict(v, f"{path}.{k}") for k, v in value.items()})
+    raise TypeError(f"value is not a JSON-shaped object: {type(value)!r}")
+
+
+def _decode_json_value(value: object, path: str) -> Value:
+    # Custom props / contentHash / exposedNodeIds — structured JVal positions,
+    # null-strict per rule 12.
+    return _from_json_strict(value, path)
+
+
+def _decode_string(value: object, path: str) -> Value:
+    return _expect_string(value, path)
+
+
+def _decode_int(value: object, path: str) -> Value:
+    return _expect_int(value, path)
+
+
+def _decode_skeleton_rows(value: object, path: str) -> Value:
+    """``Skeleton.rows``, bounded by WIRE_FORMAT.md §21.9 (Phase 1666).
+
+    ``_expect_int`` decides FIRST, so §7.1's slot rule is untouched: a
+    fractional, non-finite or out-of-32-bit value is still a ``WRONG_TYPE`` and
+    never a limit breach. The bound then refuses a value the slot CAN hold but
+    the format will not carry the work of - a renderer emits one placeholder row
+    per count, so ``{"rows":100000000}`` names 10**8 rendered rows in a handful of
+    bytes. The two codes answer different questions and the ORDER is what keeps
+    them apart.
+
+    Upper bound only, deliberately: a negative count is an authoring defect
+    (``FUARAN152`` in the pre-emit family), not a resource breach.
+    """
+    rows = _expect_int(value, path)
+    if rows > MAX_SKELETON_ROWS:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"skeleton rows {rows} exceeds the maximum of {MAX_SKELETON_ROWS} (WIRE_FORMAT 21.9)",
+            f"at most {MAX_SKELETON_ROWS} rows on one Skeleton",
+        )
+    return rows
+
+
+def _decode_bool(value: object, path: str) -> Value:
+    return _expect_bool(value, path)
+
+
+def _enum_decoder(allowed: frozenset[str], name: str) -> Callable[[object, str], Value]:
+    def dec(value: object, path: str) -> Value:
+        return _enum(value, path, allowed, name)
+
+    return dec
+
+
+def _enum_aliased_decoder(
+    allowed: frozenset[str], aliases: dict[str, str], name: str
+) -> Callable[[object, str], Value]:
+    """A required bare-enum decoder that also accepts the §3.6 lenient-ingest aliases."""
+
+    def dec(value: object, path: str) -> Value:
+        return _enum_aliased(value, path, allowed, aliases, name)
+
+    return dec
+
+
+# ── Phase 460 omit-when-default (WIRE_FORMAT.md §3.6, decode-only) ──────────
+# A field whose absence restores an identity default. On the generic structural
+# model the encoder re-emits exactly the fields present, so byte-minimal canonical
+# output is achieved by DROPPING the field when it is absent OR carries the
+# identity default (a present explicit-default value still decodes — read-compat).
+# The `_DROP` sentinel tells `_decode_kind` to omit the field from the model.
+_DROP = object()
+
+
+def _omit_default_enum(
+    allowed: frozenset[str], aliases: dict[str, str], default: str, name: str
+) -> Callable[[object, str], object]:
+    def dec(value: object, path: str) -> object:
+        v = _enum_aliased(value, path, allowed, aliases, name)
+        return _DROP if v == default else v
+
+    return dec
+
+
+def _omit_default_format(value: object, path: str) -> object:
+    v = _decode_cell_format(value, path)
+    return _DROP if isinstance(v, Obj) and v.tag == "None" else v
+
+
+def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
+    """0.2.0 behavioural omit-when-default: the flag is omitted at its default
+    on BOTH boundaries (`Toast.dismissable` is the one omit-when-TRUE)."""
+
+    def dec(value: object, path: str) -> object:
+        b = _expect_bool(value, path)
+        return _DROP if b == default else b
+
+    return dec
+
+
+def _omit_default_binding_static_int(default: int) -> Callable[[object, str], object]:
+    """Phase 1585 — a ``Binding<int>`` slot omitted at the identity
+    ``Static(<default>)``.
+
+    The sibling of :func:`_omit_default_bool`, and the differences are the whole
+    reason it is its own function. A bool default has two inhabitants, so
+    "is it the default" and "which case is it" are the same question; a binding
+    default is one inhabitant of a union whose payload domain is unbounded, so
+    the test is on the CASE **and** its PAYLOAD — a ``Static`` carrying any other
+    index must survive, and so must every ``State`` / ``Filter`` / ``Selection``
+    / ``Query`` binding. Dropping on the tag alone would silently discard a
+    document's authored tab.
+
+    ``type(...) is int`` rather than ``== default``: Python makes ``False == 0``
+    and ``0.0 == 0`` both true, and the wire decoder above has already refused a
+    mistyped payload, so the only way one reaches here is a shape this function
+    must not quietly absorb.
+    """
+
+    def dec(value: object, path: str) -> object:
+        v = _decode_binding_int(value, path)
+        if isinstance(v, Obj) and v.tag == "Static":
+            payload = v.fields.get("value")
+            if type(payload) is int and payload == default:
+                return _DROP
+        return v
+
+    return dec
+
+
+def _decode_emphasis_enum(value: object, path: str) -> str:
+    """The `Emphasis` style ENUM, with the §3.6 aliases and the cross-vocabulary
+    bool projection (true ⇒ Loud, false ⇒ Normal)."""
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, bool):
+        return "Loud" if value else "Normal"
+    return _enum_aliased(value, path, EMPHASIS, EMPHASIS_ALIASES, "emphasis")
+
+
+def _omit_default_emphasis_enum(value: object, path: str) -> object:
+    v = _decode_emphasis_enum(value, path)
+    return _DROP if v == "Normal" else v
+
+
+def _decode_emphasis_flag(value: object, path: str) -> object:
+    """The behavioural `emphasis` BOOL (Fact / LabelValueRow) — the other half
+    of the same-name collision with the `Emphasis` style enum: booleans pass
+    through; the enum AND its aliases project one-to-one; any other string is
+    the didactic reject naming both vocabularies. 0.2.2 — omitted-when-false."""
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, str):
+        if value in _EMPHASIS_TRUE:
+            b = True
+        elif value in _EMPHASIS_FALSE:
+            b = False
+        else:
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"expected JSON boolean, got '{value}' — this `emphasis` is a BOOL (is this an "
+                "emphasised row/fact?); the Emphasis style enum (Quiet|Normal|Loud) lives on "
+                "style/Metric.emphasis. Write true or false",
+                "JSON boolean",
+            )
+            raise AssertionError("unreachable")
+    else:
+        b = _expect_bool(value, path)
+    return _DROP if not b else True
+
+
+def _omit_default_width(value: object, path: str) -> object:
+    # ColumnWidth is a closed `$type` DU; `Auto` is the identity. Non-Auto widths
+    # pass through structurally (validated discriminator).
+    obj = _expect_object(value, path)
+    if "$type" not in obj:
+        _fail(MISSING_FIELD, f"{path}.$type", "missing $type discriminator")
+    if obj.get("$type") == "Auto":
+        return _DROP
+    return from_json(value)
+
+
+# ── Image srcSet + MediaKind (WIRE_FORMAT §3.6.4 / §3.6.6) ─────────────────
+
+
+def _decode_srcset_entry(value: object, path: str) -> Value:
+    """One ``SrcSetEntry`` — ``{"src":<Binding<string>>,"width":<positive int>}``.
+
+    Both members are required *within* the entry. ``width`` is the ``w``
+    descriptor a client selects on, and the POSITIVE floor is a decode rule
+    rather than a validator one: zero is refused as firmly as a negative,
+    because a ``0w`` candidate is not a small image but one a client can never
+    select — admitting it would let the wire state a rendition no host can
+    render. The published schema says the same thing as ``minimum: 1``.
+    """
+    obj = _expect_object(value, path)
+    src = _decode_binding_string(_require(obj, "src", path), f"{path}.src")
+    width = _expect_int(_require(obj, "width", path), f"{path}.width")
+    if width <= 0:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.width",
+            f"srcSet width must be a POSITIVE integer pixel width, got {width}",
+            "JSON number (positive integer pixel width)",
+        )
+    return Obj(None, {"src": src, "width": width})
+
+
+def _decode_srcset(value: object, path: str) -> object:
+    """``Image.srcSet`` — the MISSING-LIST-FIELD decode class, and the one slot in
+    this decoder most worth reading.
+
+    An ABSENT ``srcSet`` is the EMPTY LIST: on the structural model that is the
+    key simply not being carried, which is exactly what the empty list denotes,
+    so the two spellings are one document by construction. An EMPTY array
+    therefore ``_DROP``s to the same shape (the encode half of the rule), and a
+    present ``null`` is REFUSED rather than read as absence — absence already has
+    a spelling, and admitting a second would let two conformant hosts emit
+    different canonical bytes for one document.
+
+    The array ORDER is the author's and is preserved verbatim. Canonicalisation
+    sorts object KEYS (§2) and never array elements; a codec that sorted here
+    would emit bytes it did not decode. Ascending-by-width is the RENDERER's
+    canonicalisation, and putting the sort there is what lets both rules be true.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_decode_srcset_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_track_entry(value: object, path: str) -> Value:
+    """One ``TrackEntry`` — the STRICTEST record on the wire (fuaran#1110).
+
+    Four of the five members are required: ``kind``, ``label``, ``src`` and
+    ``srcLang``. Only ``default`` is optional, and it is the ordinary
+    omitted-at-``false`` bool, refused rather than coerced when it carries a
+    stringified boolean — the ``Image.expandable`` ruling one level further in,
+    at the position a host decoding array elements with a looser walker than its
+    records would get wrong.
+
+    ``srcLang`` is required on EVERY kind, where HTML makes ``srclang``
+    mandatory only on a subtitles track. The extra strictness costs an author
+    one value and buys a menu a user agent can order, a speech engine can
+    pronounce and a reader can tell apart; a track with no language is one
+    nothing downstream can route, and there is no value to default to that would
+    not be an invented claim about someone else's recording.
+
+    ``label`` is required for the reason ``MediaSpec.label`` is: it is the entry
+    a user agent puts in its track menu and the only thing distinguishing one
+    track from another there. The wire requires the MEMBER; the empty value that
+    satisfies the requirement while meaning nothing is an authoring-gate matter
+    (FUARAN113), not a decode one.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "default" in obj and _expect_bool(obj["default"], f"{path}.default"):
+        fields["default"] = True
+    fields["kind"] = _enum(_require(obj, "kind", path), f"{path}.kind", TRACK_KIND, "track kind")
+    fields["label"] = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    fields["src"] = _decode_binding_string(_require(obj, "src", path), f"{path}.src")
+    fields["srcLang"] = _expect_string(_require(obj, "srcLang", path), f"{path}.srcLang")
+    return Obj(None, fields)
+
+
+def _decode_upload_destination(value: object, path: str) -> Value:
+    """``FileUploadSpec.destination`` — a NAME, and a name because it must never
+    be an ADDRESS (fuaran#1117).
+
+    The string is an id the host has registered with its own upload sink; it is
+    not a URL, not a path, not a template, and nothing on this member is ever
+    fetched or joined to a base. A wire document comes from an arbitrary emitter,
+    and a URL here would let that emitter choose where a reader's file goes.
+
+    The EMPTY STRING is REFUSED rather than read as absence: it is a name no host
+    registers, so a document carrying it describes an upload that can never
+    stream, and reading it as absence silently turns an upload the author meant
+    to stream into a client-only one — with every visible thing about the control
+    still working.
+
+    An UNREGISTERED non-empty id is NOT a decode refusal, and that division is
+    deliberate: whether an id is registered is a fact about the HOST, not about
+    the document, so a decoder that judged it would make one document's validity
+    depend on who was reading it. The refusal belongs at dispatch.
+    """
+    text = _expect_string(value, path)
+    if text == "":
+        _fail(
+            WRONG_TYPE,
+            path,
+            "destination must be a non-empty host-registered id — the empty string is a name no "
+            "host registers, so it describes an upload that can never stream (WIRE_FORMAT §3.6.20)",
+            "non-empty string (a host-registered destination id)",
+        )
+    return text
+
+
+def _decode_upload_ceiling(name: str) -> Callable[[object, str], Value]:
+    """``FileUploadSpec.maxBytes`` / ``.maxFiles`` — a declared ceiling
+    (fuaran#1548).
+
+    Two rules compose, in this order, and the order is the content. The value
+    goes through the INTEGER-slot choke point first, so §7.1 decides the shape:
+    a fractional value is not truncated, a sentinel string is refused, and a
+    value beyond the signed 32-bit slot is a ``WRONG_TYPE`` naming the slot's
+    width rather than a number silently wrapped into one the author never wrote.
+    Only then does the POSITIVE floor decide the sign.
+
+    Zero is refused as firmly as a negative, on the ``SrcSetEntry.width`` rule
+    exactly: a ceiling of zero is not a small ceiling, it is a control that can
+    accept no file at all, so the document describes a control that cannot
+    exist. The author who means "no ceiling" OMITS the member — that is how this
+    wire spells it, and reading ``0`` as absence would be the coercion the rule
+    exists to refuse. The published schema says the same thing as ``minimum: 1``.
+    """
+
+    def dec(value: object, path: str) -> Value:
+        n = _integer_slot(value, path)
+        if not isinstance(n, int) or n <= 0:
+            _fail(
+                WRONG_TYPE,
+                path,
+                f"{name} must be a POSITIVE integer ceiling, got {n}",
+                "JSON number (a positive integer ceiling)",
+            )
+        return n
+
+    return dec
+
+
+def _decode_tracks(value: object, path: str) -> object:
+    """``MediaSpec.tracks`` — the MISSING-LIST-FIELD decode class again, on the
+    ``Image.srcSet`` rule exactly (see :func:`_decode_srcset` for why absent,
+    empty and ``null`` are three different answers and only two of them decode).
+
+    The array ORDER is the author's and is preserved verbatim — and here that is
+    a rule the RENDERER also keeps, which is the opposite of ``srcSet``'s. A
+    browser picks ONE candidate from a srcset by an algorithm, so ordering it is
+    canonicalisation; a reader picks a track from a menu the user agent builds in
+    document order, so ordering it would be rewriting someone else's menu.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_decode_track_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_permissions(value: object, path: str) -> object:
+    """``EmbedSpec.permissions`` — the MISSING-LIST-FIELD class once more, and
+    here the empty list carries a second meaning worth naming: it is TOTAL
+    DENIAL.
+
+    Absent MEANS the empty list, an empty array drops back to absence, and a
+    present ``null`` is refused, because absence already has a spelling. The
+    order is the DOCUMENT'S and is carried verbatim — a JSON array is ordered
+    data, and re-sorting it here would make this decoder's re-encode differ from
+    the bytes it read. Emitting the tokens in a canonical order is the
+    RENDERER's obligation, not the codec's.
+    """
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_enum(item, f"{path}[{i}]", EMBED_PERMISSION, "permission") for i, item in enumerate(items)])
+
+
+# ── Tree items (fuaran#1120) ────────────────────────────────────────────────
+#
+# §21.5 — ``TreeItem`` is a THIRD recursive axis, arriving exactly the way
+# ``TreeOp.Batch`` did. A tree's rows nest inside ONE node, so the node bound
+# cannot see them however deep they go, and at roughly two JSON levels per row
+# the syntactic bound is not reached either — the same two false comforts, at a
+# new slot. The FIGURE is ``MAX_NODE_DEPTH``, reused rather than a sixth limit
+# minted: these frames cost what the node decoder's frames cost.
+#
+# A ``ContextVar`` rather than a module global — see the note on ``_walk_depth``.
+_item_depth: ContextVar[int] = ContextVar("fuaran_item_depth", default=0)
+
+
+def _decode_tree_item(value: object, path: str) -> Value:
+    """One row of a ``Tree``.
+
+    ``id`` and ``label`` are required; ``children`` omits at the EMPTY LIST and
+    ``icon`` when absent, so a leaf carries two keys and nothing else — which is
+    most of a real hierarchy, and a host emitting ``"children":[]`` on a leaf
+    produces different bytes for most of a file listing.
+
+    ``id`` is required because it is what the two State slots NAME. Row ids must
+    be unique within one tree, but that is an EMIT-side obligation rather than a
+    decode refusal: duplicate detection is a whole-tree property, a decoder
+    streaming a document is not required to carry the id set, and there is no
+    error code for it.
+
+    The nested walker is THIS SAME FUNCTION, deliberately — the corpus's third
+    reject vector sits one level DOWN precisely because a host whose child walker
+    is looser than its root walker passes the other two.
+    """
+    if _item_depth.get() >= MAX_NODE_DEPTH:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"tree-item nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
+        )
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "children" in obj:
+        items = _expect_array(obj["children"], f"{path}.children")
+        if items:
+            token = _item_depth.set(_item_depth.get() + 1)
+            try:
+                fields["children"] = Arr([_decode_tree_item(c, f"{path}.children[{i}]") for i, c in enumerate(items)])
+            finally:
+                _item_depth.reset(token)
+    if "icon" in obj:
+        fields["icon"] = _expect_string(obj["icon"], f"{path}.icon")
+    fields["id"] = _expect_string(_require(obj, "id", path), f"{path}.id")
+    fields["label"] = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    known = frozenset({"children", "icon", "id", "label"})
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj(None, fields)
+
+
+def _decode_tree_items(value: object, path: str) -> Value:
+    """A ``Tree``'s root row list. Required and never dropped — a tree with no
+    rows is still a tree, where an absent ``items`` is a document that never said
+    what it holds."""
+    items = _expect_array(value, path)
+    _item_depth.set(0)
+    return Arr([_decode_tree_item(item, f"{path}[{i}]") for i, item in enumerate(items)])
+
+
+def _decode_media_kind(value: object, path: str) -> Value:
+    """``MediaSpec.kind`` — which playback surface this is.
+
+    ``$type``-discriminated, so an unknown case reports at ``<path>.$type`` (the
+    ``Binding`` / ``TextSource`` position) rather than at the bare slot.
+
+    ``Audio`` declares NO fields, and the absence of an autoplay slot is stronger
+    than a default of ``false``: a slot that defaults to off is one a document
+    can switch on, and there is no document this format wants to be able to state
+    in which a page begins making sound unbidden. A carried
+    ``{"$type":"Audio","autoplay":true}`` therefore decodes to an audio surface
+    that does not autoplay, because the value has nowhere to land — it is dropped
+    rather than preserved structurally, since carrying it forward would re-mint
+    on the wire exactly the pathway the case exists not to have.
+    """
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, MEDIA_KIND_CASES)
+    if tag == "Audio":
+        return Obj("Audio", {})
+    fields: dict[str, Value] = {}
+    # Omitted at `false`, and a present non-boolean is refused rather than
+    # coerced — the `Image.expandable` ruling, on the slot where getting it wrong
+    # starts playing a video the document says not to.
+    if "autoplay" in obj:
+        autoplay = _expect_bool(obj["autoplay"], f"{path}.autoplay")
+        if autoplay:
+            fields["autoplay"] = True
+    if "poster" in obj:
+        fields["poster"] = _decode_binding_string(obj["poster"], f"{path}.poster")
+    return Obj("Video", fields)
+
+
+def _alias_get(obj: dict, canonical: str, aliases: tuple[str, ...]) -> tuple[object, bool]:
+    """Field-name aliasing (WIRE_FORMAT §3.6, decode-only): the canonical name wins
+    when both are present; otherwise the first present alias supplies the value."""
+    if canonical in obj:
+        return obj[canonical], True
+    for a in aliases:
+        if a in obj:
+            return obj[a], True
+    return None, False
+
+
+# The `Format` cases with a TOTAL, LOCALE-INDEPENDENT inverse — the only ones a
+# `Binding.Local` may declare as its edit-buffer codec (WIRE_FORMAT.md Section
+# 3.3.3). `Binding.Format` carries a `LocaleSource` because it renders for
+# READING; a `Local` codec carries none, because whatever it renders it must
+# also parse back from what the reader typed. `Currency` prepends a
+# locale-chosen symbol, `Date`'s four styles are locale renditions, and
+# `RelativeTime` / `Since` / `Duration` render a phrase rather than a number.
+# `Percent` is refused for a narrower reason worth recording, since it looks
+# admissible: its inverse needs a x100 scale whose IEEE round-trip is not exact.
+_LOCAL_CODEC_CASES = frozenset({"Number"})
+
+
+def _decode_local_binding(obj: dict, path: str) -> Value:
+    """Decode ``Binding.Local``, with the two refusals its declarative half carries.
+
+    Everything else about the case passes through structurally, exactly as it did
+    before the declarative members existed: ``flushOn`` and ``initialFrom`` were
+    always wire-carried, and ``format`` / ``onCommit`` / ``parse`` are the
+    ``"<closure>"`` sentinels a re-encode reproduces verbatim.
+
+    What is new is that two members are DATA — ``codec`` and ``commitTo`` — and
+    each brings a refusal that structure alone cannot make:
+
+    * a ``codec`` whose ``Format`` case has no total, locale-independent
+      inverse. Admitted silently it would give a buffer that formats one way and
+      parses another, which is the round-trip hole the members exist to close.
+    * ``onCommit`` and ``commitTo`` together. Not resolved by a precedence rule,
+      because the wire cannot carry the closure at all: a host honouring one and
+      a host honouring the other would write to different places from identical
+      bytes.
+    """
+    codec = obj.get("codec")
+    if codec is not None:
+        codec_obj = _expect_object(codec, f"{path}.codec")
+        case = codec_obj.get("$type")
+        if not isinstance(case, str) or case not in _LOCAL_CODEC_CASES:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.codec",
+                "Binding.Local 'codec' must be a Format case with a total, locale-independent"
+                " inverse - only 'Number' has one",
+                'use {"$type":"Number","decimals":2}, or drop the codec and let the buffer use the'
+                " identity; a locale-rendered format (Currency / Date / RelativeTime / Since /"
+                " Duration) cannot be parsed back from what the reader typed",
+            )
+    if "commitTo" in obj:
+        if "onCommit" in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.commitTo",
+                "Binding.Local carries both 'onCommit' and 'commitTo' - exactly one commit destination is allowed",
+                "either 'onCommit' (a host closure, which crosses the wire only as the closure"
+                " sentinel) or 'commitTo' (the State key the flush writes); a decoding host can"
+                " honour only the second, so keeping both makes the same document commit to two"
+                " different places depending on who read it",
+            )
+        _expect_string(obj["commitTo"], f"{path}.commitTo")
+    return from_json(obj)
+
+
+def _normalise_binding_obj(
+    obj: dict,
+    path: str,
+    *,
+    on_default: Callable[[object, str], Value] | None = None,
+) -> Value:
+    """Normalise a non-``Static`` binding case to its 0.2.0 canonical shape.
+
+    Query: ``dependsOn`` ← ``deps`` / ``dependencies`` (§3.6), omitted when
+    empty; the retired ``accessor`` sentinel is dropped (0.2.0). Selection:
+    ``accessor`` dropped; ``defaultValue`` (0.2.9) + ``field`` (Phase 632)
+    preserved. State: ``defaultValue`` ← ``initialValue`` / ``default``. Now:
+    tag-only (``{"$type":"Now"}`` — no fields survive re-encode).
+    Transform: ``params`` map form coerces to the canonical ``[{from,name}]``
+    array (name-keyed set, §3.6), ``value`` aliases ``from`` at the element,
+    and the embedded source + pipeline normalise through the columnar codec.
+    Everything else passes through structurally (validated discriminator).
+
+    ``on_default`` decodes the ``defaultValue`` payload of the value-carrying arms
+    with a slot's typed parser instead of the structural :func:`from_json` — see
+    :func:`_typed_static_binding`'s ``typed_default``."""
+    decode_default = on_default if on_default is not None else (lambda raw, _p: from_json(raw))
+    tag = obj.get("$type")
+    if not isinstance(tag, str):
+        return from_json(obj)
+    if tag == "Query":
+        name = _expect_string(_require(obj, "name", path), f"{path}.name")
+        fields: dict[str, Value] = {}
+        depends_raw, depends_present = _alias_get(obj, "dependsOn", ("deps", "dependencies"))
+        if depends_present:
+            arr = _expect_array(depends_raw, f"{path}.dependsOn")
+            if arr:
+                fields["dependsOn"] = Arr([_expect_string(d, f"{path}.dependsOn[{i}]") for i, d in enumerate(arr)])
+        fields["name"] = name
+        return Obj("Query", fields)
+    if tag == "Selection":
+        node_id = _expect_string(_require(obj, "nodeId", path), f"{path}.nodeId")
+        fields = {}
+        if "defaultValue" in obj:
+            fields["defaultValue"] = decode_default(obj["defaultValue"], f"{path}.defaultValue")
+        if "field" in obj:
+            fields["field"] = _expect_string(obj["field"], f"{path}.field")
+        fields["nodeId"] = node_id
+        return Obj("Selection", fields)
+    if tag == "State":
+        key = _expect_string(_require(obj, "key", path), f"{path}.key")
+        fields = {}
+        default_raw, default_present = _alias_get(obj, "defaultValue", ("initialValue", "default"))
+        # Phase 677 — an explicit null default is absence, same as omitting it.
+        if default_present and default_raw is not None:
+            fields["defaultValue"] = decode_default(default_raw, f"{path}.defaultValue")
+        fields["key"] = key
+        return Obj("State", fields)
+    if tag == "Now":
+        # The host-furnished current INSTANT is never on the wire: the clock
+        # lives in the HOST, resolved once per render pass. Phase 1533 — the
+        # declared ``grain`` is the one wire field, optional, absent meaning
+        # ``Second``, so a grain-less ``Now`` is still the bare
+        # ``{"$type":"Now"}``. Present-but-unreadable is a REFUSAL rather than a
+        # silent fallback to the default: a document that names a grain the host
+        # cannot honour must not be rendered at a neighbouring resolution in
+        # silence.
+        if "grain" in obj:
+            grain = _enum(obj["grain"], f"{path}.grain", TIME_GRAIN, "TimeGrain")
+            return Obj("Now", {"grain": grain})
+        return Obj("Now", {})
+    if tag == "Local":
+        return _decode_local_binding(obj, path)
+    if tag == "Transform":
+        return _decode_transform_binding(obj, path)
+    if tag == "Expr":
+        return _decode_expr_binding(obj, path)
+    return from_json(obj)
+
+
+def _expr_walk(expr: object, seen: list[str], counter: list[int]) -> bool:
+    """Walk one decoded ``ColExpr`` value, collecting its ``param`` names and
+    counting its nodes. Returns True when a ``col`` reference is present.
+
+    One traversal answers both questions the ``Expr`` case asks of an
+    expression, and it stops as soon as either verdict is settled - a hostile
+    expression is exactly the input that must not be walked to the end.
+    """
+    counter[0] += 1
+    if counter[0] > MAX_EXPR_NODES:
+        return False
+    if not isinstance(expr, Obj):
+        return False
+    tag = expr.tag
+    if tag == "col":
+        return True
+    if tag == "param":
+        name = expr.fields.get("name")
+        if isinstance(name, str) and name not in seen:
+            seen.append(name)
+        return False
+    saw_col = False
+    for key in ("expr", "left", "right", "else"):
+        child = expr.fields.get(key)
+        if child is not None and _expr_walk(child, seen, counter):
+            saw_col = True
+    for key in ("exprs", "args", "items"):
+        children = expr.fields.get(key)
+        if isinstance(children, Arr):
+            for child in children.items:
+                if _expr_walk(child, seen, counter):
+                    saw_col = True
+    cases = expr.fields.get("cases")
+    if isinstance(cases, Arr):
+        for branch in cases.items:
+            if isinstance(branch, Obj):
+                for key in ("when", "then"):
+                    child = branch.fields.get(key)
+                    if child is not None and _expr_walk(child, seen, counter):
+                        saw_col = True
+    if tag == "in":
+        # The `in`/`param` spelling names a LIST param in a `param` MEMBER
+        # rather than in a nested `param` node, so the walk above cannot see it.
+        param = expr.fields.get("param")
+        if isinstance(param, str) and param not in seen:
+            seen.append(param)
+    return saw_col
+
+
+def _check_pipeline_expr_bound(pipeline: Value, path: str) -> None:
+    """Phase 1662 - §21.8's node bound over the expressions a ``Binding.Transform``
+    PIPELINE embeds.
+
+    ``MAX_EXPR_NODES`` bounded ``Binding.Expr`` alone until now, which made it
+    bypassable by wrapping the expression in a Transform: a ``derive``'s
+    expression and a ``filter``'s predicate reach the same evaluator and carried
+    no ceiling on any host.
+
+    ``filter`` and ``derive`` are the whole surface - the only pipeline steps
+    carrying an expression; a ``join`` / ``union`` / ``intersect`` / ``except``
+    operand is a data source (embedded table or named ref), never another
+    pipeline - so there is no recursive axis to descend.
+
+    Same budget, counted per EMBEDDED EXPRESSION, refused with ``LIMIT_EXCEEDED``
+    at the path of the offending ``pred`` / ``expr`` member so an author is told
+    which STEP to come back under. The first breach wins. Reads the ENCODED step
+    values, which is the one form both the live-source and snapshot arms produce.
+    """
+    if not isinstance(pipeline, Arr):
+        return
+    for i, step in enumerate(pipeline.items):
+        if not isinstance(step, Obj):
+            continue
+        slot = "pred" if step.tag == "filter" else "expr" if step.tag == "derive" else None
+        if slot is None:
+            continue
+        expr = step.fields.get(slot)
+        if expr is None:
+            continue
+        counter = [0]
+        _expr_walk(expr, [], counter)
+        if counter[0] > MAX_EXPR_NODES:
+            _fail(
+                LIMIT_EXCEEDED,
+                f"{path}.pipeline[{i}].{slot}",
+                f"expression exceeds the maximum of {MAX_EXPR_NODES} expression nodes (WIRE_FORMAT 21.8)",
+                f"at most {MAX_EXPR_NODES} ColExpr nodes in one pipeline expression",
+            )
+
+
+def _decode_expr_binding(obj: dict[str, object], path: str) -> Value:
+    """Phase 1534 - ``Binding.Expr``: one ``ColExpr`` evaluated against its params
+    alone (WIRE_FORMAT §3.3.2).
+
+    ``expr`` rounds through the typed expression codec, so a lenient spelling
+    re-encodes canonical exactly as a pipeline step does. Three refusals follow,
+    all of them here because each wants a $-rooted path and a code:
+
+    1. a ``col`` reference - an ``Expr`` has no row, so ``col`` names nothing.
+       The remedy is a different BINDING, not a different spelling, and the
+       message says so.
+    2. a ``param`` this binding's own ``params`` does not bind. Decidable
+       statically here where it is NOT for ``Transform``, whose unbound filter
+       params are pruned under the deliberate "unset chip => no constraint"
+       leniency; an ``Expr`` has no step to prune, so an unbound param is only
+       ever an error.
+    3. an expression over ``MAX_EXPR_NODES`` - ``LIMIT_EXCEEDED``, so a
+       pathological expression is refused identically on every host instead of
+       being a budget each host's evaluator discovers differently.
+    """
+    from ..dataframe.codec import decode_expr, encode_expr_value
+
+    expr_raw = _require(obj, "expr", path)
+    expr_result = decode_expr(expr_raw)
+    if not expr_result.ok:
+        _fail(WRONG_TYPE, f"{path}.expr", f"{expr_result.error.code}: {expr_result.error.detail}")
+        raise AssertionError("unreachable")
+    expr = encode_expr_value(expr_result.value)
+
+    names: list[str] = []
+    counter = [0]
+    saw_col = _expr_walk(expr, names, counter)
+    if saw_col:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.expr",
+            "a `col` reference is not admitted inside an Expr binding - an Expr evaluates against its "
+            "params alone and has no row for a column name to read. Use `Binding.Transform`, whose "
+            "source supplies the frame, and put the column expression in a `derive` step",
+            "a ColExpr over `param` / `lit` / operators only (no `col`)",
+        )
+    if counter[0] > MAX_EXPR_NODES:
+        _fail(
+            LIMIT_EXCEEDED,
+            f"{path}.expr",
+            f"expression exceeds the maximum of {MAX_EXPR_NODES} expression nodes (WIRE_FORMAT 21)",
+            f"at most {MAX_EXPR_NODES} ColExpr nodes in one Expr binding",
+        )
+
+    fields: dict[str, Value] = {"expr": expr}
+    bound: set[str] = set()
+    if "params" in obj:
+        entries = _decode_expr_params(obj["params"], path)
+        for entry in entries:
+            assert isinstance(entry, Obj)
+            name = entry.fields.get("name")
+            if isinstance(name, str):
+                bound.add(name)
+        if entries:
+            fields["params"] = Arr(entries)
+
+    missing = [n for n in names if n not in bound]
+    if missing:
+        listed = ", ".join(f"'{n}'" for n in missing)
+        _fail(
+            WRONG_TYPE,
+            f"{path}.expr",
+            f"the expression reads param(s) {listed} that this binding's `params` does not bind - an "
+            "Expr has no rows and no filter to prune, so an unbound param has no value to take; add a "
+            "params entry naming each, or drop the reference",
+            '{"$type":"Expr","expr":{...},"params":[{"name":"<name>","from":<Binding>}]}',
+        )
+    return Obj("Expr", fields)
+
+
+def _decode_expr_params(raw_params: object, path: str) -> list[Value]:
+    """Phase 1534 - the optional ``params`` slot, shared by ``Transform`` (Phase
+    424, where it started) and ``Expr``. The §3.6 name->binding MAP coercion
+    rides along, so the leniency an author gets on one case they get on the
+    other."""
+    entries: list[Value] = []
+    if isinstance(raw_params, dict):
+        # Map form - a name-keyed set, coerced to the canonical array in key
+        # order (deterministic: F# Map.toList is key-sorted).
+        for name in sorted(raw_params):
+            binding = _decode_binding(raw_params[name], f"{path}.params.{name}.from")
+            entries.append(Obj(None, {"from": binding, "name": name}))
+        return entries
+    arr = _expect_array(raw_params, f"{path}.params")
+    for i, el in enumerate(arr):
+        el_obj = _expect_object(el, f"{path}.params[{i}]")
+        name = _expect_string(_require(el_obj, "name", f"{path}.params[{i}]"), f"{path}.params[{i}].name")
+        from_raw, from_present = _alias_get(el_obj, "from", ("value",))
+        if not from_present:
+            _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
+        binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
+        entries.append(Obj(None, {"from": binding, "name": name}))
+    return entries
+
+
+def _normalise_transform_source(raw: object) -> object:
+    """fuaran#815 — organic-demand leniencies for the Transform ``source`` slot,
+    both observed cross-family (the Tier-D pilot, 2026-08-13): models bind a
+    derived value to a Transform whose source is
+    ``{"$type":"State","defaultValue":[{row},…]}``. Two universal priors,
+    accommodated as typed data at THIS host bridge, before the columnar codec
+    sees the value (the Phase 633 ``Bound``-unwrap precedent — no wire-spec
+    change, no new key). Mirror of the F# ``normaliseTransformSource``:
+
+    1. a ``State``/``Static``/``Bound`` binding WRAPPER around the data unwraps
+       to its ``defaultValue``/``value`` (initial-snapshot semantics — a LIVE
+       state-sourced Transform is deliberately not this). A wrapper carrying
+       neither passes through UNCHANGED. It used to fail in the columnar decode
+       (``reject/reject-transform-source-empty-wrapper``, retired by
+       fuaran#1085); §16 now ACCEPTS the bare ``State`` wrapper as a live source
+       over the empty snapshot, and ``_decode_transform_binding`` takes that arm
+       BEFORE reaching this normalisation — so the pass-through here is reached
+       only by the ``Static`` / ``Bound`` spellings, which name no live slot and
+       still fail;
+    2. ROW-MAJOR data (an array of row objects) transposes to the canonical
+       columnar ``{"columns": …}`` shape — FIRST-row key set (sorted ordinal
+       ascending, the F# Map ordering), absent cells (and non-object rows)
+       filled with JSON null. Canonical columnar and ``ref`` sources pass
+       through untouched, so existing fixtures stay byte-identical.
+
+    Ragged / mixed-type rows may still fail downstream — deliberately not
+    special-cased."""
+    unwrapped = raw
+    if isinstance(raw, dict) and raw.get("$type") in ("State", "Static", "Bound"):
+        if "defaultValue" in raw:
+            unwrapped = raw["defaultValue"]
+        elif "value" in raw:
+            unwrapped = raw["value"]
+    if isinstance(unwrapped, list) and unwrapped and isinstance(unwrapped[0], dict):
+        rows = unwrapped
+        columns = {k: [row.get(k) if isinstance(row, dict) else None for row in rows] for k in sorted(rows[0])}
+        return {"columns": columns}
+    return unwrapped
+
+
+def _decode_transform_binding(obj: dict, path: str) -> Value:
+    """The `Binding.Transform` case (Phase 282/424): `source` + `pipeline`
+    normalise through the columnar codec (`fuaran_ui.dataframe`), which owns the
+    lenient columnar/expression ingest; `params` carries the §3.6 map coercion +
+    the `value` ← `from` element alias. The `source` value first rounds through
+    the fuaran#815 wrapper/row-major normalisation (`_normalise_transform_source`).
+
+    fuaran#818 — a binding-shaped source (State / Selection / Query ``$type``) is
+    PRESERVED as the live source: the decoded binding sits in the ``source`` slot
+    verbatim (canonical re-encode is byte-for-byte — one wire dialect) and the
+    compute evaluator re-derives against the current store, falling back to the
+    initial snapshot from the binding's carried default data. A State wrapper
+    carrying NO data — the bare ``{"$type":"State","key":k}`` — is a live source
+    over the EMPTY initial snapshot (§16), and a State wrapper's carried data is
+    snapshot-VALIDATED here so the ragged-rows didactic stays byte-identical to
+    the snapshot era."""
+    source_raw_orig = _require(obj, "source", path)
+    pipeline_raw = _require(obj, "pipeline", path)
+    live_tag = source_raw_orig.get("$type") if isinstance(source_raw_orig, dict) else None
+    preserved = live_tag in ("State", "Selection", "Query")
+    # Phase 1656 — a ``null`` member is a SPELLING OF ABSENCE (§5), so it carries
+    # nothing. It did not read that way before: a present ``None`` satisfied the
+    # membership test and is not ``[]``, so it fell to the snapshot branch and was
+    # validated as carried data. The reference host never had the defect because it
+    # reads the DECODED binding's default, where every spelling of absence has
+    # already collapsed to one value; this reads the raw member, so it has to name
+    # them.
+    has_carried = isinstance(source_raw_orig, dict) and source_raw_orig.get("defaultValue") is not None
+    # §16 / §24.4 — an EMPTY carried array is the EMPTY TABLE, not a malformed
+    # source. An initially-empty live collection ("count the requests in an
+    # empty log") is a complete intent with zero rows and no columns to infer,
+    # and under §24.4 it is also how a reader spells "I read this key and carry
+    # no data of my own" while a SIBLING reader's declaration seeds the slot.
+    # Sending it through the columnar codec instead ACCUSES it: a bare ``[]``
+    # has no first row to transpose from, so it reaches ``decode_source_json``
+    # as an array and surfaces ``MALFORMED_SHAPE: expected object, got array``
+    # against a document the reference hosts decode — which is what kept
+    # ``nodes/shared-source-seeded-pair`` red on this host. The binding is
+    # preserved exactly as the carried-data arm preserves it; only the snapshot
+    # VALIDATION is skipped, because an empty array has nothing to validate.
+    # §16 (fuaran#1085) — an ABSENT ``defaultValue`` takes the same arm. The bare
+    # ``{"$type":"State","key":k}`` is a live source over the EMPTY initial
+    # snapshot, exactly as a Selection / Query source already was. It surfaced
+    # the columnar codec's missing-field didactic until now, which was correct
+    # while nothing else could fill the slot; under §24.4 a sibling reader's
+    # declaration fills it, so the refusal was rejecting the most direct spelling
+    # of "I read this key and carry no data of my own" — the one ``FUARAN106``'s
+    # remedy text tells an author to write. The two spellings say ONE thing and
+    # decode to the same live source; neither is normalised into the other, so
+    # each still re-encodes to its own bytes (``_decode_binding``'s State arm
+    # already omits an absent default).
+    empty_carried = has_carried and source_raw_orig["defaultValue"] == []  # type: ignore[index]
+    carries_no_data = empty_carried or not has_carried
+    if preserved:
+        assert isinstance(source_raw_orig, dict)
+        source = _decode_binding(source_raw_orig, f"{path}.source")
+        if live_tag == "State" and not carries_no_data:
+            # Validate the carried data as the initial snapshot (didactics
+            # byte-identical to the 815 snapshot decode); the preserved binding
+            # stays the stored source.
+            from ..dataframe.codec import decode_source_json
+
+            snapshot = decode_source_json(_normalise_transform_source(source_raw_orig))
+            if not snapshot.ok:
+                _fail(WRONG_TYPE, f"{path}.source", f"{snapshot.error.code}: {snapshot.error.detail}")
+        from ..dataframe.codec import decode_pipeline_json, encode_transform_value
+
+        pipe_result = decode_pipeline_json(pipeline_raw)
+        if not pipe_result.ok:
+            _fail(WRONG_TYPE, f"{path}.pipeline", f"{pipe_result.error.code}: {pipe_result.error.detail}")
+            raise AssertionError("unreachable")
+        pipeline: Value = Arr([encode_transform_value(t) for t in pipe_result.value])
+    else:
+        source_raw = _normalise_transform_source(source_raw_orig)
+        source, pipeline = _normalise_transform_payload(source_raw, pipeline_raw, path)
+    # Phase 1662 - §21.8's expression-node bound over the pipeline's own embedded
+    # expressions, at DECODE and not at validation: a document that decodes must
+    # not be able to name an unbounded evaluation.
+    _check_pipeline_expr_bound(pipeline, path)
+    fields: dict[str, Value] = {}
+    if "params" in obj:
+        raw_params = obj["params"]
+        entries: list[Value] = []
+        if isinstance(raw_params, dict):
+            # Map form — a name-keyed set, coerced to the canonical array in
+            # key order (deterministic: F# Map.toList is key-sorted).
+            for name in sorted(raw_params):
+                binding = _decode_binding(raw_params[name], f"{path}.params.{name}.from")
+                entries.append(Obj(None, {"from": binding, "name": name}))
+        else:
+            arr = _expect_array(raw_params, f"{path}.params")
+            for i, el in enumerate(arr):
+                el_obj = _expect_object(el, f"{path}.params[{i}]")
+                name = _expect_string(_require(el_obj, "name", f"{path}.params[{i}]"), f"{path}.params[{i}].name")
+                from_raw, from_present = _alias_get(el_obj, "from", ("value",))
+                if not from_present:
+                    _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
+                binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
+                entries.append(Obj(None, {"from": binding, "name": name}))
+        if entries:
+            fields["params"] = Arr(entries)
+    fields["pipeline"] = pipeline
+    fields["source"] = source
+    return Obj("Transform", fields)
+
+
+def _normalise_transform_payload(source_raw: object, pipeline_raw: object, path: str) -> tuple[Value, Value]:
+    """Round the Transform `source` + `pipeline` sub-trees through the typed
+    columnar codec so lenient columnar/expression input re-encodes canonical.
+    The codec owns the lenient ingest (schemaless inference, bare-array
+    columns, flat predicate spellings, step aliases, …)."""
+    from ..dataframe.codec import (
+        decode_pipeline_json,
+        decode_source_json,
+        encode_source_value,
+        encode_transform_value,
+    )
+
+    src_result = decode_source_json(source_raw)
+    if not src_result.ok:
+        _fail(WRONG_TYPE, f"{path}.source", f"{src_result.error.code}: {src_result.error.detail}")
+        raise AssertionError("unreachable")
+    pipe_result = decode_pipeline_json(pipeline_raw)
+    if not pipe_result.ok:
+        _fail(WRONG_TYPE, f"{path}.pipeline", f"{pipe_result.error.code}: {pipe_result.error.detail}")
+        raise AssertionError("unreachable")
+    source = encode_source_value(src_result.value)
+    pipeline = Arr([encode_transform_value(t) for t in pipe_result.value])
+    return source, pipeline
+
+
+def _decode_children(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_node_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
+
+
+def _decode_closure_slot(_value: object, _path: str) -> Value:
+    """A ``fn``-typed slot — PRESENCE-ONLY, normalising to the ``<closure>`` sentinel.
+
+    The IDL declares these slots ``{"$type":"fn", "wire":"<closure>"}``: a host
+    closure whose BEHAVIOUR cannot cross the wire at all, so the only thing the
+    bytes can say is whether the emitter had one. The reference host reads exactly
+    that — a present key of ANY value reconstructs an inert placeholder, an absent
+    key stays absent — and re-encodes the sentinel whatever came in.
+
+    So this decoder deliberately does not type its input, and normalising is the
+    parity point rather than a tidy-up: left structural, this host re-encoded
+    whatever it was handed, so a document spelling ``"onSelect": 42`` round-tripped
+    as ``42`` here and as ``"<closure>"`` at the reference. Identical for every
+    well-formed document, since the only spelling an emitter produces is the
+    sentinel itself.
+    """
+    return "<closure>"
+
+
+def _decode_string_list(value: object, path: str) -> Value:
+    """An array of plain strings, each refused by index (the reference's shape)."""
+    arr = _expect_array(value, path)
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_tab_header(value: object, path: str) -> Value:
+    """One ``TabHeader`` — ``label`` required (``TextSource``), ``icon`` / ``disabled`` optional.
+
+    A record nested one level inside an ARRAY, which is the position a host walking
+    elements with a looser walker than its records gets wrong: before this, every
+    member of every header decoded structurally, so a non-string ``icon`` or a
+    header with no ``label`` at all round-tripped byte-perfectly.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {"label": _decode_text_source(_require(obj, "label", path), f"{path}.label")}
+    if "icon" in obj:
+        # A BARE string, matching the reference (`decodeIconSource` is
+        # `requireString`) and every other icon slot in this host.
+        fields["icon"] = _expect_string(obj["icon"], f"{path}.icon")
+    if "disabled" in obj:
+        fields["disabled"] = _decode_binding_bool(obj["disabled"], f"{path}.disabled")
+    return Obj(None, fields)
+
+
+def _decode_tab_headers(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_tab_header(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_switch_case(value: object, path: str) -> Value:
+    # One Switch case (Phase 392): ``{"child":<Node>,"match":<string>}``.
+    #
+    # fuaran#1535 — a case selects on a string ``match`` XOR a ``when`` predicate
+    # (a ``Binding<bool>`` evaluated at render time). Exactly one; both and
+    # neither are refused, naming both fields, on the Phase 818 value /
+    # valueFrom precedent.
+    #
+    # "Neither" is refused rather than skipped at render because a case that
+    # names no condition has no rendering that could be right: skipping it
+    # renders the ``default`` and reports nothing.
+    obj = _expect_object(value, path)
+    child = _decode_node_value(_require(obj, "child", path), f"{path}.child")
+    has_match = "match" in obj
+    has_when = "when" in obj
+    if has_match and has_when:
+        _fail(
+            WRONG_TYPE,
+            f"{path}.when",
+            "Switch case carries both 'match' and 'when' — exactly one is allowed: "
+            "either 'match' (a literal string compared against the switch's `on` selector) "
+            "or 'when' (a Binding<bool> predicate evaluated at render time, needing no selector)",
+        )
+    if not has_match and not has_when:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.match",
+            "Switch case carries neither 'match' nor 'when' — give it a literal string under "
+            "'match' (compared against the switch's `on` selector), or a Binding<bool> under "
+            "'when' (a predicate evaluated at render time)",
+        )
+    if has_match:
+        match = _expect_string(obj["match"], f"{path}.match")
+        return Obj(None, {"child": child, "match": match})
+    when = _decode_binding(obj["when"], f"{path}.when")
+    return Obj(None, {"child": child, "when": when})
+
+
+def _decode_switch_cases(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_switch_case(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_single_node(value: object, path: str) -> Value:
+    # Deferred wrapper so KIND_SCHEMAS (built before `_decode_node_value` is
+    # defined) can decode a single-Node field; the call resolves at decode time.
+    return _decode_node_value(value, path)
+
+
+def _decode_fragment_args(value: object, path: str) -> Value:
+    """A ``FragmentArg`` map (``Mount.inputs`` / ``FragmentRef.args``).
+
+    Every case but one is a scalar and passes through structurally, WITHOUT
+    null-strictness — these positions legitimately carry §5 obj-erased opaque
+    seams. The exception is ``SlotArg``, whose ``tree`` is a whole ``Node``: it
+    routes through the node decoder so a node passed as a fragment argument is a
+    node in the decoded tree rather than an untagged generic object.
+
+    An arg the wire calls ``SlotArg`` but that carries no ``tree`` is left
+    structural rather than refused. This decoder exists to route a node it can
+    see; inventing a requiredness rule for a case the corpus schema governs is a
+    different change with a different blast radius.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for name, raw in obj.items():
+        if isinstance(raw, dict) and raw.get("$type") == "SlotArg" and isinstance(raw.get("tree"), dict):
+            arg: dict[str, Value] = {}
+            for key, inner in raw.items():
+                if key == "tree":
+                    arg["tree"] = _decode_node_value(inner, f"{path}.{name}.tree")
+                elif key != "$type":
+                    arg[key] = from_json(inner)
+            fields[name] = Obj("SlotArg", arg)
+        else:
+            fields[name] = from_json(raw)
+    return Obj(None, fields)
+
+
+def _decode_text_source_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
+
+
+def _decode_int_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_expect_int(item, f"{path}.{i}") for i, item in enumerate(arr)])
+
+
+# Action cases (WIRE_FORMAT.md §3.3 / §4). Wire-survivable actions (e.g. a Modal's
+# ``onDismiss``) carry a real ``$type`` — validated here, then preserved structurally
+# (the same pass-through Form.onSubmit takes, which has no typed schema).
+ACTION_CASES = frozenset(
+    {
+        "Chain",
+        "Dispatch",
+        "Navigate",
+        "SetState",
+        "Notify",
+        "WriteToClipboard",
+        # fuaran#1124 — the format's first PAYLOAD-FREE action case.
+        "Print",
+        # fuaran#1537 — the confirm-before-action dialogue and the focus move.
+        "Confirm",
+        "Focus",
+        "ReadFileBody",
+        "Call",
+        "AiTool",
+        "CommitLocal",
+        "Invoke",
+    }
+)
+
+
+def _decode_action(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, ACTION_CASES)
+    # Field-name aliases (WIRE_FORMAT §3.6, decode-only): Call.endpoint ← url;
+    # Navigate.route ← href / url / to. The canonical name wins.
+    if tag == "Call" and "endpoint" not in obj and "url" in obj:
+        obj = {**obj, "endpoint": obj["url"]}
+        del obj["url"]
+    elif tag == "Navigate" and "route" not in obj:
+        for a in ("href", "url", "to"):
+            if a in obj:
+                obj = {**obj, "route": obj[a]}
+                del obj[a]
+                break
+    elif tag == "Print":
+        # fuaran#1124 — the ONE action arm that is STRICT about unrecognised
+        # members, and the asymmetry is deliberate: everywhere else in this
+        # format an unknown member is one the reading host has not learned yet,
+        # and dropping it is the forward-compatible answer. Here there is
+        # nothing to learn, and a host that accepted
+        # `{"$type":"Print","pageRange":"1-3"}` and printed everything would
+        # leave the emitter believing it had constrained a printing it had not,
+        # with no error anywhere saying otherwise.
+        for key in obj:
+            if key != "$type":
+                _fail(
+                    WRONG_TYPE,
+                    f"{path}.{key}",
+                    f"Action.Print takes NO payload — '{key}' is not a member of it. Page size, "
+                    "margins, orientation, sheet range and copies belong to the host's page setup "
+                    "or to the dialogue the reader is looking at (WIRE_FORMAT §3.6.14)",
+                    "an object carrying only $type",
+                )
+        return Obj("Print", {})
+    elif tag == "Navigate":
+        # fuaran#1536 — the route is a `TextSource`, not a bare string, so a tree
+        # can name a destination it computes from what the reader is looking at.
+        # The bare JSON string IS `Literal`'s canonical form, so every document
+        # written before the widening decodes exactly as it did — including one
+        # using an alias, since the aliases above are resolved before this point,
+        # keeping exactly one canonical field a router can be reached through.
+        #
+        # `target` is omitted at `Self`, so absence is the pre-1536 behaviour. An
+        # unrecognised token is UNKNOWN_DU_CASE at the member's own path and is
+        # never coerced to one of the two.
+        route = _decode_text_source(_require(obj, "route", path), f"{path}.route")
+        decoded: dict[str, Value] = {"route": route}
+        if "target" in obj:
+            target = _enum_aliased(obj["target"], f"{path}.target", NAVIGATE_TARGET, {}, "NavigateTarget")
+            if target != "Self":
+                decoded["target"] = target
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "route", "target")}
+        return Obj("Navigate", {**rest, **decoded})
+    elif tag == "Confirm":
+        # fuaran#1537 — ask, then act. `prompt` is a `TextSource` (so the
+        # question can name what the reader selected), `onConfirm` is required
+        # and `onCancel` optional; an author who declares no cancel branch means
+        # "nothing happens", which an absent action already expresses.
+        #
+        # THE DEPTH-ONE REFUSAL is the substance of this arm. A `Confirm`
+        # reachable from either continuation is refused, and the check walks the
+        # DECODED continuation rather than its immediate `$type`, so a nested
+        # confirm inside a `Chain` is caught by the same line that catches a bare
+        # one. A dialogue that answers a dialogue is a modal stack the reader
+        # cannot escape, and it says nothing one question does not.
+        #
+        # WRONG_TYPE follows the `SetState` value/valueFrom and Print-with-
+        # payload precedents: a decoder POLICY refusal reuses it rather than
+        # minting a code every host in the roster would owe an adoption for.
+        def _nested_confirm_path(p: str, action: Value) -> str | None:
+            if isinstance(action, Obj):
+                if action.tag == "Confirm":
+                    return p
+                if action.tag == "Chain":
+                    ops = action.fields.get("ops")
+                    if isinstance(ops, Arr):
+                        for i, inner in enumerate(ops.items):
+                            found = _nested_confirm_path(f"{p}.ops[{i}]", inner)
+                            if found is not None:
+                                return found
+            return None
+
+        def _refuse_nested(p: str, action: Value) -> None:
+            found = _nested_confirm_path(p, action)
+            if found is not None:
+                _fail(
+                    WRONG_TYPE,
+                    found,
+                    "a Confirm may not appear inside another Confirm's continuation — confirmation is "
+                    "bounded at one question. A dialogue that answers a dialogue is a modal stack the "
+                    "reader cannot escape (WIRE_FORMAT §3.6.22)",
+                    "any action but Confirm",
+                )
+
+        prompt = _decode_text_source(_require(obj, "prompt", path), f"{path}.prompt")
+        on_confirm = _decode_action(_require(obj, "onConfirm", path), f"{path}.onConfirm")
+        _refuse_nested(f"{path}.onConfirm", on_confirm)
+        decoded_confirm: dict[str, Value] = {"onConfirm": on_confirm, "prompt": prompt}
+        if "onCancel" in obj:
+            on_cancel = _decode_action(obj["onCancel"], f"{path}.onCancel")
+            _refuse_nested(f"{path}.onCancel", on_cancel)
+            decoded_confirm["onCancel"] = on_cancel
+        rest = {
+            k: _from_json_strict(v, f"{path}.{k}")
+            for k, v in obj.items()
+            if k not in ("$type", "prompt", "onConfirm", "onCancel")
+        }
+        return Obj("Confirm", {**rest, **decoded_confirm})
+    elif tag == "WriteToClipboard":
+        # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
+        # bare JSON string IS `Literal`'s canonical form, so every document
+        # written before the widening decodes exactly as it did and the explicit
+        # `Literal` envelope normalises down to it here as at every other text
+        # slot. A `text` that is neither a string nor a `$type`-tagged
+        # `TextSource` is WRONG_TYPE and is never coerced: a host that read the
+        # widening as "this member is now open" would put a JSON literal on the
+        # reader's clipboard, and a clipboard is a channel the reader later
+        # pastes somewhere with authority.
+        text = _decode_text_source(_require(obj, "text", path), f"{path}.text")
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "text")}
+        return Obj("WriteToClipboard", {**rest, "text": text})
+    elif tag == "Dispatch" and "msg" in obj:
+        # 0.2.0 — the `msg` closure sentinel is off the wire (no decoder ever
+        # read it); a pre-0.2.0 input normalises to the bare `{"$type":"Dispatch"}`.
+        obj = {k: v for k, v in obj.items() if k != "msg"}
+    elif tag == "Chain":
+        # Recurse so nested actions pick up the same normalisation.
+        ops_arr = _expect_array(_require(obj, "ops", path), f"{path}.ops")
+        decoded_ops = Arr([_decode_action(o, f"{path}.ops[{i}]") for i, o in enumerate(ops_arr)])
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "ops")}
+        return Obj("Chain", {"ops": decoded_ops, **rest})
+    elif tag == "SetState":
+        # fuaran#818 — `value` (a literal JSON value, written verbatim) XOR
+        # `valueFrom` (a Binding evaluated at dispatch time inside the existing
+        # gate). Exactly one must be present; both / neither error didactically
+        # naming both fields. A present `valueFrom` decodes through the binding
+        # decoder (the typed default-deny surface); the literal `value` keeps
+        # the structural null-strict pass-through below.
+        has_value = "value" in obj
+        has_from = "valueFrom" in obj
+        if has_value and has_from:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.valueFrom",
+                "SetState carries both 'value' and 'valueFrom' — exactly one is allowed: "
+                "'value' is a literal JSON value written verbatim; 'valueFrom' derives the "
+                "written value from a Binding at dispatch time; remove one",
+            )
+        if not has_value and not has_from:
+            _fail(
+                MISSING_FIELD,
+                f"{path}.value",
+                "missing required field 'value' — provide 'value' (a literal JSON value) "
+                "or 'valueFrom' (a Binding evaluated at dispatch time)",
+            )
+        if has_from:
+            value_from = _decode_binding(obj["valueFrom"], f"{path}.valueFrom")
+            rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "valueFrom")}
+            return Obj("SetState", {**rest, "valueFrom": value_from})
+    # Structural (validated discriminator) but NULL-STRICT: the action payload
+    # positions (SetState.value / Notify.payload / AiTool.args) are structured
+    # JVal positions per rule 12, and no action case carries a §5 opaque seam —
+    # so a null anywhere in an action rejects at its exact path, matching the
+    # F# reference and the corpus reject-null-action-* fixtures.
+    return _from_json_strict(obj, path)
+
+
+#: The three §5/§7 quoted sentinels for a non-finite number, mapped to the value
+#: they denote. §7 is symmetric with §5: a float slot accepts BOTH a JSON number
+#: and the quoted spelling this host itself emits for a non-finite. Without them
+#: a document this host encodes is one it cannot read back — ``decode → encode →
+#: decode`` does not close on any non-finite number, and a peer host's canonical
+#: output is undecodable here.
+_NON_FINITE_SENTINELS: dict[str, float] = {
+    "NaN": float("nan"),
+    "Infinity": float("inf"),
+    "-Infinity": float("-inf"),
+}
+
+
+def _decode_number(value: object, path: str) -> Value:
+    # A JSON number — an ``int`` or ``float`` (e.g. Date.step in seconds) — or one
+    # of the three §7 non-finite sentinel strings. bool is an int subclass; reject
+    # it as it is never a numeric value here.
+    #
+    # This is the FLOAT-slot choke point. Integer slots go through ``_expect_int``
+    # (a bare int position) or ``_decode_integer`` (a ``Binding<int>`` slot), both
+    # unreachable from here, so a sentinel at an integer slot stays a WRONG_TYPE —
+    # §7 widens float slots and nothing else.
+    #
+    # The float is returned rather than the sentinel string so decode is idempotent
+    # at the TREE level and not merely at the byte level: ``json.loads`` already
+    # turns the bare overflowing literal ``-1e999`` into ``-inf``, so answering a
+    # re-decode of its own canonical form with a ``str`` would hand a consumer a
+    # float the first time and a string the second.
+    value = _unwrap_static_envelope(value)
+    if isinstance(value, str):
+        sentinel = _NON_FINITE_SENTINELS.get(value)
+        if sentinel is not None:
+            return sentinel
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(WRONG_TYPE, path, f"expected a number at {path}")
+    return value  # type: ignore[return-value]
+
+
+def _decode_integer(value: object, path: str) -> Value:
+    """The INTEGER-slot choke point — §7's *other* numeric accept set.
+
+    §7 is asymmetric on purpose, and the asymmetry is the whole content of this
+    function::
+
+        a FLOAT slot accepts  { JSON number } u { "NaN", "Infinity", "-Infinity" }
+        an INT  slot accepts  { finite integral JSON number within int32 }
+
+    An integer has no non-finite form, so a *correctly spelled* sentinel string
+    here is a ``WRONG_TYPE`` — the case that makes the two sets distinguishable
+    rather than merely stated. The accept set itself is §7.1's and is shared with
+    every bare integer position through :func:`_integer_slot`, so the two cannot
+    drift apart again.
+
+    Two Python-specific traps, both silent if missed:
+
+    * ``bool`` is an ``int`` subclass, so it is tested FIRST in
+      :func:`_integer_slot` — ``True`` would otherwise decode as ``1``.
+    * The sentinel widening is a *membership test against three exact strings*
+      (:data:`_NON_FINITE_SENTINELS`) and lives in :func:`_decode_number` alone;
+      a ``float(s)`` in a ``try`` would accept ``"nan"``, ``"inf"``, ``"1e5"``
+      and ``"  NaN "`` at both slot classes.
+    """
+    return _integer_slot(value, path)
+
+
+# ── Drawing (Phase 524) ────────────────────────────────────────────────────
+#
+# A bounded, typed vector-graphics primitive. Geometry is static numbers (a
+# Drawing is a resolved artefact); only DrawStyle carries Bindings. The Shape
+# and CurveCommand DUs are closed + typed — an unrecognised discriminator is
+# UNKNOWN_DU_CASE via ``_dispatch`` (the typed-surface default-deny). Array
+# positions use ``[i]`` bracket paths to match the F# reference reject paths.
+
+DRAW_SHAPE_CASES = frozenset(
+    {"Group", "Rectangle", "Line", "Polyline", "Polygon", "Curve", "Circle", "Ellipse", "Label"}
+)
+CURVE_COMMAND_CASES = frozenset({"MoveTo", "LineTo", "CubicTo", "QuadraticTo", "Close"})
+
+
+def _decode_view_box(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "height": _decode_number(_require(obj, "height", path), f"{path}.height"),
+            "minX": _decode_number(_require(obj, "minX", path), f"{path}.minX"),
+            "minY": _decode_number(_require(obj, "minY", path), f"{path}.minY"),
+            "width": _decode_number(_require(obj, "width", path), f"{path}.width"),
+        },
+    )
+
+
+def _decode_draw_point(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        },
+    )
+
+
+def _decode_draw_style(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for key in ("fill", "opacity", "stroke", "strokeWidth"):
+        if key in obj:
+            # `fill` / `stroke` are Binding<string> (a colour token); `opacity` /
+            # `strokeWidth` are Binding<float> — typed here, closing the numeric
+            # half of the sweep Phase 956 opened on the scalar slots.
+            decoder = _decode_binding_string if key in ("fill", "stroke") else _decode_binding_float
+            fields[key] = decoder(obj[key], f"{path}.{key}")
+    # Text-only fields (Phase 528.1) — bare enum / number / string, not bindings;
+    # all optional, omitted when unset (byte-unchanged for non-text shapes).
+    if "textAnchor" in obj:
+        fields["textAnchor"] = _enum(obj["textAnchor"], f"{path}.textAnchor", TEXT_ANCHOR, "textAnchor")
+    if "fontSize" in obj:
+        fields["fontSize"] = _decode_number(obj["fontSize"], f"{path}.fontSize")
+    if "emphasis" in obj:
+        fields["emphasis"] = _enum(obj["emphasis"], f"{path}.emphasis", EMPHASIS, "emphasis")
+    if "fontFamily" in obj:
+        fields["fontFamily"] = _expect_string(obj["fontFamily"], f"{path}.fontFamily")
+    # Phase 642 — keyed mark identity (`data-fuaran-mark` at render time); optional.
+    if "markId" in obj:
+        fields["markId"] = _expect_string(obj["markId"], f"{path}.markId")
+    # Phase 877 — Label text rotation in degrees, clockwise; optional with no
+    # default (absent = upright). Keys off PRESENCE in the object: an explicit
+    # 0 is a distinct present value, so a truthiness test here would drop it and
+    # re-encode to different bytes.
+    if "rotation" in obj:
+        fields["rotation"] = _decode_number(obj["rotation"], f"{path}.rotation")
+    # Phase 883 — the per-mark hover readout, a full TextSource (so a `Bound`
+    # envelope decodes here as well as the canonical bare-string `Literal`).
+    # Optional, absent = untipped. Keys off PRESENCE for the same reason
+    # `rotation` does, and here the trap is sharper: an explicitly EMPTY tip is
+    # a distinct present value, and `if obj.get("tip"):` would silently drop it.
+    if "tip" in obj:
+        fields["tip"] = _decode_text_source(obj["tip"], f"{path}.tip")
+    return Obj(None, fields)
+
+
+def _decode_draw_point_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_draw_point(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_curve_command(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, CURVE_COMMAND_CASES)
+    if tag in ("MoveTo", "LineTo"):
+        return Obj(tag, {"to": _decode_draw_point(_require(obj, "to", path), f"{path}.to")})
+    if tag == "CubicTo":
+        return Obj(
+            tag,
+            {
+                "control1": _decode_draw_point(_require(obj, "control1", path), f"{path}.control1"),
+                "control2": _decode_draw_point(_require(obj, "control2", path), f"{path}.control2"),
+                "to": _decode_draw_point(_require(obj, "to", path), f"{path}.to"),
+            },
+        )
+    if tag == "QuadraticTo":
+        return Obj(
+            tag,
+            {
+                "control": _decode_draw_point(_require(obj, "control", path), f"{path}.control"),
+                "to": _decode_draw_point(_require(obj, "to", path), f"{path}.to"),
+            },
+        )
+    return Obj("Close", {})  # tag == "Close"
+
+
+def _decode_curve_command_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_curve_command(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_shape(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, DRAW_SHAPE_CASES)
+    style = _decode_draw_style(obj["style"], f"{path}.style") if "style" in obj else Obj(None, {})
+    if tag == "Group":
+        return Obj(
+            tag,
+            {
+                "children": _decode_shape_array(_require(obj, "children", path), f"{path}.children"),
+                "style": style,
+            },
+        )
+    if tag == "Rectangle":
+        fields: dict[str, Value] = {
+            "height": _decode_number(_require(obj, "height", path), f"{path}.height"),
+            "style": style,
+            "width": _decode_number(_require(obj, "width", path), f"{path}.width"),
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        }
+        if "cornerRadius" in obj:
+            fields["cornerRadius"] = _decode_number(obj["cornerRadius"], f"{path}.cornerRadius")
+        return Obj(tag, fields)
+    if tag == "Line":
+        return Obj(
+            tag,
+            {
+                "style": style,
+                "x1": _decode_number(_require(obj, "x1", path), f"{path}.x1"),
+                "x2": _decode_number(_require(obj, "x2", path), f"{path}.x2"),
+                "y1": _decode_number(_require(obj, "y1", path), f"{path}.y1"),
+                "y2": _decode_number(_require(obj, "y2", path), f"{path}.y2"),
+            },
+        )
+    if tag in ("Polyline", "Polygon"):
+        return Obj(
+            tag,
+            {
+                "points": _decode_draw_point_array(_require(obj, "points", path), f"{path}.points"),
+                "style": style,
+            },
+        )
+    if tag == "Curve":
+        return Obj(
+            tag,
+            {
+                "commands": _decode_curve_command_array(_require(obj, "commands", path), f"{path}.commands"),
+                "style": style,
+            },
+        )
+    if tag == "Circle":
+        return Obj(
+            tag,
+            {
+                "cx": _decode_number(_require(obj, "cx", path), f"{path}.cx"),
+                "cy": _decode_number(_require(obj, "cy", path), f"{path}.cy"),
+                "r": _decode_number(_require(obj, "r", path), f"{path}.r"),
+                "style": style,
+            },
+        )
+    if tag == "Ellipse":
+        return Obj(
+            tag,
+            {
+                "cx": _decode_number(_require(obj, "cx", path), f"{path}.cx"),
+                "cy": _decode_number(_require(obj, "cy", path), f"{path}.cy"),
+                "rx": _decode_number(_require(obj, "rx", path), f"{path}.rx"),
+                "ry": _decode_number(_require(obj, "ry", path), f"{path}.ry"),
+                "style": style,
+            },
+        )
+    # Label
+    return Obj(
+        tag,
+        {
+            "style": style,
+            "text": _decode_text_source(_require(obj, "text", path), f"{path}.text"),
+            "x": _decode_number(_require(obj, "x", path), f"{path}.x"),
+            "y": _decode_number(_require(obj, "y", path), f"{path}.y"),
+        },
+    )
+
+
+def _decode_shape_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_shape(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+# ── Per-kind field schemas: (field, required, decoder[, aliases]) ──────────
+# A decoder returns a wire :data:`~fuaran_ui.model.Value`, or the `_DROP` sentinel
+# (an `object`) for a Phase 460 omit-when-default field. An optional 4th tuple
+# element lists the field's decode-only name aliases (WIRE_FORMAT §3.6).
+
+# 0.2.0 rename law — retired names are a clean break: not aliased, not
+# preserved (`Metric.source` / `LabelValueRow.source`; `source` is reserved
+# for collection feeds).
+_RETIRED_FIELDS: dict[str, frozenset[str]] = {
+    "Metric": frozenset({"source"}),
+    "LabelValueRow": frozenset({"source"}),
+}
+
+FieldDecoder = Callable[[object, str], object]
+SchemaEntry = tuple[str, bool, FieldDecoder] | tuple[str, bool, FieldDecoder, tuple[str, ...]]
+
+
+def _unpack_schema(entry: SchemaEntry) -> tuple[str, bool, FieldDecoder, tuple[str, ...]]:
+    """Normalise a 3- or 4-tuple schema entry to (name, required, decoder, aliases)."""
+    if len(entry) == 4:
+        return entry  # type: ignore[return-value]
+    return entry[0], entry[1], entry[2], ()
+
+
+KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
+    "Heading": [
+        ("level", True, _decode_int),
+        ("text", True, _decode_text_source),
+        ("variant", True, _enum_aliased_decoder(HEADING_VARIANT, HEADING_VARIANT_ALIASES, "variant")),
+    ],
+    "Markdown": [
+        ("text", True, _decode_text_source),
+    ],
+    # Phase 460 — `format` / `tone` / `weight` / `emphasis` are omitted-when-default.
+    # 0.2.0 rename law (clean break): the scalar displayed value is `value`
+    # (`data` stays a web-prior alias); the retired `source` is NOT accepted.
+    "Metric": [
+        ("emphasis", False, _omit_default_emphasis_enum),
+        ("format", False, _omit_default_format),
+        ("label", True, _decode_text_source),
+        ("value", True, _decode_binding_float, ("data",)),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+        ("weight", False, _omit_default_enum(WEIGHT, {}, "Standard", "weight")),
+        ("icon", False, _decode_string),
+        ("subtext", False, _decode_text_source),
+        ("trend", False, _decode_binding_float),
+        ("trendFormat", False, _decode_cell_format),
+        # fuaran#867 — `trendPolarity` is omitted-when-`HigherIsBetter` (§3.6's
+        # omit-when-default table). An absent `trend` makes the slot inert: a
+        # Metric with no trend that declares a polarity is legal and says nothing,
+        # so nothing here couples the two.
+        ("trendPolarity", False, _omit_default_enum(TREND_POLARITY, {}, "HigherIsBetter", "trendPolarity")),
+    ],
+    # The labeled TEXT fact (2026-07-17) — Metric's complementary kind: only
+    # `label` + `value` required; `tone` / `emphasis` omitted-when-default on
+    # BOTH boundaries; optional `help` / `icon`. `emphasis` is the behavioural
+    # BOOL (cross-vocab coercion via `_decode_emphasis_flag`).
+    "Fact": [
+        ("emphasis", False, _decode_emphasis_flag),
+        ("help", False, _decode_text_source),
+        ("icon", False, _decode_string),
+        ("label", True, _decode_text_source),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+        ("value", True, _decode_text_source),
+    ],
+    "Badge": [
+        ("label", True, _decode_text_source),
+        ("variant", True, _enum_aliased_decoder(BADGE_VARIANT, BADGE_VARIANT_ALIASES, "variant")),
+    ],
+    "Callout": [
+        ("body", True, _decode_text_source),
+        # 0.2.0 — omitted-when-false on both boundaries.
+        ("dismissable", False, _omit_default_bool(False)),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+        ("heading", False, _decode_text_source, ("title",)),
+        ("icon", False, _decode_string),
+    ],
+    "Progress": [
+        ("fraction", True, _decode_binding_float),
+        # 0.2.0 — omitted-when-false on both boundaries.
+        ("indeterminate", False, _omit_default_bool(False)),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+        ("label", False, _decode_text_source),
+        ("caveat", False, _decode_text_source),
+    ],
+    "Skeleton": [
+        # Phase 1666 - the §21.9 row bound rides the field's own decoder, so the
+        # table stays the single statement of what a Skeleton's shape is.
+        ("rows", True, _decode_skeleton_rows),
+    ],
+    # Phase 821 — the standalone icon-only display kind: `size` omitted-when-
+    # `Medium`, `tone` omitted-when-`Default` (the Phase 460 discipline),
+    # `label` omitted-when-decorative.
+    "Icon": [
+        ("icon", True, _decode_string),
+        ("label", False, _decode_string),
+        ("size", False, _omit_default_enum(ICON_SIZE, {}, "Medium", "IconSize")),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+    ],
+    "Sparkline": [
+        # Phase 429 — `source` is a typed Static float-series position; `data` alias (§3.6).
+        ("source", True, _decode_binding_float_seq, ("data",)),
+    ],
+    # Phase 429 — Map `source` is a typed Static marker-list position. The three
+    # numeric envelope fields pass through structurally like any unlisted key.
+    # `source` aliases `data` / `markers` (§3.6).
+    "Map": [
+        ("source", True, _decode_binding_marker_seq, ("data", "markers")),
+    ],
+    "LabelValueRow": [
+        # `emphasis` is the behavioural bool (cross-vocab coerced) — 0.2.2:
+        # omitted-when-false. `format` omitted-when-default. 0.2.0 rename law:
+        # the scalar value is `value` (`data` alias; retired `source` NOT accepted).
+        ("emphasis", False, _decode_emphasis_flag),
+        ("format", False, _omit_default_format),
+        ("label", True, _decode_text_source),
+        ("value", True, _decode_binding_float, ("data",)),
+        ("help", False, _decode_text_source),
+    ],
+    "Link": [
+        ("download", True, _decode_bool),
+        ("href", True, _decode_binding_string),
+        ("label", True, _decode_text_source),
+        # Phase 812 — optional closed enumeration; unknown case rejects
+        # UNKNOWN_DU_CASE at $.kind.protection via the _enum default-deny.
+        ("protection", False, _enum_decoder(LINK_PROTECTION, "protection")),
+        ("rel", False, _decode_string),
+        ("target", False, _decode_string),
+    ],
+    "Image": [
+        ("alt", True, _decode_text_source),
+        # fuaran#1077 — the three presentation slots, omitted at their identity
+        # defaults on BOTH boundaries, so a document written before they existed
+        # decodes to today's behaviour and re-encodes to the bytes it already had.
+        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
+        # fuaran#1078 — a caption is CONTENT, so it is NOT an identity default:
+        # there is no default caption the way there is a default fit, and the slot
+        # takes the ordinary optional-field posture (omitted when absent). It is a
+        # full `TextSource`, not a string — the rule a second host is most likely
+        # to break, because a caption reads like a string and narrowing the slot
+        # costs nothing until somebody needs a locale.
+        ("caption", False, _decode_text_source),
+        # fuaran#1079 — an ordinary omit-at-`false` bool. A present non-boolean is
+        # a WRONG_TYPE, never a truthiness coercion: a decoder that guessed at
+        # `"true"` would have to rule on `"false"` and `""` too, at which point two
+        # conformant hosts can disagree about whether the document declares an
+        # affordance at all.
+        ("expandable", False, _omit_default_bool(False)),
+        ("fit", False, _omit_default_enum(IMAGE_FIT, {}, "Natural", "fit")),
+        ("loading", False, _omit_default_enum(IMAGE_LOADING, {}, "Eager", "loading")),
+        ("src", True, _decode_binding_string),
+        # fuaran#1080 — absent MEANS the empty list and `null` is refused; see
+        # `_decode_srcset`.
+        ("srcSet", False, _decode_srcset),
+        ("variant", True, _enum_decoder(IMAGE_VARIANT, "variant")),
+    ],
+    # fuaran#1076 — the playback surface. ONE kind, two variants: everything a
+    # video surface and an audio surface SHARE is stated once on the record (the
+    # source, the accessible name, whether the transport is shown, whether
+    # playback repeats), and only the slots that genuinely differ live in the
+    # `$type`-discriminated variant at `kind`.
+    #
+    # `label` is REQUIRED, and this is the one place the media contract differs
+    # from `Image`'s: an image can honestly be decorative and say so with an empty
+    # `alt`, but a media element is a TRANSPORT — a control a reader focuses,
+    # plays, pauses and seeks — so it is never decorative, and there is no value
+    # to default to that would not be a fabricated name for someone else's
+    # recording.
+    #
+    # `controls` is omitted at TRUE — the second such slot in the vocabulary after
+    # `Toast.dismissable`, and the polarity is deliberate: a media element without
+    # a transport cannot be paused, seeked or muted by a keyboard user at all, so
+    # the accessible setting is what a document gets for free and taking it away
+    # is the deviation that costs a key. `loop` takes the ordinary polarity.
+    "Media": [
+        ("controls", False, _omit_default_bool(True)),
+        ("kind", True, _decode_media_kind),
+        ("label", True, _decode_text_source),
+        ("loop", False, _omit_default_bool(False)),
+        ("src", True, _decode_binding_string),
+        # fuaran#1110 — the timed-text tracks and the text alternative, both on
+        # the SPEC rather than on the `Video` case. The second placement is the
+        # one worth explaining: a transcript is the affordance an AUDIO surface
+        # needs most, because a recording with no visual channel has nowhere else
+        # to put its words, where a video can usually be served by captions
+        # riding the timeline it already has.
+        #
+        # `tracks` is absent-MEANS-empty and refuses `null` (`_decode_tracks`);
+        # `transcript` is an ordinary optional, so absent and empty are different
+        # statements — one offers no transcript, the other offers an empty one.
+        ("tracks", False, _decode_tracks),
+        ("transcript", False, _decode_text_source),
+    ],
+    # fuaran#1111 — the sandboxed third-party embed. A NEW kind rather than a
+    # `Mount` variant: `Mount` composes a COOPERATING guest (a scope id, a
+    # declared channel, a capability list, a host-side loader) and a third-party
+    # page has none of those. It is equally not a `Media` variant — `Media`
+    # fetches an asset and DISPLAYS it, this fetches a document and lets it
+    # EXECUTE.
+    #
+    # Nothing here inspects the `src` STRING: the `embed` egress class admits
+    # `https` and nothing else, and that is a RENDER-time obligation, as every
+    # §19-class rule is. A document naming a URL the floor refuses is still a
+    # valid wire document.
+    "Embed": [
+        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
+        ("permissions", False, _decode_permissions),
+        ("src", True, _decode_binding_string),
+        # REQUIRED, on `MediaSpec.label`'s argument one kind over: a frame is a
+        # focus container a reader tabs INTO, so it is never decorative, and an
+        # unnamed one is announced as "frame" and nothing more.
+        ("title", True, _decode_text_source),
+    ],
+    # fuaran#1120 — the hierarchy, and the format's first SELF-REFERENTIAL
+    # shape. This kind carries NO `expandable` and NO `selectable` boolean, and
+    # none is coming: a behaviour the reader drives is declared as a named State
+    # key the host both writes and reads, and a flag with no key behind it is a
+    # decorative control writing state nothing reads.
+    #
+    # A tree naming NO `expandedStateKey` renders FULLY EXPANDED, which is the
+    # grid-behaviour rule read straight across: an initial presentation without a
+    # reader-driven affordance is a legitimate shape, and it is the only reading
+    # under which such a tree shows its content at all.
+    "Tree": [
+        ("expandedStateKey", False, _decode_string),
+        ("items", True, _decode_tree_items),
+        ("onSelect", False, _decode_string),
+        ("selectionStateKey", False, _decode_string),
+    ],
+    # fuaran#1115 / #1116 / #1117 — the upload control had NO typed schema at
+    # all, so every member below reached the structural pass-through and each of
+    # the four reject vectors decoded happily. The three ingress routes and the
+    # one egress declaration are typed here; the remaining fields (`label`,
+    # `onSelect`, `disabled`, …) keep the structural preservation they had.
+    "FileUpload": [
+        # The two gestures, both OMITTING at `false`. A present member of any
+        # other type is WRONG_TYPE and is never coerced — the slot decides
+        # whether a whole ingress route EXISTS, so a lenient truthiness read
+        # would open a drop target on `"no"` and on `"false"`.
+        ("acceptPaste", False, _omit_default_bool(False)),
+        ("dropTarget", False, _omit_default_bool(False)),
+        # fuaran#1116 — OPTIONAL, not omit-at-default, and the distinction is
+        # real: "say nothing" is a state of its own, because an upload naming no
+        # device asks for the ordinary file browser, which is not one of the two
+        # devices wearing a default. A present value outside the set is
+        # UNKNOWN_DU_CASE at the member's own path — a BARE enum, so no `.$type`
+        # suffix — and must NOT fall back to either device.
+        ("capture", False, _enum_decoder(CAPTURE_SOURCE, "capture")),
+        # fuaran#1117 — the streamed destination.
+        ("destination", False, _decode_upload_destination),
+        # fuaran#1548 — the two declared ceilings. Optional: absent declares no
+        # ceiling, which is the pre-1548 control and the wire identity.
+        ("maxBytes", False, _decode_upload_ceiling("maxBytes")),
+        ("maxFiles", False, _decode_upload_ceiling("maxFiles")),
+    ],
+    "List": [
+        ("items", True, _decode_text_source_array),
+        ("ordered", True, _decode_bool),
+    ],
+    "Toast": [
+        # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
+        ("dismissable", False, _omit_default_bool(True)),
+        ("message", True, _decode_text_source),
+        ("open", True, _decode_binding_bool),
+        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
+    ],
+    "CodeBlock": [
+        ("code", True, _decode_string),
+        ("copyable", True, _decode_bool),
+        ("highlightLines", True, _decode_int_array),
+        ("language", True, _decode_string),
+        ("lineNumbers", True, _decode_bool),
+    ],
+    "Math": [
+        ("display", True, _enum_decoder(MATH_DISPLAY, "display")),
+        ("source", True, _decode_string),
+    ],
+    "Drawing": [
+        # Phase 524 — geometry static; the closed Shape / CurveCommand DUs
+        # default-deny an unknown discriminator; DrawStyle carries the bindings.
+        ("description", False, _decode_text_source),
+        ("shapes", True, _decode_shape_array),
+        ("style", True, _decode_draw_style),
+        ("title", False, _decode_text_source),
+        ("viewBox", True, _decode_view_box),
+    ],
+    "Select": [
+        ("label", True, _decode_text_source),
+        # Phase 426 — the handler fields are OPTIONAL: omitted on the wire when the
+        # control is declarative (AI-authored), where the renderer arms a write-back
+        # default against the paired `value` slot. Present → the `"<closure>"`
+        # sentinel; absent → decodes to nothing (the field simply isn't carried).
+        ("onChange", False, _decode_string),
+        ("onChangeMulti", False, _decode_string),
+        # Phase 429 — `source`/`value`/`values` are typed Static positions: a
+        # SelectOption list, a scalar string option, a string list respectively.
+        # `source` aliases `options` / `data` (§3.6).
+        ("source", True, _decode_binding_select_options, ("options", "data")),
+        ("value", True, _decode_binding_string_opt),
+        ("disabled", False, _decode_binding_bool),
+        ("placeholder", False, _decode_text_source),
+        # Multi-select (Phase 291) — both optional; omitted on a single-select.
+        ("multiple", False, _decode_bool),
+        ("values", False, _decode_binding_string_list),
+    ],
+    "Modal": [
+        ("children", True, _decode_children),
+        ("dismissable", True, _decode_bool),
+        # Phase 426 — `onDismiss` is OPTIONAL (omitted when declarative). Unlike the
+        # closure-sentinel handlers it is a genuine wire-survivable Action, so it
+        # decodes through the null-strict action decoder when present.
+        ("onDismiss", False, _decode_action),
+        ("open", True, _decode_binding_bool),
+        ("heading", False, _decode_text_source, ("title",)),
+        # fuaran#1119 — the modality. `Blocking` is the identity and omits at it,
+        # so every modal written before this member is byte-identical; an
+        # unrecognised token is REFUSED rather than read as the default, because
+        # a document that meant `Popover` and misspelled it would otherwise trap
+        # focus and claim the page behind it inert.
+        ("modality", False, _omit_default_enum(MODALITY_KIND, {}, "Blocking", "modality")),
+        ("anchor", False, _decode_string),
+    ],
+    "ScrollArea": [
+        ("children", True, _decode_children),
+        ("orientation", True, _enum_decoder(SCROLL_ORIENTATION, "orientation")),
+        ("maxHeight", False, _decode_int),
+        ("maxWidth", False, _decode_int),
+    ],
+    # ── The rest of the child-bearing vocabulary ─────────────────────────────
+    #
+    # Every kind below carries node-valued positions that reached the structural
+    # pass-through, so their children decoded as untagged generic objects: they
+    # round-tripped byte-exactly and were invisible to `walk_nodes` / `find_node`
+    # / `inspect_tree`, and `validate_node` did not descend into them — a
+    # duplicate id inside a `Disclosure` produced no `FUARAN-DUP-ID`.
+    #
+    # These entries are DELIBERATELY MINIMAL, on the Tabs/Stepper precedent
+    # below: they type the node positions and nothing else, leaving every other
+    # key to the structural preservation it already had. `children` is required
+    # here because the corpus schema requires it on all five, matching the
+    # Modal / ScrollArea / Box entries that already did.
+    "Disclosure": [
+        ("children", True, _decode_children),
+    ],
+    "SplitPanel": [
+        ("children", True, _decode_children),
+    ],
+    "SummaryList": [
+        ("children", True, _decode_children),
+    ],
+    # ErrorBoundary's `child` / `fallback` and FragmentDecl's `body` are single
+    # nodes rather than lists. The corpus schema models no spec for either kind,
+    # so there is no oracle for their requiredness and none is asserted: the
+    # fields are optional, and the only change is that a node in one of these
+    # positions decodes as a node.
+    "ErrorBoundary": [
+        ("child", False, _decode_single_node),
+        ("fallback", False, _decode_single_node),
+    ],
+    "FragmentDecl": [
+        ("body", False, _decode_single_node),
+    ],
+    # A `SlotArg` fragment argument carries a whole node tree (`FragmentArg`,
+    # corpus schema) — the same class of hidden node, one level further in.
+    "FragmentRef": [
+        ("args", False, _decode_fragment_args),
+    ],
+    # Tabs / Stepper carry the language's only two ``Binding<int>`` slots, and
+    # had no typed schema at all — so the whole kind reached the structural
+    # pass-through and `activeIndex: true` decoded happily. Phase 1064 typed the
+    # numeric slot and nothing else, DELIBERATELY: the blast radius was the slot
+    # that phase was about, and it recorded the rest as residue. Requiredness
+    # follows the reference host: `activeIndex` is optional (`tryField`),
+    # `activeStep` required (`requireField`).
+    # `children` was added to both after the audit above: minimal is not the same
+    # as blind, and leaving a node-valued position structural is the one omission
+    # that costs more than it saves.
+    # Phase 1585 — `activeIndex` is omit-at-default (`Static(0)`), so the decoder
+    # drops the identity rather than carrying it: on the generic structural model
+    # the encoder re-emits exactly the fields present, so an explicit
+    # `{"$type":"Static","value":0}` carried through would make the pre-phase
+    # spelling a SECOND canonical form. `Stepper.activeStep` is deliberately NOT
+    # given the same treatment — it is IDL-`required`, not omit-at-default, and
+    # this decoder must not invent a rule the artefact does not state.
+    #
+    # Phase 1654 — the 1064 residue: BOTH SPECS ARE NOW COMPLETE against the
+    # corpus IDL's `kinds` entry for each, every member typed to the reference
+    # host's own reading (`JsonDecode.fs`'s `"Tabs"` / `"Stepper"` arms):
+    #   * `orientation` — omit-at-default `Horizontal`, the ordinary §3.6 enum
+    #     treatment, with the `Row`/`Column` aliases every other orientation slot
+    #     in this host accepts;
+    #   * `tabHeaders` — an array of records whose `label` is REQUIRED, so a
+    #     header with no label is now a `MISSING_FIELD` rather than a document
+    #     that round-trips perfectly and renders an unnamed tab;
+    #   * `tabTags` — an array of plain strings, refused by index;
+    #   * `activeTag` — the tag-side selection, a `Binding<string>`; the second
+    #     way a `Tabs` is live, which the validator already reads;
+    #   * `onSelect` / `onSelectTag` — `fn` slots, presence-only and normalised
+    #     to the sentinel (see `_decode_closure_slot`).
+    # `Stepper` gains the one member it was missing (`onSelect`). Nothing here
+    # invents a rule the IDL does not state — a member's requiredness, its
+    # omit-at-default and its type all come from that artefact.
+    "Tabs": [
+        ("activeIndex", False, _omit_default_binding_static_int(0)),
+        ("children", True, _decode_children),
+        ("orientation", False, _omit_default_enum(ORIENTATION, ORIENTATION_ALIASES, "Horizontal", "Orientation")),
+        ("tabHeaders", False, _decode_tab_headers),
+        ("tabTags", False, _decode_string_list),
+        ("activeTag", False, _decode_binding_string),
+        ("onSelect", False, _decode_closure_slot),
+        ("onSelectTag", False, _decode_closure_slot),
+    ],
+    "Stepper": [
+        ("activeStep", True, _decode_binding_int),
+        ("children", True, _decode_children),
+        ("onSelect", False, _decode_closure_slot),
+    ],
+    # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
+    # field schema, because it re-nests `layout` and role-validates.
+    # Button gets a (minimal) typed schema so its two contract-bearing fields
+    # route through the typed decoders: `label` picks up the §16 bare-string
+    # leniency, and `onClick` goes through the null-strict action decoder
+    # (rule 12 — the corpus reject-null-action-* fixtures pin the paths).
+    # The remaining fields (variant / icon / disabled / tooltip / …) pass
+    # through structurally like any unlisted key.
+    "Button": [
+        ("label", True, _decode_text_source),
+        ("onClick", True, _decode_action),
+        # `variant` alias-decoded (Danger→Destructive, §3.6); other fields
+        # (icon / disabled / tooltip / …) pass through structurally.
+        ("variant", False, _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant")),
+    ],
+    "Custom": [
+        ("moduleId", True, _decode_string),
+        ("componentId", True, _decode_string),
+        ("props", False, _decode_json_value),
+        ("contentHash", False, _decode_json_value),
+        ("exposedNodeIds", False, _decode_json_value),
+    ],
+    # Switch (Phase 392, selector widened Phase 768) — decoded by a dedicated
+    # builder (`_decode_switch`), not a flat field schema, because the selector
+    # is one-of `stateKey` / `on` with the Phase 768 collapse rule.
+    # Isolation/embedding boundary (WIRE_FORMAT §4o). scopeId + channel +
+    # capabilities are required; inputs is a FragmentArg map (additive) whose
+    # non-node cases pass through structurally WITHOUT null-strictness — it embeds
+    # whole node trees whose Binding.Static values are §5 opaque seams — while a
+    # `SlotArg`'s `tree` routes through the node decoder like any other node
+    # position.
+    #
+    # Phase 1579 — `onBubble` is OPTIONAL, and was wrongly required here. The IDL
+    # declares it optional and the reference decoder reads it with a presence
+    # test, so a mount whose bubbles the host does not take is a document every
+    # other host accepts and this one refused. Both corpus fixtures carry the
+    # sentinel, which is why no fixture caught it; the generative floor did, on
+    # the first run after the authoring surface could spell the absence.
+    "Mount": [
+        ("scopeId", True, _decode_string),
+        ("channel", True, _decode_guest_channel),
+        ("capabilities", True, _decode_json_value),
+        ("onBubble", False, _decode_string),
+        ("inputs", False, _decode_fragment_args),
+    ],
+}
+
+
+# ── Box (Phase 390) — the unified container + legacy decode-upgrade ─────────
+#
+# The wire is: {"$type":"Box","children":[…],"heading":<TextSource>?,
+#   "layout":{…},"role":"Group|Card|Dashboard|Separator"}. The nested `layout`
+# is `$type`-discriminated (Flex | Grid | Masonry | Auto). Mirrors the F# `decodeLayoutKind`
+# "Box" branch: role-validated, layout re-built, heading optional. The four
+# retired container tags decode-upgrade to the equivalent Box on read (a legacy
+# tag never re-encodes to its old form — it round-trips as Box).
+
+
+def _decode_box_layout(value: object, path: str) -> Obj:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, BOX_LAYOUT_CASES)
+    if tag == "Flex":
+        fields: dict[str, Value] = {
+            "direction": _enum_aliased(
+                _require(obj, "direction", path), f"{path}.direction", ORIENTATION, ORIENTATION_ALIASES, "direction"
+            ),
+            "wrap": _expect_bool(_require(obj, "wrap", path), f"{path}.wrap"),
+        }
+        if "gap" in obj:
+            fields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        return Obj("Flex", fields)
+    if tag == "Grid":
+        # `cols` aliases `columns` (§3.6).
+        cols_raw, cols_present = _alias_get(obj, "cols", ("columns",))
+        if not cols_present and "templateColumns" not in obj:
+            # §3.6 lenient shape coercion: a Grid with NO cols/columns/
+            # templateColumns is the CSS auto-grid prior — coerce to the
+            # responsive `Auto` layout (accept-and-canonicalise).
+            return Obj("Auto", {})
+        # 0.1.7 — a Grid with `templateColumns` but no column count defaults
+        # `cols` to 1 (a `Some templateColumns` supersedes `cols`).
+        cols = _expect_int(cols_raw, f"{path}.cols") if cols_present else 1
+        gfields: dict[str, Value] = {"cols": cols}
+        if "gap" in obj:
+            gfields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        if "templateColumns" in obj:
+            gfields["templateColumns"] = _expect_string(obj["templateColumns"], f"{path}.templateColumns")
+        return Obj("Grid", gfields)
+    if tag == "Masonry":
+        # WIRE_FORMAT §3.6.7 — column-FILL. `cols` is REQUIRED and must be a
+        # POSITIVE integer, on the §3.6.4 `srcSet` width-floor pattern:
+        # `column-count: 0` is invalid CSS, so a container declaring it would
+        # fall back to whatever the host stylesheet last said and the wire
+        # would be carrying a layout whose rendered result is host-defined.
+        #
+        # There is deliberately NO auto-column leniency of the kind the `Grid`
+        # arm above carries. A column-less `Grid` canonicalises to `Auto`
+        # because the language already owns that concept; `Auto` is a ROW-fill
+        # mode, so rewriting a masonry into it would discard the author's whole
+        # intent rather than recover it. The absence is a MISSING_FIELD and a
+        # non-positive value is refused rather than repaired.
+        #
+        # `cols` aliases `columns` (§3.6), as on `Grid`. There is no
+        # `templateColumns` twin: the multi-column model has no track list for
+        # one to name, and its absence is what keeps this case bounded.
+        cols_raw, cols_present = _alias_get(obj, "cols", ("columns",))
+        if not cols_present:
+            _fail(MISSING_FIELD, f"{path}.cols", "missing required field 'cols'", "positive integer column count")
+        cols = _expect_int(cols_raw, f"{path}.cols")
+        if cols <= 0:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.cols",
+                f"masonry column count must be positive, got {cols}",
+                "JSON number (positive integer column count)",
+            )
+        mfields: dict[str, Value] = {"cols": cols}
+        if "gap" in obj:
+            mfields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
+        return Obj("Masonry", mfields)
+    # Auto
+    return Obj("Auto", {})
+
+
+def _decode_box(obj: dict, path: str) -> Obj:
+    children = _decode_children(_require(obj, "children", path), f"{path}.children")
+    role = _enum(_require(obj, "role", path), f"{path}.role", BOX_ROLE, "role")
+    layout = _decode_box_layout(_require(obj, "layout", path), f"{path}.layout")
+    fields: dict[str, Value] = {"children": children}
+    # `heading` aliases `title` (§3.6, scoped to container kinds).
+    heading_raw, heading_present = _alias_get(obj, "heading", ("title",))
+    if heading_present:
+        fields["heading"] = _decode_text_source(heading_raw, f"{path}.heading")
+    fields["layout"] = layout
+    fields["role"] = role
+    # fuaran#1473 — the two paged-medium declarations, both omitted at `False`.
+    # ABSENT is the only spelling of "not declared", so there is no third value;
+    # a present member of the wrong JSON kind is REFUSED, never coerced, because
+    # a document that meant `true` and wrote `"true"` would otherwise render with
+    # its declaration silently dropped — exactly the split block the member
+    # exists to prevent. Pinned on BOTH decoder arms the vocabulary reaches
+    # (here and `DataGrid`'s) because they are separate branches and a vector on
+    # one proves nothing about the other.
+    for member in ("keepTogether", "breakBefore"):
+        if member in obj and _expect_bool(obj[member], f"{path}.{member}"):
+            fields[member] = True
+    return Obj("Box", fields)
+
+
+def _decode_switch(obj: dict, path: str) -> Obj:
+    """Switch — the binding-selected conditional child (Phase 392; the selector
+    widened to any Binding by Phase 768).
+
+    ``cases`` is an array of ``{child,match}`` objects; ``default`` a Node —
+    both required. Duplicate ``match`` values are NOT a decode error
+    (first-match-wins keeps decode structural; the validator flags them,
+    FUARAN082). The selector is one of two spellings: ``on`` (any Binding —
+    wins when both are present) or the compact ``stateKey`` string, the
+    canonical spelling of the ``State(key)`` form. Both absent keeps the
+    ``stateKey`` MISSING_FIELD, so the reject fixture's error is unchanged.
+    The Phase 768 collapse rule: an ``on`` that decodes to a default-free
+    ``State`` normalises to ``stateKey``, so the canonical bytes carry ``on``
+    only for a selector the compact form cannot spell."""
+    fields: dict[str, Value] = {
+        "cases": _decode_switch_cases(_require(obj, "cases", path), f"{path}.cases"),
+        "default": _decode_single_node(_require(obj, "default", path), f"{path}.default"),
+    }
+    if "on" in obj:
+        selector = _decode_binding(obj["on"], f"{path}.on")
+        if isinstance(selector, Obj) and selector.tag == "State" and "defaultValue" not in selector.fields:
+            fields["stateKey"] = selector.fields["key"]
+        else:
+            fields["on"] = selector
+    else:
+        fields["stateKey"] = _decode_string(_require(obj, "stateKey", path), f"{path}.stateKey")
+    # fuaran#1122 — the timed advance: a POSITIVE INTEGER count of milliseconds.
+    # Non-positive and FRACTIONAL are both WRONG_TYPE and neither is
+    # canonicalised. `0` is what an emitter reaches for to mean "off" and the
+    # language already HAS a spelling for off — an absent key — so rewriting a
+    # zero to absence would make two document shapes mean one thing and tell the
+    # emitter nothing about its misreading, while decoding it to a live
+    # zero-millisecond timer would be a re-render loop. A fraction is refused for
+    # a separate reason worth stating: the slot is an integer count, and a
+    # decoder truncating where another rounded would leave two hosts disagreeing
+    # about a document neither refused.
+    if "autoAdvanceMs" in obj:
+        raw_ms = obj["autoAdvanceMs"]
+        if isinstance(raw_ms, bool) or not isinstance(raw_ms, int) or raw_ms < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.autoAdvanceMs",
+                "autoAdvanceMs must be a positive whole number of milliseconds — an absent key is "
+                "how a switch says it does not advance (WIRE_FORMAT §3.3)",
+                "JSON number (positive integer milliseconds)",
+            )
+        fields["autoAdvanceMs"] = raw_ms
+    known = frozenset({"$type", "cases", "default", "on", "stateKey", "autoAdvanceMs"})
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj("Switch", fields)
+
+
+def _decode_kind(value: object, path: str) -> Obj:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, KNOWN_KINDS, code_unknown=WRONG_NODE_KIND)
+    if tag == "Box":
+        return _decode_box(obj, path)
+    if tag == "Switch":
+        return _decode_switch(obj, path)
+    if tag == "DataGrid":
+        return _decode_datagrid(obj, path)
+    if tag == "Form":
+        return _decode_form(obj, path)
+    if tag == "Filters":
+        return _decode_filters(obj, path)
+    if tag == "Chart":
+        return _decode_chart(obj, path)
+    if tag in _TITLE_TO_HEADING_KINDS:
+        obj = _title_to_heading(obj)
+    schema = KIND_SCHEMAS.get(tag)
+    if schema is None:
+        # Recognised kind without a typed schema yet — accept structurally.
+        return Obj(tag, {k: from_json(v) for k, v in obj.items() if k != "$type"})
+
+    # Schema entries are (name, required, decoder) or (name, required, decoder, aliases).
+    known: set[str] = set()
+    for entry in schema:
+        name, _, _, aliases = _unpack_schema(entry)
+        known.add(name)
+        known.update(aliases)
+    fields: dict[str, Value] = {}
+    for entry in schema:
+        name, required, dec, aliases = _unpack_schema(entry)
+        raw, present = _alias_get(obj, name, aliases)
+        if present:
+            decoded = dec(raw, f"{path}.{name}")
+            # Phase 460 omit-when-default: a `_DROP` result is omitted from the model
+            # (so the generic encoder re-emits the byte-minimal canonical form).
+            if decoded is not _DROP:
+                fields[name] = cast(Value, decoded)
+        elif required:
+            _fail(MISSING_FIELD, f"{path}.{name}", f"missing required field '{name}'")
+    # Preserve any extra (unknown) keys structurally so the round-trip is lossless
+    # and tolerant of fields a later spec version adds (decoder tolerance, §2 rule 2).
+    # Retired vocabulary (0.2.0 clean break) is NEVER preserved — the reference
+    # decoder does not read it, so carrying it forward would mint a second dialect.
+    retired = _RETIRED_FIELDS.get(tag, frozenset())
+    for key, raw in obj.items():
+        if key != "$type" and key not in known and key not in retired:
+            fields[key] = from_json(raw)
+    return Obj(tag, fields)
+
+
+# ── Scoped `title` → `heading` alias (WIRE_FORMAT §3.6, decode-only) ─────────
+# Box / Modal / Disclosure / SummaryList / Callout name their heading slot
+# `heading`; the `title` alias is the common author prior. SCOPED: Chart.title
+# and Drawing.title are real canonical fields and are never aliased.
+_TITLE_TO_HEADING_KINDS = frozenset({"Disclosure", "SummaryList"})
+
+
+def _title_to_heading(obj: dict) -> dict:
+    if "heading" not in obj and "title" in obj:
+        out = {k: v for k, v in obj.items() if k != "title"}
+        out["heading"] = obj["title"]
+        return out
+    return obj
+
+
+# ── TonedPill (WIRE_FORMAT §3.6 + §16, Phase 750) ───────────────────────────
+# The tone-map field names a `TonedPill` cell accepts (canonical first). `map` is the
+# shortest honest name for a value→tone dictionary and the least descriptive one.
+_TONE_MAP_KEYS = ("toneMap", "tones")
+
+
+def _decode_tone_map(value: object, path: str) -> Obj:
+    """A ``TonedPill``'s ``map``: a string-keyed object whose VALUES are ``ToneVariant``s.
+
+    Routed through the ordinary tone reader per entry, which buys two things deliberately
+    rather than by accident: the §3.6 tone aliases work inside the map exactly as they do
+    at a ``tone`` field, and an unrecognised value is refused rather than carried forward.
+    A second, private tone reader here is precisely how this position would come to accept
+    a vocabulary the ``tone`` field does not.
+
+    The refusal is RE-ISSUED rather than passed through: the shared reader reports
+    ``unrecognised tone '…'`` with the enum's own sorted hint, which does not say *which
+    map entry* is wrong — and "one of your tones is wrong" is not an actionable report
+    when the map has nine entries. The re-issue keeps the code, names the offending KEY
+    and value in the terms the author wrote them, and teaches the seven legal names.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    for key, raw in obj.items():
+        entry_path = f"{path}.{key}"
+        try:
+            fields[key] = _enum_aliased(raw, entry_path, TONE, TONE_ALIASES, "tone")
+        except _Fail as f:
+            # A non-string value is a WRONG_TYPE and already reports at the right path.
+            if f.error.code != UNKNOWN_DU_CASE:
+                raise
+            got = raw if isinstance(raw, str) else ""
+            _fail(
+                UNKNOWN_DU_CASE,
+                entry_path,
+                f"tone-map value '{got}' for '{key}' is not a ToneVariant",
+                " | ".join(TONE_NAMES),
+            )
+    return Obj(None, fields)
+
+
+def _decode_toned_pill(obj: dict, path: str) -> Obj:
+    """The shared body of the canonical ``TonedPill`` case and the ``Pill``-tagged §16
+    shorthand below — one reader, so the two spellings cannot drift apart in what they
+    accept."""
+    fields: dict[str, Value] = {}
+    field_raw, field_present = _alias_get(obj, "field", ())
+    if not field_present:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.field",
+            "missing required field 'field'",
+            "TonedPill row-field name (drives the label and the map key)",
+        )
+    fields["field"] = _expect_string(field_raw, f"{path}.field")
+    map_raw, map_present = _alias_get(obj, "map", _TONE_MAP_KEYS)
+    if not map_present:
+        _fail(
+            MISSING_FIELD,
+            f"{path}.map",
+            "missing required field 'map'",
+            "TonedPill value→ToneVariant map",
+        )
+    fields["map"] = _decode_tone_map(map_raw, f"{path}.map")
+    # `default` is omitted-when-`Default` (Phase 460); an absent key restores the
+    # identity, and an aliased `Neutral` normalises to `Default` and then omits.
+    if "default" in obj:
+        tone = _enum_aliased(obj["default"], f"{path}.default", TONE, TONE_ALIASES, "tone")
+        if tone != "Default":
+            fields["default"] = tone
+    return Obj("TonedPill", fields)
+
+
+def _decode_cell_kind(value: object, path: str) -> Value:
+    """A DataGrid column's cell kind — a `$type`-discriminated case, preserved
+    structurally (the closure/handler payloads are host-side) except for the one case
+    that carries no closure and so survives the wire: `TonedPill` (Phase 750)."""
+    obj = _expect_object(value, path)
+    if "$type" not in obj:
+        _fail(MISSING_FIELD, f"{path}.$type", "missing $type discriminator")
+    tag = obj["$type"]
+    if tag == "TonedPill":
+        return _decode_toned_pill(obj, path)
+    # Lenient-ingest (WIRE_FORMAT §16, Phase 750): "pill" is the WORD for the thing, so a
+    # declarative tone rule arrives tagged `Pill` more often than tagged `TonedPill`.
+    # Before this phase the extra keys fell through the structural pass-through and the
+    # author's whole intent was carried as a closure pill's dead payload. Presence of a
+    # tone map is the unambiguous tell — a closure `Pill` carries only `labelFn`/`toneFn`
+    # and can never carry one.
+    if tag == "Pill" and any(k in obj for k in ("map", *_TONE_MAP_KEYS)):
+        return _decode_toned_pill(obj, path)
+    return from_json(value)
+
+
+def _decode_row_cell(value: object, path: str) -> Value:
+    """One cell of a typed row (fuaran#665) — the residual-opaque boundary, narrowed
+    from the whole rows payload to the cell seam.
+
+    The §2 rule-11 recognised scalars (string / bool / number) carry faithfully; a
+    nested array or object is display-opaque and normalises to the ``"<opaque>"``
+    sentinel, which is what the reference hosts *re-encode* such a cell as — so this
+    host's decode-time normalisation keeps the round-trip byte-stable in one pass
+    rather than two (the established ``_typed_static_binding`` idiom above).
+    """
+    del path  # every JSON value is representable here; nothing rejects
+    if isinstance(value, bool) or isinstance(value, (int, float, str)):
+        return value
+    return OPAQUE
+
+
+def _decode_row(value: object, path: str) -> Value:
+    """One row: an *open* name→value record of scalar cells. A ``null`` cell is
+    OMITTED (rule 4 — absence is structural, never ``"k":null``), matching what the
+    reference encoders emit. Built structurally rather than via :func:`from_json` so
+    a cell named ``$type`` stays a cell, never a discriminator."""
+    obj = _expect_object(value, path)
+    return Obj(None, {k: _decode_row_cell(v, f"{path}.{k}") for k, v in obj.items() if v is not None})
+
+
+def _decode_row_array(value: object, path: str) -> Value:
+    arr = _expect_array(value, path)
+    return Arr([_decode_row(item, f"{path}[{i}]") for i, item in enumerate(arr)])
+
+
+def _decode_grid_source(value: object, path: str) -> Value:
+    """A DataGrid/Chart data source. fuaran#665 moved its rows off the §5 host-typed
+    opaque seam: a ``Static``/``State`` payload is a typed array of row objects, and a
+    bare JSON array coerces to ``Static`` of the same (§3.6). Both legacy spellings —
+    the ``"<opaque>"`` sentinel a pre-typed host emitted, and an absent/``null``
+    payload — normalise to the empty feed ``[]`` (read-compat, indefinitely: that
+    *was* the whole value the sentinel carried). Every other binding case
+    (Transform/Query/…) normalises through the binding decoder."""
+    # `typed_default` — the editable-grid authoring shape is a `State`-sourced rows
+    # array (the write-back floor), so `defaultValue` carries rows just as `value`
+    # does and must take the same normalisation.
+    return _typed_static_binding(value, path, _decode_row_array, Arr([]), Arr([]), typed_default=True)
+
+
+def _check_near_misses(
+    obj: dict,
+    path: str,
+    candidates: tuple[tuple[str, str], ...],
+    vocabulary: str = "grid",
+    consequence: str = "",
+) -> None:
+    """fuaran#863 — decode-time didactics for the grid-behaviour family's NEAR MISSES
+    (the fuaran#860 charter's rejected-spellings deliverable).
+
+    Every spelling below decoded SILENTLY before: WIRE_FORMAT §2 rule 2 tolerates unknown
+    keys, so a model that reached for the wrong name got a tree that decoded, validated and
+    rendered while the declaration did nothing — the fake-affordance failure in a new guise,
+    and tolerance is what hid it. The narrowing is an ENUMERATED set with an unambiguous
+    canonical form each; rule 2 holds for everything else. Walked in declaration order, so
+    which defect surfaces first is deterministic across hosts.
+
+    ``consequence`` is an optional trailing clause naming what the silence costs in
+    that particular vocabulary (fuaran#959) — the refusal is didactic, and the
+    didactic is sharper when it says what was lost, not only what was ignored.
+    Empty for the grid, whose message the four other hosts pin unchanged.
+    """
+    for found, canonical in candidates:
+        if found in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.{found}",
+                f"'{found}' is not part of the {vocabulary} vocabulary — it would be ignored, "
+                f"not honoured{consequence}",
+                canonical,
+            )
+
+
+# Named by the census row itself. Deliberately NOT aliased to `editable: false`: an
+# inverting alias that guesses wrong makes a read-only column editable.
+_COLUMN_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("readOnly", "editable: false — the column flag NARROWS the grid's editable capability"),
+)
+
+_GRID_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    # The sharpest of them: a LITERAL page number is not expressible at all, because the
+    # position lives in State so a control can move it.
+    (
+        "currentPage",
+        'pageStateKey — the page POSITION lives in State as {"page": N} so the pager can move it; '
+        "a literal page number is not expressible",
+    ),
+    (
+        "page",
+        'pageStateKey — the page POSITION lives in State as {"page": N} so the pager can move it; '
+        "a literal page number is not expressible",
+    ),
+    ("pageIndex", 'pageStateKey — the page POSITION lives in State as {"page": N}, 1-based (not a zero-based index)'),
+    (
+        "sortable",
+        "sortStateKey on the grid + sortable on each COLUMN — grid-wide sortable is the staticRows "
+        "spelling; a data-bound grid narrows per column",
+    ),
+    (
+        "onEdit",
+        "editStateKey — the edit DESTINATION is a State key on the grid; onEdit is a per-cell host "
+        "closure and carries no destination across the wire",
+    ),
+    (
+        "behaviour",
+        "sibling fields on the grid (sortStateKey / pageStateKey / pageSize / editStateKey / "
+        "defaultSort) — grid behaviour is not a nested record",
+    ),
+    (
+        "behavior",
+        "sibling fields on the grid (sortStateKey / pageStateKey / pageSize / editStateKey / "
+        "defaultSort) — grid behaviour is not a nested record",
+    ),
+)
+
+
+def _decode_column(value: object, path: str) -> Value:
+    """A DataGrid ``ColumnErased`` record (WIRE_FORMAT §3.6): ``kind`` ← ``type``,
+    ``label`` ← ``header`` / ``title``, ``format`` / ``width`` omitted-when-default
+    (``CellFormat.None`` / ``ColumnWidth.Auto``). ``value`` (closure) + ``field``
+    (declarative) are sibling optional slots preserved structurally."""
+    obj = _expect_object(value, path)
+    _check_near_misses(obj, path, _COLUMN_NEAR_MISSES)
+    fields: dict[str, Value] = {}
+    kind_raw, kind_present = _alias_get(obj, "kind", ("type",))
+    if kind_present:
+        fields["kind"] = _decode_cell_kind(kind_raw, f"{path}.kind")
+    label_raw, label_present = _alias_get(obj, "label", ("header", "title"))
+    if label_present:
+        fields["label"] = _expect_string(label_raw, f"{path}.label")
+    if "format" in obj:
+        fv = _omit_default_format(obj["format"], f"{path}.format")
+        if fv is not _DROP:
+            fields["format"] = cast(Value, fv)
+    if "width" in obj:
+        wv = _omit_default_width(obj["width"], f"{path}.width")
+        if wv is not _DROP:
+            fields["width"] = cast(Value, wv)
+    _column_known = frozenset({"kind", "type", "label", "header", "title", "format", "width"})
+    for key, raw in obj.items():
+        if key not in _column_known:
+            fields[key] = from_json(raw)
+    return Obj(None, fields)
+
+
+_SORT_DIRECTIONS = frozenset({"asc", "desc"})
+
+
+def _validate_static_rows(raw: object, path: str) -> None:
+    """Phase 801 — check the two declarative sort-intent slots on ``staticRows``.
+
+    ``staticRows`` itself still passes through structurally (``from_json``), which is
+    what makes the round-trip byte-identical for free. What structure cannot do is
+    REFUSE: a direction outside the closed pair and a negative header index are both
+    well-formed JSON, so without this check they would decode silently and the corpus's
+    reject fixtures would pass as accepts. Validation only — nothing is rewritten, so
+    the passthrough encoding is untouched.
+    """
+    if not isinstance(raw, dict):
+        return
+    sortable = raw.get("sortable")
+    if sortable is not None and not isinstance(sortable, bool):
+        _fail(WRONG_TYPE, f"{path}.sortable", "sortable must be a boolean")
+    default_sort = raw.get("defaultSort")
+    if default_sort is None:
+        return
+    _validate_default_sort(default_sort, f"{path}.defaultSort")
+
+
+def _validate_default_sort(default_sort: object, ds_path: str) -> None:
+    """Phase 801 / fuaran#861 — the ``{column, direction}`` initial-order declaration.
+
+    ONE checker, shared by the ``staticRows`` spelling and the bound grid's own slot: same
+    record, same bound, same message at a different path. ``column`` is a NON-NEGATIVE
+    index; a negative (or non-integral) value is WRONG_TYPE, which is also what
+    ``schema.json``'s ``minimum: 0`` says. An index PAST the end is deliberately accepted —
+    a relation between sibling values is not something a per-object codec judges.
+    """
+    ds = _expect_object(default_sort, ds_path)
+    if "column" not in ds:
+        _fail(MISSING_FIELD, f"{ds_path}.column", "missing required field 'column'", "non-negative header index")
+    column = ds["column"]
+    # `bool` is a subclass of `int` in Python — exclude it explicitly, or `true` would
+    # decode as column 1.
+    if isinstance(column, bool) or not isinstance(column, int) or column < 0:
+        _fail(
+            WRONG_TYPE,
+            f"{ds_path}.column",
+            "column must be a non-negative integer header index",
+            "JSON number (non-negative integer header index)",
+        )
+    if "direction" not in ds:
+        _fail(MISSING_FIELD, f"{ds_path}.direction", "missing required field 'direction'", "asc | desc")
+    _enum(ds["direction"], f"{ds_path}.direction", _SORT_DIRECTIONS, "SortDirection")
+
+
+def _decode_datagrid(obj: dict, path: str) -> Obj:
+    """DataGrid (GridSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` / ``rows`` (the
+    rows are opaque-erased), typed ``columns``. Remaining fields (``editable`` /
+    ``rowKey`` / ``rowKeyField`` / ``staticRows`` / ``onRowClick``) pass through
+    structurally, as the pre-typed decoder did — with the Phase 801 sort-intent slots
+    on ``staticRows`` validated in passing (see ``_validate_static_rows``)."""
+    fields: dict[str, Value] = {}
+    if "staticRows" in obj:
+        _validate_static_rows(obj["staticRows"], f"{path}.staticRows")
+    # fuaran#862 — `pageSize` is how many rows a page holds. A page of zero or fewer rows
+    # names no page at all, so it is WRONG_TYPE — which is also what schema.json's
+    # `minimum: 1` says. Validation only: the field still passes through structurally
+    # below, which is what keeps the round-trip byte-identical for free.
+    if "pageSize" in obj:
+        page_size = obj["pageSize"]
+        if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.pageSize",
+                "pageSize must be an integer page size of 1 or more",
+                "JSON number (integer page size of 1 or more)",
+            )
+    # fuaran#861 — the bound path's declared initial order, checked by the SAME function
+    # the staticRows spelling uses.
+    if "defaultSort" in obj:
+        _validate_default_sort(obj["defaultSort"], f"{path}.defaultSort")
+    _check_near_misses(obj, path, _GRID_NEAR_MISSES)
+    src_raw, src_present = _alias_get(obj, "source", ("data", "rows"))
+    if src_present:
+        fields["source"] = _decode_grid_source(src_raw, f"{path}.source")
+    if "columns" in obj:
+        arr = _expect_array(obj["columns"], f"{path}.columns")
+        fields["columns"] = Arr([_decode_column(c, f"{path}.columns[{i}]") for i, c in enumerate(arr)])
+    # 0.2.0 — `editable` omitted-when-false on both boundaries.
+    if "editable" in obj and _expect_bool(obj["editable"], f"{path}.editable"):
+        fields["editable"] = True
+    # fuaran#818 — the grid-sort header affordance: `sortStateKey` names the
+    # State key carrying the `{column, direction}` sort descriptor a data-bound
+    # grid's runtime sorts by. Typed as a string; encode-omitted when absent.
+    if "sortStateKey" in obj:
+        fields["sortStateKey"] = _expect_string(obj["sortStateKey"], f"{path}.sortStateKey")
+    # fuaran#1123 — the two ends of ONE shared transfer key. A present member of
+    # any type other than string is WRONG_TYPE and is never coerced: the slot
+    # names a STATE KEY, so an ordinal or a boolean names no key, and a grid
+    # identified by position could not be paired with by any other grid.
+    for transfer in ("transferOutKey", "transferInKey"):
+        if transfer in obj:
+            fields[transfer] = _expect_string(obj[transfer], f"{path}.{transfer}")
+    # fuaran#1125 — the export declaration, and fuaran#1473's grid pair. All
+    # three omit at `False` and all three refuse a present non-boolean, on
+    # `editable`'s terms.
+    for flag in ("exportable", "keepRowsTogether", "repeatHeader"):
+        if flag in obj and _expect_bool(obj[flag], f"{path}.{flag}"):
+            fields[flag] = True
+    _grid_known = frozenset(
+        {
+            "$type",
+            "source",
+            "data",
+            "rows",
+            "columns",
+            "editable",
+            "sortStateKey",
+            "transferOutKey",
+            "transferInKey",
+            "exportable",
+            "keepRowsTogether",
+            "repeatHeader",
+        }
+    )
+    for key, raw in obj.items():
+        if key not in _grid_known:
+            fields[key] = from_json(raw)
+    return Obj("DataGrid", fields)
+
+
+_CHART_ANNOTATION_CASES = frozenset({"ReferenceLine", "EventMarker", "RangeBand"})
+_CHART_ANNOTATION_X_CASES = frozenset({"Category", "Date"})
+_CHART_ANNOTATION_RANGE_CASES = frozenset({"ValueRange", "XRange"})
+
+
+def _is_canonical_iso_day(text: str) -> bool:
+    """``True`` when ``text`` is a canonical ISO-8601 date the temporal axis can
+    place — ``YYYY-MM-DD``, optionally followed by ``T…`` whose time-of-day is
+    discarded.
+
+    STRICT by shape AND by calendar: four digits, two, two, both hyphens, a month
+    in 1–12 and a day the month actually has. A locale spelling (``15/01/2026``)
+    and a bare year are both refused — admitting either would be the
+    string-sniffing the temporal axis exists to avoid.
+    """
+    if len(text) < 10 or text[4] != "-" or text[7] != "-":
+        return False
+    if len(text) > 10 and text[10] != "T":
+        return False
+    y_s, m_s, d_s = text[0:4], text[5:7], text[8:10]
+    if not (y_s.isdigit() and m_s.isdigit() and d_s.isdigit()):
+        return False
+    # ``str.isdigit`` admits non-ASCII digits; the canonical form is ASCII only.
+    if not all(c in "0123456789" for c in y_s + m_s + d_s):
+        return False
+    y, m, d = int(y_s), int(m_s), int(d_s)
+    if not 1 <= m <= 12:
+        return False
+    if m == 2:
+        last = 29 if (y % 4 == 0 and y % 100 != 0) or y % 400 == 0 else 28
+    elif m in (4, 6, 9, 11):
+        last = 30
+    else:
+        last = 31
+    return 1 <= d <= last
+
+
+def _check_chart_annotation_x(raw: object, path: str) -> str | None:
+    """An annotation's X ADDRESS (Phase 1491, §4l "The three addressing forms").
+
+    THE DATE MUST BE A DATE, and this refusal is the twin of ``ReferenceLine``'s
+    finite-value narrowing rather than a new posture. The lowering's calendar is
+    deliberately TOTAL — an unparseable x CELL reads as 1970-01-01, because a
+    non-date COLUMN is loud upstream and refusing per-cell would be worse. An
+    annotation has no column to be loud about: the string is authored directly.
+    And because §4l rule 3 has a temporal address ENTER the axis extent before the
+    ticks are chosen, a typo does not misplace one marker — it drags the domain
+    back to the epoch and rescales the whole picture.
+
+    Returns the canonical ISO string for a ``Date`` address (so the pair rule can
+    compare two of them), or ``None`` for a ``Category`` one.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_X_CASES)
+    if tag == "Category":
+        _expect_string(_require(o, "key", path), f"{path}.key")
+        return None
+    iso = _expect_string(_require(o, "iso", path), f"{path}.iso")
+    if not _is_canonical_iso_day(iso):
+        _fail(
+            WRONG_TYPE,
+            f"{path}.iso",
+            "expected a canonical ISO-8601 date (YYYY-MM-DD, optionally followed by a time) naming a "
+            "real calendar day — an event marker's date is the address it is drawn at, and an "
+            "unreadable one would place the marker at 1970-01-01 and drag the axis back with it",
+        )
+    return iso
+
+
+def _check_chart_annotation_range(raw: object, path: str) -> None:
+    """A range band's PAIR (Phase 1492, §4l). The case carries the AXIS as well as
+    the pair, so a value axis addressed by category keys is not a document this
+    decoder has to refuse — it is one no encoder can write.
+
+    TWO REFUSALS, and they are the pair rules the WIRE can decide by itself. A
+    non-finite endpoint is ``ReferenceLine``'s narrowing at two slots instead of
+    one, for its reason exactly. An UNORDERED pair is refused at the pair's own
+    slot — the defect is the pair's, not either end's — rather than silently
+    swapped: a band written backwards is a mistake about the author's own data.
+
+    A CATEGORY pair's order is NOT decided here: the order of two band keys is the
+    ROWS' order, a cross-reference rather than a local property of the address.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_RANGE_CASES)
+    if tag == "ValueRange":
+        lo = _decode_number(_require(o, "from", path), f"{path}.from")
+        hi = _decode_number(_require(o, "to", path), f"{path}.to")
+        for slot, v in (("from", lo), ("to", hi)):
+            if not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+                _fail(
+                    WRONG_TYPE,
+                    f"{path}.{slot}",
+                    "expected a FINITE JSON number — a range band's end names a place on the value "
+                    "axis, and NaN / Infinity names none; give the value in the axis's own units, or "
+                    "drop the annotation",
+                )
+        if float(lo) > float(hi):  # type: ignore[arg-type]
+            _fail(
+                WRONG_TYPE,
+                path,
+                "expected an ORDERED pair — a range band runs from its lower value to its upper one, "
+                "and this pair runs backwards; swapping the ends silently would draw a band the "
+                "author did not describe",
+            )
+        return
+    a = _check_chart_annotation_x(_require(o, "from", path), f"{path}.from")
+    b = _check_chart_annotation_x(_require(o, "to", path), f"{path}.to")
+    # Both dates are already known canonical and calendar-valid, and a canonical
+    # ``YYYY-MM-DD`` sorts lexicographically exactly as it sorts chronologically —
+    # so no calendar arithmetic is needed to decide the order at this boundary.
+    if a is not None and b is not None and a > b:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "expected an ORDERED pair — a range band runs from its earlier date to its later one, and "
+            "this pair runs backwards; swapping the ends silently would draw a band the author did "
+            "not describe",
+        )
+
+
+def _check_chart_annotation(raw: object, path: str) -> None:
+    """A chart's data-addressed annotation (Phase 1490, §4l). One closed
+    ``$type``-discriminated union.
+
+    THE REFERENCE LINE'S VALUE MUST BE FINITE, and that is a slot-specific
+    NARROWING of §7 rather than a disagreement with it. §7 admits the quoted
+    sentinels at every float slot and ``_decode_number`` reads them — the widening
+    is deliberate and stays. But a reference line addresses a place on the VALUE
+    AXIS, and a non-finite value names no such place: it would enter the domain
+    computation and put every gridline, tick and mark at a NaN coordinate. The
+    picture is not merely wrong at the annotation, it is wrong everywhere.
+
+    The annotation itself passes through STRUCTURALLY (this function only checks),
+    so a conformant document round-trips byte-for-byte as it always did.
+    """
+    o = _expect_object(raw, path)
+    tag = _dispatch(o, path, _CHART_ANNOTATION_CASES)
+    if "label" in o:
+        _decode_text_source(o["label"], f"{path}.label")
+    if tag == "ReferenceLine":
+        v = _decode_number(_require(o, "value", path), f"{path}.value")
+        if not isinstance(v, (int, float)) or not math.isfinite(float(v)):
+            _fail(
+                WRONG_TYPE,
+                f"{path}.value",
+                "expected a FINITE JSON number — a reference line names a place on the value axis, "
+                "and NaN / Infinity names none; give the value in the axis's own units, or drop the "
+                "annotation",
+            )
+    elif tag == "EventMarker":
+        _check_chart_annotation_x(_require(o, "at", path), f"{path}.at")
+    else:
+        _check_chart_annotation_range(_require(o, "range", path), f"{path}.range")
+
+
+def _decode_chart(obj: dict, path: str) -> Obj:
+    """Chart (ChartSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` (opaque-erased
+    rows). ``title`` is a real canonical field here (NOT the `heading` alias).
+    Remaining fields pass through structurally."""
+    fields: dict[str, Value] = {}
+    src_raw, src_present = _alias_get(obj, "source", ("data",))
+    if src_present:
+        fields["source"] = _decode_grid_source(src_raw, f"{path}.source")
+    # Phase 1490 — ``annotations`` (§4l): the data-addressed attachments. Carried
+    # structurally like every other pass-through field, so a conformant document
+    # round-trips byte-for-byte; CHECKED here because three of its rules cannot be
+    # recovered downstream (a non-finite address poisons the whole domain, an
+    # unparseable date drags the axis to the epoch, and an unordered pair draws a
+    # band the author did not describe).
+    if "annotations" in obj:
+        for i, item in enumerate(_expect_array(obj["annotations"], f"{path}.annotations")):
+            _check_chart_annotation(item, f"{path}.annotations[{i}]")
+    _chart_known = frozenset({"$type", "source", "data"})
+    for key, raw in obj.items():
+        if key not in _chart_known:
+            fields[key] = from_json(raw)
+    # Phase 1585 — ``stacked`` is omit-at-default (`False`). This decoder is
+    # structural, so an explicit `"stacked": false` would otherwise be carried
+    # into the model and re-emitted, making the pre-phase spelling a SECOND
+    # canonical form. Dropping it here is the same `_DROP` rule the
+    # schema-driven kinds get from `_omit_default_bool`, reached by hand because
+    # `Chart` decodes through its own function.
+    if fields.get("stacked") is False:
+        del fields["stacked"]
+    return Obj("Chart", fields)
+
+
+# ── FormFieldKind — the unified control vocabulary (0.2.0 filters-unification) ──
+#
+# One decoder covers form fields AND filter chips. The auto-bind context
+# (`FilterChip name` | `FormFieldId id` | none) mirrors the F# `ControlAutoBind`:
+# a `value` that is exactly the context's auto-binding — `Filter(name)` on a
+# chip, `State(field id, typed placeholder)` on a form field (0.2.1) — is
+# OMITTED from the model, so the canonical minimal control carries no `value`
+# key at all; an absent `value` simply stays absent (the canonical bytes).
+
+FORM_FIELD_KIND_CASES = frozenset(
+    {
+        "Text",
+        "Number",
+        "Checkbox",
+        "Toggle",
+        "Choice",
+        "RangedNumber",
+        "SegmentedChoice",
+        "TextArea",
+        "Range",
+        "Date",
+        "DateRange",
+        # fuaran#1113 — the typeahead field; #1121 the multi-token one; #1130 the
+        # score and the swatch.
+        "Combobox",
+        "Tokens",
+        "Rating",
+        "Color",
+    }
+)
+
+# The 0.2.1 typed placeholders (the F# `ControlValueDefaults`): the values the
+# form-field auto-binding `State(field id, <placeholder>)` carries per control.
+_AUTO_TEXT: tuple[Value, ...] = ("",)
+_AUTO_NUMBER: tuple[Value, ...] = (0, 0.0)
+_AUTO_CHECKBOX: tuple[Value, ...] = (False,)
+_AUTO_CHOICE: tuple[Value, ...] = (None,)
+_AUTO_RANGE: tuple[Value, ...] = (Obj(None, {"max": 0, "min": 0}), Obj(None, {"max": 0.0, "min": 0.0}))
+# 0.7.0 — the DateRange placeholder is the ISO-empty pair at both ends.
+_AUTO_DATE_RANGE: tuple[Value, ...] = (Obj(None, {"from": "", "to": ""}),)
+# fuaran#1121 — a token field's placeholder is the EMPTY LIST: the list is
+# ordered and the order is the reader's, so an auto-bound field starts with no
+# chips rather than with a placeholder one.
+_AUTO_TOKENS: tuple[Value, ...] = (Arr([]),)
+# fuaran#1130 — the unset swatch. `#000000` is what a native colour input
+# substitutes when handed nothing, and it is the one `#rrggbb` form the control
+# can hold.
+_AUTO_COLOR: tuple[Value, ...] = ("#000000",)
+
+
+def _is_auto_value(decoded: Value, auto: tuple[str, str] | None, placeholders: tuple[Value, ...]) -> bool:
+    """Is `decoded` exactly the context's auto-binding (drop it from the model)?"""
+    if auto is None or not isinstance(decoded, Obj):
+        return False
+    context, name = auto
+    if context == "filter":
+        return decoded == Obj("Filter", {"name": name})
+    # form field: State(field id, typed placeholder)
+    if decoded.tag != "State" or decoded.fields.get("key") != name:
+        return False
+    if "defaultValue" not in decoded.fields:
+        return False
+    return any(decoded.fields["defaultValue"] == p for p in placeholders)
+
+
+def _decode_range_pair_value(value: object, path: str) -> Value:
+    """A `FormFieldKind.Range` value: the canonical Static pair rides as the
+    BARE `{"max":…,"min":…}` object (no envelope); a `[min,max]` two-element
+    array and the enveloped `Static` form decode leniently (§3.6); any other
+    binding case passes through the normal binding decode."""
+    raw: object = value
+    if isinstance(raw, dict) and raw.get("$type") == "Static" and "value" in raw:
+        raw = raw["value"]
+    if isinstance(raw, list):
+        if len(raw) != 2:
+            _fail(WRONG_TYPE, path, "a range value array must carry exactly [min, max]")
+        lo = _decode_number(raw[0], f"{path}[0]")
+        hi = _decode_number(raw[1], f"{path}[1]")
+        return Obj(None, {"max": hi, "min": lo})
+    if isinstance(raw, dict) and "$type" not in raw and "min" in raw and "max" in raw:
+        return Obj(
+            None,
+            {
+                "max": _decode_number(raw["max"], f"{path}.max"),
+                "min": _decode_number(raw["min"], f"{path}.min"),
+            },
+        )
+    return _decode_binding(value, path)
+
+
+def _ordered_date_pair(lo: str, hi: str, path: str) -> Value:
+    """The DateRange ordered-pair rule (WIRE_FORMAT §3.6, 0.7.0).
+
+    A *literal* pair must satisfy ``from <= to``. Same-variant ISO-8601 strings
+    sort lexicographically in chronological order, so Python's ordinal string
+    compare (the `String.CompareOrdinal` twin) is total here — no date parsing,
+    no locale. Only a literal pair is checked; a bound pair's ordering is a
+    runtime concern."""
+    if lo > hi:
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"date-range start '{lo}' is after end '{hi}' — a DateRange pair is ordered (from <= to); "
+            "ISO-8601 strings of one variant compare lexicographically, so swap the two values",
+            'ordered ISO-8601 pair ({"from": <iso>, "to": <iso>} with from <= to)',
+        )
+    return Obj(None, {"from": lo, "to": hi})
+
+
+def _decode_date_range_pair_value(value: object, path: str) -> Value:
+    """A `FormFieldKind.DateRange` value: the canonical Static pair rides as the
+    BARE `{"from":…,"to":…}` object (no envelope — the `Range` posture); a
+    `[from,to]` two-element array and the enveloped `Static` form decode
+    leniently (§3.6); any other binding case passes through the normal binding
+    decode. A literal pair is ordered-checked; a bound one is not."""
+    raw: object = value
+    if isinstance(raw, dict) and raw.get("$type") == "Static" and "value" in raw:
+        raw = raw["value"]
+    if isinstance(raw, list):
+        if len(raw) != 2:
+            _fail(WRONG_TYPE, path, "a date-range value array must carry exactly [from, to]")
+        return _ordered_date_pair(
+            _expect_string(raw[0], f"{path}[0]"),
+            _expect_string(raw[1], f"{path}[1]"),
+            path,
+        )
+    if isinstance(raw, dict) and "$type" not in raw and "from" in raw and "to" in raw:
+        return _ordered_date_pair(
+            _expect_string(raw["from"], f"{path}.from"),
+            _expect_string(raw["to"], f"{path}.to"),
+            path,
+        )
+    return _decode_binding(value, path)
+
+
+def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | None) -> Obj:
+    obj = _expect_object(value, path)
+    tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES)
+    fields: dict[str, Value] = {}
+
+    handler_key = "onToggle" if tag in ("Checkbox", "Toggle") else "onChange"
+    if handler_key in obj:
+        # A present handler (any spelling) decodes to the closure placeholder
+        # and re-encodes as the sentinel; an absent one arms the write-back default.
+        fields[handler_key] = "<closure>"
+
+    def value_slot(dec: Callable[[object, str], Value], placeholders: tuple[Value, ...]) -> None:
+        if "value" in obj:
+            decoded = dec(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, placeholders):
+                fields["value"] = decoded
+        # absent: stays absent — the canonical minimal control (auto-bound at
+        # run time to $filters.<name> / $state.<field id>).
+
+    def bound(key: str, dec: Callable[[object, str], Value]) -> None:
+        if key in obj:
+            fields[key] = dec(obj[key], f"{path}.{key}")
+
+    if tag in ("Text", "TextArea", "Date"):
+        value_slot(_decode_binding, _AUTO_TEXT)
+        if tag == "TextArea":
+            fields["rows"] = _expect_int(_require(obj, "rows", path), f"{path}.rows")
+        if tag == "Date":
+            fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+            bound("min", _decode_string)
+            bound("max", _decode_string)
+            bound("step", _decode_number)
+    elif tag in ("Number", "RangedNumber"):
+        # Binding<float> on the reference host — the numeric control's value is a
+        # float slot, so it takes the §7 sentinels and refuses everything else.
+        value_slot(_decode_binding_float, _AUTO_NUMBER)
+        if tag == "RangedNumber":
+            bound("min", _decode_number)
+            bound("max", _decode_number)
+            bound("step", _decode_number)
+    elif tag in ("Checkbox", "Toggle"):
+        # Toggle (Phase 766) — the switch-styled boolean control: Checkbox's
+        # bool mechanics under a distinct tag-only discriminator.
+        value_slot(_decode_binding, _AUTO_CHECKBOX)
+    elif tag in ("Choice", "SegmentedChoice"):
+        fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")
+        value_slot(_decode_binding_string_opt, _AUTO_CHOICE)
+        if tag == "SegmentedChoice":
+            # §3.6 — an absent `orientation` restores the language default
+            # `Horizontal` (the universal segmented-control prior); the
+            # canonical encoder always emits it.
+            if "orientation" in obj:
+                fields["orientation"] = _enum_aliased(
+                    obj["orientation"], f"{path}.orientation", ORIENTATION, ORIENTATION_ALIASES, "orientation"
+                )
+            else:
+                fields["orientation"] = "Horizontal"
+    elif tag == "DateRange":
+        # 0.7.0 — the single-control date range: `Range`'s pair mechanics with
+        # `Date`'s value conventions. `min` / `max` (ISO strings) + `step`
+        # (seconds) are flat — they bound BOTH ends — with `Date`'s
+        # omit-when-absent discipline.
+        if "value" in obj:
+            decoded = _decode_date_range_pair_value(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, _AUTO_DATE_RANGE):
+                fields["value"] = decoded
+        fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+        bound("min", _decode_string)
+        bound("max", _decode_string)
+        bound("step", _decode_number)
+    elif tag == "Combobox":
+        # fuaran#1113 — the wire shape is `Choice`'s (same option source, same
+        # value slot, same handler contract) plus `allowFreeText`, which OMITS at
+        # `false`, so the shortest combobox document is the CONSTRAINED one. A
+        # present member of any other type is WRONG_TYPE and is never coerced:
+        # the slot decides whether values outside the option set are admitted, so
+        # a lenient truthiness read would widen the field on `"no"`.
+        fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")
+        if "allowFreeText" in obj and _expect_bool(obj["allowFreeText"], f"{path}.allowFreeText"):
+            fields["allowFreeText"] = True
+        value_slot(_decode_binding_string_opt, _AUTO_CHOICE)
+    elif tag == "Tokens":
+        # fuaran#1121 — `allowFreeText` OMITS AT TRUE here, the OPPOSITE polarity
+        # to `Combobox`'s, and this is the one thing about the case a host is
+        # most likely to get wrong. The two differ because their SETS differ:
+        # `Combobox.options` is REQUIRED so "constrained" is its resting state,
+        # where `suggestions` is optional so a token box with nothing to suggest
+        # is the commonest shape rather than a degenerate one. The default
+        # follows the required-ness of the set — one rule, not two habits.
+        allow_free_text = True
+        if "allowFreeText" in obj:
+            allow_free_text = _expect_bool(obj["allowFreeText"], f"{path}.allowFreeText")
+            if not allow_free_text:
+                fields["allowFreeText"] = False
+        if "suggestions" in obj:
+            fields["suggestions"] = _decode_binding_select_options(obj["suggestions"], f"{path}.suggestions")
+        # THE ONE DECODE REFUSAL, and it is a CROSS-MEMBER one: a closed field
+        # with no suggestion source admits nothing typed and offers nothing to
+        # pick, so the document names a control that CANNOT EXIST rather than one
+        # with a bad value in it. Under the polarity above it is reachable only
+        # DELIBERATELY, which is what makes refusing it right rather than hostile.
+        #
+        # Two neighbouring rules are deliberately NOT refusals: DUPLICATES in the
+        # value list, and MEMBERSHIP of a token in the suggestion set. Both are
+        # properties of a VALUE, and a bound value is invisible to a decoder — a
+        # rule enforced only on literals would be two rules wearing one name.
+        if not allow_free_text and "suggestions" not in obj:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.allowFreeText",
+                "allowFreeText: false with no 'suggestions' names a control that cannot exist — it "
+                "admits nothing typed and offers nothing to pick, so no gesture could put a token "
+                "in it. Declare a suggestion source, or leave allowFreeText absent (it defaults to "
+                "true on Tokens) (WIRE_FORMAT §3.6.19)",
+                "a suggestion source alongside allowFreeText:false",
+            )
+        value_slot(_decode_binding_string_list, _AUTO_TOKENS)
+    elif tag == "Rating":
+        # fuaran#1130 — `max` is the case's only REQUIRED member: it is the
+        # scale, it is what the control announces as `aria-valuemax`, and a
+        # rating with no declared ceiling is not a scale. A `max` below 1 is
+        # REFUSED, not CLAMPED — a scale with no positions has nothing to draw,
+        # nothing to announce and no keystroke that could change anything, so the
+        # document names a control that cannot exist.
+        raw_max = _require(obj, "max", path)
+        if isinstance(raw_max, bool) or not isinstance(raw_max, int) or raw_max < 1:
+            _fail(
+                WRONG_TYPE,
+                f"{path}.max",
+                "Rating max must be an integer scale of 1 or more — a scale with no positions has "
+                "nothing to draw and no keystroke that could change anything (WIRE_FORMAT §3.6.17)",
+                "JSON number (integer scale of 1 or more)",
+            )
+        fields["max"] = cast(Value, raw_max)
+        # Omits at `false`, and the polarity is load-bearing: the SHORTEST rating
+        # document is the WHOLE-STAR one. It governs ENTRY, never DISPLAY — the
+        # granularity of a keystroke and of a pointer commit — and a host must
+        # NOT quantise a resolved value to it.
+        if "allowHalf" in obj and _expect_bool(obj["allowHalf"], f"{path}.allowHalf"):
+            fields["allowHalf"] = True
+        # A FLOAT even where nothing can type a fraction, and that is normative
+        # rather than incidental: the commonest rating a reader sees is an
+        # AVERAGE arriving through a `Query` binding, and an integer slot could
+        # not carry it. The VALUE's bounds are deliberately not checked here — a
+        # bound value is invisible to a decoder, so the rule lives at the two
+        # places the value becomes visible (an authoring check over a literal,
+        # and the server-side re-check on submission).
+        value_slot(_decode_binding_float, _AUTO_NUMBER)
+    elif tag == "Color":
+        # fuaran#1130 — `#rrggbb` and NOTHING ELSE: six hexadecimal digits after
+        # a `#`, either case. That is the one form a native colour input can hold
+        # or return, so it is the wire form too rather than a wider colour syntax
+        # the control would silently narrow. CASE IS PRESERVED, never normalised
+        # — a codec that lower-cased it would fail the round-trip this corpus
+        # exists to pin, and browsers normalise at the DOM, which is their
+        # business and not the wire's.
+        #
+        # Only the `Static` case is judged here, and the split is RECORDED rather
+        # than hidden: a State / Query / Selection binding carries its text from
+        # outside the document, where a decoder cannot see it.
+        if "value" in obj:
+            decoded = _decode_binding(obj["value"], f"{path}.value")
+            if isinstance(decoded, Obj) and decoded.tag == "Static":
+                literal = decoded.fields.get("value")
+                if not isinstance(literal, str) or _HEX_COLOUR.fullmatch(literal) is None:
+                    _fail(
+                        WRONG_TYPE,
+                        f"{path}.value",
+                        "a Color value literal must be #rrggbb — six hexadecimal digits after a #, "
+                        "either case. That is the one form a native colour input can hold, so a "
+                        "shorthand, a named colour or an alpha channel names a colour this control "
+                        "could never carry (WIRE_FORMAT §3.6.17)",
+                        "#rrggbb hex colour literal",
+                    )
+            if not _is_auto_value(decoded, auto, _AUTO_COLOR):
+                fields["value"] = decoded
+    else:  # Range (0.2.0 — absorbed the retired FilterKind.RangeFilter)
+        if "value" in obj:
+            decoded = _decode_range_pair_value(obj["value"], f"{path}.value")
+            if not _is_auto_value(decoded, auto, _AUTO_RANGE):
+                fields["value"] = decoded
+        bound("min", _decode_number)
+        bound("max", _decode_number)
+        bound("step", _decode_number)
+
+    known = {
+        "$type",
+        "value",
+        "options",
+        "orientation",
+        "rows",
+        "variant",
+        "min",
+        "max",
+        "step",
+        # fuaran#1113 / #1121 / #1130 — the members the four new controls add.
+        "allowFreeText",
+        "suggestions",
+        "allowHalf",
+        handler_key,
+    }
+    for key, raw in obj.items():
+        if key not in known:
+            fields[key] = from_json(raw)
+    return Obj(tag, fields)
+
+
+TEXT_FORMATS = frozenset({"email", "url", "tel"})
+COMPARE_OPS = frozenset({"eq", "neq", "lt", "lte", "gt", "gte"})
+
+#: The rule slot's rejected spellings. Small and enumerated for the same reason the
+#: grid's set is: rule 2's tolerance of unknown keys is right for a field a future
+#: profile may add and wrong for a near miss of one that exists, because the tree
+#: then decodes and renders while constraining nothing.
+FORM_FIELD_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("validation", "rule"),
+    ("constraints", "rule"),
+    ("validate", "rule"),
+)
+
+#: What the silence costs at this position, appended to the refusal message — the same
+#: shape as ``A11Y_NEAR_MISS_CONSEQUENCE``, and pinned to the reference hosts' wording,
+#: as is the ``form`` vocabulary label the call site passes (Phase 1659 — this host and
+#: ``fuaran-rs`` both said ``form field``, and both moved).
+#: A near-missed rule slot does not merely go unread: the field still renders, and it
+#: constrains nothing at all.
+FORM_FIELD_NEAR_MISS_CONSEQUENCE = ", and the field would accept anything"
+
+#: The ``Accessibility`` trait's near-miss set (fuaran#959 — the fuaran#863 discipline
+#: applied to the §3.1 trait).
+#:
+#: Rule 2's tolerance of unknown keys is right for a slot a future profile may add and
+#: wrong for a near miss of one that exists. That silence is sharper here than anywhere
+#: else in the vocabulary, for a reason peculiar to this trait: it has NO VISIBLE OUTPUT.
+#: A mislabelled column is on screen; an ignored ``ariaLabel`` looks identical to an
+#: honoured one from every side, so the refusal is the only feedback that can ever arrive.
+#:
+#: Refused rather than aliased. ``ariaLabel`` IS an unambiguous synonym, so admission
+#: turns on §16's other half — a shorthand earns its place by being a genuine assist to
+#: the emitting model, and a six-character key rename is not one. ``live`` settles it:
+#: the HTML idiom it comes from also spells a BOOLEAN, so an alias would bind a
+#: possibly-boolean prior onto a closed token set.
+#:
+#: ``live`` and ``ariaLabel`` are named by MEASURED evidence (6 and 1 emissions against
+#: ``liveRegion``'s 12 and ``label``'s 44, across 12,722 language-tier emissions); the
+#: rest of their families ride in with them. Declaration order is identical in all five
+#: hosts, so which defect surfaces first is deterministic.
+A11Y_NEAR_MISSES: tuple[tuple[str, str], ...] = (
+    ("aria-label", "label — the accessible name, a Binding<string> (a bare string is the §3.6 shorthand)"),
+    ("ariaLabel", "label — the accessible name, a Binding<string> (a bare string is the §3.6 shorthand)"),
+    ("aria-labelledby", "labelledBy — the id of a sibling node whose text carries the name"),
+    ("ariaLabelledBy", "labelledBy — the id of a sibling node whose text carries the name"),
+    ("labelledby", "labelledBy — the slot name is camelCase on the wire, not the ARIA attribute spelling"),
+    ("aria-describedby", "describedBy — the id of a sibling node whose text carries the description"),
+    ("ariaDescribedBy", "describedBy — the id of a sibling node whose text carries the description"),
+    ("describedby", "describedBy — the slot name is camelCase on the wire, not the ARIA attribute spelling"),
+    ("aria-role", "role — the ARIA role NAME as a bare string"),
+    ("ariaRole", "role — the ARIA role NAME as a bare string"),
+    ("aria-live", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("ariaLive", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("live", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("liveregion", 'liveRegion — the closed token set "polite" / "assertive" / "off"'),
+    ("aria-hidden", "hidden — a Binding<bool> (a bare bool is the §3.6 shorthand)"),
+    ("ariaHidden", "hidden — a Binding<bool> (a bare bool is the §3.6 shorthand)"),
+)
+
+#: What the silence costs at this position, appended to the refusal message.
+A11Y_NEAR_MISS_CONSEQUENCE = ", and the intent would reach assistive technology as nothing at all"
+
+
+def _decode_compare_rule(value: object, path: str) -> Value:
+    """The cross-field operand. ``against`` is a ``Binding``, and that IS the
+    cross-field mechanism rather than an accident of typing: any read slot may take a
+    Binding, and the auto-bind rule already puts every form field's value in State
+    under the field's own id, so ``{"$type":"State","key":"<sibling id>"}`` reads the
+    sibling with no coordination vocabulary at all."""
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "against": _decode_binding(_require(obj, "against", path), f"{path}.against"),
+            "op": _enum(_require(obj, "op", path), f"{path}.op", COMPARE_OPS, "CompareOp"),
+        },
+    )
+
+
+def _decode_field_rule(value: object, path: str) -> Value:
+    """A field's declared constraint — ``FormFieldKind`` names the CONTROL, this names
+    the ACCEPTED SET. Every slot is optional structurally, and two shapes are refused
+    here as POLICY:
+
+    * a rule with every slot absent. A rule that constrains nothing is a defect, not a
+      no-op: it decodes, validates and renders while declaring nothing, which is the
+      fake-affordance shape the near-miss table also forecloses, arriving through an
+      empty object instead of a wrong key. ``message`` alone does not rescue it — the
+      message is the prose shown when some OTHER slot is unmet, so a message-only rule
+      is the help-text failure wearing the new vocabulary's clothes.
+    * ``minLength`` above ``maxLength``. The ordered-pair rule applied to a length
+      pair: an inverted bound admits no value at all, so the field can never be
+      submitted and the form is dead on arrival.
+
+    Neither is a shape — both are relations BETWEEN slots — which is why they live here
+    rather than in the structural layer.
+    """
+    obj = _expect_object(value, path)
+    out: dict[str, Value] = {}
+    if "format" in obj:
+        out["format"] = _enum(obj["format"], f"{path}.format", TEXT_FORMATS, "TextFormat")
+    if "pattern" in obj:
+        out["pattern"] = _expect_string(obj["pattern"], f"{path}.pattern")
+    if "minLength" in obj:
+        out["minLength"] = _expect_int(obj["minLength"], f"{path}.minLength")
+    if "maxLength" in obj:
+        out["maxLength"] = _expect_int(obj["maxLength"], f"{path}.maxLength")
+    if "compare" in obj:
+        out["compare"] = _decode_compare_rule(obj["compare"], f"{path}.compare")
+    if "message" in obj:
+        out["message"] = _decode_text_source(obj["message"], f"{path}.message")
+
+    if not any(k in out for k in ("format", "pattern", "minLength", "maxLength", "compare")):
+        _fail(
+            WRONG_TYPE,
+            path,
+            "a rule that constrains nothing is a defect, not a no-op — declare at least one of "
+            "format / pattern / minLength / maxLength / compare, or omit 'rule' entirely",
+            "FieldRule with at least one constraint slot",
+        )
+
+    lo, hi = out.get("minLength"), out.get("maxLength")
+    if isinstance(lo, int) and isinstance(hi, int) and lo > hi:
+        _fail(
+            WRONG_TYPE,
+            path,
+            f"minLength {lo} is above maxLength {hi} — an inverted length bound admits no value "
+            "at all, so the field could never be submitted",
+            "minLength <= maxLength",
+        )
+    return Obj(None, out)
+
+
+def _decode_form(obj: dict, path: str) -> Obj:
+    """Form: typed fields (id ← name, WIRE_FORMAT §3.6; kind through the shared
+    FormFieldKind decoder with the 0.2.1 `FormFieldId` auto-bind context),
+    `submitLabel` TextSource, `onSubmit` Action, optional `disabled` binding."""
+    fields: dict[str, Value] = {}
+    if "fields" in obj:
+        arr = _expect_array(obj["fields"], f"{path}.fields")
+        norm: list[Value] = []
+        for i, fld in enumerate(arr):
+            fpath = f"{path}.fields[{i}]"
+            fobj = _expect_object(fld, fpath)
+            # The near-miss check runs BEFORE the rule decode, so a field carrying
+            # both `validation` and a well-formed `rule` still names the ignored key.
+            # The vocabulary LABEL is `form`, not `form field` — Phase 1659. The
+            # reference hosts say "is not part of the form vocabulary" and this host
+            # said "the form field vocabulary": terser, not wrong, and invisible to
+            # every gate, because an op-side reject fixture pins the code and the path
+            # and never the prose. A didactic message that reads differently on two
+            # hosts sends two authors to two documents for one defect, which is the
+            # whole failure `message-parity.json` exists to prevent one level up.
+            _check_near_misses(fobj, fpath, FORM_FIELD_NEAR_MISSES, "form", FORM_FIELD_NEAR_MISS_CONSEQUENCE)
+            id_raw, id_present = _alias_get(fobj, "id", ("name",))
+            if not id_present:
+                _fail(MISSING_FIELD, f"{fpath}.id", "missing required field 'id'")
+            fid = _expect_string(id_raw, f"{fpath}.id")
+            ffields: dict[str, Value] = {"id": fid}
+            ffields["kind"] = _decode_form_field_kind(_require(fobj, "kind", fpath), f"{fpath}.kind", ("state", fid))
+            ffields["label"] = _decode_text_source(_require(fobj, "label", fpath), f"{fpath}.label")
+            ffields["required"] = _expect_bool(_require(fobj, "required", fpath), f"{fpath}.required")
+            if "help" in fobj:
+                ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
+            if "rule" in fobj:
+                ffields["rule"] = _decode_field_rule(fobj["rule"], f"{fpath}.rule")
+            for key, raw in fobj.items():
+                if key not in ("id", "name", "kind", "label", "required", "help", "rule"):
+                    ffields[key] = from_json(raw)
+            norm.append(Obj(None, ffields))
+        fields["fields"] = Arr(norm)
+    if "onSubmit" in obj:
+        fields["onSubmit"] = _decode_action(obj["onSubmit"], f"{path}.onSubmit")
+    if "submitLabel" in obj:
+        fields["submitLabel"] = _decode_text_source(obj["submitLabel"], f"{path}.submitLabel")
+    if "disabled" in obj:
+        fields["disabled"] = _decode_binding_bool(obj["disabled"], f"{path}.disabled")
+    for key, raw in obj.items():
+        if key not in ("$type", "fields", "onSubmit", "submitLabel", "disabled"):
+            fields[key] = from_json(raw)
+    return Obj("Form", fields)
+
+
+def _decode_filters(obj: dict, path: str) -> Obj:
+    """Filters (0.2.0 unification): each item is `{kind:<FormFieldKind>, label,
+    name}` — the chip's control is an ordinary form control; an absent `value`
+    auto-binds `Filter(<the chip's own name>)`, and the encoder symmetrically
+    omits a `value` that is exactly that auto binding."""
+    fields: dict[str, Value] = {}
+    items_raw = _require(obj, "items", path)
+    arr = _expect_array(items_raw, f"{path}.items")
+    items: list[Value] = []
+    for i, item in enumerate(arr):
+        ipath = f"{path}.items[{i}]"
+        iobj = _expect_object(item, ipath)
+        name = _expect_string(_require(iobj, "name", ipath), f"{ipath}.name")
+        ifields: dict[str, Value] = {
+            "kind": _decode_form_field_kind(_require(iobj, "kind", ipath), f"{ipath}.kind", ("filter", name)),
+            "label": _decode_text_source(_require(iobj, "label", ipath), f"{ipath}.label"),
+            "name": name,
+        }
+        for key, raw in iobj.items():
+            if key not in ("kind", "label", "name"):
+                ifields[key] = from_json(raw)
+        items.append(Obj(None, ifields))
+    fields["items"] = Arr(items)
+    for key, raw in obj.items():
+        if key not in ("$type", "items"):
+            fields[key] = from_json(raw)
+    return Obj("Filters", fields)
+
+
+def _decode_style(value: object, path: str) -> Obj:
+    # Phase 460 / Phase 147 — every SemanticStyle field is omitted-when-default on
+    # the wire (`Emphasis.Normal` / `ToneVariant.Default` / `StyleWeight.Standard`
+    # / `StyleRole.None` / `FontVoice.Default`); the decoder restores each default
+    # on absence and drops explicit-default values, so an all-default style decodes
+    # to an EMPTY object (which the caller omits entirely). tone/weight/emphasis
+    # accept the §3.6 lenient-ingest aliases; role/voice do not.
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "emphasis" in obj:
+        v = _decode_emphasis_enum(obj["emphasis"], f"{path}.emphasis")
+        if v != "Normal":
+            fields["emphasis"] = v
+    if "tone" in obj:
+        v = _enum_aliased(obj["tone"], f"{path}.tone", TONE, TONE_ALIASES, "tone")
+        if v != "Default":
+            fields["tone"] = v
+    if "weight" in obj:
+        v = _enum_aliased(obj["weight"], f"{path}.weight", WEIGHT, {}, "weight")
+        if v != "Standard":
+            fields["weight"] = v
+    if "role" in obj:
+        r = _enum(obj["role"], f"{path}.role", STYLE_ROLE, "role")
+        if r != "None":
+            fields["role"] = r
+    if "voice" in obj:
+        vo = _enum(obj["voice"], f"{path}.voice", FONT_VOICE, "voice")
+        if vo != "Default":
+            fields["voice"] = vo
+    # fuaran#1472 — the DECLARED base direction, and the only member of this
+    # record that is not presentational. `emphasis`, `role`, `tone`, `voice` and
+    # `weight` are statements a host may ignore and still render a document that
+    # says the same thing; this one is a CORRECTNESS statement, so a host that
+    # drops it renders a document that says something else.
+    if "direction" in obj:
+        d = _enum(obj["direction"], f"{path}.direction", TEXT_DIRECTION, "direction")
+        if d != "auto":
+            fields["direction"] = d
+    return Obj(None, fields)
+
+
+def _decode_accessibility(value: object, path: str) -> Obj:
+    """The §3.1 Accessibility trait.
+
+    This was ``from_json`` — a structural pass-through, so every malformed
+    payload decoded with its value preserved verbatim and this host answered
+    none of the corpus's six a11y reject vectors. ``label`` / ``hidden`` are
+    ordinary ``Binding`` slots (the 2026-08-25 §3.1 ruling), so the §3.6
+    bare-scalar coercion applies to their SHAPE while the slot's own type still
+    governs the value; ``liveRegion`` is a closed token set; ``role`` is open to
+    any role NAME but not to any VALUE.
+    """
+    obj = _expect_object(value, path)
+    # fuaran#959 — the near-miss check runs BEFORE the slot reads, matching the
+    # ``FormField`` ordering, so a trait carrying both ``ariaLabel`` and a well-formed
+    # ``label`` still names the ignored key rather than decoding half the intent silently.
+    _check_near_misses(obj, path, A11Y_NEAR_MISSES, "accessibility", A11Y_NEAR_MISS_CONSEQUENCE)
+    fields: dict[str, Value] = {}
+    if "label" in obj:
+        fields["label"] = _decode_binding_string(obj["label"], f"{path}.label")
+    if "labelledBy" in obj:
+        fields["labelledBy"] = _expect_string(obj["labelledBy"], f"{path}.labelledBy")
+    if "describedBy" in obj:
+        fields["describedBy"] = _expect_string(obj["describedBy"], f"{path}.describedBy")
+    if "role" in obj:
+        fields["role"] = _expect_string(obj["role"], f"{path}.role")
+    if "liveRegion" in obj:
+        fields["liveRegion"] = _enum(obj["liveRegion"], f"{path}.liveRegion", LIVE_REGION, "liveRegion")
+    if "hidden" in obj:
+        fields["hidden"] = _decode_binding_bool(obj["hidden"], f"{path}.hidden")
+    return Obj(None, fields)
+
+
+def _decode_state(value: object, path: str) -> Obj:
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "onLoading" in obj:
+        fields["onLoading"] = _decode_node_value(obj["onLoading"], f"{path}.onLoading")
+    if "onEmpty" in obj:
+        fields["onEmpty"] = _decode_node_value(obj["onEmpty"], f"{path}.onEmpty")
+    if "onError" in obj:
+        fields["onError"] = from_json(obj["onError"])  # closure sentinel
+    return Obj(None, fields)
+
+
+# ── §21 walk bounds for the structural decoder ───────────────────────
+#
+# Node depth and total node count are enforced HERE, on the way down (§21.2
+# rule 4), rather than measured afterwards from the tree that was built. A check
+# that runs after the walk it is meant to bound has already paid the cost it
+# exists to refuse.
+#
+# Counters rather than threaded parameters: `_decode_node_value` is reached from
+# the per-kind field decoders through a table of callables whose signature is
+# `(value, path)`, so threading a depth argument would mean changing every entry
+# in that table and every decoder it names.
+#
+# They are ``ContextVar``s rather than module globals, and that is a correctness
+# requirement rather than a refinement. A host serving concurrent decodes in one
+# process — an ASGI route dispatched to a thread-pool worker is the ordinary
+# shape, and this repo ships one as a sample — shares a module global across
+# walks that know nothing of each other: two decodes each half the limit deep
+# refuse one another with a LIMIT_EXCEEDED naming a bound neither breached, and
+# one walk unwinding while another is mid-descent decrements a counter it does
+# not own and lets a document past the bound. A ``ContextVar`` is per-thread and
+# per-async-task by construction, so each walk reads and writes its own counter
+# with no lock and no change to the decoder table's signature. `_reset_walk` is
+# still called by the public entry points, so a walk that raised part-way through
+# never leaves ITS OWN counter poisoned for the next decode on the same thread.
+_walk_depth: ContextVar[int] = ContextVar("fuaran_walk_depth", default=0)
+_walk_nodes: ContextVar[int] = ContextVar("fuaran_walk_nodes", default=0)
+
+
+def _reset_walk() -> None:
+    _walk_depth.set(0)
+    _walk_nodes.set(0)
+
+
+def _decode_node_value(value: object, path: str) -> Node:
+    if _walk_depth.get() >= MAX_NODE_DEPTH:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"node nesting deeper than the wire limit MAX_NODE_DEPTH = {MAX_NODE_DEPTH}",
+        )
+    nodes = _walk_nodes.get() + 1
+    _walk_nodes.set(nodes)
+    if nodes > MAX_NODES:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"the document holds more than the wire limit MAX_NODES = {MAX_NODES} nodes",
+        )
+
+    token = _walk_depth.set(_walk_depth.get() + 1)
+    try:
+        return _decode_node_value_inner(value, path)
+    finally:
+        _walk_depth.reset(token)
+
+
+def _decode_node_value_inner(value: object, path: str) -> Node:
+    obj = _expect_object(value, path)
+
+    if "id" not in obj:
+        _fail(MISSING_FIELD, f"{path}.id", "missing required field 'id'")
+    # The §16 Static-envelope shorthand applies here as at every other plain
+    # scalar position: the other four hosts unwrap a `{"$type":"Static",...}`
+    # around a node id, and a host that does not refuses a document the rest of
+    # the roster accepts.
+    raw_id = _unwrap_static_envelope(obj["id"])
+    if not isinstance(raw_id, str):
+        _fail(WRONG_TYPE, f"{path}.id", "id must be a string")
+    if raw_id == "":
+        _fail(EMPTY_NODE_ID, f"{path}.id", "id must be a non-empty string")
+
+    if "kind" not in obj:
+        _fail(MISSING_FIELD, f"{path}.kind", "missing required field 'kind'")
+    kind = _decode_kind(obj["kind"], f"{path}.kind")
+
+    extras: dict[str, Value] = {}
+    if "state" in obj:
+        extras["state"] = _decode_state(obj["state"], f"{path}.state")
+    if "style" in obj:
+        style = _decode_style(obj["style"], f"{path}.style")
+        # An all-default (empty) SemanticStyle is omitted entirely (§3.1 / Phase 460).
+        if style.fields:
+            extras["style"] = style
+    if "accessibility" in obj:
+        extras["accessibility"] = _decode_accessibility(obj["accessibility"], f"{path}.accessibility")
+    # fuaran#1112 — the node-level tooltip TRAIT, not a field of any kind. A hint
+    # is uniform across kinds, so it lives on the envelope beside `style` and
+    # `accessibility` rather than being repeated per spec. It is a full
+    # `TextSource` (the §16 bare string is the shorthand), so a non-string,
+    # non-`$type`-tagged value is WRONG_TYPE and is never carried through.
+    if "tooltip" in obj:
+        extras["tooltip"] = _decode_text_source(obj["tooltip"], f"{path}.tooltip")
+    # fuaran#1535 — the node-level visibility predicate. An ordinary optional
+    # ``Binding<bool>``, decoded by the shared binding decoder for the reason the
+    # tooltip above states: the one time a host read a node-envelope slot as its
+    # own narrower thing it took two hosts and a ruling to unwind.
+    if "visible" in obj:
+        extras["visible"] = _decode_binding(obj["visible"], f"{path}.visible")
+
+    return Node(raw_id, kind, extras)  # type: ignore[arg-type]
+
+
+def decode_node(text: str) -> DecodeResult[Node]:
+    """Decode a canonical-wire ``Node`` document into a :class:`~fuaran_ui.model.Node`."""
+    parsed, error = load_bounded(text)
+    if error is not None:
+        return Err(error)
+    shape = check_shape(parsed)
+    if shape is not None:
+        return Err(shape)
+    _reset_walk()
+    try:
+        return Ok(_decode_node_value(parsed, "$"))
+    except _Fail as fail:
+        return Err(fail.error)

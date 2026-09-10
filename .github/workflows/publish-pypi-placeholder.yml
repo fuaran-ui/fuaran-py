@@ -1,0 +1,91 @@
+# Publish the BARE-NAME PLACEHOLDER distribution `fuaran` to PyPI, via Trusted Publishing.
+#
+# This is not the host. The host is `fuaran-ui`, published by `publish-pypi.yml` from the same
+# repository on a `v*` tag. This workflow publishes `placeholder/` — a package that exports
+# nothing and never will — so the unqualified name `fuaran` cannot be taken by an unrelated
+# project and mistaken for the Python host. Same posture as the unscoped npm name `fuaran` and
+# the bare `fuaran` crate.
+#
+# Trigger: a `placeholder-v*` tag ONLY. That prefix is deliberate and load-bearing: the host's
+# workflow triggers on `v*`, which matches tags BEGINNING with `v`, so `placeholder-v0.0.0`
+# reaches this workflow and never that one. Do not "tidy" the prefix to `v*`.
+#
+# Prerequisites (one-time, on pypi.org, operator only): register a PENDING PUBLISHER for project
+# `fuaran` — owner `fuaran-ui`, repository `fuaran-py`, workflow `publish-pypi-placeholder.yml`,
+# environment `pypi`. It is a SEPARATE registration from the `fuaran-ui` one: a
+# trusted-publisher policy is scoped to a project name.
+#
+# PEP 541 tolerates a held name that points somewhere real and refuses an empty squat, so
+# `placeholder/README.md` is part of what makes this publishable rather than decoration — it
+# names the real distribution, the import, the repository and the docs.
+name: publish-pypi-placeholder
+
+on:
+  push:
+    tags: ["placeholder-v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # The tag must equal the placeholder's own version, for the reason the host's workflow
+      # states: a mistyped tag must not publish a mismatched release.
+      - name: Version gate — tag must equal placeholder/pyproject.toml
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#placeholder-v}"
+          ver="$(python - <<'PY'
+          import tomllib
+          print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])
+          PY
+          )"
+          if [ "$tag" != "$ver" ]; then
+            echo "tag placeholder-v$tag does not match placeholder version $ver" >&2
+            exit 1
+          fi
+
+      # The only assertion worth making about this package: that it exports nothing. A
+      # placeholder that grew an API would be a different thing under the same held name.
+      - name: Assert the package is empty
+        run: |
+          set -euo pipefail
+          python -c "import sys; sys.path.insert(0, 'src'); import fuaran; assert fuaran.__all__ == [], fuaran.__all__"
+
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-placeholder
+          path: placeholder/dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist-placeholder
+          path: dist/
+      # SHA-pinned for the reason the host's workflow states: this step holds the OIDC-minted
+      # publishing identity, so a moved `release/v1` is credential-bearing code nobody reviewed.
+      # `skip-existing` is deliberately absent here too.
+      - name: Publish to PyPI (Trusted Publishing)
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fuaran_py.theme_manifest import (
+from fuaran_ui.theme_manifest import (
     ContrastFloor,
     Invariant,
     ManifestMeta,

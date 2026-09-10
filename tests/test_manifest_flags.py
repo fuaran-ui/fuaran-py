@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fuaran_py.style_observer import (
+from fuaran_ui.style_observer import (
     BLACK,
     WHITE,
     ContrastBelowDeclaredFloor,
@@ -17,7 +17,7 @@ from fuaran_py.style_observer import (
     rgb,
     verify_usage_budgets,
 )
-from fuaran_py.theme_manifest import (
+from fuaran_ui.theme_manifest import (
     ContrastFloor,
     ManifestMeta,
     ManifestToken,

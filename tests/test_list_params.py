@@ -26,9 +26,9 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.canonical import encode_value
-from fuaran_py.compute import (
+from fuaran_ui import decode_node
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.compute import (
     ComputeErr,
     ComputeOk,
     ParamNonScalar,
@@ -40,7 +40,7 @@ from fuaran_py.compute import (
     resolve_param_binding,
     substitute_list_params,
 )
-from fuaran_py.dataframe import (
+from fuaran_ui.dataframe import (
     Col,
     Column,
     Derive,
@@ -55,8 +55,8 @@ from fuaran_py.dataframe import (
     decode_pipeline,
     eval_pipeline,
 )
-from fuaran_py.dataframe.model import NULL, UNBOUND_PARAM
-from fuaran_py.model import Node, Obj
+from fuaran_ui.dataframe.model import NULL, UNBOUND_PARAM
+from fuaran_ui.model import Node, Obj
 
 _NODES = CORPUS_ROOT / "nodes"
 
@@ -291,7 +291,7 @@ def test_resolve_param_binding_reports_a_nested_list_as_non_scalar() -> None:
 def test_a_declared_default_list_seeds_the_param() -> None:
     """A structural ``Arr`` default carried on the binding resolves the same way a raw
     host list does — the two representations the store legitimately holds."""
-    from fuaran_py.model import Arr
+    from fuaran_ui.model import Arr
 
     binding = Obj("Filter", {"name": "depts", "defaultValue": Arr(["eng", "ops"])})
     resolution = resolve_param_binding("depts", binding, {})
@@ -359,7 +359,7 @@ def test_in_param_reaching_the_evaluator_names_the_param() -> None:
 
 def test_the_scalar_param_refusal_is_unchanged() -> None:
     """The pre-existing scalar strictness is the shape the list rule mirrors."""
-    from fuaran_py.dataframe import Binary
+    from fuaran_ui.dataframe import Binary
 
     result = eval_pipeline([Filter(Binary("eq", Col("dept"), Param("dept")))], _one_col(["eng"]))
     assert not result.ok
@@ -374,7 +374,7 @@ def test_the_fixture_round_trips_byte_identically() -> None:
     """The codec leg of the conformance case: this host's canonical bytes for the shared
     fixture ARE the fixture's bytes. Adoption is the resolution rule on top of that, not
     instead of it."""
-    from fuaran_py import encode_node
+    from fuaran_ui import encode_node
 
     raw = (_NODES / "multiselect-chip-list-param.json").read_text(encoding="utf-8").rstrip("\n")
     node = decode_node(raw)
@@ -396,7 +396,7 @@ def test_the_chip_to_grid_edge_is_reactive() -> None:
     The last line is Phase 610's acceptance criterion under the reactive loop: deselecting
     everything comes BACK to the unfiltered table, rather than sticking at the last
     selection or collapsing to nothing."""
-    from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+    from fuaran_ui.runtime import BrowserDeps, FuaranRuntime
 
     headless = BrowserDeps(lambda _id: None, lambda _e, _h: None, lambda _e, _t, _h: lambda: None)
     runtime = FuaranRuntime(_decode("multiselect-chip-list-param.json"), deps=headless)
@@ -417,7 +417,7 @@ def test_the_server_renderer_honours_the_rule_end_to_end() -> None:
     all three rows while nothing is selected, the selected subset otherwise."""
     import re
 
-    from fuaran_py.renderer import render_html
+    from fuaran_ui.renderer import render_html
 
     tree = _decode("multiselect-chip-list-param.json")
 

@@ -22,11 +22,11 @@ import json
 
 import pytest
 
-from fuaran_py import decode_node
-from fuaran_py.compute import evaluate_tree
-from fuaran_py.model import Node
-from fuaran_py.schema import types as t
-from fuaran_py.ui import (
+from fuaran_ui import decode_node
+from fuaran_ui.compute import evaluate_tree
+from fuaran_ui.model import Node
+from fuaran_ui.schema import types as t
+from fuaran_ui.ui import (
     UnboundParamError,
     col,
     control,
@@ -89,7 +89,7 @@ def test_the_id_first_surface_still_emits_the_handler_by_default() -> None:
     Flipping the default would silently rewrite every tree already authored against this
     surface, which is a different change from adding a way to opt out of it.
     """
-    from fuaran_py.ui import binding
+    from fuaran_ui.ui import binding
 
     unchanged = fuaran.select("s", label="Region", source=binding.static([]), value=binding.state("region", "EMEA"))
     assert '"onChange":"<closure>"' in encode(unchanged)
@@ -109,7 +109,7 @@ def test_the_control_slot_and_the_parameter_source_are_the_same_binding() -> Non
 
 def _as_json(lowerable: object) -> object:
     """One authoring value as the JSON it lowers to, so two of them are comparable."""
-    from fuaran_py.canonical import encode_value
+    from fuaran_ui.canonical import encode_value
 
     return json.loads(encode_value(lowerable.to_wire()))  # type: ignore[attr-defined]
 
@@ -203,7 +203,7 @@ def test_a_derived_option_list_needs_the_frame_it_derives_from() -> None:
 def test_unique_is_a_declaration_rather_than_an_expression() -> None:
     """It says where a control's options come from; it is not a predicate, and the type
     is what says so — a checker refuses it in a `filter` before anything runs."""
-    from fuaran_py.ui import Expr, OptionSource
+    from fuaran_ui.ui import Expr, OptionSource
 
     derived = col("region").unique()
     assert isinstance(derived, OptionSource)
@@ -258,7 +258,7 @@ def test_bind_refuses_something_that_declares_no_parameters() -> None:
 def test_a_control_is_a_node_and_its_id_is_derived() -> None:
     """It goes straight into a dashboard, and re-running an unchanged cell yields the
     same id — the same discipline every other terse constructor keeps."""
-    from fuaran_py.schema.types import UiNode
+    from fuaran_ui.schema.types import UiNode
 
     region = control.select("region", options=["EMEA"])
     assert isinstance(region, UiNode)

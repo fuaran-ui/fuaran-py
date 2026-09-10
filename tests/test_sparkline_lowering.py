@@ -1,6 +1,6 @@
 """Sparkline → Drawing lowering — cross-host byte-parity (Phase 1099).
 
-The Python lowering (:func:`fuaran_py.charts.try_lower_sparkline`) must reproduce
+The Python lowering (:func:`fuaran_ui.charts.try_lower_sparkline`) must reproduce
 the shared ``wire-format-fixtures/sparkline-lowering/*`` goldens byte-for-byte —
 the same fixtures the reference host emits and every adopting host certifies
 against, the discipline ``chart-lowering/`` already runs on. Each case ships an
@@ -12,7 +12,7 @@ chart-lowering pattern.
 
 **The series crosses through the shipped DECODER, never through ``json.loads``
 alone.** A fixture's ``series`` is spliced into a real ``Sparkline`` wire document
-and decoded with :func:`fuaran_py.decode_node`, then resolved with the renderer's
+and decoded with :func:`fuaran_ui.decode_node`, then resolved with the renderer's
 own binding resolver and float-series reader — so what the lowering is handed
 here is what the renderer hands it in production, including the §5/§7 non-finite
 sentinels arriving as floats. A harness that built a raw ``list`` itself would
@@ -29,16 +29,16 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_available
-from fuaran_py import decode_node
-from fuaran_py.charts import try_lower_sparkline, try_lower_sparkline_node
-from fuaran_py.model import Node, Obj
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.bindings import resolve_binding
+from fuaran_ui import decode_node
+from fuaran_ui.charts import try_lower_sparkline, try_lower_sparkline_node
+from fuaran_ui.model import Node, Obj
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.bindings import resolve_binding
 
 # The renderer's resolved-source reader — module-private, reached deliberately so
 # the harness feeds the lowering through the SAME extractor the render path uses.
-from fuaran_py.renderer.render import _float_series
-from fuaran_py.schema.encode import encode_node
+from fuaran_ui.renderer.render import _float_series
+from fuaran_ui.schema.encode import encode_node
 
 _SPARKLINE_LOWERING_DIR = CORPUS_ROOT / "sparkline-lowering"
 
@@ -182,7 +182,7 @@ def test_no_hand_written_sparkline_svg_survives() -> None:
     # polyline back in" is a question about the source, not about the output.
     import inspect
 
-    from fuaran_py.renderer.render import Renderer
+    from fuaran_ui.renderer.render import Renderer
 
     # Comments are stripped first: the arm's own commentary NAMES the geometry it
     # no longer builds (a `currentColor` stroke, the retired placeholder), and a

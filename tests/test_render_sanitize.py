@@ -7,10 +7,10 @@ URL-scheme, ExtraAttributes, and markdown raw-HTML seams.
 
 from __future__ import annotations
 
-from fuaran_py import decode_node
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.markdown import to_html
-from fuaran_py.renderer.sanitize import (
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.markdown import to_html
+from fuaran_ui.renderer.sanitize import (
     sanitize_extra_attributes,
     sanitize_markdown_html,
     sanitize_url,

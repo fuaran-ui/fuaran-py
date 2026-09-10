@@ -19,7 +19,7 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT
-from fuaran_py.render_fidelity import (
+from fuaran_ui.render_fidelity import (
     RenderFidelityError,
     delivered_tier,
     fidelity_badge,
@@ -27,7 +27,7 @@ from fuaran_py.render_fidelity import (
     load_manifest,
     parse_manifest,
 )
-from fuaran_py.schema.decode import KNOWN_KINDS
+from fuaran_ui.schema.decode import KNOWN_KINDS
 
 # The legacy decode-upgrade tags: recognised on decode, never emitted as a canonical
 # ``kind.$type``, so they are absent from the fidelity manifest for the same reason

@@ -4,8 +4,8 @@ BYOK** pattern.
 The access token (the paid credential) and the BYOK provider key are held in
 **server** config (environment variables) and injected by this proxy; the browser
 posts only a prompt and never sees either secret. The server calls the Phase 235
-SDK (:class:`fuaran_py.client.FuaranClient`), decodes the returned canonical wire
-tree, renders it to HTML server-side (:func:`fuaran_py.renderer.render_html`), and
+SDK (:class:`fuaran_ui.client.FuaranClient`), decodes the returned canonical wire
+tree, renders it to HTML server-side (:func:`fuaran_ui.renderer.render_html`), and
 sends the browser the tree + its rendered markup — never a credential.
 
 The turn loop lives client-side: the page holds the current tree's canonical JSON
@@ -22,7 +22,7 @@ sample cannot become an unauthenticated, unbounded spend endpoint by omission.
 
 Run it::
 
-    pip install "fuaran-py[live-host]"        # the host + fastapi + uvicorn
+    pip install "fuaran-ui[live-host]"        # the host + fastapi + uvicorn
     export FUARAN_ENDPOINT=https://<your-endpoint>/generate
     export FUARAN_ACCESS_TOKEN=...            # server-side only
     export FUARAN_PROVIDER_KEY=...            # the BYOK key, server-side only
@@ -47,8 +47,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
-from fuaran_py.client import AccessDenied, FuaranClient, Produced, TurnFailed
-from fuaran_py.renderer import reference_css_path, render_html
+from fuaran_ui.client import AccessDenied, FuaranClient, Produced, TurnFailed
+from fuaran_ui.renderer import reference_css_path, render_html
 
 #: The header a caller presents the shared secret in. A header rather than a
 #: body member, for the reason the endpoint itself gives: a body is the thing

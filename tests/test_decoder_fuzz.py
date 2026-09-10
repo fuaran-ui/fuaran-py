@@ -1,7 +1,7 @@
 """Decoder robustness fuzz — the gate leg + the go-red self-test.
 
 The bounded run below is what joins this repo's PR gate; the long form is
-``python -m fuaran_py.conformance.decoder_fuzz --long --iterations 250000
+``python -m fuaran_ui.conformance.decoder_fuzz --long --iterations 250000
 --evidence <file>``, which a scheduled job runs so the published totality figures
 cannot age quietly.
 
@@ -28,7 +28,7 @@ import tracemalloc
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_available
-from fuaran_py.conformance.decoder_fuzz import (
+from fuaran_ui.conformance.decoder_fuzz import (
     BOUNDED_CONFIG,
     DEFAULT_BUDGETS,
     REAL_SUBJECTS,

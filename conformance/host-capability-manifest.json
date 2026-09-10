@@ -1,9 +1,9 @@
 {
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
-  "hostVersion": "0.6.0",
+  "hostVersion": "0.7.0",
   "corpusAuthority": "da2c7a59248f9d96d4517490b20904d0367d69b5",
-  "generator": "fuaran_py.conformance.host_capability",
+  "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
       "covered": true
@@ -48,7 +48,7 @@
     },
     "hostedCases": {
       "covered": false,
-      "reason": "the compute layer lowers through an isinstance ladder in fuaran_py.dataframe.codec rather than through per-record to_wire, so neither the discriminators it writes nor their absence can be read off this host's type model"
+      "reason": "the compute layer lowers through an isinstance ladder in fuaran_ui.dataframe.codec rather than through per-record to_wire, so neither the discriminators it writes nor their absence can be read off this host's type model"
     }
   },
   "tokens": [

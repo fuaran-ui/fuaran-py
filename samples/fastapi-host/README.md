@@ -5,9 +5,9 @@ A worked FastAPI host for the Fuaran generation endpoint, demonstrating the
 the BYOK provider key live in **server** config and are injected by this proxy —
 the browser posts only a prompt and never sees either secret.
 
-It wraps the [`fuaran_py.client`](../../src/fuaran_py/client/) SDK: the `/generate`
+It wraps the [`fuaran_ui.client`](../../src/fuaran_ui/client/) SDK: the `/generate`
 route calls `FuaranClient.generate` server-side, decodes the returned canonical
-wire tree, renders it to HTML with `fuaran_py.renderer.render_html`, and returns
+wire tree, renders it to HTML with `fuaran_ui.renderer.render_html`, and returns
 the tree + its markup. The turn loop runs client-side — the page holds the current
 tree's JSON and posts it back as `current_tree_json`, so each prompt is a cheap
 *repair* while the server stays stateless.
@@ -16,7 +16,7 @@ tree's JSON and posts it back as `current_tree_json`, so each prompt is a cheap
 
 The BYOK key and access token are secrets. In anything user-facing or multi-user,
 they must never reach the browser. The SDK supports both placements
-([`client.py`](../../src/fuaran_py/client/client.py) docstring):
+([`client.py`](../../src/fuaran_ui/client/client.py) docstring):
 
 - **Direct** — a backend script/notebook passes `access_token` + `provider_key`
   at construction. Fine when the calling environment is already trusted.
@@ -55,7 +55,7 @@ refusal happens BEFORE the endpoint is called, so none of them costs a token.
 ## Run it
 
 ```bash
-pip install "fuaran-py[live-host]"        # the host + fastapi + uvicorn
+pip install "fuaran-ui[live-host]"        # the host + fastapi + uvicorn
 export FUARAN_ENDPOINT=https://<your-endpoint>/generate
 export FUARAN_ACCESS_TOKEN=...            # server-side only
 export FUARAN_PROVIDER_KEY=...            # the BYOK key, server-side only
@@ -114,8 +114,8 @@ rendered markup as JSON:
 import json, os
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt  # or use Django's CSRF token client-side
-from fuaran_py.client import FuaranClient, Produced, AccessDenied, TurnFailed
-from fuaran_py.renderer import render_html
+from fuaran_ui.client import FuaranClient, Produced, AccessDenied, TurnFailed
+from fuaran_ui.renderer import render_html
 
 _client = FuaranClient(
     os.environ["FUARAN_ENDPOINT"],
@@ -162,7 +162,7 @@ access-denied → 401 and turn-failed → 422, and asserts the server-held acces
 token + BYOK key never appear in any response body.
 
 It runs wherever the `live-host` extra is installed and skips — with that named
-reason — where it is not, because `fuaran-py` itself stays dependency-light. CI
+reason — where it is not, because `fuaran-ui` itself stays dependency-light. CI
 runs both arrangements: one matrix row installs the extra so these assertions
 gate, and one installs `dev` alone so the skip is proven clean rather than
 assumed.

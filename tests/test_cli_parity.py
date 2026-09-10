@@ -1,4 +1,4 @@
-"""Cross-host CLI parity: ``fuaran-py validate`` against ``@fuaran-ui/cli validate``.
+"""Cross-host CLI parity: ``fuaran-ui validate`` against ``@fuaran-ui/cli validate``.
 
 Two legs over one pinned contract (``fixtures/cli_parity/contract.json``), and
 they answer different questions:
@@ -49,7 +49,7 @@ from typing import Any
 import pytest
 
 from _reference_host import sibling_host_root
-from fuaran_py.cli import dispatch
+from fuaran_ui.cli import dispatch
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "cli_parity"
 CONTRACT: dict[str, Any] = json.loads((FIXTURES / "contract.json").read_text(encoding="utf-8"))

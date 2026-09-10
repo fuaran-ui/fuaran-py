@@ -1,4 +1,4 @@
-"""Phase 523 — the signature-searchable function registry (``fuaran_py.function``).
+"""Phase 523 — the signature-searchable function registry (``fuaran_ui.function``).
 
 There is no shared corpus for this engine (the F# ``Fuaran.Core.Function`` registry is
 certified in code, not as wire fixtures), so parity is asserted against the documented
@@ -9,7 +9,7 @@ the typed no-match (empty list), and deterministic no-LLM composition with a typ
 
 from __future__ import annotations
 
-from fuaran_py.function import (
+from fuaran_ui.function import (
     EXACT,
     SUBSUMES,
     ComposePath,
@@ -19,7 +19,7 @@ from fuaran_py.function import (
     slot_hole,
     value_hole,
 )
-from fuaran_py.ui.capability import any_string, enum, int_range
+from fuaran_ui.ui.capability import any_string, enum, int_range
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
 

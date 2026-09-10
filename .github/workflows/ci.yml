@@ -61,7 +61,7 @@ jobs:
         # TESTED. Both rows are needed and they prove different things: with the
         # extra, `tests/test_fastapi_host.py` gates — the sample's credential
         # containment is asserted rather than assumed; without it, the suite is
-        # proven to skip CLEANLY, which is what lets `fuaran-py` claim to be
+        # proven to skip CLEANLY, which is what lets `fuaran-ui` claim to be
         # dependency-light. Before this axis existed only the second arrangement
         # ever ran, so the sample's tests skipped on every run in a green job.
         extras: ['dev', 'dev,live-host']

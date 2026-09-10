@@ -30,10 +30,10 @@ from types import SimpleNamespace
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import __version__
-from fuaran_py.conformance import host_capability as hc
-from fuaran_py.model import Obj
-from fuaran_py.schema import types as real_types
+from fuaran_ui import __version__
+from fuaran_ui.conformance import host_capability as hc
+from fuaran_ui.model import Obj
+from fuaran_ui.schema import types as real_types
 
 # The published artefact and the snapshot beside it are REPOSITORY files, so they are
 # located from the test tree — the idiom `_corpus.py` already uses — and never from the

@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py.schema.decode import FORM_FIELD_KIND_CASES, KNOWN_KINDS
+from fuaran_ui.schema.decode import FORM_FIELD_KIND_CASES, KNOWN_KINDS
 
 # The legacy decode-upgrade tags: the four retired container kinds (→ Box) and
 # ``Table`` (→ DataGrid). They are recognised on decode but never appear as a

@@ -8,7 +8,7 @@ Three things are pinned here, and they are different questions.
 **That the HTML is the RENDERER's, byte for byte.** The display path must not be
 a second renderer, a post-processing pass, or a re-escape of the first one: the
 fragment inside the wrapper is exactly what
-:func:`~fuaran_py.renderer.render_html` returns for the same tree. That is what
+:func:`~fuaran_ui.renderer.render_html` returns for the same tree. That is what
 carries the sanitiser and the ambient destination policy into notebook output —
 so it is asserted as byte-identity rather than as a claim in a docstring.
 
@@ -28,10 +28,10 @@ from pathlib import Path
 
 import pytest
 
-from fuaran_py import decode_node, encode_node
-from fuaran_py.renderer import render_html
-from fuaran_py.renderer.egress import EGRESS_REFUSAL_ATTRIBUTE, EGRESS_REFUSAL_URL
-from fuaran_py.renderer.notebook import (
+from fuaran_ui import decode_node, encode_node
+from fuaran_ui.renderer import render_html
+from fuaran_ui.renderer.egress import EGRESS_REFUSAL_ATTRIBUTE, EGRESS_REFUSAL_URL
+from fuaran_ui.renderer.notebook import (
     FUARAN_UI_MIME,
     NOTEBOOK_OUTPUT_ATTR,
     UnscopableCss,
@@ -40,7 +40,7 @@ from fuaran_py.renderer.notebook import (
     scope_css,
     scoped_reference_css,
 )
-from fuaran_py.ui import UiNode, fuaran, quick
+from fuaran_ui.ui import UiNode, fuaran, quick
 
 _SCOPE = f"[{NOTEBOOK_OUTPUT_ATTR}]"
 
@@ -266,7 +266,7 @@ def test_scoping_rewrites_selectors_and_nothing_else() -> None:
     # The declarations must survive untouched — the transform is a selector
     # rewrite, and a scoper that also edited declarations would be re-styling the
     # reference host's output rather than confining it.
-    from fuaran_py.renderer import reference_css
+    from fuaran_ui.renderer import reference_css
 
     original = reference_css()
     scoped = scope_css(original, _SCOPE)

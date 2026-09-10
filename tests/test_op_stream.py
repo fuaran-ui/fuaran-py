@@ -20,9 +20,9 @@ from dataclasses import replace
 import pytest
 
 from _corpus import CORPUS_ROOT, chain_corpus, chain_corpus_required, chain_records
-from fuaran_py import decode_node, decode_op
-from fuaran_py.model import Node, Obj
-from fuaran_py.op_stream import (
+from fuaran_ui import decode_node, decode_op
+from fuaran_ui.model import Node, Obj
+from fuaran_ui.op_stream import (
     CHAIN_FORMAT_VERSION,
     GENESIS_PREVIOUS_HASH,
     AgentActor,
@@ -48,8 +48,8 @@ from fuaran_py.op_stream import (
     replay_stream,
     verify_chain,
 )
-from fuaran_py.op_stream.replay import _Gap, _previous_hash_for
-from fuaran_py.op_stream.types import Actor, OpResultEnvelope
+from fuaran_ui.op_stream.replay import _Gap, _previous_hash_for
+from fuaran_ui.op_stream.types import Actor, OpResultEnvelope
 
 
 def _actor_of(spec: dict) -> Actor:
@@ -435,7 +435,7 @@ class _ForcedRaceSink(InMemorySink):
     """An :class:`InMemorySink` whose ``head`` and ``latest_sequence`` each
     gate their first two callers through their own :class:`_FirstPairGate`.
 
-    Both of :mod:`~fuaran_py.op_stream.replay`'s write paths read one or both
+    Both of :mod:`~fuaran_ui.op_stream.replay`'s write paths read one or both
     of these as their very first step, before either caller has appended
     anything: the read-then-append fallback calls `latest_sequence` once; the
     compare-and-append path calls `head` then `latest_sequence` once per
@@ -560,10 +560,10 @@ def test_append_if_at_a_stale_head_persists_nothing() -> None:
 
 
 class _GappySink:
-    """Minimal :class:`~fuaran_py.op_stream.types.OpStreamSink` stand-in whose
+    """Minimal :class:`~fuaran_ui.op_stream.types.OpStreamSink` stand-in whose
     ``replay`` reports nothing for any range, regardless of ``latest_sequence``
     — a sink whose own bookkeeping has a hole in it. Deliberately does NOT
-    implement :class:`~fuaran_py.op_stream.types.CasOpStreamSink`, so
+    implement :class:`~fuaran_ui.op_stream.types.CasOpStreamSink`, so
     ``apply_and_persist`` takes the read-then-append path this scenario is
     about."""
 

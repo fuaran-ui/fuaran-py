@@ -21,9 +21,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fuaran_py.ui import col, encode, frame, node, transform
-from fuaran_py.ui import fuaran as F
-from fuaran_py.ui.capability import CapabilityRegistry, capability, float_range
+from fuaran_ui.ui import col, encode, frame, node, transform
+from fuaran_ui.ui import fuaran as F
+from fuaran_ui.ui.capability import CapabilityRegistry, capability, float_range
 
 
 def build_pipeline() -> object:

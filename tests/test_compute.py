@@ -18,9 +18,9 @@ from typing import Any
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.canonical import encode_value
-from fuaran_py.compute import (
+from fuaran_ui import decode_node
+from fuaran_ui.canonical import encode_value
+from fuaran_ui.compute import (
     ComputeOk,
     ParamNonScalar,
     ParamResolved,
@@ -31,7 +31,7 @@ from fuaran_py.compute import (
     resolve_param_binding,
     rows_of,
 )
-from fuaran_py.dataframe import (
+from fuaran_ui.dataframe import (
     NULL,
     Binary,
     Col,
@@ -47,9 +47,9 @@ from fuaran_py.dataframe import (
     encode_pipeline,
     encode_source,
 )
-from fuaran_py.dataframe.model import UNBOUND_PARAM
-from fuaran_py.model import Arr, Node, Obj, from_json
-from fuaran_py.runtime import BrowserDeps, FuaranRuntime
+from fuaran_ui.dataframe.model import UNBOUND_PARAM
+from fuaran_ui.model import Arr, Node, Obj, from_json
+from fuaran_ui.runtime import BrowserDeps, FuaranRuntime
 
 _NODES = CORPUS_ROOT / "nodes"
 

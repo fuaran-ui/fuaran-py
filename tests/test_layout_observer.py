@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from fuaran_py.layout_observer import (
+from fuaran_ui.layout_observer import (
     DEFAULT_OPTIONS,
     AspectRatioWildlyOff,
     ChildClippedByAncestor,

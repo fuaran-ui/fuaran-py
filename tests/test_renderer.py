@@ -7,8 +7,8 @@ import re
 import pytest
 
 from _reference_host import reference_host_root
-from fuaran_py import decode_node
-from fuaran_py.renderer import (
+from fuaran_ui import decode_node
+from fuaran_ui.renderer import (
     DENY_NON_LOCAL_EGRESS,
     EgressClass,
     ExactHost,

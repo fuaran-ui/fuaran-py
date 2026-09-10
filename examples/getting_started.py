@@ -9,7 +9,7 @@ tour, or one lesson at a time::
 **Five of the six need no key, no network and no browser.** Only the last one calls a
 model, and only when you supply your own key — so nothing here is unrunnable because
 you have not signed up for anything. Everything imports from the standard library and
-``fuaran_py``; there is no third-party dependency in this file.
+``fuaran_ui``; there is no third-party dependency in this file.
 
 The same six lessons exist for the F# and TypeScript hosts. They are siblings, not
 ports: all three are conformant hosts of one wire format, so a tree authored in any of
@@ -24,8 +24,8 @@ import sys
 import urllib.error
 import urllib.request
 
-from fuaran_py import FunctionEntry, FunctionRegistry, SigEntry, Signature, decode_node, encode_node
-from fuaran_py.op_stream import (
+from fuaran_ui import FunctionEntry, FunctionRegistry, SigEntry, Signature, decode_node, encode_node
+from fuaran_ui.op_stream import (
     GENESIS_PREVIOUS_HASH,
     SUCCESS,
     Actor,
@@ -38,12 +38,12 @@ from fuaran_py.op_stream import (
     compute_hash,
     verify_chain,
 )
-from fuaran_py.ops import apply, decode_op
-from fuaran_py.renderer import render_html
-from fuaran_py.ui import encode, fuaran
-from fuaran_py.ui import format as fmt
-from fuaran_py.ui.capability import any_string
-from fuaran_py.validator import validate_node
+from fuaran_ui.ops import apply, decode_op
+from fuaran_ui.renderer import render_html
+from fuaran_ui.ui import encode, fuaran
+from fuaran_ui.ui import format as fmt
+from fuaran_ui.ui.capability import any_string
+from fuaran_ui.validator import validate_node
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  LESSON 1 — A user interface is a value.

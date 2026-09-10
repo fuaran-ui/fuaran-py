@@ -1,6 +1,6 @@
 """The packaging contract: what the package says about itself must be true.
 
-``fuaran_py.__version__`` is what a consumer reads at runtime to answer "which
+``fuaran_ui.__version__`` is what a consumer reads at runtime to answer "which
 host is this?" — in a notebook, in a bug report, in a compatibility check. It is a
 hand-written literal, so nothing but a test stops it drifting from the version
 actually shipped, and nothing did: it sat at ``0.0.1`` through four tagged
@@ -19,7 +19,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-import fuaran_py
+import fuaran_ui
 
 
 def _pyproject() -> dict[str, Any]:
@@ -30,8 +30,8 @@ def _pyproject() -> dict[str, Any]:
 
 def test_the_declared_version_matches_the_package() -> None:
     declared = _pyproject()["project"]["version"]
-    assert declared == fuaran_py.__version__, (
-        f"pyproject.toml declares {declared!r} but fuaran_py.__version__ is "
-        f"{fuaran_py.__version__!r} — a consumer asking this package which version it is "
+    assert declared == fuaran_ui.__version__, (
+        f"pyproject.toml declares {declared!r} but fuaran_ui.__version__ is "
+        f"{fuaran_ui.__version__!r} — a consumer asking this package which version it is "
         "would be told the wrong answer. Move both in the same commit."
     )

@@ -1,0 +1,42 @@
+"""``fuaran_ui.compute`` — the compute-layer host resolver.
+
+Evaluates a wire-declared compute graph (a ``Binding.Transform`` source: embedded
+datasource + ``Transform`` pipeline + state-bound ``parameters``) to derived values,
+the Python leg of the F#/TS compute-layer host parity. See :mod:`fuaran_ui.compute.evaluate`.
+"""
+
+from __future__ import annotations
+
+from .evaluate import (
+    ComputeErr,
+    ComputeOk,
+    ComputeResult,
+    ComputeState,
+    ParamNonScalar,
+    ParamResolution,
+    ParamResolved,
+    ParamResolvedList,
+    ParamUnbound,
+    evaluate_transform,
+    evaluate_tree,
+    resolve_param_binding,
+    rows_of,
+    substitute_list_params,
+)
+
+__all__ = [
+    "evaluate_tree",
+    "evaluate_transform",
+    "resolve_param_binding",
+    "rows_of",
+    "substitute_list_params",
+    "ComputeOk",
+    "ComputeErr",
+    "ComputeResult",
+    "ComputeState",
+    "ParamResolved",
+    "ParamResolvedList",
+    "ParamUnbound",
+    "ParamNonScalar",
+    "ParamResolution",
+]

@@ -1,7 +1,7 @@
 """Deterministic GFM markdown renderer — cross-host conformance gate (Phase 292).
 
 Loads the workspace-root corpus ``../wire-format-fixtures/markdown/corpus.json``
-and asserts the Python renderer (``fuaran_py.renderer.markdown``) reproduces
+and asserts the Python renderer (``fuaran_ui.renderer.markdown``) reproduces
 every ``source -> html`` pair byte-for-byte. The F# reference renderer emits the
 corpus; this is the Python leg of the §11.1-style cross-host gate
 (``Py == corpus``), which together with the F# and TS legs proves
@@ -16,7 +16,7 @@ is what :data:`_POLICIES` below is.
 **Two legs, and both are needed.** The SEAM leg calls
 ``markdown.to_html_with_egress`` directly — it proves the policy-taking function
 is right. The AMBIENT leg renders a ``Markdown`` **node** through
-:func:`fuaran_py.renderer.render_html`, and for the ``denyNonLocal`` fixtures it
+:func:`fuaran_ui.renderer.render_html`, and for the ``denyNonLocal`` fixtures it
 names no policy at all — it proves the RENDERER REACHES that function with the
 context's policy, which is the fact the seam leg structurally cannot establish.
 """
@@ -28,10 +28,10 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.model import Node
-from fuaran_py.renderer import markdown, render_html
-from fuaran_py.renderer.egress import (
+from fuaran_ui import decode_node
+from fuaran_ui.model import Node
+from fuaran_ui.renderer import markdown, render_html
+from fuaran_ui.renderer.egress import (
     DENY_NON_LOCAL_EGRESS,
     PERMISSIVE_EGRESS,
     EgressClass,

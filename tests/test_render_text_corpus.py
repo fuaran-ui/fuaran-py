@@ -29,9 +29,9 @@ import json
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required
-from fuaran_py import decode_node
-from fuaran_py.model import Arr, Node, Obj, Value
-from fuaran_py.renderer.bindings import BindingSources, render_text, resolve_locale_tag
+from fuaran_ui import decode_node
+from fuaran_ui.model import Arr, Node, Obj, Value
+from fuaran_ui.renderer.bindings import BindingSources, render_text, resolve_locale_tag
 
 #: The family's CLOSED slot vocabulary, as THIS host reads it: the wire kind's
 #: tag paired with the field holding the TextSource. A vector naming a slot

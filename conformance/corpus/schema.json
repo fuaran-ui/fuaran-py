@@ -390,9 +390,28 @@
                 "args": {
                   "type": "object",
                   "additionalProperties": {
-                    "not": {
-                      "type": "null"
-                    }
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Binding_json"
+                      },
+                      {
+                        "allOf": [
+                          {
+                            "not": {
+                              "type": "null"
+                            }
+                          },
+                          {
+                            "not": {
+                              "type": "object",
+                              "required": [
+                                "$type"
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    ]
                   }
                 },
                 "key": {

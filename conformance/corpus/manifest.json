@@ -581,6 +581,14 @@
       "description": "§5 — a `null` State.defaultValue is the null SPELLING OF ABSENCE and normalises to the omitted key, not to the slot's typed empty. The `initialValue` alias carrying null takes the same arm. The typed-empty read-compat belongs to `Static.value` (`lenient-null-static-options`); at a collection slot a declared `[]` is a claim the seeding rule reads, and normalising absence into it fabricates one (Phase 1656)"
     },
     {
+      "id": "lenient-1661-i18n-arg-tagged-static",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1661-i18n-arg-tagged-static.json",
+      "expectedFile": "lenient/lenient-1661-i18n-arg-tagged-static.expected.json",
+      "description": "§5 — a `{\"$type\":\"Static\",\"value\":v}` I18n argument is decode-accepted and normalises to the BARE value, which is why the widening from a JVal bag to a Binding<JVal> bag moves no shipped byte. A valueless `Static` is already canonical and stays tagged: absence is structural and has no bare spelling (Phase 1661)"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -2749,6 +2757,22 @@
       "description": "Layout/Tabs (explicit headers + tags + activeTag)"
     },
     {
+      "id": "text-i18n-bound-arg-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/text-i18n-bound-arg-1.json",
+      "expectedFile": "nodes/text-i18n-bound-arg-1.json",
+      "description": "Display/Markdown (Phase 1661 — an i18n argument that is a binding)"
+    },
+    {
+      "id": "text-i18n-mixed-args-1",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/text-i18n-mixed-args-1.json",
+      "expectedFile": "nodes/text-i18n-mixed-args-1.json",
+      "description": "Display/Markdown (Phase 1661 — one i18n bag carrying both argument arms)"
+    },
+    {
       "id": "toast-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3355,6 +3379,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].validation",
       "description": "'validation' near-miss on a FormField — the canonical key is 'rule' (Phase 864)"
+    },
+    {
+      "id": "reject-i18n-arg-binding-missing-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-i18n-arg-binding-missing-key.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text.args.count.key",
+      "description": "an I18n arg naming a KNOWN binding case with its required member missing — the arg decodes as a binding, so the binding's own refusal applies at the arg's path"
+    },
+    {
+      "id": "reject-i18n-arg-unknown-binding-case",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-i18n-arg-unknown-binding-case.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.text.args.count.$type",
+      "description": "an I18n arg object carrying an unrecognised $type — the inspection reads it as a binding and refuses, rather than falling back to the literal arm"
     },
     {
       "id": "reject-image-expandable-nonbool",

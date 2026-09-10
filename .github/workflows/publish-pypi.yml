@@ -86,7 +86,7 @@ jobs:
       run:
         working-directory: fuaran-py
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: fuaran-py
 
@@ -94,7 +94,7 @@ jobs:
       # shared conformance authority and one current spec for all hosts is the
       # point of giving it a single home.
       - name: Check out the wire-format conformance corpus
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: fuaran-ui/fuaran-ui-specification
           path: wire-format-fixtures
@@ -151,7 +151,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"

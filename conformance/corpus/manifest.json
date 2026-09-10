@@ -573,6 +573,14 @@
       "description": "§2 rule 5 — integer identity in a rule-12 payload stops at ±(2⁵³−1). `boundary` is at the limit and survives verbatim; `beyond` is one past it, has no representation every host holds exactly, and decodes to the nearest double. Pinned as a lenient NORMALISATION rather than left implicit, because three hosts silently rounded it, one kept an int64 and one an arbitrary-precision integer — the same document, five canonical byte sequences, five hash-chain digests"
     },
     {
+      "id": "lenient-1656-state-default-null",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1656-state-default-null.json",
+      "expectedFile": "lenient/lenient-1656-state-default-null.expected.json",
+      "description": "§5 — a `null` State.defaultValue is the null SPELLING OF ABSENCE and normalises to the omitted key, not to the slot's typed empty. The `initialValue` alias carrying null takes the same arm. The typed-empty read-compat belongs to `Static.value` (`lenient-null-static-options`); at a collection slot a declared `[]` is a claim the seeding rule reads, and normalising absence into it fabricates one (Phase 1656)"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -2605,6 +2613,14 @@
       "description": "Layout/Stack"
     },
     {
+      "id": "state-absent-default",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/state-absent-default.json",
+      "expectedFile": "nodes/state-absent-default.json",
+      "description": "Binding (Phase 1656 — an ABSENT State.defaultValue at Float / Int / rows / options / floatSeq: absence OMITS)"
+    },
+    {
       "id": "step-1",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -3970,6 +3986,15 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.source",
       "description": "A Sparkline series element of \"lots\" — a typed float SEQUENCE slot types its ELEMENTS, not just the binding. spark-nonfinite-sentinel proves the §7 sentinels are accepted, which an entirely untyped slot also does by never reading an element, so this is the vector that separates the two (Phase 1099)"
+    },
+    {
+      "id": "reject-state-default-without-key",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-state-default-without-key.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.value.key",
+      "description": "a State binding carrying `defaultValue` and no `key` — §5's absent-default posture makes the default optional and the key required, and a host that read the optionality the other way about would decode a reader of the empty key rather than refuse. Accept twin: the `state-absent-default` node fixture (Phase 1656)"
     },
     {
       "id": "reject-style-direction-nonstring",

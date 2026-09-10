@@ -41,7 +41,10 @@ binding-bearing field could silently break.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from ..model import Arr, Node, Obj, Value
+from .bindings import BindingSources, BindingSourcesLike, as_sources
 
 #: The HOST-OWNED state namespace (§12). A tree-originated write naming one of
 #: these keys is refused, so a tree-originated SEED naming one must be too.
@@ -61,22 +64,29 @@ def collect_state_seeds(node: Node) -> BindingSeeds:
     return seeds
 
 
-def with_state_seeds(node: Node, sources: BindingSeeds | None) -> BindingSeeds | None:
+def with_state_seeds(node: Node, sources: BindingSourcesLike | None) -> BindingSources:
     """Lay a tree's seeds UNDER a caller's own binding sources (rule 2: the
     caller wins every key it names).
 
     The caller's mapping is never mutated — a host may reuse one across renders,
     and a pass that wrote into it would leak the first tree's declarations into
-    the second tree's render. Returns the caller's own object unchanged when the
-    tree declares nothing, so an unseeded tree costs one walk and no allocation.
+    the second tree's render.
+
+    Phase 1663 — seeding touches ``values`` and NOTHING else: the caller's host
+    instant and ambient locale ride through untouched, because seeding lays
+    tree-declared values under the caller's and has no business with the
+    caller's clock. Returning the widened record (rather than the bare map this
+    took and answered before) is what makes that structural instead of
+    remembered — a merge written as a dict splat would have dropped both
+    silently.
     """
+    normalised = as_sources(sources)
     seeds = collect_state_seeds(node)
     if not seeds:
-        return sources
+        return normalised
     merged: BindingSeeds = dict(seeds)
-    if sources:
-        merged.update(sources)
-    return merged
+    merged.update(normalised.values)
+    return replace(normalised, values=merged)
 
 
 def _walk(value: Value, seeds: BindingSeeds) -> None:

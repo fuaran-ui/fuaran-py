@@ -578,8 +578,15 @@ class I18n:
 
     The key is the whole of what travels: the translated strings live in the
     host's catalog, so a document is locale-free and one document serves every
-    reader. ``args`` fills the placeholders the catalog entry declares — plain
-    JSON values, written verbatim.
+    reader. ``args`` fills the placeholders the catalog entry declares.
+
+    Since Phase 1661 an argument is a ``Binding<JSON>`` rather than a bare value,
+    so ``"{count} items left"`` can take its count from the same slot the list
+    beside it reads. The slot is discriminated BY INSPECTION on the wire (§5): a
+    plain JSON value written here rides BARE and is the literal arm, and a
+    ``Binding`` rides as its own ``$type`` object. So a literal-args caption
+    authored before that phase emits exactly the bytes it always did — no author
+    edit, no byte moved.
 
     ``args`` is REQUIRED and is emitted even when empty (``"args":{}``), which is
     what the reference IDL declares (``req "args" (TMap TJson)``) and what
@@ -597,11 +604,14 @@ class I18n:
     """
 
     key: str
-    args: dict[str, Value] = field(default_factory=dict)
+    args: dict[str, Value | Binding] = field(default_factory=dict)
 
     def to_wire(self) -> Value:
         # `_obj` would drop an empty dict only if it were `None`; `{}` is a value
-        # and rides, which is the point — see the docstring.
+        # and rides, which is the point — see the docstring. `_lower` over the bag
+        # is what gives Phase 1661's two arms their two spellings for free: a
+        # plain value lowers to itself (bare), a `Binding` dataclass lowers
+        # through its own `to_wire` (its `$type` object).
         return _obj("I18n", {"args": dict(self.args), "key": self.key})
 
 

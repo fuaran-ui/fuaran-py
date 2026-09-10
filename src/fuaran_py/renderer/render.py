@@ -41,7 +41,8 @@ from collections.abc import Callable, Sequence
 from ..model import Arr, Node, Obj, Value
 from . import markdown
 from .bindings import (
-    BindingSources,
+    BindingSourcesLike,
+    as_sources,
     format_number,
     is_node_visible,
     render_text,
@@ -131,15 +132,20 @@ def _field_rule_attrs(rule: Value, control_tag: str | None) -> list[tuple[str, s
     return out
 
 
-def _a11y_name(value: Value, sources: BindingSources | None) -> str | None:
+def _a11y_name(value: Value, sources: BindingSourcesLike | None) -> str | None:
     """Resolve an accessibility name slot to its display string.
 
-    The canonical form is a ``Binding[str]``, resolved through the host sources
-    (``Static`` inline, every keyed case from the map, an unwritten
-    ``Selection`` / ``Filter`` from its declared ``defaultValue``) and rendered
-    by the same display form the text slots use — so a number or bool reaching a
-    name slot reads the way it reads everywhere else, and a structured value
-    yields ``None``.
+    The canonical form is a ``Binding[str]``, resolved through the SCALAR path
+    (Phase 1665) exactly as every other display slot is: a ``Transform`` or an
+    ``Expr`` yields its 1x1 result cell, and every other case reads the host
+    sources (``Static`` inline, every keyed case from the map, an unwritten
+    ``Selection`` / ``Filter`` / ``State`` from its declared ``defaultValue``)
+    and is rendered by the same display form the text slots use — so a number or
+    bool reaching a name slot reads the way it reads everywhere else, and a
+    structured value yields ``None``. WIRE_FORMAT's accessibility-trait render
+    obligations state the rule; the corpus pins it with
+    ``nodes/a11y-wrapper-transform-label`` and the ``behaviour`` vectors in
+    ``a11y-contract.json``.
 
     A BARE STRING is ALSO accepted, deliberately, as a LENIENT SHORTHAND: it is
     NOT canonical wire and no encoder emits it. It is kept because this host's
@@ -309,7 +315,7 @@ class Renderer:
 
     def __init__(
         self,
-        sources: BindingSources | None,
+        sources: BindingSourcesLike | None,
         fragments: dict[str, Node],
         egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
     ) -> None:
@@ -1307,7 +1313,7 @@ class Renderer:
         """
         if not isinstance(key, str):
             return frozenset()
-        raw = self.sources.get(key) if self.sources else None
+        raw = as_sources(self.sources).values.get(key)
         if isinstance(raw, Arr):
             return frozenset(v for v in raw.items if isinstance(v, str))
         if isinstance(raw, list):
@@ -1320,7 +1326,7 @@ class Renderer:
         anything else, on the expansion slot's reasoning."""
         if not isinstance(key, str):
             return None
-        raw = self.sources.get(key) if self.sources else None
+        raw = as_sources(self.sources).values.get(key)
         return raw if isinstance(raw, str) and raw != "" else None
 
     def _media(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
@@ -2387,8 +2393,10 @@ class Renderer:
         default = _as_node(fields.get("default"))
 
         current: object | None = None
-        if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
-            current = self.sources[state_key]
+        # Phase 1663 — the identity-keyed map is `values` on the widened record.
+        values = as_sources(self.sources).values
+        if isinstance(state_key, str) and state_key in values:
+            current = values[state_key]
         elif "on" in fields:
             # fuaran#1535 — the Phase-768 ``on`` form, which this renderer read
             # ``stateKey``-only until now: a Selection / Filter / Query / Now
@@ -2676,7 +2684,7 @@ _DISPATCH: dict[str, _KindHandler] = {
 
 def render_html(
     node: Node,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
 ) -> str:
     """Render a decoded :class:`~fuaran_py.model.Node` tree to a body-fragment HTML string.

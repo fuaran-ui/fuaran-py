@@ -61,7 +61,8 @@ from typing import Final, Literal
 from ..limits import MAX_NODE_DEPTH
 from ..model import Arr, Node, Obj, Value
 from .bindings import (
-    BindingSources,
+    BindingSourcesLike,
+    as_sources,
     format_number,
     is_node_visible,
     render_text,
@@ -377,7 +378,9 @@ class _MarkdownRenderer:
     reason blocks are a list rather than a string.
     """
 
-    def __init__(self, options: MarkdownOptions, sources: BindingSources | None, fragments: dict[str, Node]) -> None:
+    def __init__(
+        self, options: MarkdownOptions, sources: BindingSourcesLike | None, fragments: dict[str, Node]
+    ) -> None:
         self.options = options
         self.sources = sources
         self.fragments = fragments
@@ -483,8 +486,10 @@ class _MarkdownRenderer:
     def _switch(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
         state_key = fields.get("stateKey")
         current: object | None = None
-        if isinstance(state_key, str) and self.sources is not None and state_key in self.sources:
-            current = self.sources[state_key]
+        # Phase 1663 — the identity-keyed map is `values` on the widened record.
+        values = as_sources(self.sources).values
+        if isinstance(state_key, str) and state_key in values:
+            current = values[state_key]
         elif "on" in fields:
             # fuaran#1535 — the Phase-768 ``on`` form, resolved through the SCALAR
             # path exactly as the HTML renderer does, so this projection picks the
@@ -879,7 +884,7 @@ def _cell_text(value: Value) -> str:
 
 def render_markdown(
     node: Node,
-    sources: BindingSources | None = None,
+    sources: BindingSourcesLike | None = None,
     options: MarkdownOptions = DEFAULT_MARKDOWN_OPTIONS,
     *,
     title: str | None = None,

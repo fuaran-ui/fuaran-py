@@ -107,7 +107,7 @@ jobs:
       - name: Assert the corpus is where the tests resolve it
         run: test -f ../wire-format-fixtures/manifest.json
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
 
@@ -152,7 +152,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Version gate — tag must equal pyproject version

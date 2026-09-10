@@ -831,7 +831,7 @@ def _decode_skeleton_rows(value: object, path: str) -> Value:
     them apart.
 
     Upper bound only, deliberately: a negative count is an authoring defect
-    (``FUARAN150`` in the pre-emit family), not a resource breach.
+    (``FUARAN152`` in the pre-emit family), not a resource breach.
     """
     rows = _expect_int(value, path)
     if rows > MAX_SKELETON_ROWS:

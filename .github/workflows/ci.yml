@@ -120,7 +120,7 @@ jobs:
       - name: Assert the reference host is where the oracles resolve it
         run: test -d ../fuaran-dotnet/src/Fuaran.UI.Renderer.Core
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 

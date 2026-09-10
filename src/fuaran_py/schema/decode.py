@@ -17,7 +17,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from typing import cast
 
-from ..limits import MAX_EXPR_NODES, MAX_NODE_DEPTH, MAX_NODES
+from ..limits import MAX_EXPR_NODES, MAX_NODE_DEPTH, MAX_NODES, MAX_SKELETON_ROWS
 from ..model import Arr, Node, Obj, Value, from_json
 from ..result import (
     EMPTY_NODE_ID,
@@ -767,6 +767,31 @@ def _decode_string(value: object, path: str) -> Value:
 
 def _decode_int(value: object, path: str) -> Value:
     return _expect_int(value, path)
+
+
+def _decode_skeleton_rows(value: object, path: str) -> Value:
+    """``Skeleton.rows``, bounded by WIRE_FORMAT.md §21.9 (Phase 1666).
+
+    ``_expect_int`` decides FIRST, so §7.1's slot rule is untouched: a
+    fractional, non-finite or out-of-32-bit value is still a ``WRONG_TYPE`` and
+    never a limit breach. The bound then refuses a value the slot CAN hold but
+    the format will not carry the work of - a renderer emits one placeholder row
+    per count, so ``{"rows":100000000}`` names 10**8 rendered rows in a handful of
+    bytes. The two codes answer different questions and the ORDER is what keeps
+    them apart.
+
+    Upper bound only, deliberately: a negative count is an authoring defect
+    (``FUARAN150`` in the pre-emit family), not a resource breach.
+    """
+    rows = _expect_int(value, path)
+    if rows > MAX_SKELETON_ROWS:
+        _fail(
+            LIMIT_EXCEEDED,
+            path,
+            f"skeleton rows {rows} exceeds the maximum of {MAX_SKELETON_ROWS} (WIRE_FORMAT 21.9)",
+            f"at most {MAX_SKELETON_ROWS} rows on one Skeleton",
+        )
+    return rows
 
 
 def _decode_bool(value: object, path: str) -> Value:
@@ -2337,7 +2362,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("caveat", False, _decode_text_source),
     ],
     "Skeleton": [
-        ("rows", True, _decode_int),
+        # Phase 1666 - the §21.9 row bound rides the field's own decoder, so the
+        # table stays the single statement of what a Skeleton's shape is.
+        ("rows", True, _decode_skeleton_rows),
     ],
     # Phase 821 — the standalone icon-only display kind: `size` omitted-when-
     # `Medium`, `tone` omitted-when-`Default` (the Phase 460 discipline),

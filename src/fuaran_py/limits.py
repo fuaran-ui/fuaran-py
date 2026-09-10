@@ -77,3 +77,32 @@ MAX_NODES = 100000
 # before it either - stated rather than left to be inferred, because a limit
 # whose scope is guessed at is worse than no limit.
 MAX_EXPR_NODES = 512
+
+# Maximum value of ONE ``Skeleton`` node's ``rows`` slot (WIRE_FORMAT.md §21.9,
+# Phase 1666). Counted per node, not per document: a tree may carry many
+# ``Skeleton`` nodes, each bounded here, with the whole still bounded by
+# ``MAX_NODES`` and ``MAX_DOCUMENT_BYTES``. A breach is ``LIMIT_EXCEEDED`` at the
+# path of the ``rows`` member.
+#
+# It is the first bound here that a document breaches with four digits rather
+# than with bulk, and §21.8's argument applies more sharply because this is not
+# even an evaluation - the rows are simply not present in the input. A
+# server-side renderer emits one row of markup per count, so
+# ``{"$type":"Skeleton","rows":100000000}`` is a document well inside every other
+# limit (a handful of bytes, one node, three JSON levels) that names a hundred
+# million rendered rows. Every structural limit is satisfied, and each is
+# satisfied because none of them is looking at the value.
+#
+# §7.1 decides FIRST, and the ORDER is what keeps the two rules apart. §7.1 says
+# what a typed integer slot can HOLD, and 2147483647 is finite, fraction-free and
+# inside signed 32-bit, so §7.1 admits it; this bound then refuses it for the work
+# it names. A non-integer therefore stays ``WRONG_TYPE`` and a 32-bit-valid value
+# past the bound is ``LIMIT_EXCEEDED`` - never the reverse. Collapsing the two into
+# a narrower integer read would also refuse the at-the-bound document §21.2 rule 1
+# obliges every host to accept.
+#
+# An UPPER bound only. A negative ``rows`` is not a resource breach - nothing
+# expands - and reporting one as ``LIMIT_EXCEEDED`` would be the actively-wrong
+# diagnosis rule 2 forbids. It is an authoring defect and belongs to the pre-emit
+# validator family (``FUARAN150``), which this package does not implement.
+MAX_SKELETON_ROWS = 10000

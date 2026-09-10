@@ -15,6 +15,7 @@ whole markup cannot tell the two apart.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 import pytest
@@ -26,10 +27,20 @@ from fuaran_py.renderer import render_html
 
 @dataclass(frozen=True)
 class A11yCase:
-    """One fixture's expectation.
+    """One fixture's expectation, DERIVED from the corpus's own a11y contract.
 
-    ``element`` is ``None`` when the projection stays on the wrapper ``<div>``,
-    else the tag of the semantic element the kind body renders (the D4 rule).
+    Phase 1665 — this table used to be hand-written here, and the same table was
+    hand-written again in four sibling hosts. Five copies of one cross-host claim
+    is exactly the arrangement that let ``accessibility.label`` resolve five
+    different ways with every conformance gate green: each host measured itself
+    against its own idea of the trait, and no copy could contradict another. The
+    claim now lives once, in ``a11y-contract.json``'s ``behaviour`` section, and
+    every host reads it.
+
+    What stays host-local is the one thing the contract deliberately does not
+    state: which ELEMENT this host renders for a forwarding kind. The contract
+    says the projection FORWARDS (the D4 predicate, host-neutral); ``element`` is
+    this renderer's own answer, given in ``_FORWARDING_TAG`` below.
     """
 
     fixture: str
@@ -38,61 +49,60 @@ class A11yCase:
     absent_from_carrier: tuple[str, ...] = field(default=())
 
 
-CASES: tuple[A11yCase, ...] = (
-    # All six slots at once on an ordinary wrapper kind. `hidden` is an explicit
-    # Static FALSE — distinct on the wire from omitted, and it must emit nothing
-    # (`aria-hidden` is not a tri-state).
-    A11yCase(
-        fixture="a11y-wrapper-all-slots",
-        element=None,
-        want=(
-            'aria-label="Channel performance summary"',
-            'aria-labelledby="a11y-wrapper-heading"',
-            'aria-describedby="a11y-wrapper-note"',
-            'role="region"',
-            'aria-live="polite"',
-        ),
-        absent_from_carrier=("aria-hidden",),
-    ),
-    # The State forms. `label` resolves through its declared `defaultValue` with
-    # no host sources (the reference host's default law); the custom role's CASE
-    # is carried verbatim — the exact spelling a fold bug once rewrote — and
-    # `off` is a real `liveRegion` token, not an absence.
-    A11yCase(
-        fixture="a11y-wrapper-state-bound",
-        element=None,
-        want=(
-            'aria-label="Site footer"',
-            'role="doc-pageFooter"',
-            'aria-live="off"',
-        ),
-        absent_from_carrier=("aria-hidden",),
-    ),
-    A11yCase(
-        fixture="a11y-alert-assertive",
-        element=None,
-        want=('role="alert"', 'aria-live="assertive"'),
-    ),
-    # D4 forwarding: the body IS the semantic element. The accessible name
-    # OVERRIDES the visible "Read more".
-    A11yCase(
-        fixture="a11y-link-labelled",
-        element="a",
-        want=('aria-label="Read the 2026 annual report (PDF)"',),
-    ),
-    A11yCase(
-        fixture="a11y-button-named",
-        element="button",
-        want=('aria-label="Refresh revenue figures"', 'role="button"'),
-    ),
-    # The decorative shape: empty alt + `hidden` Static TRUE — the slot two hosts
-    # dropped entirely before the Phase 951 port.
-    A11yCase(
-        fixture="a11y-image-decorative",
-        element="img",
-        want=('aria-hidden="true"',),
-    ),
+#: The six attribute names the accessibility projection can emit, in the wire's
+#: slot order. The complement of a vector's own list is what that vector forbids:
+#: the contract declares its attribute list EXHAUSTIVE for the projection.
+_PROJECTION_ATTRIBUTES = (
+    "aria-label",
+    "aria-labelledby",
+    "aria-describedby",
+    "role",
+    "aria-live",
+    "aria-hidden",
 )
+
+#: The element THIS host's body renders for each forwarding fixture's kind — the
+#: host-local half of a contract vector. A forwarding vector with no entry here
+#: raises rather than falling back to the wrapper: a silent fallback would assert
+#: the projection landed where the contract says it must not.
+_FORWARDING_TAG = {
+    "a11y-link-labelled": "a",
+    "a11y-button-named": "button",
+    "a11y-image-decorative": "img",
+}
+
+
+def _read_contract_vectors() -> tuple[A11yCase, ...]:
+    """The contract's behaviour vectors as cases. Empty tuple with no corpus —
+    the leg below turns that into a skip rather than a vacuous pass."""
+    path = CORPUS_ROOT / "a11y-contract.json"
+    if not path.is_file():
+        return ()
+    contract = json.loads(path.read_text(encoding="utf-8"))
+    cases = []
+    for vector in contract["behaviour"]["vectors"]:
+        fixture = vector["fixture"]
+        names = {name for name, _ in vector["attributes"]}
+        element = None
+        if vector["forwards"]:
+            element = _FORWARDING_TAG.get(fixture)
+            if element is None:
+                raise AssertionError(
+                    f"{fixture}: the contract says the projection forwards, and this host has not "
+                    "said which element it renders for that kind - add it to _FORWARDING_TAG"
+                )
+        cases.append(
+            A11yCase(
+                fixture=fixture,
+                element=element,
+                want=tuple(f'{name}="{value}"' for name, value in vector["attributes"]),
+                absent_from_carrier=tuple(n for n in _PROJECTION_ATTRIBUTES if n not in names),
+            )
+        )
+    return tuple(cases)
+
+
+CASES: tuple[A11yCase, ...] = _read_contract_vectors()
 
 
 def _wrapper_tag(html: str) -> str:
@@ -131,6 +141,14 @@ def test_a11y_corpus_projection_lands_on_the_right_element(case: A11yCase) -> No
 
 
 @corpus_required
-def test_a11y_corpus_family_is_the_full_set() -> None:
-    """A table-driven leg that silently enumerated nothing checks nothing."""
-    assert len(CASES) == 6, "the Phase 955 node family is six fixtures"
+def test_a11y_contract_vectors_cover_the_transform_bound_name() -> None:
+    """A table-driven leg that silently enumerated nothing checks nothing — and
+    since Phase 1665 the table is READ rather than written here, so an empty one
+    is also what a mis-shaped contract looks like. Both are refused. The count is
+    not restated: the contract is the enumeration, exactly as ``manifest.json``
+    is for the fixtures."""
+    assert CASES, "a11y-contract.json's behaviour.vectors must enumerate the a11y fixture family"
+    assert "a11y-wrapper-transform-label" in {c.fixture for c in CASES}, (
+        "the contract must carry the Phase 1665 vector — the Transform-bound accessible name is "
+        "the one every host resolved through its row-shaped generic path"
+    )

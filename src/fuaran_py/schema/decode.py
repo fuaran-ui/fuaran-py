@@ -1544,7 +1544,14 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     pipeline_raw = _require(obj, "pipeline", path)
     live_tag = source_raw_orig.get("$type") if isinstance(source_raw_orig, dict) else None
     preserved = live_tag in ("State", "Selection", "Query")
-    has_carried = isinstance(source_raw_orig, dict) and "defaultValue" in source_raw_orig
+    # Phase 1656 — a ``null`` member is a SPELLING OF ABSENCE (§5), so it carries
+    # nothing. It did not read that way before: a present ``None`` satisfied the
+    # membership test and is not ``[]``, so it fell to the snapshot branch and was
+    # validated as carried data. The reference host never had the defect because it
+    # reads the DECODED binding's default, where every spelling of absence has
+    # already collapsed to one value; this reads the raw member, so it has to name
+    # them.
+    has_carried = isinstance(source_raw_orig, dict) and source_raw_orig.get("defaultValue") is not None
     # §16 / §24.4 — an EMPTY carried array is the EMPTY TABLE, not a malformed
     # source. An initially-empty live collection ("count the requests in an
     # empty log") is a complete intent with zero rows and no columns to infer,

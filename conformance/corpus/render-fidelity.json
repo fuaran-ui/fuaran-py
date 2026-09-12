@@ -1,7 +1,7 @@
 {
   "version": 1,
   "$id": "https://fuaran.dev/wire-format/v1/render-fidelity.json",
-  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. See WIRE_FORMAT.md 13.",
+  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. Beside kinds, traits declares the obligations owed for a member that rides the node envelope rather than any one kind - a trait is identified by the wire path of the member it governs, names the kinds it applies to, and draws its claim ids from the same closed obligationVocabulary, so a host reports an unchecked trait claim exactly as it reports an unchecked kind claim. See WIRE_FORMAT.md 13.",
   "tiers": [
     {
       "tier": "source",
@@ -88,6 +88,26 @@
     {
       "id": "ceiling-recorded-never-enforced",
       "meaning": "each declared ceiling is recorded as read with a marker carrying no value, and an undeclared ceiling emits no marker at all - the value is withheld because nothing in this tier can act on it"
+    },
+    {
+      "id": "declared-direction-emitted",
+      "meaning": "a declared text direction is emitted on the element carrying the node's run, so the run resolves in the declared direction rather than from its own characters"
+    },
+    {
+      "id": "declared-run-isolated",
+      "meaning": "a declared run is isolated from the surrounding bidirectional context, so the text around it is not reordered by the value"
+    },
+    {
+      "id": "declaration-wins-over-inference",
+      "meaning": "a declaration wins over any direction the host would otherwise infer or inherit for that node"
+    },
+    {
+      "id": "auto-is-no-declaration",
+      "meaning": "the identity value of a declaration is the absence of one - a node declaring it renders byte-identically to the same node omitting the member"
+    },
+    {
+      "id": "no-derived-direction-behaviour",
+      "meaning": "no further behaviour is derived from the declaration - not a layout side, not a locale, not an alignment, and not a direction for descendants"
     }
   ],
   "kinds": [
@@ -998,6 +1018,53 @@
         }
       ],
       "contract": "Phase 1120; WIRE_FORMAT.md 3.6.12, 21.5; docs/SSR.md (the Tree server floor)"
+    }
+  ],
+  "traits": [
+    {
+      "trait": "style.direction",
+      "summary": "the declared base direction of ONE value's own run - the only `SemanticStyle` member that is not presentational, and a correctness statement rather than a stylistic one: a value declared `ltr` inside right-to-left prose is reordered by the Unicode bidirectional algorithm unless the run is isolated, and the reader then reads its digits back in the wrong order",
+      "appliesTo": {
+        "scope": "allKinds",
+        "kinds": []
+      },
+      "fixtures": [
+        "nodes/style-direction-ltr-1.json",
+        "nodes/style-direction-isolated-1.json"
+      ],
+      "obligations": [
+        {
+          "id": "declared-direction-emitted",
+          "rule": 1,
+          "statement": "a node whose `style.direction` is `ltr` or `rtl` emits that direction on the element carrying the node's own run - as HTML `dir`, or the receiving surface's equivalent - so the run resolves in the declared direction rather than from its own characters",
+          "section": "WIRE_FORMAT.md 3.1"
+        },
+        {
+          "id": "declared-run-isolated",
+          "rule": 2,
+          "statement": "the declared run is ISOLATED from the surrounding bidirectional context (`unicode-bidi: isolate`, a `<bdi>` element, or the surface's equivalent). Direction without isolation is half the contract and leaves the neighbouring text reordered around the value",
+          "section": "WIRE_FORMAT.md 3.1"
+        },
+        {
+          "id": "declaration-wins-over-inference",
+          "rule": 3,
+          "statement": "the declaration WINS over any direction the host would otherwise infer for that node, an inherited one from an enclosing declared run included - the inference exists for values whose direction is unknown, the declaration for the values the inference gets wrong",
+          "section": "WIRE_FORMAT.md 3.1"
+        },
+        {
+          "id": "auto-is-no-declaration",
+          "rule": 4,
+          "statement": "`auto` is the ABSENCE of a declaration: a node declaring `auto` renders identically in every respect to the same node omitting the member, so the claim is a byte comparison of the two emissions rather than an assertion that nothing is emitted",
+          "section": "WIRE_FORMAT.md 3.1"
+        },
+        {
+          "id": "no-derived-direction-behaviour",
+          "rule": 5,
+          "statement": "nothing else is derived from it: not a layout side, not a locale, not a text alignment, and not a direction for the node's descendants beyond whatever the receiving surface's own inheritance already does - so a declared run's emission differs from the undeclared one by the direction and its isolation alone",
+          "section": "WIRE_FORMAT.md 3.1"
+        }
+      ],
+      "contract": "Phase 1472; Phase 1653; Phase 1696; WIRE_FORMAT.md 3.1 + 13"
     }
   ]
 }

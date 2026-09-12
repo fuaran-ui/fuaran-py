@@ -121,6 +121,50 @@ class FidelityRow:
 
 
 @dataclass(frozen=True)
+class TraitObligation:
+    """One checkable claim a node-level TRAIT owes (WIRE_FORMAT §13, fuaran#1696).
+
+    The sibling of :class:`RenderObligation` over the other subject population,
+    plus ``rule``: the ordinal of the numbered rule in the cited section. It is
+    carried rather than left to be matched from the prose — §3.1 states five
+    numbered obligations and a conformant host registers five checkers, and
+    without the ordinal the correspondence between them is a reader's
+    reconstruction rather than a fact in the artefact. ``None`` where the cited
+    section does not number its rules.
+    """
+
+    id: str
+    statement: str
+    section: str
+    rule: int | None = None
+
+
+@dataclass(frozen=True)
+class TraitRow:
+    """One node-level trait: a member that rides the ENVELOPE rather than a kind.
+
+    ``style.direction`` is owed by a ``Badge``, a ``Markdown`` and a ``DataGrid``
+    alike and belongs to none of them, so declaring it on kind rows would state
+    forty-odd claims where there is one. ``trait`` is the wire PATH of the member
+    it governs, which is why a host can key one registry by ``subject/claim``: a
+    dotted path can never collide with a ``kind.$type``.
+
+    ``scope`` is the tagged ``appliesTo.scope`` — ``allKinds``, or ``namedKinds``
+    with ``scope_kinds`` beside it. Tagged rather than a bare list because "every
+    kind" must not be spellable as an empty array, which reads as the opposite
+    claim.
+    """
+
+    trait: str
+    summary: str
+    scope: str
+    scope_kinds: tuple[str, ...]
+    fixtures: tuple[str, ...]
+    obligations: tuple[TraitObligation, ...]
+    contract: str
+
+
+@dataclass(frozen=True)
 class RenderFidelityManifest:
     version: int
     id: str
@@ -128,6 +172,13 @@ class RenderFidelityManifest:
     tiers: tuple[tuple[str, str], ...]
     kinds: tuple[FidelityRow, ...]
     obligation_vocabulary: tuple[ObligationVocabularyEntry, ...] = field(default_factory=tuple)
+    traits: tuple[TraitRow, ...] = field(default_factory=tuple)
+    """The node-level traits.
+
+    Defaulted so an artefact predating the section parses rather than failing,
+    on exactly the terms ``obligations`` is defaulted on a row: traits are
+    additive within a major version.
+    """
 
 
 class RenderFidelityError(ValueError):
@@ -184,6 +235,64 @@ def _parse_obligations(value: Any, kind: str) -> tuple[RenderObligation, ...]:
             )
         )
     return tuple(obligations)
+
+
+def _parse_traits(value: Any) -> tuple[TraitRow, ...]:
+    """Parse the top-level ``traits`` array.
+
+    An ABSENT key parses as empty — an artefact predating the section is a legal
+    shape — while a present but malformed one is a defect and is named as one.
+    """
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        raise RenderFidelityError("render-fidelity: manifest.traits must be an array")
+    traits: list[TraitRow] = []
+    for entry in value:
+        if not isinstance(entry, dict):
+            raise RenderFidelityError("render-fidelity: manifest.traits[] must hold objects")
+        name = _require_str(entry, "trait", "traits[]")
+        applies_to = entry.get("appliesTo")
+        if not isinstance(applies_to, dict):
+            raise RenderFidelityError(f"render-fidelity: {name}.appliesTo must be an object")
+        scope = _require_str(applies_to, "scope", f"{name}.appliesTo")
+        if scope not in ("allKinds", "namedKinds"):
+            raise RenderFidelityError(f"render-fidelity: {name}.appliesTo.scope is unknown: {scope!r}")
+        scope_kinds = applies_to.get("kinds") or []
+        if not isinstance(scope_kinds, list) or not all(isinstance(k, str) for k in scope_kinds):
+            raise RenderFidelityError(f"render-fidelity: {name}.appliesTo.kinds[] must be strings")
+        fixtures = entry.get("fixtures") or []
+        if not isinstance(fixtures, list) or not all(isinstance(f, str) for f in fixtures):
+            raise RenderFidelityError(f"render-fidelity: {name}.fixtures[] must be strings")
+        raw_obligations = entry.get("obligations")
+        if not isinstance(raw_obligations, list):
+            raise RenderFidelityError(f"render-fidelity: {name}.obligations must be an array")
+        obligations: list[TraitObligation] = []
+        for o in raw_obligations:
+            if not isinstance(o, dict):
+                raise RenderFidelityError(f"render-fidelity: {name}.obligations[] must hold objects")
+            where = f"{name}.obligations[]"
+            rule = o.get("rule")
+            obligations.append(
+                TraitObligation(
+                    id=_require_str(o, "id", where),
+                    statement=_require_str(o, "statement", where),
+                    section=_require_str(o, "section", where),
+                    rule=rule if isinstance(rule, int) else None,
+                )
+            )
+        traits.append(
+            TraitRow(
+                trait=name,
+                summary=_require_str(entry, "summary", name),
+                scope=scope,
+                scope_kinds=tuple(scope_kinds),
+                fixtures=tuple(fixtures),
+                obligations=tuple(obligations),
+                contract=_require_str(entry, "contract", name),
+            )
+        )
+    return tuple(traits)
 
 
 def parse_manifest(value: Any) -> RenderFidelityManifest:
@@ -250,6 +359,7 @@ def parse_manifest(value: Any) -> RenderFidelityManifest:
         tiers=tuple(tiers),
         kinds=tuple(kinds),
         obligation_vocabulary=tuple(vocabulary),
+        traits=_parse_traits(value.get("traits")),
     )
 
 
@@ -338,9 +448,21 @@ def delivered_tier(row: FidelityRow, target: Literal["no_script", "hydrated"]) -
 # actually checked.
 
 
-def all_obligations(manifest: RenderFidelityManifest) -> tuple[tuple[str, RenderObligation], ...]:
-    """Every declared obligation, paired with the kind that owes it, in table order."""
-    return tuple((row.kind, obligation) for row in manifest.kinds for obligation in row.obligations)
+def all_obligations(
+    manifest: RenderFidelityManifest,
+) -> tuple[tuple[str, RenderObligation | TraitObligation], ...]:
+    """Every declared obligation, paired with the SUBJECT that owes it, in table order.
+
+    The kind rows first, then the trait rows. Both, deliberately: the whole
+    mechanism is that the ENUMERATION is the artefact's, so a trait declared
+    tomorrow must reach a host's report without that host changing anything but
+    its answer — and a reader iterating ``kinds`` alone would hold a green gate
+    over an unowed claim.
+    """
+    return tuple(
+        [(row.kind, obligation) for row in manifest.kinds for obligation in row.obligations]
+        + [(row.trait, obligation) for row in manifest.traits for obligation in row.obligations]
+    )
 
 
 @dataclass(frozen=True)

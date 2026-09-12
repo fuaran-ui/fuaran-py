@@ -28,6 +28,10 @@ from ..model import Node, Obj
 
 _NO_ROLE = frozenset({"None"})
 _NO_VOICE = frozenset({"Default"})
+# `TextDirection`'s identity (WIRE_FORMAT §3.1). `auto` IS the absence of a
+# declaration, so it contributes no class fragment and a node declaring it is
+# byte-identical to one omitting the member.
+_NO_DIRECTION = frozenset({"auto"})
 
 # ── Wire kind discriminator → `fuaran-kind-*` class ─────────────────────────
 #
@@ -151,11 +155,20 @@ def style_class(style: Obj | None) -> str:
 
     role = fields.get("role")
     voice = fields.get("voice")
+    direction = fields.get("direction")
     parts = [base]
     if role is not None and str(role) not in _NO_ROLE:
         parts.append(f"fuaran-role-{_style_fragment(role)}")
     if voice is not None and str(voice) not in _NO_VOICE:
         parts.append(f"fuaran-voice-{_style_fragment(voice)}")
+    # fuaran#1472 / fuaran#1696 — appended LAST, after the role/voice pair, so
+    # every class string a document without a declared direction produces is
+    # byte-identical to what it was before. The CLASS is what carries the
+    # ISOLATION: the reference stylesheet gives `.fuaran-dir-ltr, .fuaran-dir-rtl`
+    # `unicode-bidi: isolate`, and `dir` alone would state a direction while
+    # leaving the text AROUND the run reordered (§3.1 rule 2).
+    if direction is not None and str(direction) not in _NO_DIRECTION:
+        parts.append(f"fuaran-dir-{_style_fragment(direction)}")
     return " ".join(parts)
 
 
@@ -206,3 +219,25 @@ def trend_sentiment(polarity: object, trend: float) -> tuple[str, str]:
     if sentiment < 0.0:
         return "regressing", "▼"
     return "unchanged", "→"
+
+
+def text_direction_attrs(style: Obj | None) -> list[tuple[str, str]]:
+    """The `dir` attribute a declared `style.direction` emits (§3.1 rule 1).
+
+    Empty for `auto` and for an absent member, which are the same statement: this
+    host has NOT adopted the reference tier's `dir="auto"` isolation heuristic
+    over runtime-bound display leaves, and inventing one under a declaration slot
+    would conflate two different claims. `fuaran-go` and `fuaran-rs` take the
+    same posture, so the three read alike.
+
+    Separate from ``style_class`` because the two halves land in different places
+    - the class on the wrapper's class list, the attribute in its attribute list
+    - and because §3.1 states them as two obligations: a host can emit the
+    direction and fail to isolate the run, which is half the contract and the
+    half that reorders the text around the value.
+    """
+    fields = style.fields if style is not None else {}
+    direction = fields.get("direction")
+    if direction is None or str(direction) in _NO_DIRECTION:
+        return []
+    return [("dir", str(direction))]

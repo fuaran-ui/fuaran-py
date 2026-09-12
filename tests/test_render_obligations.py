@@ -55,6 +55,7 @@ from fuaran_ui.render_fidelity import (
     ObligationReport,
     RenderFidelityManifest,
     Unchecked,
+    all_obligations,
     describe_obligation_report,
     parse_manifest,
     report_obligations,
@@ -617,6 +618,129 @@ def check_tree_accessible_name_always() -> None:
     )
 
 
+# ── fuaran#1696 — the `style.direction` TRAIT (§3.1) ────────────────────────
+#
+# A trait rides the node ENVELOPE, so these five checkers are written against a
+# kind chosen for being uninteresting: the claims are about the wrapper, and a
+# checker leaning on some kind's own markup would be asserting that kind.
+#
+# They decode RAW canonical JSON rather than authoring through ``fuaran``, and
+# that is load-bearing for rule 4. This host's encoder omits ``direction`` at its
+# ``auto`` identity, so an authored round trip would compare an emission against
+# itself and the claim would be vacuous — the CODEC would be under test, not the
+# renderer. A document that carries the member explicitly is the only input that
+# asks the render path the question.
+#
+# Two of the five are COMPARISONS rather than emission assertions, and that is
+# what makes them checkable at all. Rule 4 says ``auto`` is the absence of a
+# declaration, so the honest test is that the two emissions are byte-identical:
+# the reference host emits ``dir="auto"`` for a bidi-isolated display leaf under
+# a heuristic this host has deliberately not adopted, so "emits nothing" would be
+# a claim that means different things on different hosts. Rule 5 says nothing
+# else is derived, and the test is that a declared emission differs from the
+# undeclared one by the direction and its isolation ALONE — a subtraction no
+# single-node assertion can express.
+
+
+def render_json(canonical: str) -> str:
+    """Decode canonical wire JSON and render it, with no authoring surface between."""
+    decoded = decode_node(canonical)
+    assert decoded.ok, getattr(decoded, "error", decoded)
+    return render_html(decoded.value)
+
+
+def direction_leaf(direction: str | None, text: str) -> str:
+    """One leaf whose ``style.direction`` is as given; ``None`` omits the member."""
+    style = "" if direction is None else f',"style":{{"direction":"{direction}"}}'
+    return render_json(f'{{"id":"d","kind":{{"$type":"Badge","label":"{text}","variant":"Neutral"}}{style}}}')
+
+
+def direction_block(child_direction: str | None) -> str:
+    """An ``rtl`` container holding one child.
+
+    The two claims a single leaf cannot carry — inheritance and descendant
+    emission — need a tree to act on.
+    """
+    child_style = "" if child_direction is None else f',"style":{{"direction":"{child_direction}"}}'
+    return render_json(
+        '{"id":"block","kind":{"$type":"Box","children":['
+        '{"id":"child","kind":{"$type":"Badge","label":"RR123456789IL","variant":"Neutral"}'
+        f"{child_style}"
+        '}],"layout":{"$type":"Flex","direction":"Vertical","wrap":false},"role":"Group"},'
+        '"style":{"direction":"rtl"}}'
+    )
+
+
+def check_declared_direction_emitted() -> None:
+    ltr = direction_leaf("ltr", "RR123456789IL")
+    rtl = direction_leaf("rtl", "\u05e9\u05dc\u05d5\u05dd")
+    assert ' dir="ltr"' in ltr, f"a declared ltr direction is emitted on the node's own wrapper: {ltr}"
+    assert ' dir="rtl"' in rtl, f"…and so is a declared rtl one: {rtl}"
+
+    # The twin. Without it a renderer emitting `dir="ltr"` on every node would
+    # pass both assertions above while saying nothing true.
+    undeclared = direction_leaf(None, "plain")
+    assert " dir=" not in undeclared, f"an undeclared node must not carry a direction it never declared: {undeclared}"
+
+
+def check_declared_run_isolated() -> None:
+    # The ISOLATION is the class, whose reference-stylesheet rule is
+    # `unicode-bidi: isolate`. `dir` alone states a direction and leaves the text
+    # AROUND the run reordered, which is the half that is invisible when you look
+    # only at the value itself.
+    ltr = direction_leaf("ltr", "RR123456789IL")
+    rtl = direction_leaf("rtl", "\u05e9\u05dc\u05d5\u05dd")
+    assert "fuaran-dir-ltr" in ltr, f"a declared ltr run carries the isolating class: {ltr}"
+    assert "fuaran-dir-rtl" in rtl, f"…and so does a declared rtl one: {rtl}"
+
+    undeclared = direction_leaf(None, "plain")
+    assert "fuaran-dir-" not in undeclared, (
+        f"an undeclared node is isolated by nothing, because it declared nothing: {undeclared}"
+    )
+
+
+def check_declaration_wins_over_inference() -> None:
+    # An `ltr` reference INSIDE an `rtl` block — the case the member exists for.
+    html = direction_block("ltr")
+    assert ' dir="rtl"' in html, f"the declaring container keeps its own direction: {html}"
+    assert ' dir="ltr"' in html, (
+        f"the nested declaration did not win over the inherited direction — the inference exists for "
+        f"values whose direction is unknown, the declaration for the ones it gets wrong: {html}"
+    )
+
+
+def check_auto_is_no_declaration() -> None:
+    explicit = direction_leaf("auto", "plain")
+    omitted = direction_leaf(None, "plain")
+    assert explicit == omitted, (
+        "a node declaring `auto` must render identically to the same node omitting the member — "
+        f"`auto` IS the absence of a declaration\nwith auto: {explicit}\nomitted:   {omitted}"
+    )
+
+
+def check_no_derived_direction_behaviour() -> None:
+    # The SUBTRACTION: a renderer that also flipped an alignment, swapped a
+    # layout side or pushed a direction onto descendants fails here and passes
+    # every assertion above.
+    declared = direction_leaf("rtl", "RR123456789IL")
+    undeclared = direction_leaf(None, "RR123456789IL")
+    stripped = declared.replace(' dir="rtl"', "", 1).replace(" fuaran-dir-rtl", "", 1)
+    assert stripped == undeclared, (
+        "a declared direction changed something other than the direction and its isolation — no layout "
+        f"side, locale, alignment or descendant direction may be derived from it\nstripped:   {stripped}"
+        f"\nundeclared: {undeclared}"
+    )
+
+    # …and the descendant half, stated separately because a single leaf cannot
+    # carry it: an undeclared child inside a declaring parent emits no direction
+    # of its own. Inheritance is the receiving surface's, not a second emission.
+    html = direction_block(None)
+    assert html.count(" dir=") == 1, (
+        "exactly one element declared a direction, so exactly one may carry it — a direction pushed "
+        f"onto descendants is a derived behaviour rule 5 forbids: {html}"
+    )
+
+
 CHECKERS: Mapping[str, Callable[[], None]] = {
     "Media/accessible-name-always": check_accessible_name_always,
     "Media/autoplay-muted-pairing": check_autoplay_muted_pairing,
@@ -643,6 +767,15 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "FileUpload/ceiling-recorded-never-enforced": check_ceiling_recorded_never_enforced,
     "Modal/aria-modal-only-when-blocking": check_aria_modal_only_when_blocking,
     "Tree/accessible-name-always": check_tree_accessible_name_always,
+    # fuaran#1696 — the node-level TRAIT, keyed by its id rather than a kind.
+    # The dot is what keeps the two subject populations distinguishable in one
+    # registry: a trait id is the wire path of the member it governs, and a
+    # `kind.$type` is a bare identifier.
+    "style.direction/declared-direction-emitted": check_declared_direction_emitted,
+    "style.direction/declared-run-isolated": check_declared_run_isolated,
+    "style.direction/declaration-wins-over-inference": check_declaration_wins_over_inference,
+    "style.direction/auto-is-no-declaration": check_auto_is_no_declaration,
+    "style.direction/no-derived-direction-behaviour": check_no_derived_direction_behaviour,
 }
 
 #: Obligations this host declares it does NOT check, each with a reason.
@@ -785,7 +918,10 @@ def test_registers_no_checker_for_an_obligation_the_manifest_does_not_declare() 
     # forever and guards a contract that has moved, which is exactly the drift the
     # generated artefact exists to remove.
     manifest = load()
-    declared = {f"{row.kind}/{obligation.id}" for row in manifest.kinds for obligation in row.obligations}
+    # BOTH subject populations: a checker keyed by a trait id is exactly as
+    # orphanable as one keyed by a kind name, and quantifying over `kinds` alone
+    # would report every trait checker as stale.
+    declared = {f"{subject}/{obligation.id}" for subject, obligation in all_obligations(manifest)}
     orphans = sorted(key for key in CHECKERS if key not in declared)
 
     assert not orphans, (

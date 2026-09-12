@@ -68,7 +68,7 @@ from .sanitize import (
     sanitize_paint_value,
 )
 from .seeds import with_state_seeds
-from .theme import node_class_name, trend_sentiment
+from .theme import node_class_name, text_direction_attrs, trend_sentiment
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
@@ -438,6 +438,15 @@ class Renderer:
             ("data-fuaran-node-id", node.id),
             ("class", class_name),
         ]
+        # fuaran#1472 / fuaran#1696 — the DECLARED direction rides the wrapper,
+        # first among the attributes that follow `class`, which is where the
+        # reference host and `fuaran-rs` put it. It is the other half of §3.1:
+        # the class above isolates the run, this states which way it reads. A
+        # host that emitted neither passed every codec fixture for the member
+        # while rendering an RTL document left-to-right, which is why the
+        # obligation is declared in the corpus roster rather than left as prose.
+        style_extra = node.extras.get("style")
+        attrs.extend(text_direction_attrs(style_extra if isinstance(style_extra, Obj) else None))
         # Route the projection: a kind whose body IS the node's semantic element
         # takes the a11y attributes onto that element; every other kind carries
         # them on the wrapper, as before. The wrapper keeps the node's address

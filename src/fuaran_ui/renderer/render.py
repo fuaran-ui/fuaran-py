@@ -68,7 +68,12 @@ from .sanitize import (
     sanitize_paint_value,
 )
 from .seeds import with_state_seeds
-from .theme import node_class_name, text_direction_attrs, trend_sentiment
+from .theme import (
+    grid_row_interactive_class,
+    node_class_name,
+    text_direction_attrs,
+    trend_sentiment,
+)
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
@@ -2134,7 +2139,7 @@ class Renderer:
             return format_number(column.get("format"), value)
         return str(value)
 
-    def _bound_grid(self, columns: list[dict[str, Value]], rows: Arr) -> str:
+    def _bound_grid(self, columns: list[dict[str, Value]], rows: Arr, has_row_action: bool = False) -> str:
         """The resolved rows as the reference grid's own ``<table>`` markup.
 
         The element shape and class vocabulary match the reference renderer's
@@ -2162,7 +2167,13 @@ class Renderer:
                 )
                 for c in columns
             )
-            body_rows += element("tr", [("class", "fuaran-grid-row")], cells)
+            # Phase 1701 - the row-action affordance marker (WIRE_FORMAT.md
+            # 3.6.24). This host wires no click, but the class states what the
+            # DOCUMENT declared, and the row it marks is the seed a hydrating
+            # client takes over: a marked row here is a row that is about to
+            # become clickable.
+            row_class = "fuaran-grid-row" + grid_row_interactive_class(has_row_action)
+            body_rows += element("tr", [("class", row_class)], cells)
         thead = element("thead", [], element("tr", [], header_cells))
         tbody = element("tbody", [], body_rows)
         return element("table", [("class", "fuaran-grid")], thead + tbody)
@@ -2195,7 +2206,7 @@ class Renderer:
         resolved = resolve_source(fields.get("source"), self.sources)
         columns = self._grid_columns(fields.get("columns"))
         if isinstance(resolved, Arr) and any(isinstance(c.get("field"), str) for c in columns):
-            return self._bound_grid(columns, resolved)
+            return self._bound_grid(columns, resolved, "onRowClick" in fields)
         count = _seq_len(resolved)
         return self._make_vis_placeholder(
             "fuaran-grid fuaran-grid-ssr-placeholder",

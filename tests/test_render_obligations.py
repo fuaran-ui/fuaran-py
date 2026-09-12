@@ -741,6 +741,67 @@ def check_no_derived_direction_behaviour() -> None:
     )
 
 
+# ── fuaran#1701 — the interactive-row class (§3.6.24) ───────────────────────
+#
+# Built from RAW canonical JSON, for the reason the direction checkers give:
+# `onRowClick` is a closure-bearing slot whose whole wire content is its
+# PRESENCE, so authoring it through a surface would put the surface under test
+# rather than the renderer.
+
+MARKER = "fuaran-grid-row-interactive"
+
+
+def bound_grid(row_action: bool) -> str:
+    """A data-bound grid over two static rows, with the row action declared or omitted."""
+    action = '"onRowClick":"<closure>",' if row_action else ""
+    return render_json(
+        '{"id":"g","kind":{"$type":"DataGrid","columns":[{"field":"reference",'
+        '"kind":{"$type":"Text"},"label":"Reference"}],'
+        f"{action}"
+        '"source":{"$type":"Static","value":[{"reference":"S-1"},{"reference":"S-2"}]}}}'
+    )
+
+
+def static_rows_grid(row_action: bool) -> str:
+    """The same grid in ``staticRows`` mode, which honours no row action in any tier."""
+    action = '"onRowClick":"<closure>",' if row_action else ""
+    return render_json(
+        '{"id":"g","kind":{"$type":"DataGrid","columns":[],'
+        f"{action}"
+        '"source":{"$type":"Static","value":[]},'
+        '"staticRows":{"headers":["Reference"],"rows":[["S-1"]]}}}'
+    )
+
+
+def check_interactive_row_only_with_action() -> None:
+    # Rule 1, both directions. An emission test alone cannot tell a renderer that
+    # honours the declaration from one that marks every row.
+    declared = bound_grid(True)
+    assert MARKER in declared, (
+        "a grid declaring a row action must mark its rows, so the pointer affordance keyed on the "
+        f"marker promises a click the document declared: {declared}"
+    )
+    undeclared = bound_grid(False)
+    assert MARKER not in undeclared, (
+        "a grid declaring no row action must mark no row - a pointer over inert content is a "
+        f"promise the markup does not keep: {undeclared}"
+    )
+    # ...and the rows are there either way, so the negative above is about the
+    # DECLARATION rather than about an empty render.
+    assert undeclared.count('<tr class="fuaran-grid-row"') == 2, undeclared
+
+    # Rule 2 - the static leg renders real rows AND can read the declaration, and
+    # must still mark none: the mode honours no row action in any tier, so a
+    # marked row there would promise a click nothing can deliver.
+    static_declared = static_rows_grid(True)
+    assert "fuaran-table-row" in static_declared, static_declared
+    assert MARKER not in static_declared, (
+        "a `staticRows` grid honours no row action in any tier, so its rows carry no interactive-row "
+        f"marker whatever the grid declares: {static_declared}"
+    )
+    assert MARKER not in static_rows_grid(False)
+
+
 CHECKERS: Mapping[str, Callable[[], None]] = {
     "Media/accessible-name-always": check_accessible_name_always,
     "Media/autoplay-muted-pairing": check_autoplay_muted_pairing,
@@ -776,6 +837,8 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "style.direction/declaration-wins-over-inference": check_declaration_wins_over_inference,
     "style.direction/auto-is-no-declaration": check_auto_is_no_declaration,
     "style.direction/no-derived-direction-behaviour": check_no_derived_direction_behaviour,
+    # fuaran#1701 - the row-action affordance.
+    "DataGrid/interactive-row-only-with-action": check_interactive_row_only_with_action,
 }
 
 #: Obligations this host declares it does NOT check, each with a reason.

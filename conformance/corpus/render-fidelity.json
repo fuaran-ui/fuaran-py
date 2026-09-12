@@ -108,6 +108,10 @@
     {
       "id": "no-derived-direction-behaviour",
       "meaning": "no further behaviour is derived from the declaration - not a layout side, not a locale, not an alignment, and not a direction for descendants"
+    },
+    {
+      "id": "interactive-row-only-with-action",
+      "meaning": "a rendered grid row carries the interactive-row class only where the grid declares a row action, and a grid declaring none carries it on no row - the pointer affordance keyed on that class promises a click exactly where the document declared one"
     }
   ],
   "kinds": [
@@ -243,7 +247,13 @@
       "fixtures": [
         "nodes/grid-1.json"
       ],
-      "obligations": [],
+      "obligations": [
+        {
+          "id": "interactive-row-only-with-action",
+          "statement": "a rendered grid row carries the interactive-row class (`fuaran-grid-row-interactive` in the reference vocabulary) only where the grid declares a row action, and a grid declaring none carries it on no row at all - so the pointer affordance the reference stylesheet keys on that class promises a click exactly where the document declared one. A `staticRows` grid honours no row action in any tier, and so carries the class on no row whatever it declares; a host that renders the bound leg as a hydration placeholder emits no row, and so no class",
+          "section": "WIRE_FORMAT.md 3.6.24"
+        }
+      ],
       "intrinsic": [
         {
           "element": "the transfer status region beside a transfer-enabled grid",
@@ -261,7 +271,7 @@
           "tierNote": "paging is a hydration-time affordance; the static floor emits the requested page and no pager"
         }
       ],
-      "contract": "Phase 393; docs/SSR.md (Visualisation, sortable rendered tables)"
+      "contract": "Phase 393; Phase 1701; docs/SSR.md (Visualisation, sortable rendered tables); WIRE_FORMAT.md 3.6.24"
     },
     {
       "kind": "Disclosure",

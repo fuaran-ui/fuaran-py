@@ -913,6 +913,45 @@ def test_every_declared_claim_resolves_against_the_closed_vocabulary() -> None:
 
 
 @artifact_required
+def test_every_declared_trait_scope_is_actionable() -> None:
+    """``appliesTo`` decides whether a trait claim is OWED on this host at all.
+
+    One riding only kinds this host does not render owes nothing; one riding the
+    envelope is owed by everything. A scope this host cannot interpret is
+    therefore not a cosmetic defect — it is an unanswerable question about
+    whether the gate should be red.
+
+    Both arms are asserted in BOTH directions, because the tagged shape exists
+    precisely so that "every kind" is not spellable as an empty array: an
+    ``allKinds`` carrying a list, or a ``namedKinds`` carrying none, would each
+    read as the opposite of what it says.
+    """
+    manifest = load()
+    kind_names = {row.kind for row in manifest.kinds}
+
+    for row in manifest.traits:
+        assert "." in row.trait, (
+            f"a trait id is the wire path of the member it governs, never a bare kind name: {row.trait}"
+        )
+        assert row.trait not in kind_names, f"{row.trait} collides with a kind name; one registry keys both populations"
+        if row.scope == "allKinds":
+            assert not row.scope_kinds, (
+                f"{row.trait}: an allKinds scope names no kinds - a list would be a narrower claim "
+                f"than the scope itself: {row.scope_kinds}"
+            )
+        elif row.scope == "namedKinds":
+            assert row.scope_kinds, (
+                f"{row.trait}: a namedKinds scope with an empty list rides NOTHING, which is "
+                "satisfiable by rendering nothing at all"
+            )
+        else:  # pragma: no cover - the parser refuses any other token
+            raise AssertionError(
+                f"{row.trait}: this host cannot interpret the scope {row.scope!r}, so it cannot say "
+                "whether the trait's claims are owed here"
+            )
+
+
+@artifact_required
 def test_registers_no_checker_for_an_obligation_the_manifest_does_not_declare() -> None:
     # A checker for a claim no row declares is a stale assertion: it passes
     # forever and guards a contract that has moved, which is exactly the drift the

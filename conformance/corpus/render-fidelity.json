@@ -108,6 +108,14 @@
     {
       "id": "no-derived-direction-behaviour",
       "meaning": "no further behaviour is derived from the declaration - not a layout side, not a locale, not an alignment, and not a direction for descendants"
+    },
+    {
+      "id": "float-seq-reads-element-wise",
+      "meaning": "a resolved float sequence yields exactly one reading per element - an element that is not a number reads as the non-finite sentinel in its own position, and neither shortens the series nor suppresses the rest of it"
+    },
+    {
+      "id": "float-seq-accept-set-closed",
+      "meaning": "the element accept set at a float-sequence slot is closed - a JSON number or one of the three quoted sentinel spellings, and no other spelling of a number"
     }
   ],
   "kinds": [
@@ -857,11 +865,23 @@
         "meaning": "no client-only tier - the parity-checked fallback is the whole render"
       },
       "fixtures": [
-        "nodes/spark-1.json"
+        "nodes/spark-1.json",
+        "nodes/state-absent-default.json"
       ],
-      "obligations": [],
+      "obligations": [
+        {
+          "id": "float-seq-reads-element-wise",
+          "statement": "a host-fed series yields exactly one reading per element - an element that is not a number reads as NaN in its OWN position, and the host neither drops it, truncates the series at it, nor abandons the whole series because of it. A series index is a position, so a dropped element slides every later reading one place left",
+          "section": "WIRE_FORMAT.md 24.7"
+        },
+        {
+          "id": "float-seq-accept-set-closed",
+          "statement": "an element is a number only where it is a JSON number or one of §7's three quoted sentinels; a decimal string such as `\"3.5\"` is NOT one, because the decode path at this same slot refuses it and a resolver that admitted more would make the accept set its runtime's rather than the format's",
+          "section": "WIRE_FORMAT.md 24.7"
+        }
+      ],
       "intrinsic": [],
-      "contract": "Phase 644 4k; Phase 1098; docs/SSR.md (Display.Sparkline)"
+      "contract": "Phase 644 4k; Phase 1098; Phase 1704; WIRE_FORMAT.md 24.7; docs/SSR.md (Display.Sparkline)"
     },
     {
       "kind": "SplitPanel",

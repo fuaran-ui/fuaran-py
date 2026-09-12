@@ -890,6 +890,36 @@ def _omit_default_format(value: object, path: str) -> object:
     return _DROP if isinstance(v, Obj) and v.tag == "None" else v
 
 
+def _omit_empty_list(value: object, path: str) -> object:
+    """Phase 1670 — a list slot whose identity value is the EMPTY list.
+
+    `WIRE_FORMAT.md`'s parameterised-fragment section has always said a zero-hole
+    declaration omits `holes`, and since Phase 1670 it says so as a MUST: the
+    redundant `"holes":[]` is decode-accepted input, never a second canonical
+    spelling. Structural otherwise — a non-empty list is preserved exactly as the
+    untyped pass-through preserved it, so this narrows the canonical form and
+    changes nothing about what is accepted.
+    """
+    items = _expect_array(value, path)
+    return _DROP if not items else from_json(value)
+
+
+_PURE_DETERMINISTIC_EFFECT = {"determinism": "Deterministic", "hostEffect": "Pure"}
+
+
+def _omit_default_effect_class(value: object, path: str) -> object:
+    """Phase 1670 — `FragmentDecl.effect`, omitted when pure-deterministic.
+
+    The twin of :func:`_omit_empty_list` one slot over, and the reason both are
+    here rather than left to each author's discipline: this host emitted whatever
+    it was handed, so one value round-tripped to two different documents on two
+    conformant hosts and neither host's own round-trip gate could see it — each
+    compares its re-encode against bytes it produced itself.
+    """
+    obj = _expect_object(value, path)
+    return _DROP if obj == _PURE_DETERMINISTIC_EFFECT else from_json(value)
+
+
 def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
     """0.2.0 behavioural omit-when-default: the flag is omitted at its default
     on BOTH boundaries (`Toast.dismissable` is the one omit-when-TRUE)."""
@@ -899,40 +929,6 @@ def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
         return _DROP if b == default else b
 
     return dec
-
-
-# ── Phase 1670 — the `FragmentDecl` normalisations (WIRE_FORMAT.md §15.4) ────
-# The redundant `"holes":[]` and the pure-deterministic `"effect"` are NOT a
-# second canonical spelling: a conformant emitter MUST omit both, both stay
-# decode-accepted, and a decoder that meets either re-encodes without it. On
-# this host's generic structural model the encoder re-emits exactly the fields
-# the model carries, so the normalisation IS the drop — the same shape Phase
-# 460 gave every other omit-at-default slot, and the same `_DROP` sentinel.
-#
-# Both decoders normalise ONE value and type nothing. `holes`' `HoleDecl` cases
-# and `effect`'s two closed vocabularies have their own refusal paths and no
-# fixtures behind them here, and inventing refusals under cover of a
-# normalisation would refuse documents the corpus accepts.
-#
-# `FragmentRef.args` is the third member of this class and is deliberately NOT
-# treated: §15.4 records it as a SHOULD rather than a MUST, because the
-# reference host cannot yet express a map's identity default. A host that
-# normalised it anyway would be the one emitting bytes the reference does not.
-_PURE_DETERMINISTIC_EFFECT = {"determinism": "Deterministic", "hostEffect": "Pure"}
-
-
-def _omit_default_fragment_effect(value: object, path: str) -> object:
-    v = from_json(value)
-    if isinstance(v, Obj) and v.tag is None and v.fields == _PURE_DETERMINISTIC_EFFECT:
-        return _DROP
-    return v
-
-
-def _omit_empty_holes(value: object, path: str) -> object:
-    v = from_json(value)
-    if isinstance(v, Arr) and not v.items:
-        return _DROP
-    return v
 
 
 def _omit_default_binding_static_int(default: int) -> Callable[[object, str], object]:
@@ -2766,9 +2762,11 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "FragmentDecl": [
         ("body", False, _decode_single_node),
-        # §15.4 (Phase 1670) — normalised away at their defaults, not typed.
-        ("effect", False, _omit_default_fragment_effect),
-        ("holes", False, _omit_empty_holes),
+        # Phase 1670 — the two OMIT-AT-DEFAULT slots. Typed here only far enough
+        # to recognise their identity values; a non-default `holes` / `effect` is
+        # preserved structurally exactly as before.
+        ("holes", False, _omit_empty_list),
+        ("effect", False, _omit_default_effect_class),
     ],
     # A `SlotArg` fragment argument carries a whole node tree (`FragmentArg`,
     # corpus schema) — the same class of hidden node, one level further in.

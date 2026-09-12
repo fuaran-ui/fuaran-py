@@ -55,6 +55,22 @@ _REFERENCE_HOST_ROOT = reference_host_root()
 #: by an assertion about the very drift it is checking for.
 _REFERENCE_RENDERER_PROJECT_PREFIX = "Fuaran.UI.Renderer"
 
+#: The hand-maintained list this derivation REPLACED, kept as a FLOOR rather than
+#: as the list — the shape the Rust and Go hosts already carry (Phase 1677, so all
+#: three read alike). Four files were the original literal; the next three are the
+#: ones each later incident appended to it. Their value now is as a lower bound:
+#: a derivation that stops reaching them has stopped working, and a derivation no
+#: LARGER than them has stopped being a derivation.
+_REFERENCE_RENDERER_SOURCE_FLOOR = (
+    "Fuaran.UI.Renderer.Server/Render.fs",
+    "Fuaran.UI.Renderer/Render.fs",
+    "Fuaran.UI.Renderer.Core/Theme.fs",
+    "Fuaran.UI.Renderer.Core/DrawingSvg.fs",
+    "Fuaran.UI.Renderer.Core/Css.fs",
+    "Fuaran.UI.Renderer/Runtime.fs",
+    "Fuaran.UI.Renderer.Server/Registry.fs",
+)
+
 
 def _reference_renderer_files() -> list[Path]:
     if _REFERENCE_HOST_ROOT is None:
@@ -163,6 +179,38 @@ def test_reference_renderer_projects_are_found_when_the_host_is() -> None:
     assert len(projects) >= 4, (
         f"only {sorted(projects)} resolved as reference renderer projects; the oracle reads fewer sources "
         "than it did. A project rename narrows the vocabulary silently — that is how this gate drifted before."
+    )
+
+
+def test_the_reference_source_set_is_derived_rather_than_listed() -> None:
+    """The COMPLETENESS property the bundle asked for, not another presence check.
+
+    ``test_reference_renderer_projects_are_found_when_the_host_is`` above bounds
+    the PROJECT count; this bounds the FILES, and the two fail differently. A glob
+    that returned one ``.fs`` per project satisfies the project floor completely
+    while reading four files — which is exactly the state the literal was in when
+    it looked valid and was three files stale.
+
+    So the question asked here is not "is every listed file present" (the check
+    that passed throughout the drift) but "does the derivation reach PAST the list
+    it replaced". The Rust and Go hosts assert the same two things about the same
+    floor; this is the third.
+    """
+    if _REFERENCE_HOST_ROOT is None:
+        pytest.skip("no F# reference host checked out (the cross-host guard covers the wrong-path case)")
+    src = _REFERENCE_HOST_ROOT / "src"
+    relative = {p.relative_to(src).as_posix() for p in _REFERENCE_RENDERER_FILES}
+
+    missing = [f for f in _REFERENCE_RENDERER_SOURCE_FLOOR if f not in relative]
+    assert not missing, (
+        f"the derived source set does not reach {missing} — every one of these is a file the reference "
+        "spells classes in, and each was appended to the literal this derivation replaced. A derivation "
+        "that no longer reaches them is narrower than the list it was meant to improve on."
+    )
+    assert len(relative) > len(_REFERENCE_RENDERER_SOURCE_FLOOR), (
+        f"the derived set ({len(relative)} files) is no larger than the floor "
+        f"({len(_REFERENCE_RENDERER_SOURCE_FLOOR)}) — the derivation is not reaching past the list it "
+        "replaced, which is the state a presence check cannot tell from a working one."
     )
 
 

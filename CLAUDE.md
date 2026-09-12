@@ -3,7 +3,7 @@
 This repo is the **Python host of the Fuaran UI language** — a **co-equal sibling
 to the F# (`Fuaran.UI`) and TypeScript (`@fuaran-ui/*`) tiers**, not merely a
 codec. The target identity is a full authoring + rendering host: an ergonomic
-`fuaran_ui.ui` smart-constructor authoring surface (roadmap Phase 278), a tree-op
+`fuaran_ui.ui` smart-constructor authoring surface (Phase 278), a tree-op
 apply engine (279), a server-HTML renderer (`fuaran_ui.renderer`, Phase 239 —
 shipped) plus an interactive Pyodide client runtime (280), all conformant to the
 shared wire format. What ships **today** is the floor: the canonical-JSON codec
@@ -454,7 +454,7 @@ import-guarded (the `#if FABLE_COMPILER` analogue). Manifest JSON encode + the F
 No upstream dependency on any other sibling. At test time it reads the
 workspace-relative corpus at `../wire-format-fixtures/` (skipped when absent, so
 the repo is standalone-testable). It produces a Python package, not a NuGet pack
-— the workspace `pack-all.ps1` treats it as a no-op.
+— the consumer-side package build treats it as a no-op.
 
 ## Public vocabulary discipline
 

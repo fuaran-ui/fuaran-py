@@ -106,3 +106,31 @@ MAX_EXPR_NODES = 512
 # diagnosis rule 2 forbids. It is an authoring defect and belongs to the pre-emit
 # validator family (``FUARAN152``), which this package does not implement.
 MAX_SKELETON_ROWS = 10000
+
+
+# Maximum UTF-8 BYTE length of one whole input document (``WIRE_FORMAT.md``
+# §21.7, adopted on this host in Phase 1677 — the comments above have named it
+# twice as the bound that catches what ``MAX_EXPR_NODES`` and ``MAX_SKELETON_ROWS``
+# do not, which they could not, because until now the constant did not exist).
+#
+# It is the only §21 limit that bounds a document's TOTAL rather than the shape
+# of its walk, and it is needed because the five structural limits compose
+# MULTIPLICATIVELY: 100 000 array elements each holding a 1 048 576-code-point
+# string satisfies every one of them and is a hundred gigabytes. Each individual
+# check refuses nothing, because each individual check is satisfied.
+#
+# BYTES, not code points — the one place a §21 unit differs from §21.6's,
+# deliberately. §21.6 bounds a VALUE the author wrote, so it is measured in units
+# of text; this bounds the CARRIAGE, which is what an attacker sends and what a
+# host allocates. On this host that distinction is REAL rather than notational:
+# ``str`` is code points, so the two counts genuinely differ and the check must
+# convert (see ``shapeguard._check_document_bytes``, which does so without ever
+# materialising the encoded document). The Go and Rust hosts measure ``len()`` of
+# a string that is already UTF-8; the unit is the same on all three.
+#
+# Constrained from BELOW by ``MAX_NODES``: a document at exactly 100 000 nodes is
+# about 8 MB of small nodes, so an 8 MiB ceiling — which looks generous beside a
+# 1 MiB string bound — would refuse a document §21.2 rule 1 requires every host to
+# ACCEPT, quietly lowering the node ceiling while leaving its stated value in the
+# table. 32 MiB leaves about 335 bytes per node there.
+MAX_DOCUMENT_BYTES = 33554432

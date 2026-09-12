@@ -901,6 +901,40 @@ def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
     return dec
 
 
+# ── Phase 1670 — the `FragmentDecl` normalisations (WIRE_FORMAT.md §15.4) ────
+# The redundant `"holes":[]` and the pure-deterministic `"effect"` are NOT a
+# second canonical spelling: a conformant emitter MUST omit both, both stay
+# decode-accepted, and a decoder that meets either re-encodes without it. On
+# this host's generic structural model the encoder re-emits exactly the fields
+# the model carries, so the normalisation IS the drop — the same shape Phase
+# 460 gave every other omit-at-default slot, and the same `_DROP` sentinel.
+#
+# Both decoders normalise ONE value and type nothing. `holes`' `HoleDecl` cases
+# and `effect`'s two closed vocabularies have their own refusal paths and no
+# fixtures behind them here, and inventing refusals under cover of a
+# normalisation would refuse documents the corpus accepts.
+#
+# `FragmentRef.args` is the third member of this class and is deliberately NOT
+# treated: §15.4 records it as a SHOULD rather than a MUST, because the
+# reference host cannot yet express a map's identity default. A host that
+# normalised it anyway would be the one emitting bytes the reference does not.
+_PURE_DETERMINISTIC_EFFECT = {"determinism": "Deterministic", "hostEffect": "Pure"}
+
+
+def _omit_default_fragment_effect(value: object, path: str) -> object:
+    v = from_json(value)
+    if isinstance(v, Obj) and v.tag is None and v.fields == _PURE_DETERMINISTIC_EFFECT:
+        return _DROP
+    return v
+
+
+def _omit_empty_holes(value: object, path: str) -> object:
+    v = from_json(value)
+    if isinstance(v, Arr) and not v.items:
+        return _DROP
+    return v
+
+
 def _omit_default_binding_static_int(default: int) -> Callable[[object, str], object]:
     """Phase 1585 — a ``Binding<int>`` slot omitted at the identity
     ``Static(<default>)``.
@@ -2732,6 +2766,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     ],
     "FragmentDecl": [
         ("body", False, _decode_single_node),
+        # §15.4 (Phase 1670) — normalised away at their defaults, not typed.
+        ("effect", False, _omit_default_fragment_effect),
+        ("holes", False, _omit_empty_holes),
     ],
     # A `SlotArg` fragment argument carries a whole node tree (`FragmentArg`,
     # corpus schema) — the same class of hidden node, one level further in.

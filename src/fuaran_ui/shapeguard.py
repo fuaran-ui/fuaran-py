@@ -52,6 +52,7 @@ from typing import Any
 
 from .limits import (
     MAX_ARRAY_LENGTH,
+    MAX_DOCUMENT_BYTES,
     MAX_JSON_DEPTH,
     MAX_STRING_LENGTH,
 )
@@ -99,6 +100,43 @@ def _limit_exceeded_depth() -> DecodeError:
 
 def _invalid_json(message: str) -> DecodeError:
     return DecodeError(INVALID_JSON, "$", message)
+
+
+def _check_document_bytes(text: str) -> DecodeError | None:
+    """Enforce §21.7 BEFORE parsing.
+
+    The path is ``"$"``: the breach is a property of the document, not of a
+    position inside it, and there is no position to name because nothing has been
+    parsed. A host that defers this check has chosen to allocate the document a
+    second time for no benefit.
+
+    Measured in UTF-8 BYTES, which a Python ``str`` is not — so the count is
+    bracketed rather than materialised. One code point encodes to at least one
+    byte and at most four, so ``len(text) > MAX`` already breaches and
+    ``4 * len(text) <= MAX`` already cannot, and only the band between them is
+    encoded. That band is narrow and the encode there is bounded by four times the
+    limit, where encoding unconditionally would allocate a second copy of every
+    document this host ever reads — including every one well inside the bound,
+    which is all of them.
+
+    The vector is HOST-LOCAL and deliberately not a corpus fixture, matching the
+    Go host's reading: committing 32 MiB of padding to a shared repository to
+    assert one integer comparison is a poor trade, and unlike the depth bounds
+    this is not a recursion hazard. ``tests/test_document_bytes.py`` IS this
+    host's conformance evidence for §21.7.
+    """
+    code_points = len(text)
+    if 4 * code_points <= MAX_DOCUMENT_BYTES:
+        return None
+    size = code_points if code_points > MAX_DOCUMENT_BYTES else len(text.encode("utf-8"))
+    if size <= MAX_DOCUMENT_BYTES:
+        return None
+    return DecodeError(
+        LIMIT_EXCEEDED,
+        "$",
+        f"document is {size} UTF-8 bytes, over the wire limit MAX_DOCUMENT_BYTES = {MAX_DOCUMENT_BYTES}",
+        f"a document of at most {MAX_DOCUMENT_BYTES} UTF-8 bytes",
+    )
 
 
 def scan_syntax(text: str) -> DecodeError | None:
@@ -180,7 +218,17 @@ def load_bounded(text: str) -> tuple[Any, DecodeError | None]:
     is the ONLY parse entry point in this host: a wire-facing reader that calls
     ``json.loads`` directly answers the §20 rows differently and is an
     undeclared divergent entry point under §20.1.
+
+    That sole-entry-point property is also why §21.7's total-payload bound is
+    enforced HERE rather than in ``schema.decode``: the node decoder is one of
+    ten readers that reach this function, and a ceiling installed at one of them
+    would leave the op, DAG, envelope, elicitation, teleport, dataframe, client
+    and theme-manifest readers unbounded.
     """
+    size_error = _check_document_bytes(text)
+    if size_error is not None:
+        return None, size_error
+
     syntax_error = scan_syntax(text)
     if syntax_error is not None:
         return None, syntax_error

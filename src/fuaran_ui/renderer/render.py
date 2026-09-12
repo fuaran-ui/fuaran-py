@@ -2468,26 +2468,62 @@ class Renderer:
         )
 
 
+def _float_seq_element(item: object) -> float:
+    """One element of a float sequence, per WIRE_FORMAT.md §24.7 (fuaran#1704).
+
+    The accept set is §7's and it is CLOSED: a JSON number, or one of the three
+    quoted sentinel spellings. Anything else — a decimal string, a mis-cased
+    sentinel, a bool, a mapping, a nested sequence — reads as NaN, which says
+    "there is no number here" in the position where the number is not.
+
+    ``bool`` is an ``int`` subclass in Python and is NOT a number here, for the
+    reason the decoder refuses it in a numeric slot: ``True`` is not the value
+    ``1`` that an author meant to plot.
+
+    The closed set is not a narrowing for its own sake. ``float()`` accepts
+    ``"3.5"`` but also ``"1_0"``, ``" nan "`` and ``"infinity"``; Go's
+    ``ParseFloat`` accepts ``"0x1p-2"``; JavaScript's coercion accepts ``"0x10"``
+    and the empty string — so "a numeric string" names a different set on every
+    host, and one store would draw different pictures on two conformant hosts.
+    This host's own decoder refuses exactly these spellings at the same slot, so
+    admitting them here would make the two halves of one slot disagree about
+    what a number is.
+    """
+    if isinstance(item, bool):
+        return float("nan")
+    if isinstance(item, (int, float)):
+        return float(item)
+    if item == "NaN":
+        return float("nan")
+    if item == "Infinity":
+        return float("inf")
+    if item == "-Infinity":
+        return float("-inf")
+    return float("nan")
+
+
 def _float_series(value: object) -> list[float] | None:
     """A resolved ``Sparkline`` source as a float series, or ``None``.
 
+    ``None`` means the resolved value was not a SEQUENCE at all — the unresolved
+    case, which keeps the em-dash exactly as it always did. A value that IS a
+    sequence yields ONE READING PER ELEMENT (WIRE_FORMAT.md §24.7), whatever the
+    elements are.
+
     The decoder types this slot (a ``Binding<float seq>``, non-finites arriving
     as the §5/§7 quoted sentinels and leaving as floats), so a *decoded* tree
-    cannot reach here with a foreign element. A host-supplied ``sources`` value
-    can, and that is exactly the "source does not resolve to a series" case the
-    render-fidelity fallback declares — so it takes the em-dash branch rather
-    than a partial picture. ``bool`` is an ``int`` subclass and is refused for
-    the same reason the decoder refuses it in a numeric slot.
+    cannot reach here with a foreign element at all. A host-supplied ``sources``
+    value can, and this host used to treat that as "the source does not resolve
+    to a series" and render the em-dash. §24.7 settles that it is not: the host
+    demonstrably read the other elements, and discarding a hundred and
+    ninety-nine readable points because the two-hundredth is junk tells the
+    reader nothing at all, where the sentinel tells them one point is missing and
+    leaves every other reading in its own position.
     """
     if not isinstance(value, (Arr, list, tuple)):
         return None
     items = value.items if isinstance(value, Arr) else list(value)
-    out: list[float] = []
-    for item in items:
-        if isinstance(item, bool) or not isinstance(item, (int, float)):
-            return None
-        out.append(float(item))
-    return out
+    return [_float_seq_element(item) for item in items]
 
 
 def _seq_len(value: object) -> int:

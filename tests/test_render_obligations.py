@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import warnings
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -802,6 +803,90 @@ def check_interactive_row_only_with_action() -> None:
     assert MARKER not in static_rows_grid(False)
 
 
+# ── fuaran#1704 — Sparkline float-sequence resolution (§24.7) ────────────────
+#
+# The claims are about a HOST-FED series, so these two checkers are the only ones
+# in this file that render against a non-empty store. That is structural rather
+# than convenient: a float-sequence slot TYPES its elements at decode, so
+# ``[1,"3.5",3]`` is a WRONG_TYPE and no document can carry the case. The store
+# is the only place a foreign element exists, which is why §24.7 is a render
+# obligation and not a codec family.
+#
+# The observable is the emitted ``<polyline points="…">``: the lowering yields
+# one point per series element, so counting points counts readings. An assertion
+# on the em-dash alone could not tell a host that read every element from one
+# that read the first two and gave up.
+#
+# The document is the corpus's own bound-source sparkline —
+# ``nodes/state-absent-default.json``'s ``absent-default-sparkline``, reproduced
+# here as one node so the checker renders the subject rather than digging it out
+# of a six-node composite.
+BOUND_SPARKLINE = (
+    '{"id":"absent-default-sparkline","kind":{"$type":"Sparkline","source":{"$type":"State","key":"series"}}}'
+)
+
+
+def render_series(series: object) -> str:
+    """Render the bound sparkline with ``series`` fed from the store."""
+    decoded = decode_node(BOUND_SPARKLINE)
+    assert decoded.ok, getattr(decoded, "error", decoded)
+    return render_html(decoded.value, {"series": series})
+
+
+def point_count(html: str) -> int:
+    """How many readings the emission shows: one ``x,y`` pair per element."""
+    match = re.search(r'points="([^"]*)"', html)
+    return len(match.group(1).split()) if match else 0
+
+
+def check_float_seq_reads_element_wise() -> None:
+    finite = render_series([1.0, 2.0, 3.0, 4.0])
+    assert point_count(finite) == 4, f"a four-element series must draw four readings: {finite}"
+
+    # The element the rule is about: one the host cannot read as a number, among
+    # readable neighbours. Several spellings, because a host special-casing
+    # strings and one special-casing foreign types are different defects.
+    for foreign in ("banana", True, None, {}, [1]):
+        html = render_series([1.0, foreign, 3.0, 4.0])
+        assert "fuaran-sparkline-empty" not in html, (
+            f"one unreadable element ({foreign!r}) suppressed the whole series — the em-dash is the "
+            f"UNRESOLVED case, not the partly-readable one; discarding the readable points tells the "
+            f"reader nothing at all: {html}"
+        )
+        assert point_count(html) == 4, (
+            f"an unreadable element ({foreign!r}) changed the series LENGTH — a series index is a "
+            f"position, so a dropped reading slides every later one one place left: {html}"
+        )
+
+
+def check_float_seq_accept_set_closed() -> None:
+    # The twin FIRST, so the comparison below is against a real render rather
+    # than two em-dashes agreeing about nothing.
+    genuine = render_series([0.0, 3.5, 7.0])
+    assert point_count(genuine) == 3, f"the genuine number must be read — the closed set admits JSON numbers: {genuine}"
+
+    # The comparison IS the claim, and it is the one formulation that reads the
+    # same on every host: a host that coerced "3.5" emits byte-identical markup
+    # for the two, whatever its geometry. Asserting the characters ``3.5`` are
+    # absent would pass on a host that coerced and then scaled the coordinate.
+    for spelling in ("3.5", "+3.5", " 3.5 ", "1_0", "infinity", "nan"):
+        coerced = render_series([0.0, spelling, 7.0])
+        assert coerced != genuine, (
+            f"the string {spelling!r} resolved to the number it spells — the accept set at this slot "
+            f"is §7's and closed, and this host's own decoder refuses exactly this spelling, so "
+            f"accepting it here makes the two halves of one slot disagree"
+        )
+
+    # …and the three the set DOES admit, in the same shape. Without them the
+    # claim above would be satisfied by a host that read no string at all,
+    # including the sentinels the format exists to spell.
+    for sentinel in ("NaN", "Infinity", "-Infinity"):
+        html = render_series([1.0, sentinel, 3.0])
+        assert point_count(html) == 3, (
+            f"the sentinel {sentinel!r} is IN the accept set and must read as its non-finite value: {html}"
+        )
+
+
 CHECKERS: Mapping[str, Callable[[], None]] = {
     "Media/accessible-name-always": check_accessible_name_always,
     "Media/autoplay-muted-pairing": check_autoplay_muted_pairing,
@@ -839,6 +924,9 @@ CHECKERS: Mapping[str, Callable[[], None]] = {
     "style.direction/no-derived-direction-behaviour": check_no_derived_direction_behaviour,
     # fuaran#1701 - the row-action affordance.
     "DataGrid/interactive-row-only-with-action": check_interactive_row_only_with_action,
+    # fuaran#1704 — the two float-sequence resolution claims (§24.7).
+    "Sparkline/float-seq-reads-element-wise": check_float_seq_reads_element_wise,
+    "Sparkline/float-seq-accept-set-closed": check_float_seq_accept_set_closed,
 }
 
 #: Obligations this host declares it does NOT check, each with a reason.

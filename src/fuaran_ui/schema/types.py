@@ -3826,6 +3826,16 @@ class EffectClass:
     def to_wire(self) -> Value:
         return Obj(None, {"determinism": self.determinism, "hostEffect": self.host_effect})
 
+    @property
+    def is_pure_deterministic(self) -> bool:
+        """The identity effect class — the one `FragmentDecl.effect` omits.
+
+        A declaration that says nothing about its effects means this, which is
+        why the wire form drops the key rather than carrying the default; see
+        `FragmentDecl.to_wire`.
+        """
+        return self.host_effect == "Pure" and self.determinism == "Deterministic"
+
 
 @dataclass(frozen=True)
 class SlotArg:
@@ -3846,11 +3856,20 @@ class FragmentDecl:
     effect: EffectClass | None = None
 
     def to_wire(self) -> Obj:
+        # Phase 1670 — `effect` is OMIT-AT-DEFAULT, not merely optional, and this
+        # host used to emit whatever it was handed. `WIRE_FORMAT.md` has said
+        # since parameterised fragments shipped that a pure-deterministic
+        # declaration omits the key, and it now says so as a MUST: the redundant
+        # `{"determinism":"Deterministic","hostEffect":"Pure"}` is not a second
+        # canonical spelling, so a document carrying it decodes here and
+        # re-encodes without it. `holes` already had this rule; the two are one
+        # class and now read alike.
+        effect = None if self.effect is None or self.effect.is_pure_deterministic else self.effect
         return _obj(
             "FragmentDecl",
             {
                 "body": self.body,
-                "effect": self.effect,
+                "effect": effect,
                 "holes": list(self.holes) if self.holes else None,
                 "name": self.name,
             },

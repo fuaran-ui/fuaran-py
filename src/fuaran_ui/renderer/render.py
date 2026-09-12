@@ -2020,7 +2020,7 @@ class Renderer:
           so emitting it would invite a reader to believe this tier enforces it.
         """
         label = element("span", [("class", "fuaran-file-upload-label")], escape_text(self._text(fields.get("label"))))
-        control_attrs: list[tuple[str, str]] = [("class", "fuaran-file-upload-control"), ("type", "file")]
+        control_attrs: list[tuple[str, str]] = [("class", "fuaran-file-upload-input"), ("type", "file")]
         accept = fields.get("accept")
         if isinstance(accept, Arr) and accept.items:
             control_attrs.append(("accept", ",".join(str(a) for a in accept.items)))

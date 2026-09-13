@@ -1782,6 +1782,14 @@
       "description": "Input/Form (Phase 1130 — Rating: allowHalf entry + a bound average on a ten-scale, value auto-bound)"
     },
     {
+      "id": "form-rule-tokens",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/form-rule-tokens.json",
+      "expectedFile": "nodes/form-rule-tokens.json",
+      "description": "Input/Form (Phase 1692, carrying 1691 — the five mapped enum tokens with no round-trip vector anywhere in the corpus: TextFormat url / tel, CompareOp neq / lt / lte)"
+    },
+    {
       "id": "form-segmented",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2116,6 +2124,14 @@
       "inputFile": "nodes/grid-repeat-header-1.json",
       "expectedFile": "nodes/grid-repeat-header-1.json",
       "description": "Visualisation/Grid (Phase 1473 repeatHeader, the only new member)"
+    },
+    {
+      "id": "grid-sort-ascending",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-sort-ascending.json",
+      "expectedFile": "nodes/grid-sort-ascending.json",
+      "description": "Visualisation/Grid (Phase 1692, carrying 1691 — the sixth mapped enum token with no round-trip vector: SortDirection asc in defaultSort.direction)"
     },
     {
       "id": "grid-sort-state-key",

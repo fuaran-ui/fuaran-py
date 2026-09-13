@@ -10,6 +10,10 @@
     {
       "slot": "Markdown.text",
       "meaning": "the `text` TextSource of a `Markdown` node — its raw source before the GFM render (§14)"
+    },
+    {
+      "slot": "Metric.value",
+      "meaning": "the `value` numeric `Binding` of a `Metric` — the figure beside its label. A NUMERIC slot, so its text is the host's rendering of the resolved number, or the em-dash placeholder `—` when the binding does not resolve (§24.8)"
     }
   ],
   "excluded": [
@@ -39,6 +43,19 @@
     }
   ],
   "vectors": [
+    {
+      "id": "bare-state-numeric-slot-unresolved",
+      "fixture": "nodes/state-absent-default.json",
+      "nodeId": "absent-default-metric",
+      "slot": "Metric.value",
+      "sources": {
+        "now": "",
+        "locale": "",
+        "values": {}
+      },
+      "expectedText": "—",
+      "description": "a bare `State` — no declared default — at a numeric slot nothing has written and nothing has seeded is UNRESOLVED (§24.8), so the slot renders its absence placeholder and never a fabricated `0`"
+    },
     {
       "id": "now-grain-day",
       "fixture": "nodes/now-grain.json",

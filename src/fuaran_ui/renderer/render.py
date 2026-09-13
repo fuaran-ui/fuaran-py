@@ -79,6 +79,23 @@ from .theme import (
 _EM_DASH = "—"
 
 
+def metric_value_text(fields: dict[str, Value], value: object) -> str:
+    """The TEXT a ``Metric``'s numeric value slot reads.
+
+    The resolved number in the slot's declared format, or the em-dash when the
+    binding did not resolve — which ``WIRE_FORMAT.md`` §24.8 now reaches for a
+    bare ``State`` as well as for an unwritten ``Query``.
+
+    Extracted from ``_metric`` in Phase 1690 so the render-text conformance leg
+    asserts the projection this renderer actually emits, rather than a second
+    copy of it: a checker that spells the em-dash itself agrees with the
+    renderer on the day it is written and never again. It takes the
+    ALREADY-RESOLVED value, so the one call site that also needs the resolution
+    for its loading branch does not resolve twice.
+    """
+    return format_number(fields.get("format"), value) if value is not None else _EM_DASH
+
+
 # ── FormField.rule → the platform's own constraint attributes (fuaran#864) ───
 #
 # A static emitter MUST project a declared rule into the PLATFORM's constraint
@@ -832,7 +849,7 @@ class Renderer:
             if loading is not None:
                 return self.render_node(loading)
         tone = str(fields.get("tone", "Default")).lower()
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = metric_value_text(fields, value)
         parts = [
             text_element("div", [("class", "fuaran-metric-label")], self._text(fields.get("label"))),
             text_element("div", [("class", "fuaran-metric-value")], value_text),

@@ -31,16 +31,30 @@ import pytest
 from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_ui import decode_node
 from fuaran_ui.model import Arr, Node, Obj, Value
-from fuaran_ui.renderer.bindings import BindingSources, render_text, resolve_locale_tag
+from fuaran_ui.renderer.bindings import (
+    BindingSources,
+    render_text,
+    resolve_locale_tag,
+    resolve_scalar_number,
+)
+from fuaran_ui.renderer.render import metric_value_text
 
 #: The family's CLOSED slot vocabulary, as THIS host reads it: the wire kind's
 #: tag paired with the field holding the TextSource. A vector naming a slot
 #: absent from this map fails the run with the slot named — the artefact's
 #: ``slotVocabulary`` is what a reader compares against, and being behind it is a
 #: fact this host must report rather than skip.
-_SLOT_READERS: dict[str, tuple[str, str]] = {
-    "Fact.value": ("Fact", "value"),
-    "Markdown.text": ("Markdown", "text"),
+#:
+#: Phase 1690 — an entry carries its KIND as well as its address, because the
+#: vocabulary is no longer all ``TextSource``: ``Metric.value`` is a numeric
+#: ``Binding``, and the family had to reach one to pin §24.8 at all (at a text
+#: slot every divergent host already produced the empty string by accident of
+#: its runtime, so a text vector would have gone green on a host that
+#: fabricates).
+_SLOT_READERS: dict[str, tuple[str, str, bool]] = {
+    "Fact.value": ("Fact", "value", False),
+    "Markdown.text": ("Markdown", "text", False),
+    "Metric.value": ("Metric", "value", True),
 }
 
 _ARTEFACT = CORPUS_ROOT / "render-text.json"
@@ -88,15 +102,16 @@ def _find_node(node: Value, node_id: str) -> Node | None:
     return None
 
 
-def _text_slot(node: Node, slot: str) -> Value:
+def _slot_reader(node: Node, slot: str) -> tuple[Value, bool]:
+    """The slot's value and whether it is a NUMERIC binding rather than a TextSource."""
     reader = _SLOT_READERS.get(slot)
     assert reader is not None, (
         f"slot '{slot}' is declared by the corpus's render-text family and this host has no reader "
         f"for it — the host is BEHIND the artefact and must add one (not checked is not passed)"
     )
-    kind, field = reader
+    kind, field, numeric = reader
     assert node.kind.tag == kind, f"vector names slot '{slot}' on node '{node.id}', whose kind is {node.kind.tag!r}"
-    return node.kind.fields.get(field)
+    return node.kind.fields.get(field), numeric
 
 
 def _render(vector: dict) -> str:
@@ -107,7 +122,13 @@ def _render(vector: dict) -> str:
     assert target is not None, f"fixture {vector['fixture']} carries no node with id {vector['nodeId']!r}"
     pinned = vector["sources"]
     sources = BindingSources(values=dict(pinned["values"]), now=pinned["now"], locale=pinned["locale"])
-    return render_text(_text_slot(target, vector["slot"]), sources)
+    slot_value, numeric = _slot_reader(target, vector["slot"])
+    if numeric:
+        # Through the renderer's OWN projection, not a second copy of it: the
+        # claim is about what this host renders, so a checker that spelled the
+        # em-dash itself would pass while the renderer diverged.
+        return metric_value_text(target.kind.fields, resolve_scalar_number(slot_value, sources))
+    return render_text(slot_value, sources)
 
 
 @corpus_required

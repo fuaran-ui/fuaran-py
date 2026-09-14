@@ -1,0 +1,18 @@
+{
+  "id": "invisible-and-accent-indistinct",
+  "description": "The two axes are independent: an invisible-text failure and an indistinct accent at once.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":255,"g":255,"b":255,"a":1},
+    "backgroundLayers": [{"r":255,"g":255,"b":255,"a":1}, {"r":255,"g":255,"b":255,"a":1}],
+    "fontFamily": null,
+    "emittedTone": "brand"
+  },
+  "expectedFlags": [
+    "{\"kind\":\"InvisibleText\",\"ratio\":1.00}",
+    "{\"kind\":\"AccentIndistinct\",\"ratio\":1.00}"
+  ],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"effectiveBackground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":\"brand\",\"contrastRatio\":1.00,\"flags\":[{\"kind\":\"InvisibleText\",\"ratio\":1.00},{\"kind\":\"AccentIndistinct\",\"ratio\":1.00}]}"
+}

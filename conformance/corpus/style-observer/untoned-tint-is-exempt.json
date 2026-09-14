@@ -1,0 +1,15 @@
+{
+  "id": "untoned-tint-is-exempt",
+  "description": "The same near-identical tint, untoned: the accent check fires only for toned elements.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":0,"g":0,"b":0,"a":1},
+    "backgroundLayers": [{"r":240,"g":240,"b":240,"a":1}, {"r":255,"g":255,"b":255,"a":1}],
+    "fontFamily": null,
+    "emittedTone": null
+  },
+  "expectedFlags": [],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":0.00,\"g\":0.00,\"b\":0.00,\"a\":1.00},\"effectiveBackground\":{\"r\":240.00,\"g\":240.00,\"b\":240.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":null,\"contrastRatio\":18.43,\"flags\":[]}"
+}

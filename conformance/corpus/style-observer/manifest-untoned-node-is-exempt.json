@@ -1,0 +1,8 @@
+{
+  "id": "manifest-untoned-node-is-exempt",
+  "description": "An untoned node is exempt from every manifest check — the Custom / domain-SVG exemption.",
+  "tier": "per-node-manifest",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{},\"roles\":[],\"invariants\":[]}",
+  "observation": {"nodeId":"n","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":null,"contrastRatio":1},
+  "expectedManifestFlags": []
+}

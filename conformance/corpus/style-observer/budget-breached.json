@@ -1,0 +1,13 @@
+{
+  "id": "budget-breached",
+  "description": "60px² of a 10%-budgeted token out of 100px² total — six times its declared share.",
+  "tier": "usage-budget",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}},\"roles\":[],\"invariants\":[{\"kind\":\"UsageBudget\",\"token\":\"color.brand\",\"targetPct\":10,\"tolerancePct\":5}]}",
+  "nodeAreas": [
+    {"observation": {"nodeId":"a","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":null,"contrastRatio":21}, "area": 60},
+    {"observation": {"nodeId":"b","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":9,"g":9,"b":9,"a":1},"fontRole":"Unknown","emittedTone":null,"contrastRatio":21}, "area": 40}
+  ],
+  "expectedBudgetFlags": [
+    "{\"kind\":\"UsageBudgetExceeded\",\"token\":\"color.brand\",\"declaredPct\":10.00,\"observedPct\":60.00}"
+  ]
+}

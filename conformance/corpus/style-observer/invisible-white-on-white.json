@@ -1,0 +1,17 @@
+{
+  "id": "invisible-white-on-white",
+  "description": "Text the same colour as the surface behind it — the severe subset of the legibility axis.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":255,"g":255,"b":255,"a":1},
+    "backgroundLayers": [{"r":255,"g":255,"b":255,"a":1}],
+    "fontFamily": null,
+    "emittedTone": null
+  },
+  "expectedFlags": [
+    "{\"kind\":\"InvisibleText\",\"ratio\":1.00}"
+  ],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"effectiveBackground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":null,\"contrastRatio\":1.00,\"flags\":[{\"kind\":\"InvisibleText\",\"ratio\":1.00}]}"
+}

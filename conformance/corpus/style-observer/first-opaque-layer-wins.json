@@ -1,0 +1,15 @@
+{
+  "id": "first-opaque-layer-wins",
+  "description": "The composite walk stops at the first opaque layer; deeper ancestors cannot show through.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":255,"g":255,"b":255,"a":1},
+    "backgroundLayers": [{"r":10,"g":20,"b":30,"a":1}, {"r":99,"g":99,"b":99,"a":1}],
+    "fontFamily": null,
+    "emittedTone": null
+  },
+  "expectedFlags": [],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"effectiveBackground\":{\"r\":10.00,\"g\":20.00,\"b\":30.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":null,\"contrastRatio\":18.56,\"flags\":[]}"
+}

@@ -1,4 +1,18 @@
-"""Style-observer pure tier + InMemory observer + byte-identical encode parity."""
+"""Style-observer pure tier + InMemory observer + byte-identical encode parity.
+
+**The encode literals here are the GO-RED PARTNER of the corpus family, not a
+duplicate of it** (Phase 1752). ``test_style_observer_corpus.py`` certifies this
+host against ``style-observer/`` in the shared conformance corpus, whose bytes
+are written by the reference host's emitter. These are written by hand. Keeping
+both is the point: a regression that moved the implementation AND the emitted
+family together would satisfy the corpus checker and fail here, which is exactly
+the failure mode a family emitted from the thing it certifies cannot see on its
+own. Do not delete them as redundant.
+
+The observer-plumbing tests below (subscription, change-only emission, BFS tree
+order, callback isolation) are deliberately NOT in the family: they are in-memory
+behaviour, and the corpus certifies bytes.
+"""
 
 from __future__ import annotations
 

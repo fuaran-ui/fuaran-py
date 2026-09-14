@@ -153,8 +153,17 @@ _COPIES_NOTE = (
 
 # The core certification families — the Node/TreeOp/reject/lenient/envelope set
 # the schema + cross-host runner certify. Mirrors sync-corpus.mjs exactly.
+#
+# Phase 1752 — ``style-observer`` joins the payload because ``manifest.json`` is
+# itself in the payload and now REFERENCES that directory. A snapshot carrying a
+# manifest that lists files the snapshot does not hold is internally
+# inconsistent: a standalone checkout enumerates the rows and then fails to open
+# them, which reads as a broken host rather than as a partial copy. (The
+# TypeScript sibling derives its payload directories from the manifest and so
+# picks the family up with no edit at all; this list is the one that has to be
+# told, which is the cost of the two not being derived from one source.)
 _FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown")
+_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 

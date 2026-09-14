@@ -1,0 +1,17 @@
+{
+  "id": "toned-observation-carries-its-tone",
+  "description": "`emittedTone` is a string on the wire when the element declared one, and null otherwise. A toned element whose only background layer is the canvas itself has no ancestor surface to stand out against, so the accent check fires here too — a fact no host's own tests asserted.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n2",
+  "input": {
+    "foreground": {"r":0,"g":0,"b":0,"a":1},
+    "backgroundLayers": [{"r":255,"g":255,"b":255,"a":1}],
+    "fontFamily": null,
+    "emittedTone": "brand"
+  },
+  "expectedFlags": [
+    "{\"kind\":\"AccentIndistinct\",\"ratio\":1.00}"
+  ],
+  "expectedObservation": "{\"nodeId\":\"n2\",\"foreground\":{\"r\":0.00,\"g\":0.00,\"b\":0.00,\"a\":1.00},\"effectiveBackground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":\"brand\",\"contrastRatio\":21.00,\"flags\":[{\"kind\":\"AccentIndistinct\",\"ratio\":1.00}]}"
+}

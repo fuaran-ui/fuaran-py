@@ -1,0 +1,15 @@
+{
+  "id": "no-layers-means-the-implicit-white-canvas",
+  "description": "An element and every ancestor transparent: the effective background is the page canvas.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":0,"g":0,"b":0,"a":1},
+    "backgroundLayers": [],
+    "fontFamily": null,
+    "emittedTone": null
+  },
+  "expectedFlags": [],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":0.00,\"g\":0.00,\"b\":0.00,\"a\":1.00},\"effectiveBackground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":null,\"contrastRatio\":21.00,\"flags\":[]}"
+}

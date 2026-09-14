@@ -1,0 +1,15 @@
+{
+  "id": "font-role-unknown",
+  "description": "An unclassifiable family reports Unknown rather than guessing.",
+  "tier": "observation",
+  "options": {"contrastAaThreshold": 4.5, "invisibleTextThreshold": 1.1, "accentIndistinctThreshold": 3},
+  "nodeId": "n",
+  "input": {
+    "foreground": {"r":0,"g":0,"b":0,"a":1},
+    "backgroundLayers": [{"r":255,"g":255,"b":255,"a":1}],
+    "fontFamily": "Wingdings",
+    "emittedTone": null
+  },
+  "expectedFlags": [],
+  "expectedObservation": "{\"nodeId\":\"n\",\"foreground\":{\"r\":0.00,\"g\":0.00,\"b\":0.00,\"a\":1.00},\"effectiveBackground\":{\"r\":255.00,\"g\":255.00,\"b\":255.00,\"a\":1.00},\"fontRole\":\"Unknown\",\"emittedTone\":null,\"contrastRatio\":21.00,\"flags\":[]}"
+}

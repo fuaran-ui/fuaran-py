@@ -1,0 +1,10 @@
+{
+  "id": "manifest-contrast-below-declared-floor",
+  "description": "An on-palette fill under a per-role floor stricter than the manifest-free AA default.",
+  "tier": "per-node-manifest",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}},\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"invariants\":[{\"kind\":\"ContrastFloor\",\"role\":\"Brand\",\"minRatio\":7}]}",
+  "observation": {"nodeId":"n","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":"Brand","contrastRatio":5},
+  "expectedManifestFlags": [
+    "{\"kind\":\"ContrastBelowDeclaredFloor\",\"role\":\"Brand\",\"ratio\":5.00,\"floor\":7.00}"
+  ]
+}

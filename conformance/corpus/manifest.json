@@ -4696,6 +4696,160 @@
       "expectedErrorCode": "UnsupportedVersion",
       "expectedPath": "$.bundle",
       "description": "the reference envelope re-stamped teleport@2 with its digest correctly recomputed, so the version refusal is what bites rather than the digest — an unrecognised envelope version is refused BY NAME, never decoded on the guess that the shape is close enough (WIRE_FORMAT 17.2, 17.4 step 3)"
+    },
+    {
+      "id": "style-observer-legible-black-on-white",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/legible-black-on-white.json",
+      "description": "Opaque black text on the implicit white canvas — the baseline: no flags, contrast 21."
+    },
+    {
+      "id": "style-observer-invisible-white-on-white",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/invisible-white-on-white.json",
+      "description": "Text the same colour as the surface behind it — the severe subset of the legibility axis."
+    },
+    {
+      "id": "style-observer-contrast-below-aa-grey-on-white",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/contrast-below-aa-grey-on-white.json",
+      "description": "Mid-grey on white: visible, but under the WCAG AA normal-text floor."
+    },
+    {
+      "id": "style-observer-accent-indistinct-toned-tint",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/accent-indistinct-toned-tint.json",
+      "description": "A toned element whose own tint is all but the colour of its container."
+    },
+    {
+      "id": "style-observer-untoned-tint-is-exempt",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/untoned-tint-is-exempt.json",
+      "description": "The same near-identical tint, untoned: the accent check fires only for toned elements."
+    },
+    {
+      "id": "style-observer-invisible-and-accent-indistinct",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/invisible-and-accent-indistinct.json",
+      "description": "The two axes are independent: an invisible-text failure and an indistinct accent at once."
+    },
+    {
+      "id": "style-observer-toned-observation-carries-its-tone",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/toned-observation-carries-its-tone.json",
+      "description": "`emittedTone` is a string on the wire when the element declared one, and null otherwise. A toned element whose only background layer is the canvas itself has no ancestor surface to stand out against, so the accent check fires here too — a fact no host's own tests asserted."
+    },
+    {
+      "id": "style-observer-font-role-monospace",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-monospace.json",
+      "description": "Font-family classification — the monospace arm."
+    },
+    {
+      "id": "style-observer-font-role-sans-serif",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-sans-serif.json",
+      "description": "Font-family classification — the sans-serif arm."
+    },
+    {
+      "id": "style-observer-font-role-serif",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-serif.json",
+      "description": "Font-family classification — the serif arm."
+    },
+    {
+      "id": "style-observer-font-role-unknown",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-unknown.json",
+      "description": "An unclassifiable family reports Unknown rather than guessing."
+    },
+    {
+      "id": "style-observer-transparent-layers-fall-through-to-white",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/transparent-layers-fall-through-to-white.json",
+      "description": "A fully transparent own layer composites to the opaque layer behind it."
+    },
+    {
+      "id": "style-observer-first-opaque-layer-wins",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/first-opaque-layer-wins.json",
+      "description": "The composite walk stops at the first opaque layer; deeper ancestors cannot show through."
+    },
+    {
+      "id": "style-observer-no-layers-means-the-implicit-white-canvas",
+      "kind": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/no-layers-means-the-implicit-white-canvas.json",
+      "description": "An element and every ancestor transparent: the effective background is the page canvas."
+    },
+    {
+      "id": "style-observer-manifest-token-resolution-failed",
+      "kind": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-token-resolution-failed.json",
+      "description": "The element declared a tone the manifest binds to nothing — the emission fell through the host CSS."
+    },
+    {
+      "id": "style-observer-manifest-token-resolution-failed-escaped-slot",
+      "kind": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-token-resolution-failed-escaped-slot.json",
+      "description": "The same failure with a slot name carrying a quote and a backslash — the encoder's escape path."
+    },
+    {
+      "id": "style-observer-manifest-off-palette-colour",
+      "kind": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-off-palette-colour.json",
+      "description": "The tone resolved, but the surface it rendered is not a colour the palette declares."
+    },
+    {
+      "id": "style-observer-manifest-contrast-below-declared-floor",
+      "kind": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-contrast-below-declared-floor.json",
+      "description": "An on-palette fill under a per-role floor stricter than the manifest-free AA default."
+    },
+    {
+      "id": "style-observer-manifest-untoned-node-is-exempt",
+      "kind": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-untoned-node-is-exempt.json",
+      "description": "An untoned node is exempt from every manifest check — the Custom / domain-SVG exemption."
+    },
+    {
+      "id": "style-observer-budget-breached",
+      "kind": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-breached.json",
+      "description": "60px² of a 10%-budgeted token out of 100px² total — six times its declared share."
+    },
+    {
+      "id": "style-observer-budget-within-tolerance",
+      "kind": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-within-tolerance.json",
+      "description": "12% observed against 10% ± 5% — inside the band, so no flag."
+    },
+    {
+      "id": "style-observer-budget-at-the-tolerance-edge",
+      "kind": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-at-the-tolerance-edge.json",
+      "description": "15% observed against 10% ± 5% — exactly on the boundary, which the comparison admits."
     }
   ]
 }

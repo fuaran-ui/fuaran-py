@@ -1,0 +1,10 @@
+{
+  "id": "manifest-token-resolution-failed-escaped-slot",
+  "description": "The same failure with a slot name carrying a quote and a backslash — the encoder's escape path.",
+  "tier": "per-node-manifest",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{},\"roles\":[],\"invariants\":[]}",
+  "observation": {"nodeId":"n","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":"he said \"hi\"\\here","contrastRatio":21},
+  "expectedManifestFlags": [
+    "{\"kind\":\"TokenResolutionFailed\",\"slot\":\"he said \\\"hi\\\"\\\\here\"}"
+  ]
+}

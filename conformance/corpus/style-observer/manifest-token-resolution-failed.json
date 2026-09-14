@@ -1,0 +1,10 @@
+{
+  "id": "manifest-token-resolution-failed",
+  "description": "The element declared a tone the manifest binds to nothing — the emission fell through the host CSS.",
+  "tier": "per-node-manifest",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{},\"roles\":[],\"invariants\":[]}",
+  "observation": {"nodeId":"n","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":"Brand","contrastRatio":21},
+  "expectedManifestFlags": [
+    "{\"kind\":\"TokenResolutionFailed\",\"slot\":\"Brand\"}"
+  ]
+}

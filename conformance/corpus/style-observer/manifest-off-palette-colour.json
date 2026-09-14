@@ -1,0 +1,10 @@
+{
+  "id": "manifest-off-palette-colour",
+  "description": "The tone resolved, but the surface it rendered is not a colour the palette declares.",
+  "tier": "per-node-manifest",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#3b5bdb\"}}},\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"invariants\":[]}",
+  "observation": {"nodeId":"n","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":"Brand","contrastRatio":21},
+  "expectedManifestFlags": [
+    "{\"kind\":\"OffPaletteColour\",\"value\":\"rgb(1, 2, 3)\"}"
+  ]
+}

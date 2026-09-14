@@ -159,7 +159,13 @@ def test_go_red_a_single_flipped_expected_byte_is_caught(tmp_path: Path) -> None
 
     case = _load(observation_cases[0])
     genuine = case["expectedObservation"]
-    perturbed = genuine.replace('"contrastRatio":21.00', '"contrastRatio":21.01')
+    # The perturbation is STRUCTURAL, not a search-and-replace for a particular
+    # number. The first draft replaced '"contrastRatio":21.00', which held only
+    # because the baseline vector happened to sort first; re-ordering the manifest
+    # rows made it match nothing, and this test then proved nothing at all. The
+    # vacuity guard below caught that, which is the whole reason it is written
+    # before the comparison rather than after it.
+    perturbed = genuine[:-2] + "X}"
     assert perturbed != genuine, (
         "the perturbation changed nothing, so this test proves nothing — the probe, not the subject, failed"
     )

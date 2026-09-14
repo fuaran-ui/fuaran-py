@@ -5,7 +5,7 @@
   "renderFidelity": "render-fidelity.json",
   "renderText": "render-text.json",
   "enumTokens": "enum-tokens.json",
-  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. See WIRE_FORMAT.md at this corpus root.",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. style-observer fixtures (Phase 1752): resolved-style FACTS in, encoded StyleFlag / StyleObservation bytes out. Nothing here is a decoded document, so the inputFile carries the evidence AND the expectations rather than pairing with an expectedFile, and each names a tier. observation: build a StyleInput from `input` under `options`, derive the manifest-free flags and encode each, assert equal to expectedFlags, then encode the whole observation for `nodeId` and assert equal to expectedObservation. per-node-manifest: decode `manifest` — a JSON STRING, fed to the host's own theme-manifest decoder verbatim so no host re-serialises it — run the manifest-aware per-node derivation over `observation`, assert the encoded flags equal expectedManifestFlags. usage-budget: decode `manifest`, pair each nodeAreas entry's observation with its area, run the tree-level budget verification, assert the encoded flags equal expectedBudgetFlags. A tier or flag kind outside a host's vocabulary is REPORTED by name with the vector id, never skipped. See WIRE_FORMAT.md at this corpus root.",
   "kinds": [
     "Badge",
     "Box",
@@ -4618,6 +4618,182 @@
       "description": "Style.tone is integer not string"
     },
     {
+      "id": "style-observer-accent-indistinct-toned-tint",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/accent-indistinct-toned-tint.json",
+      "description": "A toned element whose own tint is all but the colour of its container."
+    },
+    {
+      "id": "style-observer-budget-at-the-tolerance-edge",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-at-the-tolerance-edge.json",
+      "description": "15% observed against 10% ± 5% — exactly on the boundary, which the comparison admits."
+    },
+    {
+      "id": "style-observer-budget-breached",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-breached.json",
+      "description": "60px² of a 10%-budgeted token out of 100px² total — six times its declared share."
+    },
+    {
+      "id": "style-observer-budget-within-tolerance",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "usage-budget",
+      "inputFile": "style-observer/budget-within-tolerance.json",
+      "description": "12% observed against 10% ± 5% — inside the band, so no flag."
+    },
+    {
+      "id": "style-observer-contrast-below-aa-grey-on-white",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/contrast-below-aa-grey-on-white.json",
+      "description": "Mid-grey on white: visible, but under the WCAG AA normal-text floor."
+    },
+    {
+      "id": "style-observer-first-opaque-layer-wins",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/first-opaque-layer-wins.json",
+      "description": "The composite walk stops at the first opaque layer; deeper ancestors cannot show through."
+    },
+    {
+      "id": "style-observer-font-role-monospace",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-monospace.json",
+      "description": "Font-family classification — the monospace arm."
+    },
+    {
+      "id": "style-observer-font-role-sans-serif",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-sans-serif.json",
+      "description": "Font-family classification — the sans-serif arm."
+    },
+    {
+      "id": "style-observer-font-role-serif",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-serif.json",
+      "description": "Font-family classification — the serif arm."
+    },
+    {
+      "id": "style-observer-font-role-unknown",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/font-role-unknown.json",
+      "description": "An unclassifiable family reports Unknown rather than guessing."
+    },
+    {
+      "id": "style-observer-invisible-and-accent-indistinct",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/invisible-and-accent-indistinct.json",
+      "description": "The two axes are independent: an invisible-text failure and an indistinct accent at once."
+    },
+    {
+      "id": "style-observer-invisible-white-on-white",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/invisible-white-on-white.json",
+      "description": "Text the same colour as the surface behind it — the severe subset of the legibility axis."
+    },
+    {
+      "id": "style-observer-legible-black-on-white",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/legible-black-on-white.json",
+      "description": "Opaque black text on the implicit white canvas — the baseline: no flags, contrast 21."
+    },
+    {
+      "id": "style-observer-manifest-contrast-below-declared-floor",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-contrast-below-declared-floor.json",
+      "description": "An on-palette fill under a per-role floor stricter than the manifest-free AA default."
+    },
+    {
+      "id": "style-observer-manifest-off-palette-colour",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-off-palette-colour.json",
+      "description": "The tone resolved, but the surface it rendered is not a colour the palette declares."
+    },
+    {
+      "id": "style-observer-manifest-token-resolution-failed",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-token-resolution-failed.json",
+      "description": "The element declared a tone the manifest binds to nothing — the emission fell through the host CSS."
+    },
+    {
+      "id": "style-observer-manifest-token-resolution-failed-escaped-slot",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-token-resolution-failed-escaped-slot.json",
+      "description": "The same failure with a slot name carrying a quote and a backslash — the encoder's escape path."
+    },
+    {
+      "id": "style-observer-manifest-untoned-node-is-exempt",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "per-node-manifest",
+      "inputFile": "style-observer/manifest-untoned-node-is-exempt.json",
+      "description": "An untoned node is exempt from every manifest check — the Custom / domain-SVG exemption."
+    },
+    {
+      "id": "style-observer-no-layers-means-the-implicit-white-canvas",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/no-layers-means-the-implicit-white-canvas.json",
+      "description": "An element and every ancestor transparent: the effective background is the page canvas."
+    },
+    {
+      "id": "style-observer-toned-observation-carries-its-tone",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/toned-observation-carries-its-tone.json",
+      "description": "`emittedTone` is a string on the wire when the element declared one, and null otherwise. A toned element whose only background layer is the canvas itself has no ancestor surface to stand out against, so the accent check fires here too — a fact no host's own tests asserted."
+    },
+    {
+      "id": "style-observer-transparent-layers-fall-through-to-white",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/transparent-layers-fall-through-to-white.json",
+      "description": "A fully transparent own layer composites to the opaque layer behind it."
+    },
+    {
+      "id": "style-observer-untoned-tint-is-exempt",
+      "kind": "style-observer",
+      "decoder": "style-observer",
+      "tier": "observation",
+      "inputFile": "style-observer/untoned-tint-is-exempt.json",
+      "description": "The same near-identical tint, untoned: the accent check fires only for toned elements."
+    },
+    {
       "id": "tp-wizard-step1",
       "kind": "teleport-decode",
       "decoder": "teleport",
@@ -4696,182 +4872,6 @@
       "expectedErrorCode": "UnsupportedVersion",
       "expectedPath": "$.bundle",
       "description": "the reference envelope re-stamped teleport@2 with its digest correctly recomputed, so the version refusal is what bites rather than the digest — an unrecognised envelope version is refused BY NAME, never decoded on the guess that the shape is close enough (WIRE_FORMAT 17.2, 17.4 step 3)"
-    },
-    {
-      "id": "style-observer-legible-black-on-white",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/legible-black-on-white.json",
-      "description": "Opaque black text on the implicit white canvas — the baseline: no flags, contrast 21."
-    },
-    {
-      "id": "style-observer-invisible-white-on-white",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/invisible-white-on-white.json",
-      "description": "Text the same colour as the surface behind it — the severe subset of the legibility axis."
-    },
-    {
-      "id": "style-observer-contrast-below-aa-grey-on-white",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/contrast-below-aa-grey-on-white.json",
-      "description": "Mid-grey on white: visible, but under the WCAG AA normal-text floor."
-    },
-    {
-      "id": "style-observer-accent-indistinct-toned-tint",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/accent-indistinct-toned-tint.json",
-      "description": "A toned element whose own tint is all but the colour of its container."
-    },
-    {
-      "id": "style-observer-untoned-tint-is-exempt",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/untoned-tint-is-exempt.json",
-      "description": "The same near-identical tint, untoned: the accent check fires only for toned elements."
-    },
-    {
-      "id": "style-observer-invisible-and-accent-indistinct",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/invisible-and-accent-indistinct.json",
-      "description": "The two axes are independent: an invisible-text failure and an indistinct accent at once."
-    },
-    {
-      "id": "style-observer-toned-observation-carries-its-tone",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/toned-observation-carries-its-tone.json",
-      "description": "`emittedTone` is a string on the wire when the element declared one, and null otherwise. A toned element whose only background layer is the canvas itself has no ancestor surface to stand out against, so the accent check fires here too — a fact no host's own tests asserted."
-    },
-    {
-      "id": "style-observer-font-role-monospace",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/font-role-monospace.json",
-      "description": "Font-family classification — the monospace arm."
-    },
-    {
-      "id": "style-observer-font-role-sans-serif",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/font-role-sans-serif.json",
-      "description": "Font-family classification — the sans-serif arm."
-    },
-    {
-      "id": "style-observer-font-role-serif",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/font-role-serif.json",
-      "description": "Font-family classification — the serif arm."
-    },
-    {
-      "id": "style-observer-font-role-unknown",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/font-role-unknown.json",
-      "description": "An unclassifiable family reports Unknown rather than guessing."
-    },
-    {
-      "id": "style-observer-transparent-layers-fall-through-to-white",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/transparent-layers-fall-through-to-white.json",
-      "description": "A fully transparent own layer composites to the opaque layer behind it."
-    },
-    {
-      "id": "style-observer-first-opaque-layer-wins",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/first-opaque-layer-wins.json",
-      "description": "The composite walk stops at the first opaque layer; deeper ancestors cannot show through."
-    },
-    {
-      "id": "style-observer-no-layers-means-the-implicit-white-canvas",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "observation",
-      "inputFile": "style-observer/no-layers-means-the-implicit-white-canvas.json",
-      "description": "An element and every ancestor transparent: the effective background is the page canvas."
-    },
-    {
-      "id": "style-observer-manifest-token-resolution-failed",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "per-node-manifest",
-      "inputFile": "style-observer/manifest-token-resolution-failed.json",
-      "description": "The element declared a tone the manifest binds to nothing — the emission fell through the host CSS."
-    },
-    {
-      "id": "style-observer-manifest-token-resolution-failed-escaped-slot",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "per-node-manifest",
-      "inputFile": "style-observer/manifest-token-resolution-failed-escaped-slot.json",
-      "description": "The same failure with a slot name carrying a quote and a backslash — the encoder's escape path."
-    },
-    {
-      "id": "style-observer-manifest-off-palette-colour",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "per-node-manifest",
-      "inputFile": "style-observer/manifest-off-palette-colour.json",
-      "description": "The tone resolved, but the surface it rendered is not a colour the palette declares."
-    },
-    {
-      "id": "style-observer-manifest-contrast-below-declared-floor",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "per-node-manifest",
-      "inputFile": "style-observer/manifest-contrast-below-declared-floor.json",
-      "description": "An on-palette fill under a per-role floor stricter than the manifest-free AA default."
-    },
-    {
-      "id": "style-observer-manifest-untoned-node-is-exempt",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "per-node-manifest",
-      "inputFile": "style-observer/manifest-untoned-node-is-exempt.json",
-      "description": "An untoned node is exempt from every manifest check — the Custom / domain-SVG exemption."
-    },
-    {
-      "id": "style-observer-budget-breached",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "usage-budget",
-      "inputFile": "style-observer/budget-breached.json",
-      "description": "60px² of a 10%-budgeted token out of 100px² total — six times its declared share."
-    },
-    {
-      "id": "style-observer-budget-within-tolerance",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "usage-budget",
-      "inputFile": "style-observer/budget-within-tolerance.json",
-      "description": "12% observed against 10% ± 5% — inside the band, so no flag."
-    },
-    {
-      "id": "style-observer-budget-at-the-tolerance-edge",
-      "kind": "style-observer",
-      "decoder": "style-observer",
-      "tier": "usage-budget",
-      "inputFile": "style-observer/budget-at-the-tolerance-edge.json",
-      "description": "15% observed against 10% ± 5% — exactly on the boundary, which the comparison admits."
     }
   ]
 }

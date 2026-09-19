@@ -1630,6 +1630,22 @@
       "description": "Input/Filters (declarative — omitted onChange + typed range bounds)"
     },
     {
+      "id": "filters-param-source-declared",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-param-source-declared.json",
+      "expectedFile": "nodes/filters-param-source-declared.json",
+      "description": "Layout/Box (Phase 1784 — the CONTROL of the negative wiring pair: a Filters node declaring both chips a Transform param source reads)"
+    },
+    {
+      "id": "filters-param-source-undeclared",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-param-source-undeclared.json",
+      "expectedFile": "nodes/filters-param-source-undeclared.json",
+      "description": "Layout/Box (Phase 1784 — a Transform param source naming a chip the PRESENT Filters node does not declare; the control is `filters-param-source-declared`)"
+    },
+    {
       "id": "filters-rating-colour",
       "kind": "node-round-trip",
       "decoder": "node",

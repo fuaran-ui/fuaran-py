@@ -444,7 +444,10 @@ def _expr_as_transform(expr_binding: Obj) -> Obj:
     pipeline = Arr(
         [
             Obj("derive", {"expr": expr_binding.fields["expr"], "name": "__value"}),
-            Obj("project", {"cols": Arr([Obj(None, {"a": "__value", "b": "__value"})])}),
+            # 0.28.0 — the project step's rename list is `columns`. This is an EMITTER, so
+            # it writes the canonical spelling; `cols` would still decode, as the alias, and
+            # an emitter that writes an alias is exactly what the rename exists to stop.
+            Obj("project", {"columns": Arr([Obj(None, {"a": "__value", "b": "__value"})])}),
         ]
     )
     fields: dict[str, Value] = {"pipeline": pipeline, "source": unit_frame}

@@ -1014,6 +1014,14 @@
       "description": "fuaran-core#88 — bare-array columns are the just-the-data shorthand (all-present validity); the wrapped form stays canonical"
     },
     {
+      "id": "lenient-transform-column-member-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-column-member-legacy.json",
+      "expectedFile": "lenient/lenient-transform-column-member-legacy.expected.json",
+      "description": "0.28.0 — the pre-rename column-member spellings decode unchanged and re-encode to the spelled-out names: a project step's `cols` becomes `columns`, and a sort key's and a window frame-ordering entry's `col` becomes `column`. The `col` expression tag is NOT a member name and does not move"
+    },
+    {
       "id": "lenient-transform-epoch-timestamps",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -1091,7 +1099,7 @@
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-step-aliases.json",
       "expectedFile": "lenient/lenient-transform-step-aliases.expected.json",
-      "description": "fuaran-core#92 — the SQL/pandas step-field spellings (by/aggregations/op/as/avg, keys/column/descending, count) coerce to the canonical fields"
+      "description": "fuaran-core#92 — the SQL/pandas step-field spellings (by/aggregations/op/as/avg, keys/descending, count) coerce to the canonical fields. The sort key's `column` is no longer one of them: `0.28.0` made that spelling CANONICAL and `col` the alias, so the verbose twin here moved with it"
     },
     {
       "id": "lenient-transform-values-only-columns",
@@ -4254,6 +4262,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.tooltip",
       "description": "a node `tooltip` of `42` — refused rather than stringified. A bare STRING at this slot is the canonical encoding of a literal hint (TextSource's transparent case), so a number is one lenient `toString` away from minting hint text out of a JSON type — which no downstream check could ever catch"
+    },
+    {
+      "id": "reject-transform-project-columns-and-cols",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-project-columns-and-cols.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.pipeline",
+      "description": "a project step carrying BOTH `columns` (canonical since 0.28.0) and `cols` (its decode alias) — refused as ambiguous rather than resolved to either, since the two lists here disagree and no reading of the document says which the author meant"
+    },
+    {
+      "id": "reject-transform-sort-key-column-and-col",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-sort-key-column-and-col.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.pipeline",
+      "description": "a sort key carrying BOTH `column` (canonical since 0.28.0) and `col` (its decode alias) — refused as ambiguous, on the same rule as the project step beside it. The two name different columns here, so accepting either would silently sort by a column the author may not have meant"
     },
     {
       "id": "reject-tree-item-missing-id",

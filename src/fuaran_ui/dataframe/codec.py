@@ -198,7 +198,9 @@ def _pair_obj(p: tuple[str, str]) -> Obj:
 
 
 def _order_obj(o: tuple[str, str]) -> Obj:
-    return Obj(None, {"col": o[0], "dir": o[1]})
+    # 0.28.0 — the member is `column`, not `col`: a member whose only honest name is
+    # "the column" is spelled out in full. `col` remains a decode alias, never emitted.
+    return Obj(None, {"column": o[0], "dir": o[1]})
 
 
 def _agg_obj(a: Agg) -> Obj:
@@ -213,7 +215,8 @@ def encode_transform_value(t: Transform) -> Value:
     if isinstance(t, Filter):
         return _typed("filter", {"pred": encode_expr_value(t.pred)})
     if isinstance(t, Project):
-        return _typed("project", {"cols": Arr([_pair_obj(p) for p in t.cols])})
+        # 0.28.0 — `columns`, not `cols`, for the reason `_order_obj` above states.
+        return _typed("project", {"columns": Arr([_pair_obj(p) for p in t.cols])})
     if isinstance(t, Derive):
         return _typed("derive", {"name": t.name, "expr": encode_expr_value(t.expr)})
     if isinstance(t, GroupBy):
@@ -802,14 +805,15 @@ def _pair_of(el: object) -> Result[tuple[str, str], ColumnError]:
 
 
 def _order_of(el: object) -> Result[tuple[str, str], ColumnError]:
-    # fuaran-core#92 — sort-key aliases: `column` for `col`, boolean `descending`
-    # for `dir`; #93 — `direction` is a third spelling, and a directionless
-    # entry is the SQL default (asc).
-    rc = _field_aliased(el, "col", "column")
+    # fuaran-core#92 admitted `column` as an alias of `col`; 0.28.0 SWAPPED which of the
+    # two is canonical, so both still decode, `column` re-encodes, and giving both is
+    # refused as ambiguous. Boolean `descending` remains an alias for `dir`; #93 —
+    # `direction` is a third spelling, and a directionless entry is the SQL default (asc).
+    rc = _field_aliased(el, "column", "col")
     if not rc.ok:
         return rc  # type: ignore[return-value]
     if not isinstance(rc.value, str):
-        return _err(MALFORMED_SHAPE, "order.col: expected string")
+        return _err(MALFORMED_SHAPE, "order.column: expected string")
     name = rc.value
     dir_el = _try_field(el, "dir")
     desc_el = _try_field(el, "descending")
@@ -935,10 +939,12 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
             'or the flat short form {"column":…,"op":…,"param":…|"value":…}',
         )
     if k == "project":
-        r = _field(el, "cols")
+        # 0.28.0 — `cols` is the pre-rename spelling, kept as a decode alias; giving both
+        # is the same ambiguity refusal every other aliased member of this algebra makes.
+        r = _field_aliased(el, "columns", "cols")
         if not r.ok:
             return r  # type: ignore[return-value]
-        ps = _list_of(r.value, "project.cols", _pair_of)
+        ps = _list_of(r.value, "project.columns", _pair_of)
         return ps if not ps.ok else Ok(Project(ps.value))  # type: ignore[return-value]
     if k == "derive":
         rn = _field(el, "name")

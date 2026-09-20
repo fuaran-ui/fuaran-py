@@ -4008,7 +4008,7 @@
             "$type": {
               "const": "project"
             },
-            "cols": {
+            "columns": {
               "type": "array",
               "items": {
                 "$ref": "#/$defs/TransformRename"
@@ -4017,7 +4017,7 @@
           },
           "required": [
             "$type",
-            "cols"
+            "columns"
           ]
         },
         {
@@ -4316,7 +4316,7 @@
     "TransformSortKey": {
       "type": "object",
       "properties": {
-        "col": {
+        "column": {
           "type": "string"
         },
         "dir": {
@@ -4324,7 +4324,7 @@
         }
       },
       "required": [
-        "col"
+        "column"
       ]
     },
     "SortDir": {

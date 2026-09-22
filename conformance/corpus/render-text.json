@@ -27,7 +27,7 @@
       "slot": "Format.Date",
       "fixture": "nodes/format-bindings.json",
       "nodeId": "fmt-date",
-      "reason": "a date STYLE (`Short` / `Medium` / `Long` / `Full`) names a locale's own pattern, so the rendered text is the locale database's answer by construction"
+      "reason": "a date STYLE (`Short` / `Medium` / `Long` / `Full`) names a locale's own pattern, so the rendered text is the locale database's answer by construction. Phase 1810's `timeStyle` does not change that reason: a time STYLE names the locale's own time-of-day pattern the same way, so the time-only and date-time shapes are the locale database's answer too"
     },
     {
       "slot": "Format.Number",

@@ -2410,3 +2410,16 @@ def test_a_handler_less_control_over_a_state_slot_is_LIVE_not_inert() -> None:
         fields=[t.FormField("email", t.LiteralText("Email"), t.TextField(t.Static(""), on_change=False), False)],
     )
     assert findings(inert) == ["FUARAN069"]
+
+
+# ── Phase 1810 — ``Format.Date``'s ``timeStyle`` half ────────────────────────
+
+
+def test_fmt_date_authors_the_three_admitted_shapes() -> None:
+    """``date_style`` alone (the pre-1810 positional signature, byte-unchanged),
+    ``time_style`` alone (a time of day), and both (a date-time) — alphabetical
+    field order on the wire, and an absent half omitted rather than ``null``."""
+    assert encode_value(t.FmtDate("Medium").to_wire()) == '{"$type":"Date","dateStyle":"Medium"}'
+    assert encode_value(t.FmtDate(time_style="Short").to_wire()) == '{"$type":"Date","timeStyle":"Short"}'
+    both = encode_value(t.FmtDate("Medium", "Short").to_wire())
+    assert both == '{"$type":"Date","dateStyle":"Medium","timeStyle":"Short"}'

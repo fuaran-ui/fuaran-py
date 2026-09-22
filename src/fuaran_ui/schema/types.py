@@ -246,9 +246,12 @@ class Now:
 
 # ── Locale-aware Format DU + LocaleSource (WIRE_FORMAT.md §3.3, Phase 102) ───
 # Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
-# ``Date`` carries ``dateStyle`` (a bare enum, not a format string).
+# ``Date`` carries ``dateStyle`` / ``timeStyle`` (bare enums, not a format string).
 
 DateStyle = Literal["Short", "Medium", "Long", "Full"]
+# Phase 1810 — the time-of-day half of the platform formatter's style pair. The
+# same four spellings as ``DateStyle``, deliberately a separate closed set.
+TimeStyle = Literal["Short", "Medium", "Long", "Full"]
 RelativeTimeUnit = Literal["Second", "Minute", "Hour", "Day", "Week", "Month", "Year"]
 # Phase 819 — the numeric source counts this unit (Seconds = 1, Minutes = 60,
 # Hours = 3600); presentation is `Compact` "1h 20m", `Clock` "1:20:00",
@@ -283,10 +286,21 @@ class FmtPercent:
 
 @dataclass(frozen=True)
 class FmtDate:
-    date_style: DateStyle
+    """``Format.Date`` — the platform formatter's ``dateStyle`` / ``timeStyle`` pair.
+
+    ``date_style`` alone is a date (the pre-1810 shape, and the pre-1810
+    positional signature ``FmtDate("Medium")`` still authors it); ``time_style``
+    alone is a time of day (Phase 1810); both together a date-time, each half at
+    its own breadth. Neither is structurally legal on the wire and is refused by
+    the validator as ``FUARAN155``, never by the codec. Alphabetical field order
+    on the wire: ``dateStyle`` before ``timeStyle``.
+    """
+
+    date_style: DateStyle | None = None
+    time_style: TimeStyle | None = None
 
     def to_wire(self) -> Value:
-        return Obj("Date", {"dateStyle": self.date_style})
+        return _obj("Date", {"dateStyle": self.date_style, "timeStyle": self.time_style})
 
 
 @dataclass(frozen=True)

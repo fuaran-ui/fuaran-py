@@ -1878,6 +1878,14 @@
       "description": "Binding.Format (number/currency/percent/date/relativeTime across locales)"
     },
     {
+      "id": "format-date-time",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/format-date-time.json",
+      "expectedFile": "nodes/format-date-time.json",
+      "description": "Binding.Format (Phase 1810 — Date with a time of day: dateStyle + timeStyle, and timeStyle alone)"
+    },
+    {
       "id": "format-since",
       "kind": "node-round-trip",
       "decoder": "node",

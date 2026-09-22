@@ -288,6 +288,15 @@
         "Full"
       ]
     },
+    "TimeStyle": {
+      "type": "string",
+      "enum": [
+        "Short",
+        "Medium",
+        "Long",
+        "Full"
+      ]
+    },
     "RelativeTimeUnit": {
       "type": "string",
       "enum": [
@@ -5085,11 +5094,13 @@
             },
             "dateStyle": {
               "$ref": "#/$defs/DateStyle"
+            },
+            "timeStyle": {
+              "$ref": "#/$defs/TimeStyle"
             }
           },
           "required": [
-            "$type",
-            "dateStyle"
+            "$type"
           ]
         },
         {

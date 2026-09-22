@@ -761,6 +761,10 @@ def format_relative_english(unit: str, value: float) -> str:
 #: stdlib-only host has no canonical answer to give and resolves them to absence
 #: exactly as it did before this seam existed. The corpus's render-text family
 #: enumerates that exclusion with its reason.
+#: ``Date`` stays excluded whichever half of its style pair is declared: Phase
+#: 1810's ``timeStyle`` names the locale's own time-of-day pattern exactly as
+#: ``dateStyle`` names its date pattern, so the time-only and date-time shapes
+#: resolve to absence here for the same reason the date-only one always has.
 _LOCALE_INDEPENDENT_FORMATS = frozenset({"Duration", "RelativeTime", "Since"})
 
 

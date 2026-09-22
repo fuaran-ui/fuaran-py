@@ -37,11 +37,43 @@ without a client runtime.
 ## Install
 
 ```bash
+pip install fuaran-ui     # the published distribution
 pip install -e ".[dev]"   # editable + dev tooling (pytest / mypy / ruff)
 ```
 
 Requires CPython **3.12+**. The runtime codec has **no third-party dependencies** —
 it uses only the standard library.
+
+### The distribution and import names (**BREAKING in 0.7.0**)
+
+This host published as **`fuaran-py`** and imported as **`fuaran_py`** up to
+**0.5.0**. From **0.7.0** the distribution, the import package and the console
+script are all **`fuaran-ui`** / **`fuaran_ui`**: registry names carry the domain
+and drop the language, as every other tier already does (`Fuaran.UI.*`,
+`@fuaran-ui/*`, the `fuaran-ui` crate). The **repository** is still
+`fuaran-ui/fuaran-py`, and the **host id** in the capability manifest and in
+refusal reports is still `fuaran-py` — both of those name the repo, and neither
+moves.
+
+```diff
+-pip install fuaran-py==0.5.0
+-from fuaran_py.ui import fuaran
++pip install fuaran-ui==0.7.0
++from fuaran_ui.ui import fuaran
+```
+
+There is **no compatibility shim**, and that is deliberate: nothing has ever
+consumed this host as a dependency of another package, so a shim would exist only
+to make the old name keep working in the one place — a direct install — where
+changing it is a one-line edit. The `fuaran-py` project on PyPI is left exactly as
+it stands: its releases up to 0.5.0 stay downloadable, and it is never re-tagged
+or published to again. A consumer moves both names in one commit.
+
+**0.6.0 was never released.** It was an untagged draft slot carrying additive
+work, and the rename above is a higher class than the draft carried, so the
+number advanced rather than the change riding it. 0.7.0 is therefore the first
+release under the new name **and** the first to carry everything since 0.5.0 —
+including 0.6.0's breaking `BindingSources` record (below).
 
 ## Start here — from the command line
 
@@ -1130,6 +1162,29 @@ filter to the schema is an open question, recorded here rather than implied clos
 
 This host declares no stability policy yet (pre-1.0), so the change is recorded
 here rather than in a `STABILITY.md` it does not have.
+
+## Wire vocabulary — the dataframe algebra spells the column out (**0.7.0**)
+
+A member of the Compute `Transform` algebra whose only honest name is *the
+column* or *the columns* is now spelled in full. A `project` step's rename list is
+**`columns`** (was `cols`); a sort key's field, and a window's frame-ordering
+entry's field, are **`column`** (was `col`).
+
+This host **emits** the canonical spelling and **decodes either**, so a tree
+written by any host at any version still reads. A step carrying **both**
+spellings is **refused by name** rather than silently resolved — an ambiguity a
+decoder resolves by precedence is one the two hosts can disagree about forever.
+The emitted bytes therefore change for a pipeline that carries a `project` step
+or an order entry; nothing stored stops decoding.
+
+Three members look like this one and are **not** it: the `col` expression
+`$type` tag (a column *reference*); the `Grid` / `Masonry` box-layout `cols`
+integer (a column *count*, where `cols` stays canonical and `columns` is its
+alias, the canonical winning rather than the pair being refused); and an
+aggregate entry's `of`, which already aliased `column` in the other direction.
+
+Recorded here for the same reason the section above is: pre-1.0, there is no
+`STABILITY.md` to record it in.
 
 ## Placement helpers — `fuaran_ui.ops.placement`
 

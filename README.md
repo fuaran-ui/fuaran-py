@@ -1186,6 +1186,36 @@ aggregate entry's `of`, which already aliased `column` in the other direction.
 Recorded here for the same reason the section above is: pre-1.0, there is no
 `STABILITY.md` to record it in.
 
+## Palette attribution — the style observer's ruled tie-break (**unreleased — rides the version after 0.7.0**)
+
+`fuaran_ui.style_observer.verify_usage_budgets` attributes each rendered fill to
+the **first** palette token whose value matches. Until Phase 1727 "first" meant
+first in `theme_manifest.decode`'s token list — DOCUMENT order, because the DTCG
+walk yields tokens as the file declares them — while the Go and Rust hosts sort
+each group's keys, so a manifest carrying two same-valued colour tokens
+attributed a fill to different tokens on different hosts, and no fixture
+anywhere carried such a tie.
+
+The order is now ruled, once, in the theme-manifest contract text
+(`fuaran-dotnet/docs/THEME-BRIDGE-GUIDE.md`, "Palette attribution order"):
+attribution iterates the colour tokens in **canonical token-path order** —
+segment by segment, a shorter prefix first, each segment by Unicode code point;
+document order plays no part — and this host implements it at the attribution
+site. `theme_manifest.decode` still yields document order; `manifest_flags`
+sorts before the first-match walk.
+
+**What changes for you.** Nothing, unless a manifest carries two colour tokens
+with one value declared out of canonical order: a matching fill is then
+attributed to the path-first token where it was attributed to the document-first
+one, so a `UsageBudget` on the document-first token measures a smaller share and
+one on the path-first token a larger one. The per-node `OffPaletteColour` check
+is a membership test and is unaffected. The corpus pins the rule
+(`style-observer/budget-same-valued-tokens-*`, certified by every host with an
+observer tier), so this cannot drift again silently.
+
+Recorded here for the same reason the sections above are: pre-1.0, there is no
+`STABILITY.md` to record it in.
+
 ## Placement helpers — `fuaran_ui.ops.placement`
 
 The section above leaves every caller deriving the sibling permutation itself. That

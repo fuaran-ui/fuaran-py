@@ -46,7 +46,9 @@ from fuaran_ui.style_observer import (
     rgba,
     same_rgb,
     to_style_observation,
+    verify_usage_budgets,
 )
+from fuaran_ui.theme_manifest import decode as decode_manifest
 
 
 def _input(**over: object) -> StyleInput:
@@ -217,3 +219,60 @@ def test_inmemory_unsubscribe_and_baseline_and_isolation() -> None:
     obs.subscribe(ok)
     obs.register_fixture("c", _invisible())
     assert reached
+
+
+# ── Phase 1727 — the palette-attribution tie-break ───────────────────────────
+
+
+def _budget_obs(node_id: str, bg: object) -> StyleObservation:
+    return StyleObservation(
+        node_id=node_id,
+        foreground=BLACK,
+        effective_background=bg,  # type: ignore[arg-type]
+        font_role=FontRole.UNKNOWN,
+        emitted_tone=None,
+        contrast_ratio=21.0,
+        flags=[],
+    )
+
+
+def test_same_valued_tokens_attribute_to_the_path_first_token() -> None:
+    """Two colour tokens carry the same value, declared secondary-before-brand.
+    The decoder keeps DOCUMENT order (pinned below, so a change there is seen);
+    attribution does not follow it — the 60px² fill goes to ``color.brand``, the
+    first by canonical token-path order, so its budget breaches at 60% and
+    ``color.secondary``'s 0% ± 5% budget stays silent. A document-order host
+    reports two breaches here, which is the divergence this test exists to
+    keep red. The corpus vector of the same name is the cross-host law; this is
+    its go-red partner."""
+    manifest = decode_manifest(
+        '{"meta":{"name":"t","version":"1"},"tokens":{"color":{'
+        '"secondary":{"$type":"color","$value":"#010203"},'
+        '"brand":{"$type":"color","$value":"#010203"}}},"roles":[],"invariants":['
+        '{"kind":"UsageBudget","token":"color.brand","targetPct":10,"tolerancePct":5},'
+        '{"kind":"UsageBudget","token":"color.secondary","targetPct":0,"tolerancePct":5}]}'
+    )
+    assert [t.name for t in manifest.tokens] == ["color.secondary", "color.brand"]
+    nodes = [(_budget_obs("a", rgb(1, 2, 3)), 60.0), (_budget_obs("b", rgb(9, 9, 9)), 40.0)]
+    assert [encode_style_flag(f) for f in verify_usage_budgets(manifest, nodes)] == [
+        '{"kind":"UsageBudgetExceeded","token":"color.brand","declaredPct":10.00,"observedPct":60.00}'
+    ]
+
+
+def test_token_path_order_is_segment_wise_not_a_string_sort() -> None:
+    """``color.brand.base`` precedes ``color.brand-alt`` because the key ``brand``
+    precedes ``brand-alt`` — although ``-`` sorts before ``.`` as a character, so a
+    sort of the joined path would put ``brand-alt`` first and diverge from every
+    host that sorts per group."""
+    manifest = decode_manifest(
+        '{"meta":{"name":"t","version":"1"},"tokens":{"color":{'
+        '"brand-alt":{"$type":"color","$value":"#010203"},'
+        '"brand":{"base":{"$type":"color","$value":"#010203"}}}},"roles":[],"invariants":['
+        '{"kind":"UsageBudget","token":"color.brand.base","targetPct":10,"tolerancePct":5},'
+        '{"kind":"UsageBudget","token":"color.brand-alt","targetPct":0,"tolerancePct":5}]}'
+    )
+    assert sorted(t.name for t in manifest.tokens) == ["color.brand-alt", "color.brand.base"]
+    nodes = [(_budget_obs("a", rgb(1, 2, 3)), 60.0), (_budget_obs("b", rgb(9, 9, 9)), 40.0)]
+    assert [encode_style_flag(f) for f in verify_usage_budgets(manifest, nodes)] == [
+        '{"kind":"UsageBudgetExceeded","token":"color.brand.base","declaredPct":10.00,"observedPct":60.00}'
+    ]

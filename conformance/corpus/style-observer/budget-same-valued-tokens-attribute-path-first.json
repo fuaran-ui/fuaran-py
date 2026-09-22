@@ -1,0 +1,13 @@
+{
+  "id": "budget-same-valued-tokens-attribute-path-first",
+  "description": "Two same-valued colour tokens declared secondary-before-brand: the fill is attributed to `color.brand`, the first by canonical token-path order, so its 10% ± 5% budget breaches at 60% and `color.secondary`'s 0% ± 5% budget does not.",
+  "tier": "usage-budget",
+  "manifest": "{\"meta\":{\"name\":\"corpus\",\"version\":\"1\"},\"tokens\":{\"color\":{\"secondary\":{\"$type\":\"color\",\"$value\":\"#010203\"},\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}},\"roles\":[],\"invariants\":[{\"kind\":\"UsageBudget\",\"token\":\"color.brand\",\"targetPct\":10,\"tolerancePct\":5},{\"kind\":\"UsageBudget\",\"token\":\"color.secondary\",\"targetPct\":0,\"tolerancePct\":5}]}",
+  "nodeAreas": [
+    {"observation": {"nodeId":"a","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":1,"g":2,"b":3,"a":1},"fontRole":"Unknown","emittedTone":null,"contrastRatio":21}, "area": 60},
+    {"observation": {"nodeId":"b","foreground":{"r":0,"g":0,"b":0,"a":1},"effectiveBackground":{"r":9,"g":9,"b":9,"a":1},"fontRole":"Unknown","emittedTone":null,"contrastRatio":21}, "area": 40}
+  ],
+  "expectedBudgetFlags": [
+    "{\"kind\":\"UsageBudgetExceeded\",\"token\":\"color.brand\",\"declaredPct\":10.00,\"observedPct\":60.00}"
+  ]
+}

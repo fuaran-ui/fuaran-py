@@ -43,9 +43,28 @@ def _rgb_string(c: Rgba) -> str:
     return f"rgb({round(c.r)}, {round(c.g)}, {round(c.b)})"
 
 
+def _token_path_key(name: str) -> list[str]:
+    """Canonical token-path order — the order palette ATTRIBUTION iterates in
+    (Phase 1727; the rule is stated once, in fuaran-dotnet's
+    ``docs/THEME-BRIDGE-GUIDE.md`` under "Palette attribution order", and pinned by
+    the corpus's ``style-observer/budget-same-valued-tokens-*`` vectors). Paths
+    compare segment by segment, a shorter prefix first, each segment by Unicode
+    code point — which is what comparing the segment lists does, and is the order
+    a depth-first walk of the DTCG tree yields when it visits every group's
+    members in ascending key order (the Go and Rust decoders emit exactly that).
+    This host's decoder preserves DOCUMENT order, and a projection consumer may
+    rely on that, so the ordering lives here, at the one site where order is a
+    contract — not in ``theme_manifest.decode``."""
+    return name.split(".")
+
+
 def _palette_rgba(manifest: ThemeManifest) -> list[tuple[Rgba, str]]:
+    """The manifest's colour palette, parsed and paired with the declaring token
+    name, in canonical token-path order. The first entry whose colour matches a
+    rendered fill is the token the fill is ATTRIBUTED to, so two same-valued
+    tokens attribute to the path-first one on every host."""
     out: list[tuple[Rgba, str]] = []
-    for t in manifest.tokens:
+    for t in sorted(manifest.tokens, key=lambda t: _token_path_key(t.name)):
         if t.type != "color":
             continue
         c = try_parse_hex(t.value)

@@ -1638,6 +1638,22 @@
       "description": "Input/Filters (declarative — omitted onChange + typed range bounds)"
     },
     {
+      "id": "filters-dependson-declared",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-dependson-declared.json",
+      "expectedFile": "nodes/filters-dependson-declared.json",
+      "description": "Layout/Box (Phase 1800 — the CONTROL of the dependsOn pair: a Filters node declaring both chips a Query's dependsOn names)"
+    },
+    {
+      "id": "filters-dependson-undeclared",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/filters-dependson-undeclared.json",
+      "expectedFile": "nodes/filters-dependson-undeclared.json",
+      "description": "Layout/Box (Phase 1800 — a Query dependsOn naming a chip the PRESENT Filters node does not declare; the control is `filters-dependson-declared`)"
+    },
+    {
       "id": "filters-param-source-declared",
       "kind": "node-round-trip",
       "decoder": "node",

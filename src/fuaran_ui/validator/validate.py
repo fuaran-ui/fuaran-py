@@ -38,6 +38,7 @@ def validate_node(node: Node) -> list[Finding]:
     findings: list[Finding] = []
     seen_ids: set[str] = set()
     _walk(node, "$", findings, seen_ids)
+    _check_filter_edges(node, findings)
     return findings
 
 
@@ -778,3 +779,112 @@ def _check_inert_control(node: Node, kind: Obj, path: str, findings: list[Findin
                     field_id = item.fields.get("id")
                     if isinstance(field_kind, Obj) and _inert(field_kind, "onChange", "value"):
                         report(f"FormField({field_id if isinstance(field_id, str) else '?'})")
+
+
+# ── FUARAN075 — the dangling-filter-reference rule (fuaran#1800) ─────────────
+#
+# A node DECLARES a filter edge on a name no ``Filters`` chip in the tree
+# declares. Two shapes carry such an edge: a ``Query``'s ``dependsOn`` entry
+# (fuaran#421), and a ``Transform`` / ``Expr`` param whose ``from`` is a
+# ``Filter`` binding (fuaran#424 / #1534).
+#
+# It is an ERROR rather than a warning because nothing downstream of the tree
+# can notice. An undeclared chip resolves to nothing exactly as an UNSET chip
+# does, and the lenient "unset filter ⇒ no constraint" prune then drops the
+# dependent pipeline step — so a resolver silently returns the UNFILTERED set
+# for a document whose author asked for a filter. On the ``dependsOn`` arm it is
+# sharper still: that list is an invalidation SUBSCRIPTION, so an undeclared
+# name subscribes a consumer to a slot nothing can ever write. Neither shape is
+# a codec defect; both documents are legal wire and round-trip byte-identically,
+# which is why the corpus carries each arm as a PAIR differing in one thing —
+# ``nodes/filters-param-source-{declared,undeclared}.json`` and
+# ``nodes/filters-dependson-{declared,undeclared}.json``.
+#
+# Judged tree-wide, after the per-node walk, because "names a chip this tree
+# declares" is only answerable once the whole tree has been seen: a consumer may
+# precede its ``Filters`` sibling in document order.
+#
+# Attribution is by NEAREST ENCLOSING NODE, which is what the reference host's
+# binding walk calls the edge's READER.
+
+_FILTER_EDGE_PARAM_TAGS = frozenset({"Transform", "Expr"})
+
+
+def _declared_filter_names(value: Value, out: set[str]) -> None:
+    """Every chip name a ``Filters`` node in the tree declares."""
+    if isinstance(value, Node):
+        if value.kind.tag == "Filters":
+            items = value.kind.fields.get("items")
+            if isinstance(items, Arr):
+                for item in items.items:
+                    if isinstance(item, Obj):
+                        name = item.fields.get("name")
+                        if isinstance(name, str):
+                            out.add(name)
+        _declared_filter_names(value.kind, out)
+    elif isinstance(value, Arr):
+        for item in value.items:
+            _declared_filter_names(item, out)
+    elif isinstance(value, Obj):
+        for field_value in value.fields.values():
+            _declared_filter_names(field_value, out)
+
+
+def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str, str, str]]) -> None:
+    """Every declared filter edge as ``(reader node id, filter name, path)``."""
+    if isinstance(value, Node):
+        _filter_edge_uses(value.kind, value.id, f"{path}.kind", out)
+        return
+
+    if isinstance(value, Arr):
+        for i, item in enumerate(value.items):
+            _filter_edge_uses(item, reader, f"{path}.{i}", out)
+        return
+
+    if not isinstance(value, Obj):
+        return
+
+    if value.tag == "Query":
+        depends_on = value.fields.get("dependsOn")
+        if isinstance(depends_on, Arr):
+            for i, name in enumerate(depends_on.items):
+                if isinstance(name, str):
+                    out.append((reader, name, f"{path}.dependsOn.{i}"))
+
+    if value.tag in _FILTER_EDGE_PARAM_TAGS:
+        params = value.fields.get("params")
+        if isinstance(params, Arr):
+            for i, param in enumerate(params.items):
+                if not isinstance(param, Obj):
+                    continue
+                source = param.fields.get("from")
+                # A param's ``Filter`` source is the DECLARED edge; a plain
+                # ``Filter`` binding elsewhere is an ordinary value read (and a
+                # chip's own self-read is a DECLARATION), so neither is judged.
+                if isinstance(source, Obj) and source.tag == "Filter":
+                    name = source.fields.get("name")
+                    if isinstance(name, str):
+                        out.append((reader, name, f"{path}.params.{i}.from"))
+
+    for key, field_value in value.fields.items():
+        _filter_edge_uses(field_value, reader, f"{path}.{key}", out)
+
+
+def _check_filter_edges(node: Node, findings: list[Finding]) -> None:
+    """FUARAN075 (Error) — a declared filter edge grounded in no chip."""
+    declared: set[str] = set()
+    _declared_filter_names(node, declared)
+
+    uses: list[tuple[str, str, str]] = []
+    _filter_edge_uses(node, node.id, "$", uses)
+
+    for reader, name, path in uses:
+        if name not in declared:
+            findings.append(
+                Finding(
+                    "FUARAN075",
+                    path,
+                    f"'{reader}' declares a filter edge on '{name}' (dependsOn / Transform param "
+                    f"source) but no Filters chip declares that name",
+                )
+            )

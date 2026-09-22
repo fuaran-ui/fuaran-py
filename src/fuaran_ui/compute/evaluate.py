@@ -641,6 +641,9 @@ def _child_nodes(node: Node) -> list[Node]:
             value = state_extra.fields.get(key)
             if isinstance(value, Node):
                 out.append(value)
+    fallback = node.extras.get("fallback")  # fuaran#1812 -- the envelope fallback
+    if isinstance(fallback, Node):
+        out.append(fallback)
     return out
 
 

@@ -113,6 +113,9 @@ def _node_ids(node: Node, acc: list[str]) -> None:
             child = _as_node(state.fields.get(key))
             if child is not None:
                 _node_ids(child, acc)
+    fallback = _as_node(node.extras.get("fallback"))  # fuaran#1812
+    if fallback is not None:
+        _node_ids(fallback, acc)
 
 
 # ── The runtime ──────────────────────────────────────────────────────────────

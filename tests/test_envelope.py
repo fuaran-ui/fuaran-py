@@ -91,3 +91,38 @@ def test_current_round_trip_via_constructed_envelope() -> None:
     assert result.ok and result.value.negotiation == CURRENT
     assert isinstance(result.value, Envelope)
     assert encode_envelope(result.value) == canonical
+
+
+# ── Phase 1812 — the behind reader lifts the fallback, and preserves the bytes ─
+
+
+def test_behind_reader_lifts_the_fallback_without_editing_the_payload() -> None:
+    from fuaran_ui.envelope import lift_fallback
+    from fuaran_ui.result import Ok
+
+    fallback = '{"id":"h1-fallback","kind":{"$type":"Markdown","text":"A hologram would appear here."}}'
+    payload = (
+        '{"fallback":' + fallback + ',"id":"h1","kind":{"$type":"hologram"},'
+        '"requiredProfile":"core@1.4","shimmer":true}'
+    )
+    wire = '{"$payload":' + payload + ',"$profile":"core@1.4"}'
+    result = decode_envelope(wire)
+    assert isinstance(result, Ok)
+    env = result.value
+    assert env.negotiation == BEHIND
+
+    lifted = lift_fallback(env)
+    assert lifted is not None and isinstance(lifted, Ok)
+    assert lifted.value.id == "h1-fallback"
+    # must-ignore-but-preserve is untouched by the lift
+    assert encode_envelope(env) == wire
+
+
+def test_behind_reader_with_no_fallback_lifts_nothing() -> None:
+    from fuaran_ui.envelope import lift_fallback
+    from fuaran_ui.result import Ok
+
+    wire = '{"$payload":{"id":"h1","kind":{"$type":"hologram"},"shimmer":true},"$profile":"core@1.1"}'
+    result = decode_envelope(wire)
+    assert isinstance(result, Ok)
+    assert lift_fallback(result.value) is None

@@ -135,6 +135,13 @@ def child_nodes(node: Node) -> tuple[Node, ...]:
 
     for field_value in node.kind.fields.values():
         walk(field_value)
+    # fuaran#1812 -- the author-declared `fallback` is a node-valued envelope
+    # slot: a full node a BEHIND reader renders in place of this one. It is a
+    # node position of the document (its ids share the one id space, 8.1), so
+    # every consumer of the decoded tree sees it.
+    fallback = node.extras.get("fallback")
+    if isinstance(fallback, Node):
+        children.append(fallback)
     return tuple(children)
 
 

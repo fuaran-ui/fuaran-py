@@ -50,7 +50,7 @@ idl_required = pytest.mark.skipif(not _IDL.is_file(), reason=f"corpus idl.json n
 #: PURPOSE — it is one side of a comparison whose other side is derived, so a
 #: literal here is the thing being checked rather than a second unmaintained
 #: source of truth. Deriving both sides would compare the corpus to itself.
-_DECODED_OPTIONAL_KEYS = frozenset({"state", "style", "accessibility", "tooltip", "visible"})
+_DECODED_OPTIONAL_KEYS = frozenset({"state", "style", "accessibility", "tooltip", "visible", "fallback"})
 
 
 def _node_fields() -> list[dict]:

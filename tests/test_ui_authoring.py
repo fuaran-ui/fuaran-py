@@ -2423,3 +2423,36 @@ def test_fmt_date_authors_the_three_admitted_shapes() -> None:
     assert encode_value(t.FmtDate(time_style="Short").to_wire()) == '{"$type":"Date","timeStyle":"Short"}'
     both = encode_value(t.FmtDate("Medium", "Short").to_wire())
     assert both == '{"$type":"Date","dateStyle":"Medium","timeStyle":"Short"}'
+
+
+# ── Phase 1812 — ``accessibility.speak`` and the envelope ``fallback`` ────────
+
+
+def test_speak_and_fallback_author_to_the_corpus_bytes() -> None:
+    """``speak`` beside a Static name lowers to the bare-string canonical form
+    (a ``TextSource`` like ``tooltip``); a ``fallback`` is a full node under the
+    ``fallback`` key, sorted before ``id``. Both round-trip through the decoder."""
+    from fuaran_ui.result import Ok
+    from fuaran_ui.schema.decode import decode_node
+    from fuaran_ui.schema.encode import encode_node
+
+    spoken = fuaran.markdown("m", "body").replace(
+        accessibility=t.Accessibility(label=t.Static("Service status"), speak=t.LiteralText("Service status: fine."))
+    )
+    wire = encode_value(spoken.to_wire())
+    assert wire == (
+        '{"accessibility":{"label":{"$type":"Static","value":"Service status"},'
+        '"speak":"Service status: fine."},"id":"m","kind":{"$type":"Markdown","text":"body"}}'
+    )
+
+    alt = fuaran.markdown("c-alt", "A chart would appear here.")
+    carrier = fuaran.markdown("c", "body").replace(fallback=alt)
+    wire = encode_value(carrier.to_wire())
+    assert wire == (
+        '{"fallback":{"id":"c-alt","kind":{"$type":"Markdown","text":"A chart would appear here."}},'
+        '"id":"c","kind":{"$type":"Markdown","text":"body"}}'
+    )
+    decoded = decode_node(wire)
+    assert isinstance(decoded, Ok)
+    assert encode_node(decoded.value) == wire
+    assert "fallback" in decoded.value.extras

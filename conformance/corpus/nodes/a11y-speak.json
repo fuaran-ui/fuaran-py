@@ -1,0 +1,1 @@
+{"accessibility":{"label":{"$type":"Static","value":"Service status"},"liveRegion":"polite","role":"status","speak":"Service status: all systems are operational as of the last check."},"id":"a11y-speak","kind":{"$type":"Callout","body":"All systems operational.","tone":"Success"}}

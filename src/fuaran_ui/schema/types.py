@@ -1043,6 +1043,11 @@ class Accessibility:
     role: str | None = None
     live_region: LiveRegion | None = None
     hidden: Binding | None = None
+    #: fuaran#1812 — the node's SPOKEN rendering for a voice surface, a
+    #: ``TextSource`` like ``tooltip`` (authored, translated content). Inert to
+    #: every visual renderer and never a source for ``aria-label``: ``label`` is
+    #: the accessible NAME, ``speak`` is what a listener hears.
+    speak: TextSource | None = None
 
     def to_wire(self) -> Value:
         return _obj(
@@ -1054,6 +1059,7 @@ class Accessibility:
                 "labelledBy": self.labelled_by,
                 "liveRegion": self.live_region,
                 "role": self.role,
+                "speak": self.speak,
             },
         )
 
@@ -3983,6 +3989,14 @@ class UiNode:
     #: replacement for `accessibility.label`: a hint that is the only name a
     #: control has is a missing name, not a tooltip.
     tooltip: TextSource | None = None
+    #: fuaran#1812 — the AUTHOR-DECLARED FALLBACK: a full node that a reader
+    #: BEHIND this node's kind renders in place of its labelled placeholder
+    #: (WIRE_FORMAT §3.1 / §15.3). A current reader decodes it, preserves it and
+    #: never renders it. Emit it sparingly, and build it from kinds every reader
+    #: has: a fallback carrying the kind it stands in for is refused (FUARAN156),
+    #: as is a fallback inside a fallback (FUARAN157); its ids share the
+    #: document's one id space (§8.1).
+    fallback: UiNode | None = None
 
     def to_wire(self) -> WireNode:
         extras: dict[str, Value] = {}
@@ -3996,6 +4010,8 @@ class UiNode:
             extras["visible"] = self.visible
         if self.tooltip is not None:
             extras["tooltip"] = _lower(self.tooltip)
+        if self.fallback is not None:
+            extras["fallback"] = self.fallback.to_wire()
         return WireNode(self.id, self.kind.to_wire(), extras)
 
     def replace(self, **changes: object) -> UiNode:

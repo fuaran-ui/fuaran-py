@@ -196,6 +196,13 @@ def _child_slots(node: Node) -> list[ChildSlot]:
         if isinstance(on_empty, Node):
             slots.append((on_empty, lambda c: _set_state_child(node, "onEmpty", c)))
 
+    # fuaran#1812 -- a `TreeOp` addresses a node inside the author-declared
+    # `fallback` like any child position (WIRE_FORMAT 3.1): the same lens as the
+    # State arms, which are alternative renderings too.
+    fallback = node.extras.get("fallback")
+    if isinstance(fallback, Node):
+        slots.append((fallback, lambda c: _set_extra(node, "fallback", c)))
+
     return slots
 
 

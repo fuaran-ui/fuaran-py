@@ -70,6 +70,12 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
         _walk(child, child_path, findings, seen_ids)
 
+    # fuaran#1812 -- the author-declared `fallback` is walked like any subtree,
+    # so NodeId uniqueness (8.1) holds across it.
+    fallback = node.extras.get("fallback")
+    if isinstance(fallback, Node):
+        _walk(fallback, f"{path}.fallback", findings, seen_ids)
+
 
 def _check_media_label(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
     """FUARAN108 (fuaran#1076) — a media transport with no accessible name.

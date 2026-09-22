@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from .canonical import encode_value
-from .model import Obj, Value, from_json
+from .model import Node, Obj, Value, from_json
 from .result import (
     MISSING_FIELD,
     WRONG_NODE_KIND,
@@ -164,3 +164,24 @@ def encode_envelope(env: Envelope) -> str:
     round-trip is byte-exact.
     """
     return encode_value(Obj(None, {"$payload": env.payload, "$profile": env.profile}))
+
+
+def lift_fallback(env: Envelope) -> DecodeResult[Node] | None:
+    """fuaran#1812 — lift the author-declared ``fallback`` out of a Behind
+    envelope's preserved payload, WITHOUT removing it from the bytes.
+
+    ``None`` when the payload is a decoded (Current) node or carries no
+    ``fallback``; otherwise the fallback decoded through the ordinary bounded
+    node decoder — the same gate a top-level node meets — so an authored
+    fallback that does not decode is a refusal the caller turns into the
+    §15.3 placeholder, never a partial render. ``env.payload`` is untouched:
+    :func:`encode_envelope` still reproduces the producer's bytes, fallback
+    included (must-ignore-but-preserve).
+    """
+    payload = env.payload
+    if not isinstance(payload, Obj):
+        return None
+    fallback = payload.fields.get("fallback")
+    if fallback is None:
+        return None
+    return decode_node(encode_value(fallback))

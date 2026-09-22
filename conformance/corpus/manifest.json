@@ -518,6 +518,14 @@
       "description": "Behind (core@1.1) unknown-kind payload — tolerant decode preserves bytes verbatim (WIRE_FORMAT 15.3)"
     },
     {
+      "id": "envelope-unknown-fallback",
+      "kind": "envelope-round-trip",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-unknown-fallback.json",
+      "expectedFile": "envelope/envelope-unknown-fallback.json",
+      "description": "Behind unknown kind carrying an author-declared fallback (Phase 1812) — payload preserved verbatim, fallback included; a behind reader lifts and renders the fallback in place of the placeholder (WIRE_FORMAT 3.1, 15.3)"
+    },
+    {
       "id": "envelope-unknown-malformed-required-profile",
       "kind": "envelope-round-trip",
       "decoder": "node",
@@ -1150,6 +1158,14 @@
       "description": "Accessibility (Phase 955 — Link: the accessible name overriding the visible 'Read more' text)"
     },
     {
+      "id": "a11y-speak",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/a11y-speak.json",
+      "expectedFile": "nodes/a11y-speak.json",
+      "description": "Accessibility (Phase 1812 — `speak`: the spoken rendering beside a Static name; inert to ARIA)"
+    },
+    {
       "id": "a11y-wrapper-all-slots",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -1580,6 +1596,14 @@
       "inputFile": "nodes/empty-state-card.json",
       "expectedFile": "nodes/empty-state-card.json",
       "description": "Layout/Box (Phase 767 — the canonical empty state with a CTA: one Card region, no nested Callout)"
+    },
+    {
+      "id": "envelope-fallback",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/envelope-fallback.json",
+      "expectedFile": "nodes/envelope-fallback.json",
+      "description": "Node envelope (Phase 1812 — an author-declared `fallback` subtree, preserved by a current reader and never rendered by it; `speak` on the fallback's envelope)"
     },
     {
       "id": "expr-params-state-selection",

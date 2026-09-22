@@ -4274,6 +4274,11 @@ def _decode_accessibility(value: object, path: str) -> Obj:
         fields["liveRegion"] = _enum(obj["liveRegion"], f"{path}.liveRegion", LIVE_REGION, "liveRegion")
     if "hidden" in obj:
         fields["hidden"] = _decode_binding_bool(obj["hidden"], f"{path}.hidden")
+    # fuaran#1812 — `speak`, the node's spoken rendering for a voice surface: a
+    # full `TextSource` like `tooltip`, decoded and preserved here, inert to the
+    # visual renderer and never a source for `aria-label`.
+    if "speak" in obj:
+        fields["speak"] = _decode_text_source(obj["speak"], f"{path}.speak")
     return Obj(None, fields)
 
 
@@ -4387,6 +4392,13 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
     # own narrower thing it took two hosts and a ruling to unwind.
     if "visible" in obj:
         extras["visible"] = _decode_binding(obj["visible"], f"{path}.visible")
+    # fuaran#1812 — the author-declared `fallback`: a full node a reader BEHIND
+    # this node's kind renders in place of its placeholder (§3.1 / §15.3). This
+    # reader knows the kind, so it decodes the fallback, preserves it and never
+    # renders it; the descent goes through the bounded node decoder like
+    # `state.onEmpty` does, so the §21 limits cover the subtree.
+    if "fallback" in obj:
+        extras["fallback"] = _decode_node_value(obj["fallback"], f"{path}.fallback")
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

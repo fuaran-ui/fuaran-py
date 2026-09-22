@@ -9652,6 +9652,9 @@
         },
         "hidden": {
           "$ref": "#/$defs/Binding_bool"
+        },
+        "speak": {
+          "$ref": "#/$defs/TextSource"
         }
       },
       "allOf": [
@@ -9793,6 +9796,9 @@
         },
         "visible": {
           "$ref": "#/$defs/Binding_bool"
+        },
+        "fallback": {
+          "$ref": "#/$defs/Node"
         }
       },
       "required": [

@@ -312,6 +312,49 @@ def _selected(field: str, default: str) -> t.Selection:
 
 # Authored trees keyed by their corpus fixture id. Built lazily inside a function
 # so the import-time module body stays readable.
+def _edge_chip_region() -> t.FilterSpec:
+    """fuaran#1800 / #1784 — the chip both filter-edge pairs declare."""
+    return t.FilterSpec(
+        "region",
+        t.LiteralText("Region"),
+        t.ChoiceFilter(
+            binding.static([t.SelectOption("EMEA", "emea"), t.SelectOption("Americas", "amer")]),
+            on_change=False,
+        ),
+    )
+
+
+def _edge_chip_genre() -> t.FilterSpec:
+    """The chip the CONTROL declares and the negative does not — the pairs' single variable."""
+    return t.FilterSpec(
+        "genre",
+        t.LiteralText("Genre"),
+        t.ChoiceFilter(
+            binding.static([t.SelectOption("Drama", "drama"), t.SelectOption("Documentary", "docs")]),
+            on_change=False,
+        ),
+    )
+
+
+def _edge_scoped_metric() -> t.UiNode:
+    """The `dependsOn` pair's consumer, identical in both documents."""
+    from fuaran_ui.ui import format
+
+    # `node.bare` — the reference emitter carries no accessibility section on
+    # this metric, and the authoring default here would add a live region.
+    return node.bare(
+        fuaran.metric(
+            "scoped-metric",
+            label="Revenue",
+            value=binding.query("orders", "region", "genre"),
+            format=format.currency("GBP"),
+            tone="Brand",
+            icon="trending-up",
+            subtext="vs last month",
+        )
+    )
+
+
 def _authored() -> dict[str, t.UiNode]:
     from fuaran_ui.ui import format
 
@@ -1839,6 +1882,29 @@ def _authored() -> dict[str, t.UiNode]:
                 tone="Brand",
                 icon="trending-up",
                 subtext="vs last month",
+            )
+        ),
+        # fuaran#1800 — the FUARAN075 `dependsOn` pair. The two documents differ
+        # in ONE thing, whether the `Filters` node declares `genre`, so authoring
+        # both is what keeps that the only difference on this host's side too.
+        "filters-dependson-declared": node.bare(
+            fuaran.dashboard(
+                "filters-dependson-declared",
+                heading="Catalogue",
+                children=[
+                    fuaran.filters("edge-chips", items=[_edge_chip_region(), _edge_chip_genre()]),
+                    _edge_scoped_metric(),
+                ],
+            )
+        ),
+        "filters-dependson-undeclared": node.bare(
+            fuaran.dashboard(
+                "filters-dependson-undeclared",
+                heading="Catalogue",
+                children=[
+                    fuaran.filters("edge-chips", items=[_edge_chip_region()]),
+                    _edge_scoped_metric(),
+                ],
             )
         ),
         "form-combobox-query": node.bare(

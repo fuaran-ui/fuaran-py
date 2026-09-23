@@ -287,6 +287,59 @@ def payload_files(authority: Path) -> list[str]:
     return sorted(files)
 
 
+class _CannotDeclare(Exception):
+    """The consumer prefix cannot be established; the message names why."""
+
+
+def consumer_prefix(snapshot: Path) -> str:
+    """The workspace-relative prefix this snapshot's records are declared under (Phase 1802).
+
+    It names the REPOSITORY as the estate places it, plus the snapshot's path inside it —
+    never the checkout's own absolute path. The prefix used to be the snapshot's path
+    relative to a workspace root inferred from the authority, so a run from a git worktree
+    declared the worktree as the estate copy and exited 0. The repository's PRIMARY
+    checkout is the parent of git's common dir, which a worktree shares with the checkout
+    it was cut from, so a worktree and a full checkout now write byte-identical records.
+
+    Raises ``_CannotDeclare`` — never guesses — when git cannot name the repository, when
+    its git directory is not a checkout's ``.git`` (a bare repository, or a separated git
+    dir), or when the primary checkout does not sit in the canonical side-by-side layout
+    beside the corpus, so its workspace-relative path is unknown.
+    """
+    anchor = snapshot.parent
+    toplevel = _git(anchor, "rev-parse", "--show-toplevel")
+    common = _git(anchor, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not toplevel or not common:
+        raise _CannotDeclare(f"git cannot name the repository holding {anchor} (not a clone, or no git on PATH).")
+
+    common_dir = Path(common).resolve()
+    if common_dir.name != ".git":
+        raise _CannotDeclare(
+            f"the repository's git directory {common_dir} is not a checkout's .git, so there is no "
+            "checkout to name it by (a bare repository, or a separated git dir)."
+        )
+
+    # A worktree's common dir is the .git of the checkout it was cut from, so this is the
+    # PRIMARY checkout whichever of the two is running.
+    checkout = common_dir.parent
+    try:
+        in_repo = snapshot.resolve().relative_to(Path(toplevel).resolve()).as_posix()
+    except ValueError:
+        in_repo = ""
+    if in_repo in ("", "."):
+        raise _CannotDeclare(f"the snapshot at {snapshot} does not sit inside its repository's toplevel {toplevel}.")
+
+    # The workspace root: three levels above a checkout in the canonical layout
+    # (<workspace>/Fuaran/Fuaran-UI/<repo>). `roadmapctl copies` resolves every consumer
+    # path against it, and there is no other root that can address a file in another repo.
+    if len(checkout.parents) < 3 or not (checkout.parent / "wire-format-fixtures" / "manifest.json").is_file():
+        raise _CannotDeclare(
+            f"the repository's primary checkout {checkout} does not sit in the canonical side-by-side "
+            "layout (no wire-format-fixtures corpus beside it), so its workspace-relative path is unknown."
+        )
+    return f"{checkout.relative_to(checkout.parents[2]).as_posix()}/{in_repo}"
+
+
 def declare(authority: Path | None = None, snapshot: Path | None = None) -> int:
     """(Re)write this snapshot's per-file records into the authority's ``copies.json``.
 
@@ -310,18 +363,13 @@ def declare(authority: Path | None = None, snapshot: Path | None = None) -> int:
         )
         return 1
 
-    # The workspace root: the directory the estates sit under, three levels above the
-    # authority in the canonical layout. `roadmapctl copies` resolves every consumer path
-    # against it, and there is no other root that can address a file in a different repo.
-    workspace_root = authority.parents[2]
     try:
-        prefix = snapshot.relative_to(workspace_root).as_posix()
-    except ValueError:
+        prefix = consumer_prefix(snapshot)
+    except _CannotDeclare as why:
         print(
-            f"cannot declare: the bundled snapshot at {snapshot} does not sit under the "
-            f"workspace root inferred from the authority ({workspace_root}). The estate copy "
-            "registry addresses consumers by workspace-relative path, so a checkout outside "
-            "the canonical side-by-side layout cannot declare — re-run from one that is.",
+            f"cannot declare: {why} The estate copy registry addresses a consumer by the "
+            "repository's workspace-relative path, and this step refuses rather than write one it "
+            "cannot establish.",
             file=sys.stderr,
         )
         return 1

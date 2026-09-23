@@ -272,7 +272,7 @@ def date_range(
     *,
     start: str | None = None,
     end: str | None = None,
-    variant: t.DateVariant = "Date",
+    variant: t.DateTimeVariant = "Date",
     label: str | None = None,
     occurrence: int = 0,
 ) -> Control:
@@ -292,8 +292,10 @@ def date_range(
     node = fuaran.filters(
         derive_id("daterange", name, occurrence),
         items=[
-            t.FilterSpec(from_key, t.LiteralText(f"{heading} from"), t.DateField(from_slot, variant, on_change=False)),
-            t.FilterSpec(to_key, t.LiteralText(f"{heading} to"), t.DateField(to_slot, variant, on_change=False)),
+            t.FilterSpec(
+                from_key, t.LiteralText(f"{heading} from"), t.DateTimeField(from_slot, variant, on_change=False)
+            ),
+            t.FilterSpec(to_key, t.LiteralText(f"{heading} to"), t.DateTimeField(to_slot, variant, on_change=False)),
         ],
     )
     return Control(

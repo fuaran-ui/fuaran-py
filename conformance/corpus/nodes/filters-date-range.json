@@ -1,1 +1,1 @@
-{"id":"filters-date-range","kind":{"$type":"Filters","items":[{"kind":{"$type":"DateRange","variant":"Date"},"label":"Stay","name":"stay"}]}}
+{"id":"filters-date-range","kind":{"$type":"Filters","items":[{"kind":{"$type":"DateTimeRange","variant":"Date"},"label":"Stay","name":"stay"}]}}

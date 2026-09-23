@@ -388,8 +388,9 @@ class format:  # noqa: N801, A001 — namespace object, mirrors the cross-tier `
         return t.SignificantDigits(digits)
 
     @staticmethod
-    def date(fmt: str) -> CellFormat:
-        return t.DateFormat(fmt)
+    def date_time(fmt: str) -> CellFormat:
+        """Phase 1811 — ``date_time`` (was ``date``): the pattern renders a date, a time or both."""
+        return t.DateTimeFormat(fmt)
 
     @staticmethod
     def duration(unit: t.DurationUnit, style: t.DurationStyle) -> CellFormat:

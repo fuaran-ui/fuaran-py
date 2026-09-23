@@ -285,7 +285,8 @@ TEXT_DIRECTION = frozenset({"auto", "ltr", "rtl"})
 #: carry. Case is ACCEPTED and never rewritten.
 _HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
 SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
-DATE_VARIANT = frozenset({"Date", "Time", "DateTime"})
+# Phase 1811 — ``DateTimeVariant`` (was ``DateVariant``); the cases did not move.
+DATE_TIME_VARIANT = frozenset({"Date", "Time", "DateTime"})
 MATH_DISPLAY = frozenset({"Inline", "Block"})
 BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
 BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Masonry", "Auto"})  # Phase 390; Masonry §3.6.7
@@ -355,8 +356,21 @@ BINDING_CASES = frozenset(
         "Invoke",
     }
 )
+# Phase 1811 — ``DateTime`` is canonical; ``Date`` is its §16 lenient alias (the
+# pre-rename spelling), accepted here and normalised in ``_decode_cell_format``.
 CELL_FORMAT_CASES = frozenset(
-    {"None", "Number", "Currency", "Percent", "SignificantDigits", "Date", "Duration", "RelativeTime", "Custom"}
+    {
+        "None",
+        "Number",
+        "Currency",
+        "Percent",
+        "SignificantDigits",
+        "DateTime",
+        "Date",
+        "Duration",
+        "RelativeTime",
+        "Custom",
+    }
 )
 
 # Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2). A kind not in
@@ -737,6 +751,11 @@ def _decode_cell_format(value: object, path: str) -> Value:
         # Phase 819 — cell-vocabulary parity with `Format.RelativeTime`.
         unit = _enum(_require(obj, "unit", path), f"{path}.unit", RELATIVE_TIME_UNIT, "RelativeTimeUnit")
         return Obj("RelativeTime", {"unit": unit})
+    if tag in ("DateTime", "Date"):
+        # Phase 1811 — `DateTime` is canonical; `Date` (the pre-rename spelling) is
+        # a §16 lenient alias, decoded to the same value and re-encoded canonical.
+        fmt = _expect_string(_require(obj, "format", path), f"{path}.format")
+        return Obj("DateTime", {"format": fmt})
     return from_json(value)
 
 
@@ -1390,6 +1409,15 @@ def _normalise_binding_obj(
     tag = obj.get("$type")
     if not isinstance(tag, str):
         return from_json(obj)
+    if tag == "Format":
+        # Structural pass-through, except the `format` case tag: Phase 1811 made
+        # `DateTime` canonical there and kept `Date` (the pre-rename spelling) as a
+        # §16 lenient alias, so the alias normalises here and re-encodes canonical.
+        format_fields: dict[str, Value] = {k: from_json(v) for k, v in obj.items() if k != "$type"}
+        fmt = format_fields.get("format")
+        if isinstance(fmt, Obj) and fmt.tag == "Date":
+            format_fields["format"] = Obj("DateTime", fmt.fields)
+        return Obj("Format", format_fields)
     if tag == "Query":
         name = _expect_string(_require(obj, "name", path), f"{path}.name")
         fields: dict[str, Value] = {}
@@ -3670,8 +3698,12 @@ FORM_FIELD_KIND_CASES = frozenset(
         "SegmentedChoice",
         "TextArea",
         "Range",
-        "Date",
-        "DateRange",
+        # Phase 1811 — `DateTime` / `DateTimeRange` (were `Date` / `DateRange`). The
+        # old spellings and the invented `Time` / `TimeRange` are §16 lenient aliases
+        # handled in `_decode_form_field_kind`, deliberately NOT listed here: this is
+        # the CANONICAL vocabulary the corpus attests.
+        "DateTime",
+        "DateTimeRange",
         # fuaran#1113 — the typeahead field; #1121 the multi-token one; #1130 the
         # score and the swatch.
         "Combobox",
@@ -3688,7 +3720,7 @@ _AUTO_NUMBER: tuple[Value, ...] = (0, 0.0)
 _AUTO_CHECKBOX: tuple[Value, ...] = (False,)
 _AUTO_CHOICE: tuple[Value, ...] = (None,)
 _AUTO_RANGE: tuple[Value, ...] = (Obj(None, {"max": 0, "min": 0}), Obj(None, {"max": 0.0, "min": 0.0}))
-# 0.7.0 — the DateRange placeholder is the ISO-empty pair at both ends.
+# 0.7.0 — the DateTimeRange placeholder is the ISO-empty pair at both ends.
 _AUTO_DATE_RANGE: tuple[Value, ...] = (Obj(None, {"from": "", "to": ""}),)
 # fuaran#1121 — a token field's placeholder is the EMPTY LIST: the list is
 # ordered and the order is the reader's, so an auto-bound field starts with no
@@ -3741,7 +3773,7 @@ def _decode_range_pair_value(value: object, path: str) -> Value:
 
 
 def _ordered_date_pair(lo: str, hi: str, path: str) -> Value:
-    """The DateRange ordered-pair rule (WIRE_FORMAT §3.6, 0.7.0).
+    """The DateTimeRange ordered-pair rule (WIRE_FORMAT §3.6, 0.7.0).
 
     A *literal* pair must satisfy ``from <= to``. Same-variant ISO-8601 strings
     sort lexicographically in chronological order, so Python's ordinal string
@@ -3752,7 +3784,7 @@ def _ordered_date_pair(lo: str, hi: str, path: str) -> Value:
         _fail(
             WRONG_TYPE,
             path,
-            f"date-range start '{lo}' is after end '{hi}' — a DateRange pair is ordered (from <= to); "
+            f"date-range start '{lo}' is after end '{hi}' — a DateTimeRange pair is ordered (from <= to); "
             "ISO-8601 strings of one variant compare lexicographically, so swap the two values",
             'ordered ISO-8601 pair ({"from": <iso>, "to": <iso>} with from <= to)',
         )
@@ -3760,7 +3792,7 @@ def _ordered_date_pair(lo: str, hi: str, path: str) -> Value:
 
 
 def _decode_date_range_pair_value(value: object, path: str) -> Value:
-    """A `FormFieldKind.DateRange` value: the canonical Static pair rides as the
+    """A `FormFieldKind.DateTimeRange` value: the canonical Static pair rides as the
     BARE `{"from":…,"to":…}` object (no envelope — the `Range` posture); a
     `[from,to]` two-element array and the enveloped `Static` form decode
     leniently (§3.6); any other binding case passes through the normal binding
@@ -3785,9 +3817,40 @@ def _decode_date_range_pair_value(value: object, path: str) -> Value:
     return _decode_binding(value, path)
 
 
+#: Phase 1811 — the §16 lenient `$type` aliases of the two temporal form-field kinds.
+#: Admitted at dispatch, normalised to the canonical tag in `_decode_form_field_kind`,
+#: and deliberately NOT part of `FORM_FIELD_KIND_CASES` (the attested vocabulary).
+_TEMPORAL_FORM_FIELD_ALIASES = frozenset({"Date", "Time", "DateRange", "TimeRange"})
+
+
+def _temporal_variant(obj: dict, path: str, tag: str, time_alias: str) -> Value:
+    """Phase 1811 — the ``variant`` of a ``DateTime`` / ``DateTimeRange`` field, read
+    through the §16 ``Time`` / ``TimeRange`` alias rule.
+
+    Under the canonical tag (or the pre-rename alias) ``variant`` is required as it
+    always was. Under the time-alias tag the alias SUPPLIES ``Time`` when the member
+    is absent, and an explicit member beside it must agree — a ``$type`` of ``Time``
+    carrying ``variant: "Date"`` is refused as ambiguous rather than resolved to
+    either, the 0.28.0 column-member posture applied to a ``$type``.
+    """
+    if tag != time_alias:
+        return _enum(_require(obj, "variant", path), f"{path}.variant", DATE_TIME_VARIANT, "variant")
+    if "variant" not in obj:
+        return "Time"
+    variant = _enum(obj["variant"], f"{path}.variant", DATE_TIME_VARIANT, "variant")
+    if variant != "Time":
+        _fail(
+            WRONG_TYPE,
+            f"{path}.variant",
+            f"a $type of {time_alias} already fixes the variant to Time, and a different one beside it is ambiguous",
+            "the variant Time, or no variant at all",
+        )
+    return variant
+
+
 def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | None) -> Obj:
     obj = _expect_object(value, path)
-    tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES)
+    tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES | _TEMPORAL_FORM_FIELD_ALIASES)
     fields: dict[str, Value] = {}
 
     handler_key = "onToggle" if tag in ("Checkbox", "Toggle") else "onChange"
@@ -3808,15 +3871,21 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
         if key in obj:
             fields[key] = dec(obj[key], f"{path}.{key}")
 
-    if tag in ("Text", "TextArea", "Date"):
+    if tag in ("Text", "TextArea", "DateTime", "Date", "Time"):
         value_slot(_decode_binding, _AUTO_TEXT)
         if tag == "TextArea":
             fields["rows"] = _expect_int(_require(obj, "rows", path), f"{path}.rows")
-        if tag == "Date":
-            fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+        if tag in ("DateTime", "Date", "Time"):
+            # Phase 1811 — `DateTime` is canonical. `Date` is the pre-rename spelling,
+            # kept as a §16 lenient alias; `Time` is the invented spelling the rename
+            # exists to make findable (a `DateTime{variant:"Time"}` reached for by
+            # intent), so it SUPPLIES the variant when absent and REFUSES a
+            # disagreeing one beside it. All three re-encode canonical.
+            fields["variant"] = _temporal_variant(obj, path, tag, "Time")
             bound("min", _decode_string)
             bound("max", _decode_string)
             bound("step", _decode_number)
+            tag = "DateTime"
     elif tag in ("Number", "RangedNumber"):
         # Binding<float> on the reference host — the numeric control's value is a
         # float slot, so it takes the §7 sentinels and refuses everything else.
@@ -3842,19 +3911,22 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
                 )
             else:
                 fields["orientation"] = "Horizontal"
-    elif tag == "DateRange":
+    elif tag in ("DateTimeRange", "DateRange", "TimeRange"):
         # 0.7.0 — the single-control date range: `Range`'s pair mechanics with
-        # `Date`'s value conventions. `min` / `max` (ISO strings) + `step`
-        # (seconds) are flat — they bound BOTH ends — with `Date`'s
-        # omit-when-absent discipline.
+        # `DateTime`'s value conventions. `min` / `max` (ISO strings) + `step`
+        # (seconds) are flat — they bound BOTH ends — with `DateTime`'s
+        # omit-when-absent discipline. Phase 1811 — `DateTimeRange` is canonical;
+        # `DateRange` (pre-rename) and `TimeRange` (invented, fixes `variant` to
+        # `Time`) are its §16 lenient aliases on exactly the `DateTime` rule above.
         if "value" in obj:
             decoded = _decode_date_range_pair_value(obj["value"], f"{path}.value")
             if not _is_auto_value(decoded, auto, _AUTO_DATE_RANGE):
                 fields["value"] = decoded
-        fields["variant"] = _enum(_require(obj, "variant", path), f"{path}.variant", DATE_VARIANT, "variant")
+        fields["variant"] = _temporal_variant(obj, path, tag, "TimeRange")
         bound("min", _decode_string)
         bound("max", _decode_string)
         bound("step", _decode_number)
+        tag = "DateTimeRange"
     elif tag == "Combobox":
         # fuaran#1113 — the wire shape is `Choice`'s (same option source, same
         # value slot, same handler contract) plus `allowFreeText`, which OMITS at

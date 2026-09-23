@@ -615,7 +615,7 @@ _HONOURS_TEXT_BOUNDS = frozenset({"Text", "TextArea"})
 #: compare operand can duplicate (FUARAN101). `compare` itself is absent from the
 #: unhonourable table on purpose: it compares the field's VALUE, which every
 #: control has.
-_BOUNDED_CONTROLS = frozenset({"RangedNumber", "Range", "Date", "DateRange"})
+_BOUNDED_CONTROLS = frozenset({"RangedNumber", "Range", "DateTime", "DateTimeRange"})
 
 #: Which of a control's declared bounds each comparison operator duplicates.
 #: `eq` / `neq` duplicate neither and are silent.

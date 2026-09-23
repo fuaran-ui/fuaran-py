@@ -757,11 +757,11 @@ def format_relative_english(unit: str, value: float) -> str:
 #: cross-pipeline parity, and the relative-time pair reduces to ``(unit, count)``
 #: through the one shared ladder and then phrases it in the deterministic English
 #: form — the fallback tier. The four cases NOT here (``Number`` / ``Currency`` /
-#: ``Percent`` / ``Date``) take their text from a locale database, so a
+#: ``Percent`` / ``DateTime``) take their text from a locale database, so a
 #: stdlib-only host has no canonical answer to give and resolves them to absence
 #: exactly as it did before this seam existed. The corpus's render-text family
 #: enumerates that exclusion with its reason.
-#: ``Date`` stays excluded whichever half of its style pair is declared: Phase
+#: ``DateTime`` stays excluded whichever half of its style pair is declared: Phase
 #: 1810's ``timeStyle`` names the locale's own time-of-day pattern exactly as
 #: ``dateStyle`` names its date pattern, so the time-only and date-time shapes
 #: resolve to absence here for the same reason the date-only one always has.
@@ -812,7 +812,7 @@ def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str 
     if fmt.tag == "RelativeTime":
         return format_relative_english(str(fmt.fields.get("unit")), value)
     # ``Since``. The source is read as an instant in whole Unix-epoch seconds
-    # (``Date``'s convention) and the sign follows ``Intl.RelativeTimeFormat``'s:
+    # (``DateTime``'s convention) and the sign follows ``Intl.RelativeTimeFormat``'s:
     # negative is the past. An unset or unreadable host instant is ABSENCE, for
     # exactly the reason ``Binding.Now`` gives — a relative time computed against
     # an invented "now" is a plausible wrong answer, which is worse than a
@@ -873,5 +873,5 @@ def format_number(fmt: Value, value: object) -> str:
         # answer. A caller that wants the phrase resolves the binding rather
         # than the format.
         return ""
-    # Date / Custom: structural — fall back to the plain numeric form.
+    # DateTime / Custom: structural — fall back to the plain numeric form.
     return _plain_number(num)

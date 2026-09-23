@@ -134,7 +134,7 @@
         "Microphone"
       ]
     },
-    "DateVariant": {
+    "DateTimeVariant": {
       "type": "string",
       "enum": [
         "Date",
@@ -4837,7 +4837,7 @@
           "type": "object",
           "properties": {
             "$type": {
-              "const": "Date"
+              "const": "DateTime"
             },
             "format": {
               "type": "string"
@@ -5004,7 +5004,7 @@
           "type": "object",
           "properties": {
             "$type": {
-              "const": "Date"
+              "const": "DateTime"
             },
             "dateStyle": {
               "$ref": "#/$defs/DateStyle"
@@ -5354,7 +5354,7 @@
           "type": "object",
           "properties": {
             "$type": {
-              "const": "Date"
+              "const": "DateTime"
             },
             "onChange": {
               "const": "<closure>"
@@ -5363,7 +5363,7 @@
               "$ref": "#/$defs/Binding_str"
             },
             "variant": {
-              "$ref": "#/$defs/DateVariant"
+              "$ref": "#/$defs/DateTimeVariant"
             },
             "min": {
               "type": "string"
@@ -5395,14 +5395,14 @@
           "type": "object",
           "properties": {
             "$type": {
-              "const": "DateRange"
+              "const": "DateTimeRange"
             },
             "onChange": {
               "const": "<closure>"
             },
             "value": true,
             "variant": {
-              "$ref": "#/$defs/DateVariant"
+              "$ref": "#/$defs/DateTimeVariant"
             },
             "min": {
               "type": "string"

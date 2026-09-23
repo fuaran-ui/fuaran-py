@@ -123,7 +123,7 @@ def test_the_authoring_surface_can_express_every_rule_slot() -> None:
             t.FormField(
                 "end",
                 t.LiteralText("End date"),
-                t.DateField(t.Static(""), "Date"),
+                t.DateTimeField(t.Static(""), "Date"),
                 True,
                 rule=rule.compare(binding.state("start", ""), "gte", "End must not precede start"),
             ),
@@ -163,7 +163,7 @@ def test_a_field_with_no_rule_is_byte_unchanged() -> None:
         ('{"$type":"Checkbox","onToggle":"<closure>"}', '"format":"email"', True),
         ('{"$type":"Checkbox","onToggle":"<closure>"}', '"pattern":"a+"', True),
         ('{"$type":"Number","onChange":"<closure>"}', '"maxLength":8', True),
-        ('{"$type":"Date","onChange":"<closure>","variant":"Date"}', '"pattern":"a+"', True),
+        ('{"$type":"DateTime","onChange":"<closure>","variant":"Date"}', '"pattern":"a+"', True),
     ],
 )
 def test_a_rule_slot_the_control_cannot_honour_is_flagged(control: str, slot_json: str, expect: bool) -> None:

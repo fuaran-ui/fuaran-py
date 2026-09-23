@@ -1,0 +1,1 @@
+{"id":"len-1811-time","kind":{"$type":"Form","fields":[{"id":"alarm","kind":{"$type":"DateTime","value":{"$type":"Static","value":"08:30"},"variant":"Time"},"label":"Alarm","required":false}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Set"}}

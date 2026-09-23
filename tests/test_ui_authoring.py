@@ -788,8 +788,8 @@ def _authored() -> dict[str, t.UiNode]:
         # ── Phase 1576 — the handler and the value are OPTIONAL on every control ─
         #
         # Nineteen corpus fixtures the authoring surface could not reach while
-        # `TextField` / `CheckboxField` / `ChoiceField` / `DateField` /
-        # `DateRangeField` / `ComboboxField` / `TokensField` / `RatingField` /
+        # `TextField` / `CheckboxField` / `ChoiceField` / `DateTimeField` /
+        # `DateTimeRangeField` / `ComboboxField` / `TokensField` / `RatingField` /
         # `ColorField` / `Tabs` / `Modal` / `Disclosure` / `Select` hard-coded a
         # handler or a value. Each is authored here in the spelling the fixture
         # carries, so the flags are pinned to bytes rather than to intent: an
@@ -851,7 +851,7 @@ def _authored() -> dict[str, t.UiNode]:
                         ),
                         False,
                     ),
-                    t.FormField("visit-date", t.LiteralText("Date"), t.DateField(on_change=False), True),
+                    t.FormField("visit-date", t.LiteralText("Date"), t.DateTimeField(on_change=False), True),
                 ],
             )
         ),
@@ -883,11 +883,11 @@ def _authored() -> dict[str, t.UiNode]:
                         True,
                         rule=rule.length(3, 24),
                     ),
-                    t.FormField("hire-start-date", t.LiteralText("Start date"), t.DateField(on_change=False), True),
+                    t.FormField("hire-start-date", t.LiteralText("Start date"), t.DateTimeField(on_change=False), True),
                     t.FormField(
                         "hire-end-date",
                         t.LiteralText("End date"),
-                        t.DateField(on_change=False),
+                        t.DateTimeField(on_change=False),
                         True,
                         rule=rule.compare(
                             t.State("hire-start-date", None), "gte", "End date must be on or after the start date"
@@ -919,13 +919,13 @@ def _authored() -> dict[str, t.UiNode]:
                     t.FormField(
                         "stay",
                         t.LiteralText("Stay"),
-                        t.DateRangeField(("2026-03-01", "2026-03-08"), min="2026-01-01", max="2026-12-31"),
+                        t.DateTimeRangeField(("2026-03-01", "2026-03-08"), min="2026-01-01", max="2026-12-31"),
                         True,
                     ),
                     t.FormField(
                         "shift",
                         t.LiteralText("Shift"),
-                        t.DateRangeField(
+                        t.DateTimeRangeField(
                             t.State("shift", Obj(None, {"from": "08:00", "to": "17:00"})),
                             "Time",
                             step=900,
@@ -936,7 +936,7 @@ def _authored() -> dict[str, t.UiNode]:
                     t.FormField(
                         "window",
                         t.LiteralText("Window"),
-                        t.DateRangeField(("2026-03-01T09:00", "2026-03-01T17:00"), "DateTime"),
+                        t.DateTimeRangeField(("2026-03-01T09:00", "2026-03-01T17:00"), "DateTime"),
                         False,
                     ),
                 ],
@@ -958,7 +958,7 @@ def _authored() -> dict[str, t.UiNode]:
         ),
         "filters-date-range": fuaran.filters(
             "filters-date-range",
-            items=[t.FilterSpec("stay", t.LiteralText("Stay"), t.DateRangeField(on_change=False))],
+            items=[t.FilterSpec("stay", t.LiteralText("Stay"), t.DateTimeRangeField(on_change=False))],
         ),
         "filters-rating-colour": fuaran.filters(
             "filters-rating-colour",
@@ -1263,7 +1263,7 @@ def _authored() -> dict[str, t.UiNode]:
                 ),
                 fuaran.markdown(
                     "fmt-date",
-                    t.Bound(binding.format(t.Static(1700000000), t.FmtDate("Medium"), t.Explicit("fr-FR"))),
+                    t.Bound(binding.format(t.Static(1700000000), t.FmtDateTime("Medium"), t.Explicit("fr-FR"))),
                 ),
                 fuaran.markdown(
                     "fmt-relative",
@@ -2273,8 +2273,8 @@ _HANDLER_RECORDS = [
     (t.TextAreaField, "on_change", "onChange", (None, 4)),
     (t.RangedNumber, "on_change", "onChange", ()),
     (t.RangeField, "on_change", "onChange", ()),
-    (t.DateField, "on_change", "onChange", ()),
-    (t.DateRangeField, "on_change", "onChange", ()),
+    (t.DateTimeField, "on_change", "onChange", ()),
+    (t.DateTimeRangeField, "on_change", "onChange", ()),
     (t.ChoiceField, "on_change", "onChange", (t.Static([]),)),
     (t.SegmentedChoice, "on_change", "onChange", (t.Static([]),)),
     (t.ComboboxField, "on_change", "onChange", (t.Static([]),)),
@@ -2412,17 +2412,17 @@ def test_a_handler_less_control_over_a_state_slot_is_LIVE_not_inert() -> None:
     assert findings(inert) == ["FUARAN069"]
 
 
-# ── Phase 1810 — ``Format.Date``'s ``timeStyle`` half ────────────────────────
+# ── Phase 1810 — ``Format.DateTime``'s ``timeStyle`` half ────────────────────────
 
 
 def test_fmt_date_authors_the_three_admitted_shapes() -> None:
     """``date_style`` alone (the pre-1810 positional signature, byte-unchanged),
     ``time_style`` alone (a time of day), and both (a date-time) — alphabetical
     field order on the wire, and an absent half omitted rather than ``null``."""
-    assert encode_value(t.FmtDate("Medium").to_wire()) == '{"$type":"Date","dateStyle":"Medium"}'
-    assert encode_value(t.FmtDate(time_style="Short").to_wire()) == '{"$type":"Date","timeStyle":"Short"}'
-    both = encode_value(t.FmtDate("Medium", "Short").to_wire())
-    assert both == '{"$type":"Date","dateStyle":"Medium","timeStyle":"Short"}'
+    assert encode_value(t.FmtDateTime("Medium").to_wire()) == '{"$type":"DateTime","dateStyle":"Medium"}'
+    assert encode_value(t.FmtDateTime(time_style="Short").to_wire()) == '{"$type":"DateTime","timeStyle":"Short"}'
+    both = encode_value(t.FmtDateTime("Medium", "Short").to_wire())
+    assert both == '{"$type":"DateTime","dateStyle":"Medium","timeStyle":"Short"}'
 
 
 # ── Phase 1812 — ``accessibility.speak`` and the envelope ``fallback`` ────────

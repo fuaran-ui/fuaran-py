@@ -81,7 +81,9 @@ ImageAspect = Literal["Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine
 # the author knows where the image sits — so the format declines to guess.
 ImageLoading = Literal["Eager", "Lazy"]
 ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
-DateVariant = Literal["Date", "Time", "DateTime"]
+#: Phase 1811 — ``DateTimeVariant`` (was ``DateVariant``): the temporal breadth of a
+#: ``DateTime`` / ``DateTimeRange`` field. The three cases did not move.
+DateTimeVariant = Literal["Date", "Time", "DateTime"]
 MathDisplay = Literal["Inline", "Block"]
 #: Text alignment for a `Drawing`'s `Label` shape — SVG's `text-anchor`, in the
 #: wire's own capitalised spelling. Absent means the renderer's inherited default.
@@ -246,7 +248,7 @@ class Now:
 
 # ── Locale-aware Format DU + LocaleSource (WIRE_FORMAT.md §3.3, Phase 102) ───
 # Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
-# ``Date`` carries ``dateStyle`` / ``timeStyle`` (bare enums, not a format string).
+# ``DateTime`` carries ``dateStyle`` / ``timeStyle`` (bare enums, not a format string).
 
 DateStyle = Literal["Short", "Medium", "Long", "Full"]
 # Phase 1810 — the time-of-day half of the platform formatter's style pair. The
@@ -285,11 +287,13 @@ class FmtPercent:
 
 
 @dataclass(frozen=True)
-class FmtDate:
-    """``Format.Date`` — the platform formatter's ``dateStyle`` / ``timeStyle`` pair.
+class FmtDateTime:
+    """``Format.DateTime`` — the platform formatter's ``dateStyle`` / ``timeStyle`` pair.
 
-    ``date_style`` alone is a date (the pre-1810 shape, and the pre-1810
-    positional signature ``FmtDate("Medium")`` still authors it); ``time_style``
+    ``FmtDate`` / ``Format.Date`` until Phase 1811, renamed so the case says what it
+    renders once Phase 1810 gave it a time of day. ``date_style`` alone is a date
+    (the pre-1810 shape, and the positional signature ``FmtDateTime("Medium")``
+    still authors it); ``time_style``
     alone is a time of day (Phase 1810); both together a date-time, each half at
     its own breadth. Neither is structurally legal on the wire and is refused by
     the validator as ``FUARAN155``, never by the codec. Alphabetical field order
@@ -300,7 +304,7 @@ class FmtDate:
     time_style: TimeStyle | None = None
 
     def to_wire(self) -> Value:
-        return _obj("Date", {"dateStyle": self.date_style, "timeStyle": self.time_style})
+        return _obj("DateTime", {"dateStyle": self.date_style, "timeStyle": self.time_style})
 
 
 @dataclass(frozen=True)
@@ -328,7 +332,7 @@ class FmtSince:
 
     ``RelativeTime``'s source is a signed COUNT of its unit, already computed by
     whoever produced it; this one's source is an instant in whole Unix-epoch
-    seconds (``Date``'s convention) and the count is the delta the HOST takes
+    seconds (``DateTime``'s convention) and the count is the delta the HOST takes
     against its own furnished instant.
 
     ``unit`` absent is NOT a default — it is the auto-selection request, resolved
@@ -341,7 +345,7 @@ class FmtSince:
         return _obj("Since", {"unit": self.unit})
 
 
-Format = FmtNumber | FmtCurrency | FmtPercent | FmtDate | FmtRelativeTime | FmtDuration | FmtSince
+Format = FmtNumber | FmtCurrency | FmtPercent | FmtDateTime | FmtRelativeTime | FmtDuration | FmtSince
 
 
 @dataclass(frozen=True)
@@ -426,7 +430,7 @@ class Local:
     commit_to: str | None = None
     #: The edit-buffer codec. Only :class:`NumberFormat` is admissible: the
     #: buffer must PARSE BACK what it renders, and a locale-rendered format
-    #: (Currency / Date / RelativeTime / Duration) has no total inverse.
+    #: (Currency / DateTime / RelativeTime / Duration) has no total inverse.
     codec: CellFormat | None = None
     #: Whether the host closure is the commit destination. ``None`` (the default)
     #: means "whichever ``commit_to`` implies", so neither spelling has to name
@@ -987,11 +991,14 @@ class SignificantDigits:
 
 
 @dataclass(frozen=True)
-class DateFormat:
+class DateTimeFormat:
+    """``CellFormat.DateTime`` (``Date`` until Phase 1811) — a host-formatter pattern
+    string that renders a date, a time or both."""
+
     format: str
 
     def to_wire(self) -> Value:
-        return Obj("Date", {"format": self.format})
+        return Obj("DateTime", {"format": self.format})
 
 
 @dataclass(frozen=True)
@@ -1023,7 +1030,7 @@ CellFormat = (
     | NumberFormat
     | PercentFormat
     | SignificantDigits
-    | DateFormat
+    | DateTimeFormat
     | DurationFormat
     | RelativeTimeFormat
 )
@@ -2952,7 +2959,7 @@ class RangeField:
     than the bounds: a `RangedNumber` resolves to ONE number inside `min`/`max`,
     where this resolves to the ordered `(min, max)` pair the reader has narrowed
     to. A literal pair rides the wire as the BARE ``{"max":…,"min":…}`` object
-    (no ``Static`` envelope — the ``DateRange`` posture), and the auto-bound
+    (no ``Static`` envelope — the ``DateTimeRange`` posture), and the auto-bound
     spelling omits `value` entirely.
     """
 
@@ -2978,9 +2985,12 @@ class RangeField:
 
 
 @dataclass(frozen=True)
-class DateField:
+class DateTimeField:
+    """``FormFieldKind.DateTime`` (``Date`` until Phase 1811) — a date, a time of day or a
+    date-time input per ``variant``; the name now says so."""
+
     value: Binding | None = None
-    variant: DateVariant = "Date"
+    variant: DateTimeVariant = "Date"
     min: str | None = None
     max: str | None = None
     step: float | None = None
@@ -2990,7 +3000,7 @@ class DateField:
 
     def to_wire(self) -> Value:
         return _obj(
-            "Date",
+            "DateTime",
             {
                 "max": self.max,
                 "min": self.min,
@@ -3003,10 +3013,11 @@ class DateField:
 
 
 @dataclass(frozen=True)
-class DateRangeField:
-    """``FormFieldKind.DateRange`` (0.7.0) — the single-control date range.
+class DateTimeRangeField:
+    """``FormFieldKind.DateTimeRange`` (0.7.0; ``DateRange`` until Phase 1811) — the
+    single-control date-time range.
 
-    ``Range``'s pair mechanics with ``Date``'s value conventions: the bound value
+    ``Range``'s pair mechanics with ``DateTime``'s value conventions: the bound value
     is the ordered ``(from, to)`` pair, each end an ISO-8601 string in the
     ``variant``'s shape. A literal pair rides the wire as the BARE
     ``{"from":…,"to":…}`` object (no ``Static`` envelope — the ``Range``
@@ -3015,7 +3026,7 @@ class DateRangeField:
     """
 
     value: Binding | tuple[str, str] | None = None
-    variant: DateVariant = "Date"
+    variant: DateTimeVariant = "Date"
     min: str | None = None
     max: str | None = None
     step: float | None = None
@@ -3025,7 +3036,7 @@ class DateRangeField:
         pair = self.value
         lowered: object = Obj(None, {"from": pair[0], "to": pair[1]}) if isinstance(pair, tuple) else pair
         return _obj(
-            "DateRange",
+            "DateTimeRange",
             {
                 "max": self.max,
                 "min": self.min,
@@ -3213,8 +3224,8 @@ FormFieldKind = (
     | TextAreaField
     | RangedNumber
     | RangeField
-    | DateField
-    | DateRangeField
+    | DateTimeField
+    | DateTimeRangeField
     | ChoiceField
     | SegmentedChoice
     | ComboboxField

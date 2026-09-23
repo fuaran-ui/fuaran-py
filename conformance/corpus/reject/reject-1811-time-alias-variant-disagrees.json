@@ -1,0 +1,1 @@
+{"id":"f1","kind":{"$type":"Form","fields":[{"id":"alarm","kind":{"$type":"Time","value":{"$type":"Static","value":"08:30"},"variant":"Date"},"label":"Alarm","required":false}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Set"}}

@@ -56,8 +56,8 @@
     "Choice",
     "Color",
     "Combobox",
-    "Date",
-    "DateRange",
+    "DateTime",
+    "DateTimeRange",
     "Number",
     "Range",
     "RangedNumber",
@@ -604,6 +604,54 @@
       "inputFile": "lenient/lenient-1670-fragment-decl-redundant-defaults.json",
       "expectedFile": "lenient/lenient-1670-fragment-decl-redundant-defaults.expected.json",
       "description": "Parameterised fragments — a `FragmentDecl` carrying the REDUNDANT pure-deterministic `effect` and an empty `holes` list is decode-accepted and re-encodes with both keys OMITTED. Neither slot is optional-with-a-convention any more: both are omit-at-default on every conformant host, so the redundant form is input-only (Phase 1670)"
+    },
+    {
+      "id": "lenient-1811-cellformat-date-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-cellformat-date-legacy.json",
+      "expectedFile": "lenient/lenient-1811-cellformat-date-legacy.expected.json",
+      "description": "Phase 1811 — a `CellFormat`'s pre-rename `$type` `Date` decodes as `DateTime` and re-encodes canonical; the .NET format string it carries is untouched. Note the `CellKind` `Date` (a data-cell kind, a different family) does NOT move and takes no alias"
+    },
+    {
+      "id": "lenient-1811-form-date-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-form-date-legacy.json",
+      "expectedFile": "lenient/lenient-1811-form-date-legacy.expected.json",
+      "description": "Phase 1811 — the pre-rename form-field `$type` `Date` decodes as `DateTime` and re-encodes canonical. A decode alias kept by the D8 ruling for documents written before the rename, never emitted; `variant` stays required under it exactly as under the canonical name"
+    },
+    {
+      "id": "lenient-1811-form-daterange-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-form-daterange-legacy.json",
+      "expectedFile": "lenient/lenient-1811-form-daterange-legacy.expected.json",
+      "description": "Phase 1811 — the pre-rename form-field `$type` `DateRange` decodes as `DateTimeRange` and re-encodes canonical; the value pair, `variant` and the ordered-pair rule are untouched by the alias"
+    },
+    {
+      "id": "lenient-1811-form-time-invented",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-form-time-invented.json",
+      "expectedFile": "lenient/lenient-1811-form-time-invented.expected.json",
+      "description": "Phase 1811 — the invented form-field `$type` `Time` (the spelling a model reaches for when it wants a time-of-day input) decodes as `DateTime` with `variant` SUPPLIED as `Time` when absent, and re-encodes canonical. An explicit `variant` beside it must agree — `Time` is refused by `reject-1811-time-alias-variant-disagrees`"
+    },
+    {
+      "id": "lenient-1811-form-timerange-invented",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-form-timerange-invented.json",
+      "expectedFile": "lenient/lenient-1811-form-timerange-invented.expected.json",
+      "description": "Phase 1811 — the invented form-field `$type` `TimeRange` decodes as `DateTimeRange` with `variant` SUPPLIED as `Time` when absent, on exactly the `Time` alias rule; an explicit disagreeing `variant` beside it is refused, never resolved"
+    },
+    {
+      "id": "lenient-1811-format-date-legacy",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1811-format-date-legacy.json",
+      "expectedFile": "lenient/lenient-1811-format-date-legacy.expected.json",
+      "description": "Phase 1811 — a `Format` binding's pre-rename `$type` `Date` decodes as `DateTime` (the Phase 1810 dateStyle / timeStyle pair) and re-encodes canonical; both style slots ride the alias unchanged"
     },
     {
       "id": "lenient-460-alias-emphasis-muted",
@@ -3214,6 +3262,15 @@
       "description": "UpdateStyle (Phase 1472 Direction=Ltr, the only style member)"
     },
     {
+      "id": "reject-1811-time-alias-variant-disagrees",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-1811-time-alias-variant-disagrees.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.fields[0].kind.variant",
+      "description": "a `Time` form field (the Phase 1811 alias, which fixes `variant` to `Time`) carrying an explicit `variant` of `Date` — refused as ambiguous rather than resolved to either spelling"
+    },
+    {
       "id": "reject-a11y-hidden-nonbool",
       "kind": "reject",
       "decoder": "node",
@@ -3418,7 +3475,7 @@
       "inputFile": "reject/reject-daterange-unordered.json",
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.value",
-      "description": "DateRange literal pair with start after end — the ordered-pair rule (Phase 725)"
+      "description": "DateTimeRange literal pair with start after end — the ordered-pair rule (Phase 725)"
     },
     {
       "id": "reject-embed-missing-title",

@@ -1,0 +1,1 @@
+{"id":"len-1811-fmt","kind":{"$type":"Markdown","text":{"$type":"Bound","binding":{"$type":"Format","format":{"$type":"Date","dateStyle":"Medium","timeStyle":"Short"},"locale":{"$type":"Explicit","tag":"en-GB"},"source":{"$type":"Static","value":1700000000}}}}}

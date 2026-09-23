@@ -1,0 +1,1 @@
+{"id":"len-1811-tr","kind":{"$type":"Form","fields":[{"id":"shift","kind":{"$type":"TimeRange","value":{"from":"08:00","to":"17:00"}},"label":"Shift","required":false}],"onSubmit":{"$type":"Dispatch"},"submitLabel":"Set"}}

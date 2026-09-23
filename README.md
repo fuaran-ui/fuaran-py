@@ -547,7 +547,7 @@ unwritten `Query`.)
 default. The `Format` cases this host renders — `Since`, `RelativeTime`,
 `Duration` — are locale-**independent** by declaration (unit glyphs and English
 words, not CLDR forms), so they consult no tag. The four that are not
-(`Number` / `Currency` / `Percent` / `Date`) resolve to absence here, exactly as
+(`Number` / `Currency` / `Percent` / `DateTime`) resolve to absence here, exactly as
 they did before: their text comes out of a locale database, a stdlib-only host has
 no canonical answer to give, and the corpus's render-text family enumerates that
 exclusion with its reason. `resolve_locale_tag(binding, sources)` is the public

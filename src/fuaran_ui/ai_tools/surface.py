@@ -47,7 +47,7 @@ _VALUE_SPACE_ENUMS: dict[str, Any] = {
     "ImageAspect": t.ImageAspect,
     "ImageLoading": t.ImageLoading,
     "ScrollOrientation": t.ScrollOrientation,
-    "DateVariant": t.DateVariant,
+    "DateTimeVariant": t.DateTimeVariant,
     "MathDisplay": t.MathDisplay,
     # fuaran#867 — the two-case polarity enum. `Neutral` is reserved and is
     # deliberately absent from the alias, so an agent offered this projection

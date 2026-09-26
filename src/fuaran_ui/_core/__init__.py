@@ -6,6 +6,9 @@ reference ``Fuaran.Core`` libraries — behind ONE internal boundary:
 * :mod:`fuaran_ui._core.dataframe` — the columnar ``DataFrame`` model, its byte-exact
   canonical codec (including the lenient-ingest rules) and the reference-parity
   ``Transform`` evaluator.
+* :mod:`fuaran_ui._core.function` — the ``Function`` twin: the ``HoleSpace`` value-space
+  vocabulary (the reference ``ValueSpace``) and the signature-searchable function registry
+  that matches over it (Phase 1872).
 
 **The boundary rule.** Nothing in here imports from the host's domain packages (the UI
 authoring surface, the schema codec, the renderer, the validator, the compute resolver, …).
@@ -17,6 +20,7 @@ walk rather than a convention; ``CONTRIBUTING.md`` says why the wire foundation 
 allow-list and not yet inside the boundary.
 
 **Private.** Nothing here is a published import path. The published names stay where they
-have always been (``fuaran_ui.dataframe`` and its submodules re-export this package
-unchanged); import from there.
+have always been (``fuaran_ui.dataframe`` and its submodules, ``fuaran_ui.function`` and
+``fuaran_ui.ui.capability``'s ``HoleSpace`` re-export this package unchanged); import from
+there.
 """

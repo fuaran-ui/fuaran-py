@@ -26,6 +26,12 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+# A declared argument's value space. ``HoleSpace`` is the Core ``ValueSpace`` twin, so it
+# lives inside the Core boundary (``fuaran_ui._core.function.space``) beside the function
+# registry that matches over it. Phase 1872 moved it there; this module re-exports it
+# unchanged, so ``from fuaran_ui.ui.capability import HoleSpace`` keeps working and there is
+# one type, not two.
+from .._core.function.space import HoleSpace as HoleSpace
 from ..schema.types import Invoke as _Invoke
 from ..schema.types import InvokeArg as _InvokeArg
 
@@ -44,38 +50,6 @@ CapabilityBody = Callable[[Mapping[str, Any]], Any]
 #: cross-host-invalid documents, which is the one thing a conformant host must
 #: not offer.
 InvokeArgValue = str
-
-
-@dataclass(frozen=True)
-class HoleSpace:
-    """A declared argument's value space — the validation envelope for an invocation arg.
-
-    A closed contract by shape (default-deny): an arg outside its space is rejected before
-    the body runs. Mirrors the reference hole-space vocabulary (int/float range, string
-    length, enum, any-string)."""
-
-    kind: str  # "intRange" | "floatRange" | "stringLen" | "enum" | "anyString"
-    min: float | None = None
-    max: float | None = None
-    choices: tuple[str, ...] = ()
-
-    def accepts(self, value: object) -> bool:
-        if self.kind == "intRange":
-            return isinstance(value, int) and not isinstance(value, bool) and self._in_range(value)
-        if self.kind == "floatRange":
-            return isinstance(value, (int, float)) and not isinstance(value, bool) and self._in_range(float(value))
-        if self.kind == "stringLen":
-            return isinstance(value, str) and self._in_range(len(value))
-        if self.kind == "enum":
-            return isinstance(value, str) and value in self.choices
-        if self.kind == "anyString":
-            return isinstance(value, str)
-        return False
-
-    def _in_range(self, n: float) -> bool:
-        if self.min is not None and n < self.min:
-            return False
-        return not (self.max is not None and n > self.max)
 
 
 @dataclass(frozen=True)

@@ -30,9 +30,17 @@ libraries (Apache-2.0, public). Those twins live together behind one private bou
 edit there, and cutting a separate Core package later is a copy rather than an untangling.
 
 - **What it holds:** `_core/dataframe/` — the columnar DataFrame model, its byte-exact canonical
-  codec (including the lenient-ingest rules) and the reference-parity Transform evaluator.
+  codec (including the lenient-ingest rules) and the reference-parity Transform evaluator; and
+  `_core/function/` — the `Fuaran.Core.Function` twin: `HoleSpace`, the value-space vocabulary
+  (the reference `ValueSpace`), and the signature-searchable function registry that matches over it.
 - **Published paths do not move.** `fuaran_ui.dataframe` and its `model` / `codec` / `evaluate`
-  submodules re-export `_core` unchanged. Import from those; `_core` is private.
+  submodules, `fuaran_ui.function`, and `fuaran_ui.ui.capability`'s `HoleSpace` re-export `_core`
+  unchanged. Import from those; `_core` is private.
+- **Decision — why `HoleSpace` moved rather than stayed with the capability registry** (Phase 1872).
+  The function registry was the one Core twin left outside the boundary, because it took its value
+  space from the UI capability module. That space is not a UI type: it is the Core `ValueSpace`, which
+  the capability registry *also* validates against. So the type moved into `_core/function/` and the
+  capability module re-exports it — one type, two published paths, no widening of the allow-list.
 - **The rule:** nothing under `_core` imports from the host's domain packages (`ui`, `schema`,
   `renderer`, `validator`, `compute`, …). Its only other `fuaran_ui` imports are the wire
   foundation — `canonical`, `model`, `result`, `shapeguard`, `limits`. `tests/test_core_boundary.py`

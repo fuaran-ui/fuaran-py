@@ -119,8 +119,41 @@ def _core_sources() -> list[Path]:
 def test_the_boundary_is_populated() -> None:
     # A walk over nothing passes vacuously; the boundary must actually hold the twins.
     modules = {_module_name(p)[0] for p in _core_sources()}
-    for twin in (f"{CORE}.dataframe.model", f"{CORE}.dataframe.codec", f"{CORE}.dataframe.evaluate"):
+    for twin in (
+        f"{CORE}.dataframe.model",
+        f"{CORE}.dataframe.codec",
+        f"{CORE}.dataframe.evaluate",
+        f"{CORE}.function.space",
+        f"{CORE}.function.registry",
+    ):
         assert twin in modules, f"{twin} is missing from the Core boundary"
+
+
+def test_the_published_paths_re_export_the_twins_unchanged() -> None:
+    # Moving a twin behind the boundary must not move a published name: each published path
+    # hands out the SAME object the boundary defines, never a copy that could drift from it.
+    from fuaran_ui import function
+    from fuaran_ui._core.function import registry, space
+    from fuaran_ui.ui import capability
+
+    assert capability.HoleSpace is space.HoleSpace
+    assert registry.HoleSpace is space.HoleSpace
+    for name in (
+        "EXACT",
+        "SUBSUMES",
+        "ComposePath",
+        "FunctionEntry",
+        "FunctionRegistry",
+        "NoPath",
+        "SigEntry",
+        "Signature",
+        "SignatureQuery",
+        "function_entry",
+        "slot_hole",
+        "value_hole",
+        "HoleSpace",
+    ):
+        assert getattr(function, name) is getattr(registry, name), name
 
 
 def test_the_wire_foundation_is_frozen() -> None:

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "$id": "https://fuaran.dev/wire-format/v1/render-fidelity.json",
-  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. Beside kinds, traits declares the obligations owed for a member that rides the node envelope rather than any one kind - a trait is identified by the wire path of the member it governs, names the kinds it applies to, and draws its claim ids from the same closed obligationVocabulary, so a host reports an unchecked trait claim exactly as it reports an unchecked kind claim. See WIRE_FORMAT.md 13.",
+  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. Beside kinds, traits declares the obligations owed for a member that rides the node envelope rather than any one kind - a trait is identified by the wire path of the member it governs, names the kinds it applies to, and draws its claim ids from the same closed obligationVocabulary, so a host reports an unchecked trait claim exactly as it reports an unchecked kind claim. Each kind also declares its SPEECH ruling: what a speech projection says for the kind when a node carries no accessibility.speak of its own, drawn from the closed speechClasses (spoken, derived, announced-only, omitted) with the per-kind derivation as a note. See WIRE_FORMAT.md 13.",
   "tiers": [
     {
       "tier": "source",
@@ -14,6 +14,24 @@
     {
       "tier": "rich",
       "meaning": "the declared client-only render, explicitly outside every parity comparison rather than silently divergent"
+    }
+  ],
+  "speechClasses": [
+    {
+      "class": "spoken",
+      "meaning": "the kind's authored prose is read aloud as written"
+    },
+    {
+      "class": "derived",
+      "meaning": "the utterance is composed from what the node already carries - typed fields, a heading, its accessible label, its children in authored order"
+    },
+    {
+      "class": "announced-only",
+      "meaning": "the node is announced as what it is and its content is never pretended at - an interactive or client-drawn surface a listener cannot operate"
+    },
+    {
+      "class": "omitted",
+      "meaning": "nothing is said, and the node is reported in the projection's omission list rather than dropped"
     }
   ],
   "obligationVocabulary": [
@@ -135,6 +153,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "the resolved label, as one short utterance"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -149,6 +171,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "no utterance of its own beyond a Card's heading (emphasised); its children speak in authored order"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -165,6 +191,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Button: <label>' - the declared action is never described as done"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -179,6 +209,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "spoken",
+        "note": "the heading (emphasised) then the body, as authored"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -197,6 +231,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Chart: <title>' - the series are not read out; `speak` is how an author supplies the spoken summary"
+      },
       "contract": "Phase 526; docs/SSR.md (Visualisation)"
     },
     {
@@ -215,6 +253,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Code block (<language>)[: <name>], <n> lines' - source text read aloud is noise rather than content"
+      },
       "contract": "Phase 290; WIRE_FORMAT.md 3.2; docs/SSR.md (deterministic-render + client-only-enhancement contract)"
     },
     {
@@ -239,6 +281,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Component: <accessible label, else the component id>'"
+      },
       "contract": "Phase 141; Phase 1108; docs/SSR.md (custom-renderer registry); WIRE_FORMAT.md 25; SANITIZATION.md"
     },
     {
@@ -279,6 +325,10 @@
           "tierNote": "paging is a hydration-time affordance; the static floor emits the requested page and no pager"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Table[: <name>], <n> rows, <m> columns' for the static-rows form, else 'Table[: <name>]'; the cells are not read out"
+      },
       "contract": "Phase 393; Phase 1701; docs/SSR.md (Visualisation, sortable rendered tables); WIRE_FORMAT.md 3.6.24"
     },
     {
@@ -293,6 +343,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "the heading (emphasised) then its children, always - a spoken summary that skips a closed section is a lie about what it contains"
+      },
       "contract": "docs/SSR.md (Layout.Disclosure)"
     },
     {
@@ -307,6 +361,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Diagram: <title>', then the description where one is declared"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -321,6 +379,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "the protected child speaks; the fallback is a client-runtime path and is reported as not taken"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -335,6 +397,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "'<label>: <value>', then the help text"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -368,6 +434,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'File upload: <label>'"
+      },
       "contract": "Phase 1115; Phase 1548; WIRE_FORMAT.md 3.6.10 + 3.6.23; docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -403,6 +473,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Filters[: <name>], <n> fields'"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -438,6 +512,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Form[: <name>], <n> fields' - a form is never filled in by voice here"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -452,6 +530,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "omitted",
+        "note": "a template declaration says nothing, here as everywhere"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -466,6 +548,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "expanded against the tree's fragment registry, the body speaks; an unresolved reference is reported"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -480,6 +566,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "spoken",
+        "note": "the text, emphasised, with a long pause after - a heading announces a section"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -501,6 +591,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "derived",
+        "note": "the icon's declared label, else its accessible label; an icon with neither is decorative and is reported as omitted"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -546,6 +640,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "'Image: <alt>'; an EMPTY alt declares the image decorative, and it is reported as omitted"
+      },
       "contract": "Phase 1079; WIRE_FORMAT.md 3.6.5; docs/SSR.md (expandable images)"
     },
     {
@@ -560,6 +658,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "'<label>: <value>', the value formatted through the declared format"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -576,6 +678,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "'Link: <label>'"
+      },
       "contract": "Phase 812; WIRE_FORMAT.md 3.2 (link protection); docs/SSR.md (protected email links)"
     },
     {
@@ -590,6 +696,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "spoken",
+        "note": "one utterance per item, numbered for an ordered list"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -608,6 +718,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Map[: <name>]' - the markers are not read out"
+      },
       "contract": "docs/SSR.md (Visualisation)"
     },
     {
@@ -626,6 +740,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "spoken",
+        "note": "the one deterministic GFM render, read as its text: markup removed, entities decoded, one utterance per block"
+      },
       "contract": "Phases 292, 293; WIRE_FORMAT.md 14; docs/MARKDOWN.md"
     },
     {
@@ -644,6 +762,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Formula[: <name>]' - LaTeX read aloud is not mathematics; `speak` supplies a reading"
+      },
       "contract": "Phases 293, 658; WIRE_FORMAT.md 3.2; docs/SSR.md; docs/MATH-DEGRADATION.md"
     },
     {
@@ -702,6 +824,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Video: <label>' or 'Audio: <label>'"
+      },
       "contract": "Phase 1076; WIRE_FORMAT.md 3.6.6; docs/SSR.md (media)"
     },
     {
@@ -736,6 +862,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Embedded view: <title>'"
+      },
       "contract": "Phase 1111; WIRE_FORMAT.md 3.6.8, 19.1; docs/SSR.md (embed)"
     },
     {
@@ -757,6 +887,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "derived",
+        "note": "'<label>: <value>' with the value through its format, then 'trend <trend>' through the trend format, then the subtext"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -789,6 +923,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Dialog: <heading>' - an overlay's content is not read into the page"
+      },
       "contract": "Phase 289; Phase 1119; WIRE_FORMAT.md 3.2 + 3.6.11; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -803,6 +941,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Embedded view[: <name>]' - the guest tree attaches client-side"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -817,6 +959,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "'<label>: <n> percent', or 'In progress' when indeterminate"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -833,6 +979,10 @@
       ],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "no utterance of its own; its children speak in full"
+      },
       "contract": "Phase 289; WIRE_FORMAT.md 3.2; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -849,6 +999,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Selection: <label>'"
+      },
       "contract": "Phase 291; docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -863,6 +1017,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "omitted",
+        "note": "a loading placeholder describes a state a script is never read in"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -891,6 +1049,10 @@
         }
       ],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Trend line[: <name>]' - the points are not read out"
+      },
       "contract": "Phase 644 4k; Phase 1098; Phase 1704; WIRE_FORMAT.md 24.7; docs/SSR.md (Display.Sparkline)"
     },
     {
@@ -905,6 +1067,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "no utterance of its own; the panes speak in authored order"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -921,6 +1087,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Step-by-step section[: <name>], <n> steps'"
+      },
       "contract": "docs/SSR.md (Layout)"
     },
     {
@@ -935,6 +1105,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "the heading (emphasised) then its children"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -949,6 +1123,10 @@
       "fixtures": [],
       "obligations": [],
       "intrinsic": [],
+      "speech": {
+        "class": "derived",
+        "note": "the case matching the resolved selector, else the default; every other case is reported as not taken"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -981,6 +1159,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Tabbed section[: <name>], <n> tabs' - reading only the active panel would be a lie about how much the section contains"
+      },
       "contract": "docs/SSR.md (Layout.Tabs)"
     },
     {
@@ -1004,6 +1186,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "spoken",
+        "note": "an OPEN toast reads its message; a closed one is reported as omitted, never read"
+      },
       "contract": "Phase 289; WIRE_FORMAT.md 3.2 (Toast vs Action.Notify); docs/SSR.md"
     },
     {
@@ -1047,6 +1233,10 @@
           "tier": "bothPipelines"
         }
       ],
+      "speech": {
+        "class": "announced-only",
+        "note": "'Hierarchy[: <name>]' - a listener can expand nothing"
+      },
       "contract": "Phase 1120; WIRE_FORMAT.md 3.6.12, 21.5; docs/SSR.md (the Tree server floor)"
     }
   ],

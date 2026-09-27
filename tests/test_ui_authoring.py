@@ -38,6 +38,7 @@ from fuaran_ui.ui import (
     node,
     param,
     rule,
+    source_ref,
     track,
 )
 
@@ -1343,6 +1344,37 @@ def _authored() -> dict[str, t.UiNode]:
                 sort_state_key="ledger-sort",
                 default_sort=t.DefaultSort(1, "desc"),
                 window_state_key="ledger-window",
+            )
+        ),
+        # Phase 1889 — the unchecked binding-check document: a chart over a Transform
+        # of an undeclared Ref and a grid over a Query. Neither source has a schema a
+        # negative verdict could stand on, so nothing in it is refused.
+        "binding-check-unchecked": node.bare(
+            fuaran.dashboard(
+                "binding-check-unchecked",
+                children=[
+                    node.bare(
+                        fuaran.chart(
+                            "spend-chart",
+                            source=frame(source_ref("spend", [])).filter(col("amount") > lit(0)).to_transform_binding(),
+                            x_field="region",
+                            y_fields=["revenue"],
+                            kind="Bar",
+                            title="Spend by department",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.grid(
+                            "spend-grid",
+                            source=t.Query("spend"),
+                            columns=[
+                                t.Column(label="region", field_name="region"),
+                                t.Column(label="revenue", field_name="revenue"),
+                            ],
+                            row_key_field="region",
+                        )
+                    ),
+                ],
             )
         ),
         "grid-reorderable": node.bare(

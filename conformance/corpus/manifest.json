@@ -1294,6 +1294,54 @@
       "description": "Display/Badge (Phase 818 — LIVE State-sourced Transform: the Tier-D count badge, preserved source + initial snapshot)"
     },
     {
+      "id": "binding-check-chart-not-numeric",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-chart-not-numeric.json",
+      "expectedFile": "nodes/binding-check-chart-not-numeric.json",
+      "description": "Visualisation/Chart (Phase 1889 - FUARAN087: a yFields entry naming a string column)"
+    },
+    {
+      "id": "binding-check-chart-temporal-not-date",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-chart-temporal-not-date.json",
+      "expectedFile": "nodes/binding-check-chart-temporal-not-date.json",
+      "description": "Visualisation/Chart (Phase 1889 - FUARAN097: a temporal x-axis over a column that is not a date)"
+    },
+    {
+      "id": "binding-check-chart-ungrounded",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-chart-ungrounded.json",
+      "expectedFile": "nodes/binding-check-chart-ungrounded.json",
+      "description": "Visualisation/Chart (Phase 1889 - FUARAN086: a yFields entry naming a column the groupBy renamed away)"
+    },
+    {
+      "id": "binding-check-control",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-control.json",
+      "expectedFile": "nodes/binding-check-control.json",
+      "description": "Visualisation/Chart+Grid (Phase 1889 - the CONTROL: a chart and a grid reading only what their groupBy pipeline produces; both grade checked)"
+    },
+    {
+      "id": "binding-check-grid-ungrounded",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-grid-ungrounded.json",
+      "expectedFile": "nodes/binding-check-grid-ungrounded.json",
+      "description": "Layout/Box (Phase 1889 - FUARAN114: a grid column field and rowKeyField naming a column the pipeline does not produce)"
+    },
+    {
+      "id": "binding-check-unchecked",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/binding-check-unchecked.json",
+      "expectedFile": "nodes/binding-check-unchecked.json",
+      "description": "Layout/Box (Phase 1889 - UNCHECKED: a chart over a Transform of an undeclared Ref and a grid over a Query; nothing refused)"
+    },
+    {
       "id": "boundary-1",
       "kind": "node-round-trip",
       "decoder": "node",

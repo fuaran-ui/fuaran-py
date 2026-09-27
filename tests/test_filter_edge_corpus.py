@@ -148,3 +148,55 @@ def test_a_query_dependson_with_no_filters_node_at_all_is_still_the_finding() ->
         Obj("Metric", {"label": "Revenue", "value": Obj("Query", {"name": "orders", "dependsOn": Arr(["region"])})}),
     )
     assert [f.code for f in validate_node(tree)] == ["FUARAN075"]
+
+
+def test_a_grids_own_page_and_window_keys_are_the_host_slicing_edge_not_a_filter() -> None:
+    """Phase 1892 — a host-slicing ``Query`` names the reading grid's own
+    ``pageStateKey`` / ``windowStateKey`` in ``dependsOn``; only the other,
+    undeclared name is a dangling filter edge."""
+    grid = Node(
+        "orders-grid",
+        Obj(
+            "DataGrid",
+            {
+                "columns": Arr([Obj(None, {"field": "ref", "kind": Obj("Text", {}), "label": "Ref"})]),
+                "pageStateKey": "orders-page",
+                "rowKeyField": "ref",
+                "source": Obj(
+                    "Query", {"name": "orders", "dependsOn": Arr(["orders-window", "orders-page", "region"])}
+                ),
+                "windowStateKey": "orders-window",
+            },
+        ),
+    )
+    findings = [f for f in validate_node(grid) if f.code == "FUARAN075"]
+    assert [f.path for f in findings] == ["$.kind.source.dependsOn.2"], findings
+    assert "'region'" in findings[0].message
+
+
+def test_another_grids_window_key_is_still_a_dangling_edge() -> None:
+    """The exemption is the READER's own key: a metric depending on a grid's window key fires."""
+    grid = Node(
+        "orders-grid",
+        Obj(
+            "DataGrid",
+            {
+                "columns": Arr([Obj(None, {"field": "ref", "kind": Obj("Text", {}), "label": "Ref"})]),
+                "rowKeyField": "ref",
+                "source": Obj("State", {"key": "orders"}),
+                "windowStateKey": "orders-window",
+            },
+        ),
+    )
+    metric = Node(
+        "orders-metric",
+        Obj("Metric", {"label": "Orders", "value": Obj("Query", {"name": "n", "dependsOn": Arr(["orders-window"])})}),
+    )
+    tree = Node("root", Obj("Stack", {"children": Arr([grid, metric])}))
+    assert [f.code for f in validate_node(tree) if f.code == "FUARAN075"] == ["FUARAN075"]
+
+
+@corpus_required
+def test_the_host_windowed_grid_fixture_reports_no_dangling_edge() -> None:
+    """``nodes/grid-windowed.json``'s ``dependsOn`` names its own window key."""
+    assert _dangling("grid-windowed") == []

@@ -812,6 +812,12 @@ def _check_inert_control(node: Node, kind: Obj, path: str, findings: list[Findin
 #
 # Attribution is by NEAREST ENCLOSING NODE, which is what the reference host's
 # binding walk calls the edge's READER.
+#
+# Phase 1892 — the host-slicing re-run edge is not a filter reference. The page
+# rule (Phase 862) and the window rule (Phase 1892) both have a host-slicing
+# ``Query`` name the grid's own ``pageStateKey`` / ``windowStateKey`` in
+# ``dependsOn``, so a ``dependsOn`` entry naming a key of the READING grid itself
+# is exempt. A key belonging to any other grid is not.
 
 _FILTER_EDGE_PARAM_TAGS = frozenset({"Transform", "Expr"})
 
@@ -836,8 +842,25 @@ def _declared_filter_names(value: Value, out: set[str]) -> None:
             _declared_filter_names(field_value, out)
 
 
-def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str, str, str]]) -> None:
-    """Every declared filter edge as ``(reader node id, filter name, path)``."""
+def _grid_own_state_keys(value: Value, out: set[tuple[str, str]]) -> None:
+    """Every ``(DataGrid node id, key)`` for the grid's own page and window keys."""
+    if isinstance(value, Node):
+        if value.kind.tag == "DataGrid":
+            for member in ("pageStateKey", "windowStateKey"):
+                key = value.kind.fields.get(member)
+                if isinstance(key, str):
+                    out.add((value.id, key))
+        _grid_own_state_keys(value.kind, out)
+    elif isinstance(value, Arr):
+        for item in value.items:
+            _grid_own_state_keys(item, out)
+    elif isinstance(value, Obj):
+        for field_value in value.fields.values():
+            _grid_own_state_keys(field_value, out)
+
+
+def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str, str, str, bool]]) -> None:
+    """Every declared filter edge as ``(reader node id, filter name, path, is a dependsOn entry)``."""
     if isinstance(value, Node):
         _filter_edge_uses(value.kind, value.id, f"{path}.kind", out)
         return
@@ -855,7 +878,7 @@ def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str,
         if isinstance(depends_on, Arr):
             for i, name in enumerate(depends_on.items):
                 if isinstance(name, str):
-                    out.append((reader, name, f"{path}.dependsOn.{i}"))
+                    out.append((reader, name, f"{path}.dependsOn.{i}", True))
 
     if value.tag in _FILTER_EDGE_PARAM_TAGS:
         params = value.fields.get("params")
@@ -870,7 +893,7 @@ def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str,
                 if isinstance(source, Obj) and source.tag == "Filter":
                     name = source.fields.get("name")
                     if isinstance(name, str):
-                        out.append((reader, name, f"{path}.params.{i}.from"))
+                        out.append((reader, name, f"{path}.params.{i}.from", False))
 
     for key, field_value in value.fields.items():
         _filter_edge_uses(field_value, reader, f"{path}.{key}", out)
@@ -881,11 +904,14 @@ def _check_filter_edges(node: Node, findings: list[Finding]) -> None:
     declared: set[str] = set()
     _declared_filter_names(node, declared)
 
-    uses: list[tuple[str, str, str]] = []
+    grid_own: set[tuple[str, str]] = set()
+    _grid_own_state_keys(node, grid_own)
+
+    uses: list[tuple[str, str, str, bool]] = []
     _filter_edge_uses(node, node.id, "$", uses)
 
-    for reader, name, path in uses:
-        if name not in declared:
+    for reader, name, path, depends_on in uses:
+        if name not in declared and not (depends_on and (reader, name) in grid_own):
             findings.append(
                 Finding(
                     "FUARAN075",

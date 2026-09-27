@@ -3462,6 +3462,13 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     for transfer in ("transferOutKey", "transferInKey"):
         if transfer in obj:
             fields[transfer] = _expect_string(obj[transfer], f"{path}.{transfer}")
+    # Phase 1892 — the row window. `windowStateKey` names a State key, so any other
+    # type is WRONG_TYPE; `rowTotal` is a `Binding<int>` and takes the integer accept
+    # set every other int Binding slot takes (`Stepper.activeStep`).
+    if "windowStateKey" in obj:
+        fields["windowStateKey"] = _expect_string(obj["windowStateKey"], f"{path}.windowStateKey")
+    if "rowTotal" in obj:
+        fields["rowTotal"] = _decode_binding_int(obj["rowTotal"], f"{path}.rowTotal")
     # fuaran#1125 — the export declaration, and fuaran#1473's grid pair. All
     # three omit at `False` and all three refuse a present non-boolean, on
     # `editable`'s terms.
@@ -3482,6 +3489,8 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
             "exportable",
             "keepRowsTogether",
             "repeatHeader",
+            "windowStateKey",
+            "rowTotal",
         }
     )
     for key, raw in obj.items():

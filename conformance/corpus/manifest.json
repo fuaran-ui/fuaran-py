@@ -2294,6 +2294,22 @@
       "description": "Visualisation/Grid (Phase 1674 — a filter step naming a param NO params entry declares)"
     },
     {
+      "id": "grid-windowed",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-windowed.json",
+      "expectedFile": "nodes/grid-windowed.json",
+      "description": "Visualisation/Grid (Phase 1892 — windowStateKey + rowTotal: a host-windowed Query and the total it declares)"
+    },
+    {
+      "id": "grid-windowed-sorted",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-windowed-sorted.json",
+      "expectedFile": "nodes/grid-windowed-sorted.json",
+      "description": "Visualisation/Grid (Phase 1892 — the client-sliced window under a sort: the window indexes the sorted rows)"
+    },
+    {
       "id": "heading-1",
       "kind": "node-round-trip",
       "decoder": "node",

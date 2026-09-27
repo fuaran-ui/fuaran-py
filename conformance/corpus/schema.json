@@ -7871,6 +7871,12 @@
         "exportable": {
           "type": "boolean"
         },
+        "windowStateKey": {
+          "type": "string"
+        },
+        "rowTotal": {
+          "$ref": "#/$defs/Binding_int"
+        },
         "defaultSort": {
           "type": "object",
           "properties": {

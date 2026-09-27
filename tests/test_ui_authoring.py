@@ -1322,6 +1322,29 @@ def _authored() -> dict[str, t.UiNode]:
                 sort_state_key="ledger-sort",
             )
         ),
+        # Phase 1892 — the row window: host-windowed with a declared total, and
+        # client-sliced under a sort.
+        "grid-windowed": node.bare(
+            fuaran.grid(
+                "grid-windowed",
+                source=t.Query("orders", ("orders-window",)),
+                columns=[t.Column(label="Reference", field_name="reference"), _numeric_col("Amount", "amount")],
+                row_key_field="reference",
+                window_state_key="orders-window",
+                row_total=t.Query("orders.total"),
+            )
+        ),
+        "grid-windowed-sorted": node.bare(
+            fuaran.grid(
+                "grid-windowed-sorted",
+                source=t.State("ledger", _LEDGER_ROWS),
+                columns=[t.Column(label="Month", field_name="month"), _numeric_col("Revenue", "revenue")],
+                row_key_field="month",
+                sort_state_key="ledger-sort",
+                default_sort=t.DefaultSort(1, "desc"),
+                window_state_key="ledger-window",
+            )
+        ),
         "grid-reorderable": node.bare(
             fuaran.grid(
                 "grid-reorderable",

@@ -1429,6 +1429,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         exportable: bool = False,
         keep_rows_together: bool = False,
         repeat_header: bool = False,
+        window_state_key: str | None = None,
+        row_total: Binding | None = None,
     ) -> UiNode:
         """``row_key_field`` names the row property that identifies a row — the
         declarative sibling of the erased ``rowKey`` closure; pass it whenever the
@@ -1457,6 +1459,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
                 page_state_key=page_state_key,
                 edit_state_key=edit_state_key,
                 reorderable=reorderable,
+                window_state_key=window_state_key,
+                row_total=row_total,
             ),
             accessibility.grid,
         )

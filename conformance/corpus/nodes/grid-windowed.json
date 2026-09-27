@@ -1,0 +1,1 @@
+{"id":"grid-windowed","kind":{"$type":"DataGrid","columns":[{"field":"reference","kind":{"$type":"Text"},"label":"Reference"},{"field":"amount","kind":{"$type":"Numeric"},"label":"Amount"}],"rowKeyField":"reference","rowTotal":{"$type":"Query","name":"orders.total"},"source":{"$type":"Query","dependsOn":["orders-window"],"name":"orders"},"windowStateKey":"orders-window"}}

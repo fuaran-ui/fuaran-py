@@ -3567,6 +3567,12 @@ class DataGrid:
     #: fuaran#1123 — the reader may re-order rows by dragging them. Omitted at its
     #: `False` identity, like the behaviour flags above it.
     reorderable: bool = False
+    #: Phase 1892 — the row window: the State key carrying the
+    #: `{"offset", "count"}` descriptor of the rows the viewport shows, and the
+    #: DECLARED size of the whole result set for a grid whose host slices it (a
+    #: `Binding` of an integer, like `Tabs.active_index`). Both omitted when absent.
+    window_state_key: str | None = None
+    row_total: Binding | None = None
 
     def to_wire(self) -> Obj:
         # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 and
@@ -3588,10 +3594,12 @@ class DataGrid:
                 "repeatHeader": True if self.repeat_header else None,
                 "rowKey": None if self.row_key_field is not None else CLOSURE,
                 "rowKeyField": self.row_key_field,
+                "rowTotal": self.row_total,
                 "sortStateKey": self.sort_state_key,
                 "source": self.source,
                 "transferInKey": self.transfer_in_key,
                 "transferOutKey": self.transfer_out_key,
+                "windowStateKey": self.window_state_key,
             },
         )
 

@@ -61,6 +61,17 @@ from .egress import (
     sanitize_embed_src_for_egress,
     sanitize_url_for_egress,
 )
+from .grid import (
+    PresentedWindow,
+    effective_sort,
+    grid_host_windows,
+    grid_page,
+    grid_window,
+    slice_rows_to_page,
+    sort_rows,
+    window_row_count,
+    window_row_index,
+)
 from .html import element, escape_text, text_element, void_element
 from .sanitize import (
     sanitize_css_value_for_slot,
@@ -2156,7 +2167,13 @@ class Renderer:
             return format_number(column.get("format"), value)
         return str(value)
 
-    def _bound_grid(self, columns: list[dict[str, Value]], rows: Arr, has_row_action: bool = False) -> str:
+    def _bound_grid(
+        self,
+        columns: list[dict[str, Value]],
+        rows: Arr,
+        has_row_action: bool = False,
+        window: PresentedWindow[Obj] | None = None,
+    ) -> str:
         """The resolved rows as the reference grid's own ``<table>`` markup.
 
         The element shape and class vocabulary match the reference renderer's
@@ -2173,9 +2190,10 @@ class Renderer:
             text_element("th", [("class", "fuaran-grid-header")], str(c.get("label", ""))) for c in columns
         )
         body_rows = ""
-        for row in rows.items:
-            if not isinstance(row, Obj):
-                continue
+        # Phase 1892 - a windowed grid presents the window's rows, and each carries
+        # its `aria-rowindex` in the whole range; an unwindowed grid is unchanged.
+        presented = window.rows if window is not None else [r for r in rows.items if isinstance(r, Obj)]
+        for row_index, row in enumerate(presented):
             cells = "".join(
                 element(
                     "td",
@@ -2190,10 +2208,59 @@ class Renderer:
             # client takes over: a marked row here is a row that is about to
             # become clickable.
             row_class = "fuaran-grid-row" + grid_row_interactive_class(has_row_action)
-            body_rows += element("tr", [("class", row_class)], cells)
+            row_attrs = [("class", row_class)]
+            row_index_attr = window_row_index(window, row_index)
+            if row_index_attr is not None:
+                row_attrs.append(("aria-rowindex", str(row_index_attr)))
+            body_rows += element("tr", row_attrs, cells)
         thead = element("thead", [], element("tr", [], header_cells))
         tbody = element("tbody", [], body_rows)
-        return element("table", [("class", "fuaran-grid")], thead + tbody)
+        table_attrs = [("class", "fuaran-grid")]
+        row_count = window_row_count(window)
+        if row_count is not None:
+            table_attrs.append(("aria-rowcount", str(row_count)))
+        return element("table", table_attrs, thead + tbody)
+
+    def _windowed_grid(self, columns: list[dict[str, Value]], rows: Arr, fields: dict[str, Value]) -> str:
+        """Phase 1892 - a grid naming a ``windowStateKey``: sort, then page (only where
+        the grid holds its whole set), then window, all from the seeded State.
+
+        This host is the static floor: it performs the slice the State determines and
+        writes nothing back, so a paged grid's pager steps are inert. A host-paged grid
+        states its page count only when the document declares ``rowTotal``.
+        """
+        fields_of = [c.get("field") for c in columns]
+        ordered = sort_rows(
+            [f if isinstance(f, str) else None for f in fields_of],
+            effective_sort(fields.get("sortStateKey"), fields.get("defaultSort"), self.sources),
+            [r for r in rows.items if isinstance(r, Obj)],
+        )
+        page = grid_page(self.sources, fields, len(ordered))
+        host_windows = grid_host_windows(fields)
+        page_rows = (
+            slice_rows_to_page(page.size, page.page, ordered)
+            if page is not None and not page.host_pages and not host_windows
+            else ordered
+        )
+        window = grid_window(self.sources, fields, page_rows)
+        table = self._bound_grid(columns, rows, "onRowClick" in fields, window)
+        if page is None:
+            return table
+        status = f"Page {page.page} of {page.last_page}" if page.last_page is not None else f"Page {page.page}"
+
+        def step(label: str) -> str:
+            return text_element(
+                "button", [("class", "fuaran-grid-pager-step"), ("type", "button"), ("disabled", "")], label
+            )
+
+        pager = element(
+            "nav",
+            [("class", "fuaran-grid-pager"), ("aria-label", "Pagination")],
+            step("Previous")
+            + text_element("span", [("class", "fuaran-grid-pager-status"), ("aria-live", "polite")], status)
+            + step("Next"),
+        )
+        return element("div", [("class", "fuaran-grid-paged")], table + pager)
 
     def _data_grid(self, node: Node, fields: dict[str, Value]) -> str:
         # Phase 393 — a static read-only grid renders the semantic <table>
@@ -2223,6 +2290,8 @@ class Renderer:
         resolved = resolve_source(fields.get("source"), self.sources)
         columns = self._grid_columns(fields.get("columns"))
         if isinstance(resolved, Arr) and any(isinstance(c.get("field"), str) for c in columns):
+            if isinstance(fields.get("windowStateKey"), str):
+                return self._windowed_grid(columns, resolved, fields)
             return self._bound_grid(columns, resolved, "onRowClick" in fields)
         count = _seq_len(resolved)
         return self._make_vis_placeholder(

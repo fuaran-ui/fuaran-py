@@ -16,6 +16,7 @@ certified by reading nothing.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -246,3 +247,51 @@ def test_a_host_windowed_grid_slices_nothing_and_reports_the_declared_total() ->
     assert '<table class="fuaran-grid" aria-rowcount="5001">' in html
     assert 'aria-rowindex="102"' in html and 'aria-rowindex="106"' in html
     assert html.count("aria-rowindex=") == 5
+
+
+# ── Phase 1912: every bound grid sorts, pages and carries the pager ──────────
+#
+# Phase 1892 ran the sort / page / window pipeline only for a grid naming a
+# `windowStateKey`; a merely sorted or paged grid on this host presented its
+# authored rows in full. The reference bound grid sorts and pages every grid, so
+# these pin the same for a grid with no window key at all.
+
+
+def _row_ids(html: str) -> list[str]:
+    return re.findall(r"<td class=\"fuaran-grid-cell\"><span>(r\d\d)</span>", html)
+
+
+def test_a_sorted_unwindowed_grid_presents_its_rows_in_the_effective_order() -> None:
+    html = _render(_grid(defaultSort={"column": 1, "direction": "asc"}))
+    expected = [r["id"] for r in sorted(_ROWS, key=lambda r: r["score"])]
+    assert _row_ids(html) == expected
+    assert "aria-rowindex" not in html
+
+
+def test_the_sort_state_overrides_the_declared_default_on_an_unwindowed_grid() -> None:
+    html = _render(
+        _grid(sortStateKey="s", defaultSort={"column": 1, "direction": "asc"}),
+        {"s": Obj(None, {"column": 1, "direction": "desc"})},
+    )
+    expected = [r["id"] for r in sorted(_ROWS, key=lambda r: r["score"], reverse=True)]
+    assert _row_ids(html) == expected
+
+
+def test_a_client_paged_unwindowed_grid_presents_its_page_and_an_inert_pager() -> None:
+    html = _render(_grid(pageStateKey="p", pageSize=5), {"p": Obj(None, {"page": 2})})
+    assert _row_ids(html) == ["r05", "r06", "r07", "r08", "r09"]
+    assert '<div class="fuaran-grid-paged">' in html
+    assert "Page 2 of 3" in html
+    assert html.count('disabled=""') == 2
+
+
+def test_a_page_past_the_end_clamps_to_the_last_page() -> None:
+    html = _render(_grid(pageStateKey="p", pageSize=5), {"p": Obj(None, {"page": 40})})
+    assert _row_ids(html) == ["r10", "r11"]
+    assert "Page 3 of 3" in html
+
+
+def test_a_grid_that_neither_sorts_nor_pages_is_unchanged() -> None:
+    html = _render(_grid())
+    assert _row_ids(html) == [r["id"] for r in _ROWS]
+    assert "fuaran-grid-paged" not in html

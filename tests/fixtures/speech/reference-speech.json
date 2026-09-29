@@ -1,0 +1,4367 @@
+{
+  "generator": "Fuaran.UI.Renderer.Server 0.87.0 Speech.projectStatic",
+  "fixtures": {
+    "a11y-alert-assertive": {
+      "text": "Upload failed\nThe file exceeded the size limit.\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Upload failed</emphasis></s><break strength=\"strong\"/>\n<s>The file exceeded the size limit.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-alert-assertive",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "a11y-alert-assertive",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-button-named": {
+      "text": "Button: Refresh revenue figures\n",
+      "ssml": "<speak>\n<s>Button: Refresh revenue figures</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-button-named",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-image-decorative": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "a11y-image-decorative",
+          "kind": "Image",
+          "reason": "hidden",
+          "decidedAt": "a11y-image-decorative"
+        }
+      ]
+    },
+    "a11y-link-labelled": {
+      "text": "Link: Read more\n",
+      "ssml": "<speak>\n<s>Link: Read more</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-link-labelled",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-speak": {
+      "text": "Service status: all systems are operational as of the last check.\n",
+      "ssml": "<speak>\n<s>Service status: all systems are operational as of the last check.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-speak",
+          "source": "speak",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-wrapper-all-slots": {
+      "text": "Channel performance\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Channel performance</emphasis></s><break strength=\"strong\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-wrapper-heading",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "a11y-wrapper-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-wrapper-state-bound": {
+      "text": "Updated hourly.\n",
+      "ssml": "<speak>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-footer-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "a11y-wrapper-transform-label": {
+      "text": "Updated hourly.\n",
+      "ssml": "<speak>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "a11y-transform-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "action-confirm-cancel": {
+      "text": "Button: Discard changes\n",
+      "ssml": "<speak>\n<s>Button: Discard changes</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "action-confirm-cancel",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "action-confirm": {
+      "text": "Button: Delete\n",
+      "ssml": "<speak>\n<s>Button: Delete</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "action-confirm",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "action-focus": {
+      "text": "Button: Clear search\n",
+      "ssml": "<speak>\n<s>Button: Clear search</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "action-focus",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "action-navigate-bound": {
+      "text": "Button: Open the selected order\n",
+      "ssml": "<speak>\n<s>Button: Open the selected order</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "action-navigate-bound",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "action-navigate-target": {
+      "text": "Button: Read the documentation\n",
+      "ssml": "<speak>\n<s>Button: Read the documentation</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "action-navigate-target",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "badge-1": {
+      "text": "Beta\n",
+      "ssml": "<speak>\n<s>Beta</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "badge-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "badge-transform-live": {
+      "text": "2\n",
+      "ssml": "<speak>\n<s>2</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "badge-transform-live",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-chart-not-numeric": {
+      "text": "Chart: Spend by department\n",
+      "ssml": "<speak>\n<s>Chart: Spend by department</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "binding-check-chart-not-numeric",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-chart-temporal-not-date": {
+      "text": "Chart: Spend by department\n",
+      "ssml": "<speak>\n<s>Chart: Spend by department</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "binding-check-chart-temporal-not-date",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-chart-ungrounded": {
+      "text": "Chart: Spend by department\n",
+      "ssml": "<speak>\n<s>Chart: Spend by department</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "binding-check-chart-ungrounded",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-control": {
+      "text": "Chart: Spend by department\nTable\n",
+      "ssml": "<speak>\n<s>Chart: Spend by department</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "spend-chart",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "spend-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-grid-ungrounded": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "spend-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "binding-check-unchecked": {
+      "text": "Chart: Spend by department\nTable\n",
+      "ssml": "<speak>\n<s>Chart: Spend by department</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "spend-chart",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "spend-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "boundary-1": {
+      "text": "Child body\n",
+      "ssml": "<speak>\n<s>Child body</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "boundary-child",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "boundary-fallback",
+          "kind": "Callout",
+          "reason": "not-taken",
+          "decidedAt": "boundary-1"
+        }
+      ]
+    },
+    "box-break-before-1": {
+      "text": "Appendix A\n",
+      "ssml": "<speak>\n<s>Appendix A</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "box-break-before-body-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "box-keep-together-1": {
+      "text": "Totals\nNet 1,200.00\nVAT 240.00\nGross 1,440.00\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Totals</emphasis></s><break strength=\"strong\"/>\n<s>Net 1,200.00</s><break strength=\"medium\"/>\n<s>VAT 240.00</s><break strength=\"medium\"/>\n<s>Gross 1,440.00</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "box-keep-together-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "box-keep-together-net-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "box-keep-together-vat-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "box-keep-together-gross-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-1": {
+      "text": "Button: Refresh\n",
+      "ssml": "<speak>\n<s>Button: Refresh</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-copy-bound": {
+      "text": "Button: Copy the current share link\n",
+      "ssml": "<speak>\n<s>Button: Copy the current share link</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-copy-bound",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-copy-link": {
+      "text": "Button: Copy share link\n",
+      "ssml": "<speak>\n<s>Button: Copy share link</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-copy-link",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-invoke": {
+      "text": "Button: Run model\n",
+      "ssml": "<speak>\n<s>Button: Run model</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-invoke",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-json-payloads": {
+      "text": "Button: Fire the JSON-payload actions\n",
+      "ssml": "<speak>\n<s>Button: Fire the JSON-payload actions</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-json-payloads",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "btn-read-workbook": {
+      "text": "Button: Load workbook\n",
+      "ssml": "<speak>\n<s>Button: Load workbook</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-read-workbook",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "button-print": {
+      "text": "Button: Print this invoice\n",
+      "ssml": "<speak>\n<s>Button: Print this invoice</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "button-print",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "button-setstate-valuefrom": {
+      "text": "Button: Track this order\n",
+      "ssml": "<speak>\n<s>Button: Track this order</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "button-setstate-valuefrom",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "call-into": {
+      "text": "Button: Refresh (closure)\nButton: Fetch total\nTotal: 0\nButton: Fetch orders\nOrders: no value\n",
+      "ssml": "<speak>\n<s>Button: Refresh (closure)</s><break strength=\"medium\"/>\n<s>Button: Fetch total</s><break strength=\"medium\"/>\n<s>Total: 0</s><break strength=\"medium\"/>\n<s>Button: Fetch orders</s><break strength=\"medium\"/>\n<s>Orders: no value</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "btn-call-closure",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "btn-fetch-total",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "total-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "btn-fetch-orders",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "orders-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "callout-1": {
+      "text": "Heads up\nLive data is delayed.\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Heads up</emphasis></s><break strength=\"strong\"/>\n<s>Live data is delayed.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "callout-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "callout-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "card-1": {
+      "text": "Insights\nRevenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Insights</emphasis></s><break strength=\"strong\"/>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "card-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-1": {
+      "text": "Chart: Channel mix\n",
+      "ssml": "<speak>\n<s>Chart: Channel mix</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-annotation-bands": {
+      "text": "Chart: p95 latency\nChart: Revenue by quarter\nChart: Sessions by day\n",
+      "ssml": "<speak>\n<s>Chart: p95 latency</s><break strength=\"medium\"/>\n<s>Chart: Revenue by quarter</s><break strength=\"medium\"/>\n<s>Chart: Sessions by day</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "bands-value",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "bands-category",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "bands-temporal",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-annotation-events": {
+      "text": "Chart: Revenue by quarter\nChart: Sessions by day\n",
+      "ssml": "<speak>\n<s>Chart: Revenue by quarter</s><break strength=\"medium\"/>\n<s>Chart: Sessions by day</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "events-band",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "events-temporal",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-annotations": {
+      "text": "Chart: Revenue by quarter\n",
+      "ssml": "<speak>\n<s>Chart: Revenue by quarter</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-annotations",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-axis-titles": {
+      "text": "Chart: Revenue by quarter\n",
+      "ssml": "<speak>\n<s>Chart: Revenue by quarter</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-axis-titles",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-data-labels": {
+      "text": "Chart: Revenue by quarter\n",
+      "ssml": "<speak>\n<s>Chart: Revenue by quarter</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-data-labels",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-legend-position": {
+      "text": "Chart: Sales vs target\n",
+      "ssml": "<speak>\n<s>Chart: Sales vs target</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-legend-position",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-state-rows": {
+      "text": "Chart\n",
+      "ssml": "<speak>\n<s>Chart</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-state-rows",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-temporal-x": {
+      "text": "Chart: Sessions by week\n",
+      "ssml": "<speak>\n<s>Chart: Sessions by week</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-temporal-x",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "chart-value-format": {
+      "text": "Chart: Revenue\n",
+      "ssml": "<speak>\n<s>Chart: Revenue</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "chart-value-format",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "code-1": {
+      "text": "Code block (fsharp), 2 lines\n",
+      "ssml": "<speak>\n<s>Code block (fsharp), 2 lines</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "code-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "composite-root": {
+      "text": "Composite\nRevenue: GBP 1234.50, trend 7.0%\nvs last month\nTotal: 42.00\nRevenue: GBP 1234.50, trend 7.0%\nvs last month\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Composite</emphasis></s><break strength=\"strong\"/>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Total: 42.00</s><break strength=\"medium\"/>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "composite-card",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "metric-2",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-2",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "lvr-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "composite-tabs-panels": {
+      "text": "Tabbed section, 2 tabs\n",
+      "ssml": "<speak>\n<s>Tabbed section, 2 tabs</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "composite-tabs-panels",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "overview-panel",
+          "kind": "Box",
+          "reason": "inside-announced",
+          "decidedAt": "composite-tabs-panels"
+        },
+        {
+          "nodeId": "spark-1",
+          "kind": "Sparkline",
+          "reason": "inside-announced",
+          "decidedAt": "composite-tabs-panels"
+        },
+        {
+          "nodeId": "badge-1",
+          "kind": "Badge",
+          "reason": "inside-announced",
+          "decidedAt": "composite-tabs-panels"
+        },
+        {
+          "nodeId": "settings-panel",
+          "kind": "Box",
+          "reason": "inside-announced",
+          "decidedAt": "composite-tabs-panels"
+        },
+        {
+          "nodeId": "preferences-form",
+          "kind": "Form",
+          "reason": "inside-announced",
+          "decidedAt": "composite-tabs-panels"
+        }
+      ]
+    },
+    "controls-closure": {
+      "text": "Tabbed section, 2 tabs\nAdvanced\nUpdated hourly.\nSelection: Tags\n",
+      "ssml": "<speak>\n<s>Tabbed section, 2 tabs</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Advanced</emphasis></s><break strength=\"strong\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n<s>Selection: Tags</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "closure-tabs",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "closure-disclosure",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "markdown-2",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "closure-multiselect",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "closure-tabs"
+        },
+        {
+          "nodeId": "spark-1",
+          "kind": "Sparkline",
+          "reason": "inside-announced",
+          "decidedAt": "closure-tabs"
+        }
+      ]
+    },
+    "controls-declarative": {
+      "text": "Tabbed section, 1 tab\nDialog: Confirm\nAdvanced\nUpdated hourly.\nSelection: Region\n",
+      "ssml": "<speak>\n<s>Tabbed section, 1 tab</s><break strength=\"medium\"/>\n<s>Dialog: Confirm</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Advanced</emphasis></s><break strength=\"strong\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n<s>Selection: Region</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "decl-tabs",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "decl-modal",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "decl-disclosure",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "markdown-3",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "decl-select",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "decl-tabs"
+        },
+        {
+          "nodeId": "markdown-2",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "decl-modal"
+        }
+      ]
+    },
+    "custom-1": {
+      "text": "Component: trend-card\n",
+      "ssml": "<speak>\n<s>Component: trend-card</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "custom-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "custom-bounded-1": {
+      "text": "Component: QualityRing\n",
+      "ssml": "<speak>\n<s>Component: QualityRing</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "custom-bounded-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "custom-bounded-advisory": {
+      "text": "Component: TrendCard\n",
+      "ssml": "<speak>\n<s>Component: TrendCard</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "custom-bounded-advisory",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "custom-nonascii-keys": {
+      "text": "Component: trend-card\n",
+      "ssml": "<speak>\n<s>Component: trend-card</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "custom-nonascii-keys",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "dash-empty": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "dash-empty",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "dash-empty"
+        }
+      ]
+    },
+    "discl-1": {
+      "text": "Additional entitlements\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Additional entitlements</emphasis></s><break strength=\"strong\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "discl-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "drawing-1": {
+      "text": "Diagram: Quarterly revenue chart\nA bar and line chart of revenue by quarter.\n",
+      "ssml": "<speak>\n<s>Diagram: Quarterly revenue chart</s><break strength=\"medium\"/>\n<s>A bar and line chart of revenue by quarter.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "drawing-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "drawing-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "drawing-empty": {
+      "text": "Diagram\n",
+      "ssml": "<speak>\n<s>Diagram</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "drawing-empty",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "drawing-nonfinite-sentinels": {
+      "text": "Diagram: Non-finite sentinels at typed float slots\n",
+      "ssml": "<speak>\n<s>Diagram: Non-finite sentinels at typed float slots</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "drawing-nonfinite-sentinels",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "drawing-rotated-labels": {
+      "text": "Diagram: Rotated axis labels\n",
+      "ssml": "<speak>\n<s>Diagram: Rotated axis labels</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "drawing-rotated-labels",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "drawing-tipped-shapes": {
+      "text": "Diagram: Tipped marks\n",
+      "ssml": "<speak>\n<s>Diagram: Tipped marks</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "drawing-tipped-shapes",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "embed-1": {
+      "text": "Embedded view: Harbour restoration, part two\n",
+      "ssml": "<speak>\n<s>Embedded view: Harbour restoration, part two</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "embed-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "embed-aspect-1": {
+      "text": "Embedded view: Harbour restoration, part two\n",
+      "ssml": "<speak>\n<s>Embedded view: Harbour restoration, part two</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "embed-aspect-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "embed-permissions-1": {
+      "text": "Embedded view: Harbour restoration, part two\n",
+      "ssml": "<speak>\n<s>Embedded view: Harbour restoration, part two</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "embed-permissions-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "empty-state-card": {
+      "text": "No saved searches yet\nSearches you save will appear here so you can re-run them with one click.\nButton: Browse jobs\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">No saved searches yet</emphasis></s><break strength=\"strong\"/>\n<s>Searches you save will appear here so you can re-run them with one click.</s><break strength=\"medium\"/>\n<s>Button: Browse jobs</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "empty-state-card",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "empty-state-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "empty-state-cta",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "envelope-fallback": {
+      "text": "Chart: Revenue by month\n",
+      "ssml": "<speak>\n<s>Chart: Revenue by month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "envelope-fallback",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "expr-params-state-selection": {
+      "text": "Order total: unavailable\n",
+      "ssml": "<speak>\n<s>Order total: unavailable</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "order-total",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "badge-preview",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "badge-preview"
+        },
+        {
+          "nodeId": "asof-day",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "asof-day"
+        },
+        {
+          "nodeId": "membership",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "membership"
+        }
+      ]
+    },
+    "expr-scalar": {
+      "text": "Ada Lovelace\nLine total: 50\nready\nempty\n",
+      "ssml": "<speak>\n<s>Ada Lovelace</s><break strength=\"medium\"/>\n<s>Line total: 50</s><break strength=\"medium\"/>\n<s>ready</s><break strength=\"medium\"/>\n<s>empty</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "expr-concat",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "expr-arithmetic",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "expr-boolean",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "expr-null-test",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "fact-1": {
+      "text": "Patient: Alice Smith\nPrimary insured\n",
+      "ssml": "<speak>\n<s>Patient: Alice Smith</s><break strength=\"medium\"/>\n<s>Primary insured</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "fact-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fact-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filterable-static-dashboard": {
+      "text": "Filters, 2 fields\nChart: Retention\nTable\n",
+      "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n<s>Chart: Retention</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "content-filters",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "retention-chart",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "episode-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-1": {
+      "text": "Filters, 2 fields\n",
+      "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-date-range": {
+      "text": "Filters, 1 field\n",
+      "ssml": "<speak>\n<s>Filters, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-date-range",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-declarative": {
+      "text": "Filters, 3 fields\n",
+      "ssml": "<speak>\n<s>Filters, 3 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-declarative",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-dependson-declared": {
+      "text": "Filters, 2 fields\nRevenue: no value\nvs last month\n",
+      "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "edge-chips",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-dependson-undeclared": {
+      "text": "Filters, 1 field\nRevenue: no value\nvs last month\n",
+      "ssml": "<speak>\n<s>Filters, 1 field</s><break strength=\"medium\"/>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "edge-chips",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-param-source-declared": {
+      "text": "Filters, 2 fields\nTable\n",
+      "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "edge-chips",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-param-source-undeclared": {
+      "text": "Filters, 1 field\nTable\n",
+      "ssml": "<speak>\n<s>Filters, 1 field</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "edge-chips",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "scoped-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-rating-colour": {
+      "text": "Filters, 2 fields\n",
+      "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-rating-colour",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-segmented": {
+      "text": "Filters, 1 field\n",
+      "ssml": "<speak>\n<s>Filters, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-segmented",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "filters-tokens": {
+      "text": "Filters, 1 field\n",
+      "ssml": "<speak>\n<s>Filters, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "filters-tokens",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-1": {
+      "text": "Form, 5 fields\n",
+      "ssml": "<speak>\n<s>Form, 5 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-color": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-color",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-combobox-freetext": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-combobox-freetext",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-combobox-query": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-combobox-query",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-combobox-static": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-combobox-static",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-date-range": {
+      "text": "Form, 3 fields\n",
+      "ssml": "<speak>\n<s>Form, 3 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-date-range",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-date": {
+      "text": "Form, 3 fields\n",
+      "ssml": "<speak>\n<s>Form, 3 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-date",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-declarative-minimal": {
+      "text": "Form, 4 fields\n",
+      "ssml": "<speak>\n<s>Form, 4 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-declarative-minimal",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-declarative": {
+      "text": "Form, 4 fields\n",
+      "ssml": "<speak>\n<s>Form, 4 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-declarative",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-field-rules": {
+      "text": "Form, 5 fields\n",
+      "ssml": "<speak>\n<s>Form, 5 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-field-rules",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-local-1": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-local-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-local-debounce": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-local-debounce",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-local-declared": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-local-declared",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-ranged": {
+      "text": "Form, 3 fields\n",
+      "ssml": "<speak>\n<s>Form, 3 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-ranged",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-rating-halves": {
+      "text": "Form, 2 fields\n",
+      "ssml": "<speak>\n<s>Form, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-rating-halves",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-rating": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-rating",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-rule-tokens": {
+      "text": "Form, 7 fields\n",
+      "ssml": "<speak>\n<s>Form, 7 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-rule-tokens",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-segmented": {
+      "text": "Form, 2 fields\n",
+      "ssml": "<speak>\n<s>Form, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-segmented",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-toggle": {
+      "text": "Form, 2 fields\n",
+      "ssml": "<speak>\n<s>Form, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-toggle",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-tokens-freetext": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-tokens-freetext",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-tokens-query": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-tokens-query",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "form-tokens-suggested": {
+      "text": "Form, 1 field\n",
+      "ssml": "<speak>\n<s>Form, 1 field</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-tokens-suggested",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "format-bindings": {
+      "text": "1,234.50\n£1,234.50\n42.00 %\nmardi 14 novembre 2023\n3 days ago\n",
+      "ssml": "<speak>\n<s>1,234.50</s><break strength=\"medium\"/>\n<s>£1,234.50</s><break strength=\"medium\"/>\n<s>42.00 %</s><break strength=\"medium\"/>\n<s>mardi 14 novembre 2023</s><break strength=\"medium\"/>\n<s>3 days ago</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "fmt-number",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-currency",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-percent",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-date",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-relative",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "format-date-time": {
+      "text": "14 November 2023 22:13\n22:13\nDienstag, 14. November 2023 22:13:20\n",
+      "ssml": "<speak>\n<s>14 November 2023 22:13</s><break strength=\"medium\"/>\n<s>22:13</s><break strength=\"medium\"/>\n<s>Dienstag, 14. November 2023 22:13:20</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "fmt-date-time",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-time-only",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "fmt-time-full",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "format-since": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "since-auto",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "since-auto"
+        },
+        {
+          "nodeId": "since-declared-hour",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "since-declared-hour"
+        },
+        {
+          "nodeId": "format-since",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "format-since"
+        }
+      ]
+    },
+    "frag-decl-1": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-decl-1",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-decl-1"
+        },
+        {
+          "nodeId": "frag-body",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-decl-1"
+        }
+      ]
+    },
+    "frag-decl-param": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-decl-param",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-decl-param"
+        },
+        {
+          "nodeId": "param-body",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-decl-param"
+        }
+      ]
+    },
+    "frag-ref-1": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-ref-1",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-ref-1"
+        }
+      ]
+    },
+    "frag-ref-args": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-ref-args",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-ref-args"
+        }
+      ]
+    },
+    "frag-stdlib-confirm-action-pair-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-confirm-action-pair-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-confirm-action-pair-ref"
+        }
+      ]
+    },
+    "frag-stdlib-confirm-action-pair": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-confirm-action-pair",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-confirm-action-pair"
+        },
+        {
+          "nodeId": "confirm-action-pair",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-confirm-action-pair"
+        },
+        {
+          "nodeId": "confirm-action-pair-confirm",
+          "kind": "Button",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-confirm-action-pair"
+        },
+        {
+          "nodeId": "confirm-action-pair-cancel",
+          "kind": "Button",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-confirm-action-pair"
+        }
+      ]
+    },
+    "frag-stdlib-empty-state-panel-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-empty-state-panel-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-empty-state-panel-ref"
+        }
+      ]
+    },
+    "frag-stdlib-empty-state-panel": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-empty-state-panel",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-empty-state-panel"
+        },
+        {
+          "nodeId": "empty-state-panel",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-empty-state-panel"
+        },
+        {
+          "nodeId": "empty-state-panel-title",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-empty-state-panel"
+        },
+        {
+          "nodeId": "empty-state-panel-body",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-empty-state-panel"
+        },
+        {
+          "nodeId": "empty-state-panel-action",
+          "kind": "FragmentRef",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-empty-state-panel"
+        }
+      ]
+    },
+    "frag-stdlib-filter-bar-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-filter-bar-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-filter-bar-ref"
+        }
+      ]
+    },
+    "frag-stdlib-filter-bar": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-filter-bar",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-filter-bar"
+        },
+        {
+          "nodeId": "filter-bar",
+          "kind": "Filters",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-filter-bar"
+        }
+      ]
+    },
+    "frag-stdlib-kpi-strip-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-kpi-strip-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-kpi-strip-ref"
+        }
+      ]
+    },
+    "frag-stdlib-kpi-strip": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-kpi-strip",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-kpi-strip"
+        },
+        {
+          "nodeId": "kpi-strip",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-kpi-strip"
+        },
+        {
+          "nodeId": "kpi-strip-heading",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-kpi-strip"
+        },
+        {
+          "nodeId": "kpi-strip-metric-1",
+          "kind": "Metric",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-kpi-strip"
+        }
+      ]
+    },
+    "frag-stdlib-labelled-metric-row-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-labelled-metric-row-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-labelled-metric-row-ref"
+        }
+      ]
+    },
+    "frag-stdlib-labelled-metric-row": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-labelled-metric-row",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-labelled-metric-row"
+        },
+        {
+          "nodeId": "labelled-metric-row-row",
+          "kind": "LabelValueRow",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-labelled-metric-row"
+        }
+      ]
+    },
+    "frag-stdlib-loading-placeholder-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-loading-placeholder-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-loading-placeholder-ref"
+        }
+      ]
+    },
+    "frag-stdlib-loading-placeholder": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-loading-placeholder",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-loading-placeholder"
+        },
+        {
+          "nodeId": "loading-placeholder",
+          "kind": "Skeleton",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-loading-placeholder"
+        }
+      ]
+    },
+    "frag-stdlib-metric-card-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-metric-card-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-metric-card-ref"
+        }
+      ]
+    },
+    "frag-stdlib-metric-card": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-metric-card",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-metric-card"
+        },
+        {
+          "nodeId": "metric-card",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-metric-card"
+        },
+        {
+          "nodeId": "metric-card-value",
+          "kind": "Metric",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-metric-card"
+        },
+        {
+          "nodeId": "metric-card-caption",
+          "kind": "Markdown",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-metric-card"
+        }
+      ]
+    },
+    "frag-stdlib-section-header-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-section-header-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-section-header-ref"
+        }
+      ]
+    },
+    "frag-stdlib-section-header": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-section-header",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-section-header"
+        },
+        {
+          "nodeId": "section-header",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-section-header"
+        },
+        {
+          "nodeId": "section-header-eyebrow",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-section-header"
+        },
+        {
+          "nodeId": "section-header-title",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-section-header"
+        }
+      ]
+    },
+    "glayout-1": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "glayout-tpl-autofit": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "glayout-tpl-fixed": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "glayout-tpl-ratio": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-1": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-bound-sort": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-bound-sort",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-declared-edit": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-declared-edit",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-editable-state": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-editable-state",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-exportable-1": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-exportable-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-field-named": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-field-named",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-keep-rows-together-1": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-keep-rows-together-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-paged-sorted": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-paged-sorted",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-paged": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-paged",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-reorderable": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-reorderable",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-repeat-header-1": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-repeat-header-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-sort-ascending": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-sort-ascending",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-sort-state-key": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-sort-state-key",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-toned-pill": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-toned-pill",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-transform-param": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-transform-param",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-transform-undeclared-param": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-transform-undeclared-param",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-transform": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-transform",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-windowed-sorted": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-windowed-sorted",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-windowed": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-windowed",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "heading-1": {
+      "text": "Channel performance\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Channel performance</emphasis></s><break strength=\"strong\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "heading-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        }
+      ],
+      "omissions": []
+    },
+    "icon-1": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "icon-1",
+          "kind": "Icon",
+          "reason": "nothing-sayable",
+          "decidedAt": "icon-1"
+        }
+      ]
+    },
+    "image-1": {
+      "text": "Image: User avatar\n",
+      "ssml": "<speak>\n<s>Image: User avatar</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-caption-1": {
+      "text": "Image: Fishing boats moored at first light\n",
+      "ssml": "<speak>\n<s>Image: Fishing boats moored at first light</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-caption-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-caption-i18n-1": {
+      "text": "Image: Fishing boats moored at first light\n",
+      "ssml": "<speak>\n<s>Image: Fishing boats moored at first light</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-caption-i18n-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-expandable-1": {
+      "text": "Image: Fishing boats moored at first light\n",
+      "ssml": "<speak>\n<s>Image: Fishing boats moored at first light</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-expandable-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-expandable-figure-1": {
+      "text": "Image: Fishing boats moored at first light\n",
+      "ssml": "<speak>\n<s>Image: Fishing boats moored at first light</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-expandable-figure-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-presentation-1": {
+      "text": "Image: The harbour at dawn\n",
+      "ssml": "<speak>\n<s>Image: The harbour at dawn</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-presentation-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "image-srcset-1": {
+      "text": "Image: Fishing boats moored at first light\n",
+      "ssml": "<speak>\n<s>Image: Fishing boats moored at first light</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "image-srcset-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "limit-expr-nodes-pipeline-at-max": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "limit-expr-nodes-pipeline-at-max",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "limit-node-depth-at-max": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "leaf",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "leaf"
+        },
+        {
+          "nodeId": "n22",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n22"
+        },
+        {
+          "nodeId": "n21",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n21"
+        },
+        {
+          "nodeId": "n20",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n20"
+        },
+        {
+          "nodeId": "n19",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n19"
+        },
+        {
+          "nodeId": "n18",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n18"
+        },
+        {
+          "nodeId": "n17",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n17"
+        },
+        {
+          "nodeId": "n16",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n16"
+        },
+        {
+          "nodeId": "n15",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n15"
+        },
+        {
+          "nodeId": "n14",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n14"
+        },
+        {
+          "nodeId": "n13",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n13"
+        },
+        {
+          "nodeId": "n12",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n12"
+        },
+        {
+          "nodeId": "n11",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n11"
+        },
+        {
+          "nodeId": "n10",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n10"
+        },
+        {
+          "nodeId": "n9",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n9"
+        },
+        {
+          "nodeId": "n8",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n8"
+        },
+        {
+          "nodeId": "n7",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n7"
+        },
+        {
+          "nodeId": "n6",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n6"
+        },
+        {
+          "nodeId": "n5",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n5"
+        },
+        {
+          "nodeId": "n4",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n4"
+        },
+        {
+          "nodeId": "n3",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n3"
+        },
+        {
+          "nodeId": "n2",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n2"
+        },
+        {
+          "nodeId": "n1",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n1"
+        },
+        {
+          "nodeId": "n0",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "n0"
+        }
+      ]
+    },
+    "limit-skeleton-rows-at-max": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "s",
+          "kind": "Skeleton",
+          "reason": "nothing-sayable",
+          "decidedAt": "s"
+        }
+      ]
+    },
+    "limit-tree-item-depth-at-max": {
+      "text": "Hierarchy\n",
+      "ssml": "<speak>\n<s>Hierarchy</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "t",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "link-1": {
+      "text": "Link: About us\n",
+      "ssml": "<speak>\n<s>Link: About us</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "link-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "link-protected-1": {
+      "text": "Link: Email us\n",
+      "ssml": "<speak>\n<s>Link: Email us</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "link-protected-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "list-1": {
+      "text": "1. First\n2. Second\n",
+      "ssml": "<speak>\n<s>1. First</s><break strength=\"medium\"/>\n<s>2. Second</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "list-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "list-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "lvr-1": {
+      "text": "Total: 42.00\n",
+      "ssml": "<speak>\n<s>Total: 42.00</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "lvr-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "map-1": {
+      "text": "Map\n",
+      "ssml": "<speak>\n<s>Map</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "map-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-1": {
+      "text": "Updated hourly.\n",
+      "ssml": "<speak>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "masonry-1": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "masonry-gap": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "master-detail-multi-field": {
+      "text": "Table\nTicket detail\nSelected ticket: TCK-2041\nPriority: TCK-2041\nAssignee: TCK-2041\nAssigned to\nR. Okafor\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Ticket detail</emphasis></s><break strength=\"strong\"/>\n<s>Selected ticket: TCK-2041</s><break strength=\"medium\"/>\n<s>Priority: TCK-2041</s><break strength=\"medium\"/>\n<s>Assignee: TCK-2041</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Assigned to</emphasis></s><break strength=\"strong\"/>\n<s>R. Okafor</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "ticket-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "ticket-detail",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-ticket",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-priority",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-assignee",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-note",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "master-detail-preselected-second-row": {
+      "text": "Table\nTicket detail\nSelected ticket: TCK-2042\nTable\nTicket note\nSearch index stale\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Ticket detail</emphasis></s><break strength=\"strong\"/>\n<s>Selected ticket: TCK-2042</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Ticket note</emphasis></s><break strength=\"strong\"/>\n<s>Search index stale</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "ticket-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "ticket-detail",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-ticket",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "related-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-note",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "master-detail-preselected": {
+      "text": "Table\nTicket detail\nSelected ticket: TCK-2041\nTable\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Ticket detail</emphasis></s><break strength=\"strong\"/>\n<s>Selected ticket: TCK-2041</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "ticket-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "ticket-detail",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-ticket",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "related-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "math-1": {
+      "text": "Formula\n",
+      "ssml": "<speak>\n<s>Formula</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "math-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-audio-1": {
+      "text": "Audio: Curator's commentary\n",
+      "ssml": "<speak>\n<s>Audio: Curator&apos;s commentary</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-audio-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-audio-transcript-1": {
+      "text": "Audio: Curator's commentary\n",
+      "ssml": "<speak>\n<s>Audio: Curator&apos;s commentary</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-audio-transcript-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-video-1": {
+      "text": "Video: Studio walkthrough\n",
+      "ssml": "<speak>\n<s>Video: Studio walkthrough</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-video-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-video-autoplay-1": {
+      "text": "Video: Ambient loop\n",
+      "ssml": "<speak>\n<s>Video: Ambient loop</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-video-autoplay-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-video-captions-1": {
+      "text": "Video: Studio walkthrough\n",
+      "ssml": "<speak>\n<s>Video: Studio walkthrough</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-video-captions-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-video-poster-1": {
+      "text": "Video: Studio walkthrough\n",
+      "ssml": "<speak>\n<s>Video: Studio walkthrough</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-video-poster-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "media-video-tracks-2": {
+      "text": "Video: Harbour restoration, part two\n",
+      "ssml": "<speak>\n<s>Video: Harbour restoration, part two</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "media-video-tracks-2",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-1": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-duration-1": {
+      "text": "Avg wait: 1h 20m, trend 3 minutes ago\n",
+      "ssml": "<speak>\n<s>Avg wait: 1h 20m, trend 3 minutes ago</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-duration-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-float-17sig": {
+      "text": "Revenue: GBP 0.30\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 0.30</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-float-17sig",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-float-17sig",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-float-1e17": {
+      "text": "Revenue: GBP 100000000000000000.00\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 100000000000000000.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-float-1e17",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-float-1e17",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-float-bigint": {
+      "text": "Revenue: GBP 123456789012345680.00\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 123456789012345680.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-float-bigint",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-float-bigint",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-float-exp-neg": {
+      "text": "Revenue: GBP 0.00\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 0.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-float-exp-neg",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-float-exp-neg",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-float-exp-pos": {
+      "text": "Revenue: GBP 1000000000000000000000.00\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1000000000000000000000.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-float-exp-pos",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-float-exp-pos",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-inverted-polarity": {
+      "text": "Avg wait: 1h 20m, trend -7.34%\nstill above target\n",
+      "ssml": "<speak>\n<s>Avg wait: 1h 20m, trend -7.34%</s><break strength=\"medium\"/>\n<s>still above target</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-inverted-polarity",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-inverted-polarity",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-invoke": {
+      "text": "Revenue: no value\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-invoke",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-invoke",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-nonfinite-sentinel": {
+      "text": "Revenue: GBP Infinity, trend NaN%\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP Infinity, trend NaN%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-nonfinite-sentinel",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-nonfinite-sentinel",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "modal-1": {
+      "text": "Dialog: Confirm\n",
+      "ssml": "<speak>\n<s>Dialog: Confirm</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "modal-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "modal-1"
+        }
+      ]
+    },
+    "mount-1": {
+      "text": "Embedded view\n",
+      "ssml": "<speak>\n<s>Embedded view</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "mount-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "mount-2": {
+      "text": "Embedded view\n",
+      "ssml": "<speak>\n<s>Embedded view</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "mount-2",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "multiselect-1": {
+      "text": "Selection: Tags\n",
+      "ssml": "<speak>\n<s>Selection: Tags</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "multiselect-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "multiselect-chip-list-param": {
+      "text": "Selection: Departments\nTable\n",
+      "ssml": "<speak>\n<s>Selection: Departments</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "dept-chip",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "dept-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "node-visible": {
+      "text": "Shown while the flag is set\nShown once the basket has more than three things in it\nShown until the reader dismisses it\nRendered, because nothing could say whether to hide it\n",
+      "ssml": "<speak>\n<s>Shown while the flag is set</s><break strength=\"medium\"/>\n<s>Shown once the basket has more than three things in it</s><break strength=\"medium\"/>\n<s>Shown until the reader dismisses it</s><break strength=\"medium\"/>\n<s>Rendered, because nothing could say whether to hide it</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "visible-state-flag",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "visible-computed",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "visible-until-dismissed",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "visible-unresolved",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "aria-hidden-decoration",
+          "kind": "Markdown",
+          "reason": "hidden",
+          "decidedAt": "aria-hidden-decoration"
+        }
+      ]
+    },
+    "now-environment-binding": {
+      "text": "Today:\nTable\n",
+      "ssml": "<speak>\n<s>Today:</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "today-fact",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "overdue-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "now-grain": {
+      "text": "As of (minute):\nAs of (hour):\nToday:\nTable\n",
+      "ssml": "<speak>\n<s>As of (minute):</s><break strength=\"medium\"/>\n<s>As of (hour):</s><break strength=\"medium\"/>\n<s>Today:</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "asof-minute",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "asof-hour",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "asof-day",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "overdue-grid-day-grain",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "popover-anchored-1": {
+      "text": "Dialog: Choose a colour\n",
+      "ssml": "<speak>\n<s>Dialog: Choose a colour</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "popover-anchored-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "popover-anchored-1"
+        }
+      ]
+    },
+    "popover-open-1": {
+      "text": "Dialog\n",
+      "ssml": "<speak>\n<s>Dialog</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "popover-open-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "popover-open-1"
+        }
+      ]
+    },
+    "progress-1": {
+      "text": "Loading...: 42 percent\n",
+      "ssml": "<speak>\n<s>Loading...: 42 percent</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "progress-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "query-dependson": {
+      "text": "Revenue: no value\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "query-dependson",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "query-dependson",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "scalar-transform-composition": {
+      "text": "Table\n2\nSLA breach imminent\nTCK-2041 breaches SLA in 2 hours\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>2</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">SLA breach imminent</emphasis></s><break strength=\"strong\"/>\n<s>TCK-2041 breaches SLA in 2 hours</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "scalar-ticket-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "critical-count-badge",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "sla-warning",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "sla-warning",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "scroll-1": {
+      "text": "Updated hourly.\n",
+      "ssml": "<speak>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "select-1": {
+      "text": "Selection: Region\n",
+      "ssml": "<speak>\n<s>Selection: Region</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "shared-source-seeded-pair": {
+      "text": "Table\n2\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>2</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "member-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "member-count",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "skel-1": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "skel-1",
+          "kind": "Skeleton",
+          "reason": "nothing-sayable",
+          "decidedAt": "skel-1"
+        }
+      ]
+    },
+    "spark-1": {
+      "text": "Trend line\n",
+      "ssml": "<speak>\n<s>Trend line</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "spark-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "spark-nonfinite-sentinel": {
+      "text": "Trend line\n",
+      "ssml": "<speak>\n<s>Trend line</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "spark-nonfinite-sentinel",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "split-1": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "stack-1": {
+      "text": "Revenue: GBP 1234.50, trend 7.0%\nvs last month\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1234.50, trend 7.0%</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "markdown-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "state-absent-default": {
+      "text": "Revenue: no value\nTabbed section, 1 tab\nTrend line\nSelection: Region\nTable\n",
+      "ssml": "<speak>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>Tabbed section, 1 tab</s><break strength=\"medium\"/>\n<s>Trend line</s><break strength=\"medium\"/>\n<s>Selection: Region</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "absent-default-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "absent-default-tabs",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "absent-default-sparkline",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "absent-default-select",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "absent-default-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "absent-default-tab-body",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "absent-default-tabs"
+        }
+      ]
+    },
+    "step-1": {
+      "text": "Step-by-step section, 2 steps\n",
+      "ssml": "<speak>\n<s>Step-by-step section, 2 steps</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "step-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "step-1"
+        },
+        {
+          "nodeId": "markdown-2",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "step-1"
+        }
+      ]
+    },
+    "style-direction-isolated-1": {
+      "text": "מספר האסמכתא שלך הוא\nRR123456789IL\n",
+      "ssml": "<speak>\n<s>מספר האסמכתא שלך הוא</s><break strength=\"medium\"/>\n<s>RR123456789IL</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "style-direction-prose-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "style-direction-reference-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "style-direction-ltr-1": {
+      "text": "RR123456789IL\n",
+      "ssml": "<speak>\n<s>RR123456789IL</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "style-direction-ltr-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "style-role-voice-1": {
+      "text": "Q3 revenue\n",
+      "ssml": "<speak>\n<s>Q3 revenue</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "style-role-voice-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "summary-1": {
+      "text": "Stats\nTotal: 42.00\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Stats</emphasis></s><break strength=\"strong\"/>\n<s>Total: 42.00</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "summary-1",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "lvr-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "switch-1": {
+      "text": "Pick a view\nNo view selected\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Pick a view</emphasis></s><break strength=\"strong\"/>\n<s>No view selected</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "switch-default",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "switch-default",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "switch-details",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-1"
+        },
+        {
+          "nodeId": "switch-summary",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-1"
+        }
+      ]
+    },
+    "switch-carousel-1": {
+      "text": "Built for the long term\n",
+      "ssml": "<speak>\n<s>Built for the long term</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "switch-carousel-default",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "switch-carousel-panel-one",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-carousel-1"
+        },
+        {
+          "nodeId": "switch-carousel-panel-two",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-carousel-1"
+        },
+        {
+          "nodeId": "switch-carousel-panel-three",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-carousel-1"
+        }
+      ]
+    },
+    "switch-on-selection": {
+      "text": "Table\nOccupancy within normal range.\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>Occupancy within normal range.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "ward-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "ward-steady",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "ward-critical",
+          "kind": "Callout",
+          "reason": "not-taken",
+          "decidedAt": "ward-status-panel"
+        }
+      ]
+    },
+    "switch-on-transform-scalar": {
+      "text": "Plenty of rows\n",
+      "ssml": "<speak>\n<s>Plenty of rows</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "switch-scalar-busy",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "switch-scalar-quiet",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-on-transform-scalar"
+        },
+        {
+          "nodeId": "switch-scalar-default",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-on-transform-scalar"
+        }
+      ]
+    },
+    "switch-predicate-only": {
+      "text": "Fill in the form to continue\n",
+      "ssml": "<speak>\n<s>Fill in the form to continue</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "switch-predicate-only-default",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "switch-predicate-only-ready",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-predicate-only"
+        }
+      ]
+    },
+    "switch-predicate": {
+      "text": "A few things in your basket\n",
+      "ssml": "<speak>\n<s>A few things in your basket</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "switch-predicate-default",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "switch-predicate-empty",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-predicate"
+        },
+        {
+          "nodeId": "switch-predicate-many",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-predicate"
+        },
+        {
+          "nodeId": "switch-predicate-summary",
+          "kind": "Markdown",
+          "reason": "not-taken",
+          "decidedAt": "switch-predicate"
+        }
+      ]
+    },
+    "table-1": {
+      "text": "Table, 2 rows, 2 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "table-sortable-1": {
+      "text": "Table, 2 rows, 2 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-sortable-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tabs-1": {
+      "text": "Tabbed section, 1 tab\n",
+      "ssml": "<speak>\n<s>Tabbed section, 1 tab</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tabs-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "metric-1",
+          "kind": "Metric",
+          "reason": "inside-announced",
+          "decidedAt": "tabs-1"
+        }
+      ]
+    },
+    "tabs-explicit-1": {
+      "text": "Tabbed section, 2 tabs\n",
+      "ssml": "<speak>\n<s>Tabbed section, 2 tabs</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tabs-explicit-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "tabs-explicit-1"
+        },
+        {
+          "nodeId": "spark-1",
+          "kind": "Sparkline",
+          "reason": "inside-announced",
+          "decidedAt": "tabs-explicit-1"
+        }
+      ]
+    },
+    "text-i18n-bound-arg-1": {
+      "text": "[i18n:cart.remaining]\n",
+      "ssml": "<speak>\n<s>[i18n:cart.remaining]</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "text-i18n-bound-arg-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "text-i18n-mixed-args-1": {
+      "text": "[i18n:invoice.summary]\n",
+      "ssml": "<speak>\n<s>[i18n:invoice.summary]</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "text-i18n-mixed-args-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "toast-1": {
+      "text": "Saved\n",
+      "ssml": "<speak>\n<s>Saved</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "toast-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tooltip-button-1": {
+      "text": "Button: Rebuild index\n",
+      "ssml": "<speak>\n<s>Button: Rebuild index</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tooltip-button-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tooltip-icon-button-1": {
+      "text": "Button: Download CSV\nUpdated hourly.\n",
+      "ssml": "<speak>\n<s>Button: Download CSV</s><break strength=\"medium\"/>\n<s>Updated hourly.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tooltip-icon-button-control",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "tooltip-icon-button-note",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tooltip-metric-1": {
+      "text": "Median latency: 128\n",
+      "ssml": "<speak>\n<s>Median latency: 128</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tooltip-metric-1",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "transfer-board": {
+      "text": "Table\nTable\nTable\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "todo",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "doing",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "archive",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tree-1": {
+      "text": "Hierarchy\n",
+      "ssml": "<speak>\n<s>Hierarchy</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tree-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tree-expanded-1": {
+      "text": "Hierarchy\n",
+      "ssml": "<speak>\n<s>Hierarchy</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tree-expanded-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "tree-selection-1": {
+      "text": "Hierarchy\n",
+      "ssml": "<speak>\n<s>Hierarchy</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "tree-selection-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-1": {
+      "text": "File upload: Upload CSV\n",
+      "ssml": "<speak>\n<s>File upload: Upload CSV</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-capture-camera-1": {
+      "text": "File upload: Photograph the receipt\n",
+      "ssml": "<speak>\n<s>File upload: Photograph the receipt</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-capture-camera-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-capture-microphone-1": {
+      "text": "File upload: Record a voice note\n",
+      "ssml": "<speak>\n<s>File upload: Record a voice note</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-capture-microphone-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-destination-1": {
+      "text": "File upload: Upload your recordings\n",
+      "ssml": "<speak>\n<s>File upload: Upload your recordings</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-destination-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-drop-1": {
+      "text": "File upload: Drop a spreadsheet\n",
+      "ssml": "<speak>\n<s>File upload: Drop a spreadsheet</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-drop-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-max-bytes-1": {
+      "text": "File upload: Attach a scan\n",
+      "ssml": "<speak>\n<s>File upload: Attach a scan</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-max-bytes-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-max-files-1": {
+      "text": "File upload: Attach up to three photographs\n",
+      "ssml": "<speak>\n<s>File upload: Attach up to three photographs</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-max-files-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-paste-1": {
+      "text": "File upload: Paste an image\n",
+      "ssml": "<speak>\n<s>File upload: Paste an image</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-paste-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    }
+  }
+}

@@ -116,6 +116,20 @@ from .notebook import (  # noqa: E402  — append-only re-export at module foot
     scoped_reference_css,
 )
 
+# fuaran#1913 — the third static projection: the tree read aloud, as a spoken script
+# lowered to plain text or SSML. Beside the 1176 pair for the same reason they sit
+# here (`speech` reaches `email`'s Switch selection and this package's `render`
+# internals), and exported under speech-named aliases because `project` / `to_ssml` alone
+# say nothing about which projection they belong to.
+from .speech import (  # noqa: E402  — append-only re-export at module foot
+    SpeechOmission,
+    SpeechScript,
+    escape_ssml,
+)
+from .speech import project as project_speech  # noqa: E402
+from .speech import to_plain_text as speech_plain_text  # noqa: E402
+from .speech import to_ssml as speech_ssml  # noqa: E402
+
 __all__ = [
     "DECODED_COMPUTED_MESSAGE",
     "DEFAULT_EMAIL_OPTIONS",
@@ -133,13 +147,17 @@ __all__ = [
     "LintFinding",
     "MarkdownOptions",
     "Renderer",
+    "SpeechOmission",
+    "SpeechScript",
     "UnscopableCss",
     "WireSurvivabilityError",
     "allow_origin",
     "collect_state_seeds",
     "display_html",
+    "escape_ssml",
     "lint",
     "mimebundle",
+    "project_speech",
     "reference_css",
     "reference_css_path",
     "render_email",
@@ -148,5 +166,7 @@ __all__ = [
     "render_markdown",
     "scope_css",
     "scoped_reference_css",
+    "speech_plain_text",
+    "speech_ssml",
     "with_state_seeds",
 ]

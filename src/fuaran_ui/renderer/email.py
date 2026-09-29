@@ -455,6 +455,38 @@ def email_safe_markdown(policy: EgressPolicy, source: str) -> str:
     return html
 
 
+# ─── Switch branch selection (shared with the speech projection) ────────────
+
+
+def selected_switch_branch(fields: dict[str, Value], sources: BindingSourcesLike | None) -> Value | None:
+    """The branch a ``Switch`` shows: the matching case's ``child``, else ``default``.
+
+    Returned as the RAW wire value (the very object the switch's fields hold), so a caller
+    that walks the other branches can tell the chosen one apart by identity. The speech
+    projection (fuaran#1913) calls this rather than a copy — the reference host lifts the
+    same selection into one helper both of its projections share — so a digest and a
+    spoken script cannot disagree about which case a tree is showing.
+    """
+    state_key = fields.get("stateKey")
+    current: object | None = None
+    # Phase 1663 — the identity-keyed map is `values` on the widened record.
+    values = as_sources(sources).values
+    if isinstance(state_key, str) and state_key in values:
+        current = values[state_key]
+    elif "on" in fields:
+        # fuaran#1535 — the Phase-768 ``on`` form, resolved through the SCALAR
+        # path exactly as the HTML renderer does, so this projection picks the
+        # same branch the page shows.
+        current = resolve_scalar_text(fields["on"], sources)
+    value_str = None if current is None else str(current)
+    # fuaran#1535 — the one shared case-selection definition, so a predicate
+    # case selects here too and this projection cannot drift from the page.
+    child = select_switch_case(fields.get("cases"), value_str, sources)
+    if _as_node(child) is not None:
+        return child
+    return fields.get("default")
+
+
 # ─── The renderer ───────────────────────────────────────────────────────────
 
 _HEADING_SCALE: Final = {
@@ -715,26 +747,8 @@ class _EmailRenderer:
     def _switch(self, node: Node, fields: dict[str, Value], depth: int) -> str:
         # The same branch the HTML render picks, resolved through the same sources, so the
         # digest and the page it links to show the same case.
-        state_key = fields.get("stateKey")
-        current: object | None = None
-        # Phase 1663 — the identity-keyed map is `values` on the widened record.
-        values = as_sources(self.sources).values
-        if isinstance(state_key, str) and state_key in values:
-            current = values[state_key]
-        elif "on" in fields:
-            # fuaran#1535 — the Phase-768 ``on`` form, resolved through the SCALAR
-            # path exactly as the HTML renderer does, so this projection picks the
-            # same branch the page shows.
-            current = resolve_scalar_text(fields["on"], self.sources)
-        value_str = None if current is None else str(current)
-        cases = fields.get("cases")
-        # fuaran#1535 — the one shared case-selection definition, so a predicate
-        # case selects here too and this projection cannot drift from the page.
-        child = _as_node(select_switch_case(cases, value_str, self.sources))
-        if child is not None:
-            return self.render(child, depth + 1)
-        default = _as_node(fields.get("default"))
-        return self.render(default, depth + 1) if default is not None else ""
+        chosen = _as_node(selected_switch_branch(fields, self.sources))
+        return self.render(chosen, depth + 1) if chosen is not None else ""
 
     def _fragment_ref(self, node: Node, fields: dict[str, Value], depth: int) -> str:
         name = fields.get("name")
@@ -1434,4 +1448,5 @@ __all__ = [
     "lint",
     "render_email",
     "render_email_document",
+    "selected_switch_branch",
 ]

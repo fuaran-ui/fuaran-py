@@ -2214,6 +2214,22 @@
       "description": "Visualisation/Grid"
     },
     {
+      "id": "grid-action-column-clean",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-action-column-clean.json",
+      "expectedFile": "nodes/grid-action-column-clean.json",
+      "description": "Visualisation/DataGrid (Phase 1909 - the CONTROL: field-less Button and ButtonGroup action columns and a grounded TonedPill; clean, graded checked)"
+    },
+    {
+      "id": "grid-action-column-field",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-action-column-field.json",
+      "expectedFile": "nodes/grid-action-column-field.json",
+      "description": "Visualisation/DataGrid (Phase 1909 - FUARAN163: a Button action column declaring a field; the only finding, no FUARAN114)"
+    },
+    {
       "id": "grid-bound-sort",
       "kind": "node-round-trip",
       "decoder": "node",
@@ -2316,6 +2332,14 @@
       "inputFile": "nodes/grid-toned-pill.json",
       "expectedFile": "nodes/grid-toned-pill.json",
       "description": "Visualisation/Grid (Phase 750 — TonedPill: value-conditional cell tone declared as a value→tone map)"
+    },
+    {
+      "id": "grid-toned-pill-ungrounded",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/grid-toned-pill-ungrounded.json",
+      "expectedFile": "nodes/grid-toned-pill-ungrounded.json",
+      "description": "Visualisation/DataGrid (Phase 1909 - FUARAN114 TonedPill sub-case: the pill's own field names a column the pipeline does not produce)"
     },
     {
       "id": "grid-transform",

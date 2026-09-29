@@ -2248,6 +2248,32 @@
       ],
       "omissions": []
     },
+    "grid-action-column-clean": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-action-column-clean",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-action-column-field": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-action-column-field",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "grid-bound-sort": {
       "text": "Table\n",
       "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
@@ -2397,6 +2423,19 @@
       "utterances": [
         {
           "nodeId": "grid-sort-state-key",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "grid-toned-pill-ungrounded": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "grid-toned-pill-ungrounded",
           "source": "announced",
           "emphasis": false,
           "pause": "short"

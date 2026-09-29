@@ -2170,7 +2170,7 @@ class Renderer:
     def _bound_grid(
         self,
         columns: list[dict[str, Value]],
-        rows: Arr,
+        rows: list[Obj],
         has_row_action: bool = False,
         window: PresentedWindow[Obj] | None = None,
     ) -> str:
@@ -2191,8 +2191,9 @@ class Renderer:
         )
         body_rows = ""
         # Phase 1892 - a windowed grid presents the window's rows, and each carries
-        # its `aria-rowindex` in the whole range; an unwindowed grid is unchanged.
-        presented = window.rows if window is not None else [r for r in rows.items if isinstance(r, Obj)]
+        # its `aria-rowindex` in the whole range; an unwindowed grid presents the
+        # rows it is handed (Phase 1912: already sorted and paged).
+        presented = window.rows if window is not None else rows
         for row_index, row in enumerate(presented):
             cells = "".join(
                 element(
@@ -2221,9 +2222,15 @@ class Renderer:
             table_attrs.append(("aria-rowcount", str(row_count)))
         return element("table", table_attrs, thead + tbody)
 
-    def _windowed_grid(self, columns: list[dict[str, Value]], rows: Arr, fields: dict[str, Value]) -> str:
-        """Phase 1892 - a grid naming a ``windowStateKey``: sort, then page (only where
-        the grid holds its whole set), then window, all from the seeded State.
+    def _sliced_grid(self, columns: list[dict[str, Value]], rows: Arr, fields: dict[str, Value]) -> str:
+        """A bound grid's row pipeline, the reference bound grid's order: sort (the
+        effective order of ``sortStateKey`` over ``defaultSort``), then page (only
+        where the grid holds its whole set), then window (only for a grid naming a
+        ``windowStateKey``), all from the seeded State; a paged grid carries the pager.
+
+        Phase 1892 built this for the windowed grid alone; Phase 1912 runs every bound
+        grid through it, so a sorted or paged grid on this host presents the rows and
+        the page the reference presents rather than the authored order in full.
 
         This host is the static floor: it performs the slice the State determines and
         writes nothing back, so a paged grid's pager steps are inert. A host-paged grid
@@ -2243,7 +2250,7 @@ class Renderer:
             else ordered
         )
         window = grid_window(self.sources, fields, page_rows)
-        table = self._bound_grid(columns, rows, "onRowClick" in fields, window)
+        table = self._bound_grid(columns, page_rows, "onRowClick" in fields, window)
         if page is None:
             return table
         status = f"Page {page.page} of {page.last_page}" if page.last_page is not None else f"Page {page.page}"
@@ -2290,9 +2297,7 @@ class Renderer:
         resolved = resolve_source(fields.get("source"), self.sources)
         columns = self._grid_columns(fields.get("columns"))
         if isinstance(resolved, Arr) and any(isinstance(c.get("field"), str) for c in columns):
-            if isinstance(fields.get("windowStateKey"), str):
-                return self._windowed_grid(columns, resolved, fields)
-            return self._bound_grid(columns, resolved, "onRowClick" in fields)
+            return self._sliced_grid(columns, resolved, fields)
         count = _seq_len(resolved)
         return self._make_vis_placeholder(
             "fuaran-grid fuaran-grid-ssr-placeholder",

@@ -1204,7 +1204,7 @@ aggregate entry's `of`, which already aliased `column` in the other direction.
 Recorded here for the same reason the section above is: pre-1.0, there is no
 `STABILITY.md` to record it in.
 
-## Palette attribution — the style observer's ruled tie-break (**unreleased — rides the version after 0.7.0**)
+## Palette attribution — the style observer's ruled tie-break (**0.8.0**)
 
 `fuaran_ui.style_observer.verify_usage_budgets` attributes each rendered fill to
 the **first** palette token whose value matches. Until Phase 1727 "first" meant

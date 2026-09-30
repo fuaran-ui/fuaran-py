@@ -544,15 +544,33 @@ answerable, the host simply furnished nothing, which is the same fact as an
 unwritten `Query`.)
 
 **`locale`** is the tag a `LocaleSource.Ambient` reads; `""` means the runtime
-default. The `Format` cases this host renders — `Since`, `RelativeTime`,
-`Duration` — are locale-**independent** by declaration (unit glyphs and English
-words, not CLDR forms), so they consult no tag. The four that are not
-(`Number` / `Currency` / `Percent` / `DateTime`) resolve to absence here, exactly as
-they did before: their text comes out of a locale database, a stdlib-only host has
-no canonical answer to give, and the corpus's render-text family enumerates that
-exclusion with its reason. `resolve_locale_tag(binding, sources)` is the public
-seam for a host that wants to render them itself with `babel` or `Intl` — the
-`Explicit`-wins precedence is the seam's rule, not each caller's.
+default. Three `Format` cases — `Since`, `RelativeTime`, `Duration` — are
+locale-**independent** by declaration (unit glyphs and English words, not CLDR
+forms), so they consult no tag. The other four (`Number` / `Currency` / `Percent` /
+`DateTime`) take their canonical text from a locale database, and render through
+**one seam**, the `LocaleFormatter` protocol in `fuaran_ui.renderer.bindings`,
+which receives the tag `resolve_locale_tag` resolved (`Explicit` wins, else the
+ambient `locale`).
+
+**This host's default is locale-FREE, and says so.** `fuaran-py` stays stdlib-only,
+so its own `LocaleFormatter` — `LOCALE_FREE_FORMATTER`, whose `honours_locale` is
+`False` — renders the form the wire format's render-text section sanctions for a
+stdlib-only host: fixed-point with the declared decimals (`1234.50`), `CODE 0.00`
+currency (`GBP 1234.50`), percent with its decimals (`42.0%`), and ISO 8601 in UTC
+for the declared date/time style pair (`2023-11-14`, `22:13`,
+`2023-11-14T22:13:20`). An explicit locale tag is knowingly **not** honoured by it:
+`fr-FR` and `en-US` render the same text. None of the four ever renders blank. The
+corpus's render-text family deliberately pins none of them, because every host's
+locale answer is correct for its target and none is canonical.
+
+For the locale's own form, supply a locale-aware `LocaleFormatter` — per render
+pass as `BindingSources(formatter=…)`, or process-wide with
+`install_locale_formatter(formatter)` (the registration a companion package makes
+once; `None` restores the default). Cell formats (`CellFormat`) carry no locale, so
+a grid cell or a `Metric` figure always takes the locale-free form — through the
+same implementation, so a slot and a cell cannot disagree. Non-finite numbers are
+spelled `Infinity` / `-Infinity` / `NaN` on every path, as the reference host
+writes them.
 
 Conformance for all of the above is the corpus's **render-text family**
 (`render-text.json`, named by the manifest's `renderText` pointer): every vector

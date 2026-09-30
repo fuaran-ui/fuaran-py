@@ -1,0 +1,93 @@
+{
+  "$comment": "Canonical Fuaran accessibility contract. SINGLE SOURCE OF TRUTH for the axe-core rule set + severity threshold, shared between the F# accessibility release gate and the TS renderer's own a11y suite (fuaran-ts/packages/renderer/test/a11y.test.tsx). One a11y contract, not two: both consumers read THIS file directly from the shared wire-format-fixtures corpus, so the rule set + threshold cannot drift.",
+  "version": 1,
+  "severityThreshold": ["critical", "serious"],
+  "disabledRules": {
+    "color-contrast": "Requires real layout / canvas metrics that JSDOM does not provide; visual contrast is a real-browser (Playwright) concern, not a static-emission gate."
+  },
+  "nameResolution": {
+    "$comment": "Phase 1665. The accessibility trait's two Binding slots resolve through the SCALAR path, not the generic one. Stated here as well as in WIRE_FORMAT.md because this file is what a host's suite reads, and the defect this closes was five hosts each resolving the name slot its own way with every conformance gate green.",
+    "rule": "accessibility.label (Binding<string>) and accessibility.hidden (Binding<bool>) are ordinary scalar slots: a conformant host MUST resolve each through the same scalar path a Binding in any other scalar slot takes (WIRE_FORMAT 3.6 / 3.3.2), so a Transform yielding exactly one cell and an Expr both work. Resolving either through a row-shaped generic path is non-conformant: it throws on a typed host, yields the rows array on an erased one, and in both cases the slot silently renders nothing.",
+    "emptyName": "A name that resolves to the empty string emits NO aria-label. An empty accessible name is worse than none, because it silences the content that would otherwise have named the node.",
+    "unresolvedName": "A name that does not resolve, or whose resolution errors, emits no aria-label. It never emits a placeholder, and it never falls back to the visible text.",
+    "hiddenPolarity": "aria-hidden is emitted only on a resolved true. An explicit Static false, an unresolved binding and an errored one all emit nothing — distinct on the wire from an omitted hidden, and a host that collapses them loses the author's explicit 'this is NOT hidden'.",
+    "speak": "accessibility.speak (TextSource, Phase 1812) is the node's SPOKEN rendering for a voice surface and is NOT a member of the visual projection: a conformant host MUST NOT let it reach aria-label, aria-describedby, the visible text or any emitted attribute, and a node carrying speak MUST produce byte-identical visual and ARIA output to the same node without it. The accessible name is label; a speech line that leaked into it would rename the node for every screen reader. Its consumer is the speech projection, a separate render target."
+  },
+  "behaviour": {
+    "$comment": "Cross-host behaviour vectors for the accessibility projection, keyed by node-fixture id (nodes/<fixture>.json). HAND-AUTHORED, deliberately, on the message-parity.json precedent in validator/: vectors derived from the reference host's own projection could not falsify the reference, and the reference is one of the five hosts this table checks. Consumers verified today: the reference host's own corpus-driven a11y suite, fuaran-ts, fuaran-py, fuaran-go and fuaran-rs. Additive growth, so `version` above does not move.",
+    "$vectorShape": "`forwards` is WIRE_FORMAT-neutral and host-neutral: false means the projection lands on the node's own wrapper element, true means the kind's body IS the node's semantic element and the projection lands there instead (the D4 predicate every host implements). `attributes` are the ordered (name, value) pairs the CARRYING element must emit, in the projection order every host shares — label, labelledby, describedby, role, live, hidden. The list is EXHAUSTIVE for the accessibility projection: a pair absent from it must not be emitted by the carrier, and on a forwarding kind must not have stayed on the wrapper either.",
+    "vectors": [
+      {
+        "fixture": "a11y-wrapper-all-slots",
+        "forwards": false,
+        "attributes": [
+          ["aria-label", "Channel performance summary"],
+          ["aria-labelledby", "a11y-wrapper-heading"],
+          ["aria-describedby", "a11y-wrapper-note"],
+          ["role", "region"],
+          ["aria-live", "polite"]
+        ],
+        "note": "All six slots at once. `hidden` is an explicit Static FALSE, so no aria-hidden — the hiddenPolarity rule above."
+      },
+      {
+        "fixture": "a11y-wrapper-state-bound",
+        "forwards": false,
+        "attributes": [
+          ["aria-label", "Site footer"],
+          ["role", "doc-pageFooter"],
+          ["aria-live", "off"]
+        ],
+        "note": "A State-bound name whose declared default resolves at the render floor (WIRE_FORMAT 24). The custom role's case is carried VERBATIM; `off` is a real liveRegion token, not an absence."
+      },
+      {
+        "fixture": "a11y-wrapper-transform-label",
+        "forwards": false,
+        "attributes": [
+          ["aria-label", "3 open alerts"],
+          ["role", "region"]
+        ],
+        "note": "Phase 1665 — a Transform-bound name over embedded rows: groupBy [] [count], derive a case over the count, project to one column. The rows are in the document and the count is fixed, so this name is the same on every host with nothing seeded anywhere. Before 1665 no host emitted it: the reference threw, the erased host produced the rows array, and the other three fell through to no name at all."
+      },
+      {
+        "fixture": "a11y-alert-assertive",
+        "forwards": false,
+        "attributes": [
+          ["role", "alert"],
+          ["aria-live", "assertive"]
+        ],
+        "note": "The announcement pair, with no name of its own — the Callout's own content names it."
+      },
+      {
+        "fixture": "a11y-link-labelled",
+        "forwards": true,
+        "attributes": [["aria-label", "Read the 2026 annual report (PDF)"]],
+        "note": "The accessible name OVERRIDING the visible 'Read more' text, on the anchor the body renders."
+      },
+      {
+        "fixture": "a11y-button-named",
+        "forwards": true,
+        "attributes": [
+          ["aria-label", "Refresh revenue figures"],
+          ["role", "button"]
+        ],
+        "note": "An explicit named role on a kind that already has a native one: the trait's role must win over whatever element the host chose."
+      },
+      {
+        "fixture": "a11y-image-decorative",
+        "forwards": true,
+        "attributes": [["aria-hidden", "true"]],
+        "note": "The decorative shape — empty alt plus hidden Static true, on the img the body renders. No name at all is the point."
+      },
+      {
+        "fixture": "a11y-speak",
+        "forwards": false,
+        "attributes": [
+          ["aria-label", "Service status"],
+          ["role", "status"],
+          ["aria-live", "polite"]
+        ],
+        "note": "Phase 1812 — `speak` beside a Static name. The list is exhaustive WITHOUT the speech line: a host that projected speak into aria-label (or anywhere else) fails here, because the name must be 'Service status' and nothing may carry the spoken text."
+      }
+    ]
+  }
+}

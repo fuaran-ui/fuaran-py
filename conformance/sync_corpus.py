@@ -6,7 +6,8 @@ The authoritative corpus lives in the workspace repo at ``../wire-format-fixture
 (relative to this repo's root — the canonical side-by-side workspace layout). F#
 is the sole generator (``--emit-corpus``); this script clean-copies the
 certification payload set (``manifest.json``, ``schema.json``,
-``render-fidelity.json``, ``render-text.json``, ``nodes/``, ``ops/``, ``reject/``, ``lenient/``,
+``render-fidelity.json``, ``render-text.json``, ``a11y-contract.json``, ``nodes/``, ``ops/``,
+``reject/``, ``lenient/``,
 ``envelope/``, ``elicitation/``, ``markdown/``) into this repo's
 ``conformance/corpus/`` snapshot. The ``conformance/`` tooling subdirectory of
 the authority (its in-house cross-host gate) is intentionally NOT copied, and
@@ -19,7 +20,10 @@ suites that read them guard on the CORE manifest rather than on the file they
 actually open (``tests/test_markdown_corpus.py``'s two non-vacuity assertions),
 so a checkout carrying only the snapshot ran them against an empty fixture list
 and went RED rather than skipping. Copying them makes the snapshot the whole of
-what those suites need, which is the durable form of the fix.
+what those suites need, which is the durable form of the fix. ``a11y-contract.json``
+joined for the same reason (Phase 1920): ``tests/test_render_a11y_corpus.py`` reads its
+vectors, so a worktree gate — which resolves no side-by-side authority and falls back
+to this snapshot — needed ``FUARAN_WIRE_FIXTURES`` set to pass without it.
 
 Run after any corpus regeneration (fuaran's ``--emit-corpus``), then commit the
 snapshot with the repo. ``tests/test_corpus_sync.py`` fails the suite if the
@@ -162,7 +166,7 @@ _COPIES_NOTE = (
 # TypeScript sibling derives its payload directories from the manifest and so
 # picks the family up with no edit at all; this list is the one that has to be
 # told, which is the cost of the two not being derived from one source.)
-_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json")
+_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json", "a11y-contract.json")
 _DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")

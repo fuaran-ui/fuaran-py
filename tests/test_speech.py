@@ -163,12 +163,20 @@ def test_every_node_of_every_fixture_is_said_omitted_or_speaks_through_a_descend
 #: divergence in the HOST's text or number resolution — the same text reaches ``render_html``
 #: — rather than in this projection, and each is asserted STILL to diverge, so the entry
 #: reddens (and must be removed) the moment the host closes the gap.
+#:
+#: Phase 1920 closed ``expr-scalar`` (the compute evaluator now evaluates ``concat``) and
+#: ``metric-nonfinite-sentinel`` (non-finite numbers are spelled ``Infinity`` / ``NaN``), and
+#: RE-GRADED the two ``Binding.Format`` entries: they no longer render blank, they render the
+#: default :class:`~fuaran_ui.renderer.bindings.LocaleFormatter`'s locale-free form. They stay
+#: here only because that text still differs from the reference's, which is a locale
+#: database's; the corpus's render-text family deliberately pins none of those four cases.
 KNOWN_HOST_DIVERGENCES: dict[str, str] = {
-    "expr-scalar": "Binding.Expr `concat` does not evaluate on this host, so the bound text is empty",
-    "format-bindings": "Binding.Format: this host renders the locale-independent cases only, by design",
-    "format-date-time": "Binding.Format: this host renders the locale-independent cases only, by design",
-    "metric-nonfinite-sentinel": "format_number renders non-finite values as Python's 'inf'/'nan', "
-    "where the reference writes 'Infinity'/'NaN'",
+    "format-bindings": "Binding.Format Number/Currency/Percent/DateTime render this host's locale-free "
+    "default ('1234.50', 'GBP 1234.50', '42.0%', ISO 8601), where the reference renders its locale "
+    "database's form ('1,234.50', '£1,234.50', '42.00 %', 'mardi 14 novembre 2023') — the corpus "
+    "deliberately pins neither",
+    "format-date-time": "Binding.Format DateTime renders this host's locale-free ISO 8601 form, where the "
+    "reference renders its locale database's date and time patterns — the corpus deliberately pins neither",
 }
 
 

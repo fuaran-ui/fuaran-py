@@ -31,7 +31,8 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from typing import cast
+from datetime import UTC, datetime
+from typing import Protocol, cast
 
 from ..compute import ComputeErr, ComputeOk, evaluate_transform
 from ..model import Arr, Obj, Value
@@ -72,13 +73,20 @@ class BindingSources:
     locale". Every rendering this host produces for the locale-independent
     ``Format`` cases (``Since`` / ``RelativeTime`` / ``Duration``) ignores the
     tag by design — those are unit glyphs and English words, not CLDR-driven
-    forms — so the member exists for the cases a locale-aware host renders and
-    this one declines (see :func:`_format_projection`).
+    forms. The four locale-database cases (``Number`` / ``Currency`` /
+    ``Percent`` / ``DateTime``) render through a :class:`LocaleFormatter`, which
+    receives the resolved tag (Phase 1920).
+
+    ``formatter`` selects that :class:`LocaleFormatter` for THIS render pass.
+    ``None`` (the identity default) means the process-wide one — the stdlib
+    :data:`LOCALE_FREE_FORMATTER` unless a companion installed another through
+    :func:`install_locale_formatter`. See :func:`active_locale_formatter`.
     """
 
     values: Mapping[str, object] = field(default_factory=dict)
     now: str = ""
     locale: str = ""
+    formatter: LocaleFormatter | None = None
 
     def merged_with(self, extra: Mapping[str, object]) -> BindingSources:
         """This record with ``extra`` layered over ``values``; the two scalars ride along."""
@@ -339,9 +347,10 @@ def resolve_binding(binding: Value, sources: BindingSourcesLike | None = None) -
             grain = binding.fields.get("grain")
             return truncate_to_grain(grain, instant) if isinstance(grain, str) else instant
         if binding.tag == "Format":
-            # Phase 1663 — the locale-aware numeric projection. Only the
-            # locale-INDEPENDENT cases render here; see ``_format_projection``
-            # for which, and why the rest resolve to absence on this host.
+            # Phase 1663 — the locale-aware numeric projection. The
+            # locale-independent cases render directly and the four
+            # locale-database cases through the ``LocaleFormatter`` seam (Phase
+            # 1920); see ``_format_projection``.
             return _format_projection(binding, sources)
         # `State` keys on `key`; `Query` / `Filter` key on `name`; `Selection`
         # keys on `nodeId` (0.2.0 — the accessor sentinel is off the wire, the
@@ -688,13 +697,37 @@ def select_switch_case(
     return None
 
 
+def _non_finite(value: float) -> str | None:
+    """The reference host's spelling of a non-finite double, or ``None`` for a finite one.
+
+    Phase 1920 — .NET writes ``Infinity`` / ``-Infinity`` / ``NaN`` whatever the
+    format specifier, where Python writes ``inf`` / ``-inf`` / ``nan``. Every
+    number this module formats passes through here first, so no render path
+    (HTML, email, document, speech) can spell one the Python way.
+    """
+    if math.isnan(value):
+        return "NaN"
+    if math.isinf(value):
+        return "Infinity" if value > 0 else "-Infinity"
+    return None
+
+
+def _fixed(value: float, places: int) -> str:
+    """Fixed-point with ``places`` decimals, non-finite values spelled as the reference does."""
+    spelled = _non_finite(value)
+    return spelled if spelled is not None else f"{value:.{places}f}"
+
+
 def _plain_number(value: float) -> str:
     """Mirror F# ``string (value: float)``: integral floats print without ``.0``."""
     if isinstance(value, bool):  # defensive: bool is an int subclass
         return str(value)
     if isinstance(value, int):
         return str(value)
-    if math.isfinite(value) and value == math.floor(value):
+    spelled = _non_finite(value)
+    if spelled is not None:
+        return spelled
+    if value == math.floor(value):
         return str(int(value))
     return repr(value)
 
@@ -752,20 +785,155 @@ def format_relative_english(unit: str, value: float) -> str:
     return f"{magnitude} {plural} ago" if n < 0 else f"in {magnitude} {plural}"
 
 
-#: The ``Format`` cases this host renders (Phase 1663). Locale-INDEPENDENT by
-#: declaration: ``Duration`` is unit glyphs and English words with exact
-#: cross-pipeline parity, and the relative-time pair reduces to ``(unit, count)``
-#: through the one shared ladder and then phrases it in the deterministic English
-#: form — the fallback tier. The four cases NOT here (``Number`` / ``Currency`` /
-#: ``Percent`` / ``DateTime``) take their text from a locale database, so a
-#: stdlib-only host has no canonical answer to give and resolves them to absence
-#: exactly as it did before this seam existed. The corpus's render-text family
-#: enumerates that exclusion with its reason.
-#: ``DateTime`` stays excluded whichever half of its style pair is declared: Phase
-#: 1810's ``timeStyle`` names the locale's own time-of-day pattern exactly as
-#: ``dateStyle`` names its date pattern, so the time-only and date-time shapes
-#: resolve to absence here for the same reason the date-only one always has.
+#: The ``Format`` cases whose text is a function of the value alone (Phase 1663).
+#: Locale-INDEPENDENT by declaration: ``Duration`` is unit glyphs and English
+#: words with exact cross-pipeline parity, and the relative-time pair reduces to
+#: ``(unit, count)`` through the one shared ladder and then phrases it in the
+#: deterministic English form — the fallback tier. They consult no locale tag and
+#: no :class:`LocaleFormatter`.
 _LOCALE_INDEPENDENT_FORMATS = frozenset({"Duration", "RelativeTime", "Since"})
+
+#: The four ``Format`` cases whose canonical text comes out of a locale database
+#: (Phase 1920). They render through the render pass's :class:`LocaleFormatter`,
+#: never to absence. Until Phase 1920 this host declined them, so a ``Metric``
+#: bound through one rendered blank in HTML, email, document and speech while the
+#: same host's cell formatter rendered those very cases. The corpus's render-text
+#: family still EXCLUDES them from its byte comparison — every host's answer is
+#: correct for its target and none is canonical — and that is a claim about the
+#: text, not permission to render nothing.
+_LOCALE_DATABASE_FORMATS = frozenset({"Number", "Currency", "Percent", "DateTime"})
+
+
+# ── The locale formatter seam (Phase 1920) ───────────────────────────────────
+
+
+class LocaleFormatter(Protocol):
+    """Formats the four locale-database ``Format`` cases for a resolved locale tag.
+
+    The ONE seam a locale-aware formatter plugs into (a companion package backed
+    by a locale database, ``Intl`` under Pyodide). ``locale`` is the tag
+    :func:`resolve_locale_tag` resolved for the binding — an ``Explicit`` tag,
+    or the host's ambient :attr:`BindingSources.locale` (``""`` = the runtime
+    default) — or ``None`` where the document declared no locale source. A value
+    may be non-finite; spelling it is the implementation's job, and the default
+    spells it as the reference host does.
+
+    Select one per render pass with :attr:`BindingSources.formatter`, or
+    process-wide with :func:`install_locale_formatter`. This package itself
+    stays stdlib-only: its own implementation is :data:`LOCALE_FREE_FORMATTER`.
+    """
+
+    def number(self, value: float, decimals: int | None, locale: str | None) -> str:
+        """``Format.Number`` — ``decimals`` is ``None`` when the document declared none."""
+        ...
+
+    def currency(self, value: float, code: str, locale: str | None) -> str:
+        """``Format.Currency`` — ``code`` is the ISO-4217 code the document declared."""
+        ...
+
+    def percent(self, value: float, decimals: int | None, locale: str | None) -> str:
+        """``Format.Percent`` — ``value`` is the RATIO (``0.42`` is forty-two percent)."""
+        ...
+
+    def date_time(
+        self, epoch_seconds: float, date_style: str | None, time_style: str | None, locale: str | None
+    ) -> str:
+        """``Format.DateTime`` — ``epoch_seconds`` is Unix-epoch seconds; each style is a
+        ``DateStyle`` / ``TimeStyle`` token (``Short`` … ``Full``), ``None`` when undeclared."""
+        ...
+
+
+class LocaleFreeFormatter:
+    """This host's DEFAULT :class:`LocaleFormatter` — stdlib-only and locale-FREE.
+
+    **It honours no locale tag, knowingly** (:attr:`honours_locale` is
+    ``False``). The wire format's render-text section sanctions exactly this tier
+    for a stdlib-only host — "a hand-rolled fixed-point or ISO form" — and the
+    corpus pins none of the four cases, because their canonical text is a locale
+    database's. So an ``Explicit`` ``fr-FR`` renders the same text as
+    ``Ambient`` here; a host that wants the locale's own form installs a
+    locale-aware formatter instead.
+
+    * ``Number`` — fixed-point with the declared decimals; undeclared, the plain
+      canonical number.
+    * ``Currency`` — ``CODE 0.00``.
+    * ``Percent`` — the ratio ×100 with the declared decimals (one when
+      undeclared) and a ``%``.
+    * ``DateTime`` — ISO 8601, in UTC, for the declared style pair: the date half
+      ``YYYY-MM-DD``; the time half ``HH:MM`` for ``Short`` and ``HH:MM:SS`` for
+      every longer style; the two joined by ``T`` when both are declared. Neither
+      declared is the date alone.
+
+    Non-finite values are spelled ``Infinity`` / ``-Infinity`` / ``NaN``, as the
+    reference host writes them. The cell formatter (:func:`format_number`)
+    renders its ``Number`` / ``Currency`` / ``Percent`` cases through THIS
+    implementation, so the slot and cell paths cannot drift apart again.
+    """
+
+    #: The capability statement: this implementation does NOT honour the locale
+    #: tag it is handed. A locale-aware replacement declares ``True``.
+    honours_locale: bool = False
+
+    def number(self, value: float, decimals: int | None, locale: str | None) -> str:
+        return _fixed(value, decimals) if decimals is not None else _plain_number(value)
+
+    def currency(self, value: float, code: str, locale: str | None) -> str:
+        return f"{code} {_fixed(value, 2)}"
+
+    def percent(self, value: float, decimals: int | None, locale: str | None) -> str:
+        return f"{_fixed(value * 100, 1 if decimals is None else decimals)}%"
+
+    def date_time(
+        self, epoch_seconds: float, date_style: str | None, time_style: str | None, locale: str | None
+    ) -> str:
+        if not math.isfinite(epoch_seconds):
+            return _plain_number(epoch_seconds)
+        try:
+            instant = datetime.fromtimestamp(math.floor(epoch_seconds), tz=UTC)
+        except (OverflowError, OSError, ValueError):
+            # Outside the range a calendar date can name: the number itself is the honest
+            # answer, never an invented date.
+            return _plain_number(epoch_seconds)
+        date_half = instant.strftime("%Y-%m-%d")
+        if time_style is None:
+            return date_half
+        time_half = instant.strftime("%H:%M" if time_style == "Short" else "%H:%M:%S")
+        return f"{date_half}T{time_half}" if date_style is not None else time_half
+
+
+#: The stdlib default every render pass uses unless told otherwise.
+LOCALE_FREE_FORMATTER: LocaleFormatter = LocaleFreeFormatter()
+
+_installed_formatter: LocaleFormatter = LOCALE_FREE_FORMATTER
+
+
+def install_locale_formatter(formatter: LocaleFormatter | None) -> LocaleFormatter:
+    """Install ``formatter`` process-wide and return the one it replaced.
+
+    The registration a companion package performs once, so every render pass
+    that names no :attr:`BindingSources.formatter` of its own picks it up.
+    ``None`` restores :data:`LOCALE_FREE_FORMATTER`.
+    """
+    global _installed_formatter
+    previous = _installed_formatter
+    _installed_formatter = LOCALE_FREE_FORMATTER if formatter is None else formatter
+    return previous
+
+
+def active_locale_formatter(sources: BindingSourcesLike | None = None) -> LocaleFormatter:
+    """The :class:`LocaleFormatter` a render pass uses: its own, else the installed one."""
+    chosen = as_sources(sources).formatter
+    return chosen if chosen is not None else _installed_formatter
+
+
+def _declared_int(fields: Mapping[str, Value], name: str) -> int | None:
+    value = fields.get(name)
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _declared_str(fields: Mapping[str, Value], name: str) -> str | None:
+    value = fields.get(name)
+    return value if isinstance(value, str) else None
 
 
 def resolve_locale_tag(binding: Value, sources: BindingSourcesLike | None = None) -> str | None:
@@ -795,18 +963,34 @@ def resolve_locale_tag(binding: Value, sources: BindingSourcesLike | None = None
 def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str | None:
     """``Binding.Format`` in a slot: its numeric source projected to a string.
 
-    Renders the locale-independent cases and resolves every other to absence —
-    see :data:`_LOCALE_INDEPENDENT_FORMATS`. ``Since`` is the one case whose
-    text is a function of the HOST INSTANT as well as of its source, so the
-    delta is taken here, where the instant lives, and the phrasing helpers stay
-    pure projections of their arguments.
+    The locale-independent cases render here (:data:`_LOCALE_INDEPENDENT_FORMATS`);
+    the four locale-database cases render through the pass's
+    :class:`LocaleFormatter` under the resolved locale tag
+    (:data:`_LOCALE_DATABASE_FORMATS`). ``Since`` is the one case whose text is a
+    function of the HOST INSTANT as well as of its source, so the delta is taken
+    here, where the instant lives, and the phrasing helpers stay pure projections
+    of their arguments.
     """
     fmt = binding.fields.get("format")
-    if not isinstance(fmt, Obj) or not isinstance(fmt.tag, str) or fmt.tag not in _LOCALE_INDEPENDENT_FORMATS:
+    if not isinstance(fmt, Obj) or not isinstance(fmt.tag, str):
+        return None
+    if fmt.tag not in _LOCALE_INDEPENDENT_FORMATS and fmt.tag not in _LOCALE_DATABASE_FORMATS:
         return None
     value = resolve_scalar_number(binding.fields.get("source"), sources)
     if value is None:
         return None
+    if fmt.tag in _LOCALE_DATABASE_FORMATS:
+        formatter = active_locale_formatter(sources)
+        locale = resolve_locale_tag(binding, sources)
+        if fmt.tag == "Number":
+            return formatter.number(value, _declared_int(fmt.fields, "decimals"), locale)
+        if fmt.tag == "Currency":
+            return formatter.currency(value, _declared_str(fmt.fields, "isoCode") or "", locale)
+        if fmt.tag == "Percent":
+            return formatter.percent(value, _declared_int(fmt.fields, "decimals"), locale)
+        return formatter.date_time(
+            value, _declared_str(fmt.fields, "dateStyle"), _declared_str(fmt.fields, "timeStyle"), locale
+        )
     if fmt.tag == "Duration":
         return format_duration(str(fmt.fields.get("unit")), str(fmt.fields.get("style")), value)
     if fmt.tag == "RelativeTime":
@@ -826,7 +1010,16 @@ def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str 
 
 
 def format_number(fmt: Value, value: object) -> str:
-    """Format a numeric value through a decoded ``CellFormat`` (mirrors F# ``formatNumber``)."""
+    """Format a numeric value through a decoded ``CellFormat`` (mirrors F# ``formatNumber``).
+
+    The ``Number`` / ``Currency`` / ``Percent`` cases render through
+    :data:`LOCALE_FREE_FORMATTER` — the SAME implementation a ``Binding.Format``
+    slot defaults to (Phase 1920), so the two paths cannot drift. A cell carries
+    no locale source, so the cell path takes the locale-free form whatever
+    formatter a render pass or a companion selected for ``Binding.Format`` slots.
+    Non-finite values are spelled ``Infinity`` / ``-Infinity`` / ``NaN`` on every
+    arm, as the reference host writes them.
+    """
     try:
         num = float(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
@@ -840,20 +1033,18 @@ def format_number(fmt: Value, value: object) -> str:
     if tag == "None" or tag is None:
         return _plain_number(num)
     if tag == "Number":
-        decimals = fields.get("decimals")
-        if isinstance(decimals, int):
-            return f"{num:.{decimals}f}"
-        return _plain_number(num)
+        return LOCALE_FREE_FORMATTER.number(num, _declared_int(fields, "decimals"), None)
     if tag == "Currency":
         code = fields.get("code", "")
-        return f"{code} {num:.2f}"
+        return LOCALE_FREE_FORMATTER.currency(num, code if isinstance(code, str) else str(code), None)
     if tag == "Percent":
-        decimals = fields.get("decimals")
-        places = decimals if isinstance(decimals, int) else 1
-        return f"{num * 100:.{places}f}%"
+        return LOCALE_FREE_FORMATTER.percent(num, _declared_int(fields, "decimals"), None)
     if tag == "SignificantDigits":
         digits = fields.get("digits")
-        return f"{num:.{digits}g}" if isinstance(digits, int) else _plain_number(num)
+        if not isinstance(digits, int):
+            return _plain_number(num)
+        spelled = _non_finite(num)
+        return spelled if spelled is not None else f"{num:.{digits}g}"
     if tag == "Duration":
         # Phase 819 — locale-independent by design (see format_duration above).
         return format_duration(str(fields.get("unit")), str(fields.get("style")), num)

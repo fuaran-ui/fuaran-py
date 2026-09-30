@@ -415,7 +415,19 @@ projection (Phase 1813), and it is held to that in two ways:
 - **`KNOWN_HOST_DIVERGENCES` in `tests/test_speech.py`** pins the fixtures whose text differs
   because of THIS host's text resolution, not the projection. Each entry is asserted to STILL
   differ, and only in text, so closing the gap turns its entry red. That red is the signal to
-  remove the entry, not a failure to suppress.
+  remove the entry, not a failure to suppress. Since Phase 1920 the only entries are the two
+  `Binding.Format` fixtures, which render this host's locale-free default where the reference
+  renders a locale database's form — a difference the corpus deliberately does not pin.
+
+### The locale formatter seam (`LocaleFormatter`, Phase 1920)
+
+`Binding.Format`'s four locale-database cases (`Number` / `Currency` / `Percent` / `DateTime`)
+render through ONE protocol in `renderer/bindings.py`, selected per render pass
+(`BindingSources.formatter`) or process-wide (`install_locale_formatter`). The package's own
+implementation, `LOCALE_FREE_FORMATTER`, is stdlib-only and honours no locale tag, knowingly;
+locale-aware formatting belongs in a companion that installs its own formatter, never in an
+import here. `format_number` (the cell path) delegates to that SAME default, so the slot and cell
+paths cannot drift — keep it that way rather than growing a second formatter in either place.
 
 ## Op-stream (hash chain)
 

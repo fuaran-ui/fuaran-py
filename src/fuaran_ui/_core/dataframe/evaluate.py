@@ -374,6 +374,16 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
                     return Err(EvalError("TYPE_ERROR", f"datePart: unparseable component in '{ds}'"))
             return Err(EvalError("TYPE_ERROR", f"datePart: '{ds}' too short for {part.value}"))
         return Err(EvalError("TYPE_ERROR", "datePart expects (string part, date/timestamp/string)"))
+    if fn == "concat":
+        # fuaran-core#90 — variadic (at least one argument); any null argument propagates
+        # (compose ``coalesce`` for treat-as-empty). A non-string argument stringifies through
+        # ``cell_string``, the SAME rendering a cast to string uses, so a number concatenates
+        # in the shared cross-host layout rather than in Python's own ``str``.
+        if not args:
+            return Err(EvalError("ARITY_ERROR", "function 'concat' expects at least 1 args, got 0"))
+        if any(is_null(c) for c in args):
+            return Ok(NULL)
+        return Ok(cell_str("".join(cell_string(c) for c in args)))
     return Err(EvalError("TYPE_ERROR", f"unknown scalar fn {fn}"))
 
 

@@ -22,7 +22,7 @@ import pytest
 from _corpus import AUTHORITY_ROOT, SNAPSHOT_ROOT
 
 # The families the snapshot pins — must match conformance/sync_corpus.py.
-_FILES = ("manifest.json", "schema.json", "render-fidelity.json")
+_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "a11y-contract.json")
 _DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown")
 
 authority_present = pytest.mark.skipif(

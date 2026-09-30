@@ -184,14 +184,18 @@ def test_this_host_reads_every_declared_slot() -> None:
 
 @corpus_required
 @pytest.mark.skipif(not _ARTEFACT.is_file(), reason="render-text.json not in the corpus")
-def test_excluded_slots_are_not_rendered_by_this_host() -> None:
+def test_excluded_slots_render_through_the_locale_formatter_seam() -> None:
     """The exclusions are a claim about THIS host too, so it is checked.
 
     Every slot the family excludes is one whose text comes from a locale
-    database; this host renders none of them, and a future change that started
-    rendering one — inventing a locale answer rather than declaring absence —
-    would pass every vector above while breaking the family's premise.
+    database. Since Phase 1920 this host renders each one through the
+    :class:`~fuaran_ui.renderer.bindings.LocaleFormatter` seam rather than to
+    absence — never blank, and never an invented locale answer: the text is
+    exactly what the pass's formatter produced. Two formatters prove it: the
+    stdlib default (a non-empty, locale-free form) and a stub that stamps its
+    own marker, which the slot must carry verbatim.
     """
+    stub = _StampingFormatter()
     for entry in _family()["excluded"]:
         fixture = (CORPUS_ROOT / entry["fixture"]).read_text(encoding="utf-8")
         decoded = decode_node(fixture)
@@ -199,9 +203,28 @@ def test_excluded_slots_are_not_rendered_by_this_host() -> None:
         target = _find_node(decoded.value, entry["nodeId"])
         assert target is not None, f"excluded slot {entry['slot']} names a node that is not in its fixture"
         text = target.kind.fields.get("text")
-        assert render_text(text, BindingSources(now="2026-08-02T06:59:24Z")) == "", (
-            f"this host rendered the excluded slot {entry['slot']} — {entry['reason']}"
-        )
+        default = render_text(text, BindingSources(now="2026-08-02T06:59:24Z"))
+        assert default != "", f"this host rendered the excluded slot {entry['slot']} blank"
+        stamped = render_text(text, BindingSources(now="2026-08-02T06:59:24Z", formatter=stub))
+        assert stamped.startswith("stub:"), f"the excluded slot {entry['slot']} bypassed the formatter seam"
+
+
+class _StampingFormatter:
+    """A :class:`~fuaran_ui.renderer.bindings.LocaleFormatter` whose output names its own call."""
+
+    def number(self, value: float, decimals: int | None, locale: str | None) -> str:
+        return f"stub:number:{value}:{decimals}:{locale}"
+
+    def currency(self, value: float, code: str, locale: str | None) -> str:
+        return f"stub:currency:{value}:{code}:{locale}"
+
+    def percent(self, value: float, decimals: int | None, locale: str | None) -> str:
+        return f"stub:percent:{value}:{decimals}:{locale}"
+
+    def date_time(
+        self, epoch_seconds: float, date_style: str | None, time_style: str | None, locale: str | None
+    ) -> str:
+        return f"stub:dateTime:{epoch_seconds}:{date_style}:{time_style}:{locale}"
 
 
 @corpus_required

@@ -1,0 +1,1 @@
+{"id":"root","kind":{"$type":"Box","children":[{"id":"a","kind":{"$type":"Markdown","text":"x"}}],"layout":{"$type":"Stack","direction":7,"wrap":"no","gap":"wide"},"role":"Group"}}

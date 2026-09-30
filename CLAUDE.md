@@ -91,7 +91,8 @@ fuaran-py/
 │   ├── renderer/         # optional server-HTML renderer + sanitiser + reference CSS (Phase 239),
 │   │                     #   plus the two STATIC projections of the same tree (Phase 1176):
 │   │                     #   document.py (markdown) + email.py (email-safe digest), over the
-│   │                     #   shared disposition vocabulary in projection.py
+│   │                     #   shared disposition vocabulary in projection.py; and the speech
+│   │                     #   projection speech.py (plain text + SSML, Phase 1913)
 │   ├── style_observer/   # computed-style observer: pure flag tier + InMemory + Pyodide live read-back
 │   └── theme_manifest/   # DTCG-compatible theme contract (tokens + role bindings + invariants)
 ├── tests/                # pytest: number form, full-corpus round-trip + reject, validator
@@ -398,6 +399,23 @@ Three disciplines:
 `renderer/render.py` exposes three geometry seams for these — `bare_drawing_svg`, `chart_svg`,
 `sparkline_svg` — so a projection reaches the SAME lowering the page uses rather than a second
 one. They hand out geometry, never markup decisions.
+
+### The speech projection (`speech.py`, Phase 1913)
+
+The third static projection: a tree read aloud, as plain text and as SSML (`project_speech`,
+`speech_plain_text`, `speech_ssml`). Unlike the two above it IS a byte port of the reference host's
+projection (Phase 1813), and it is held to that in two ways:
+
+- **`speech.SCOPE` is checked against the corpus's `render-fidelity.json` speech column**, kind by
+  kind, so the table gaining a kind turns the tests red until this host rules on it.
+- **`tests/fixtures/speech/reference-speech.json` is the REFERENCE host's own output** for every
+  bundled node fixture, compared byte for byte in both lowerings. A corpus-snapshot re-sync that adds
+  or drops a node fixture fails a set-equality test until the golden is regenerated with
+  `generate_reference.fsx` beside it (needs `dotnet`). Regenerate it; never hand-edit it.
+- **`KNOWN_HOST_DIVERGENCES` in `tests/test_speech.py`** pins the fixtures whose text differs
+  because of THIS host's text resolution, not the projection. Each entry is asserted to STILL
+  differ, and only in text, so closing the gap turns its entry red. That red is the signal to
+  remove the entry, not a failure to suppress.
 
 ## Op-stream (hash chain)
 

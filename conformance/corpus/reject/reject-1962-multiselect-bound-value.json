@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Select","label":"Tags","multiple":true,"source":{"$type":"Static","value":[{"label":"Red","value":"red"}]},"value":{"$type":"State","key":"tag"},"values":{"$type":"Static","value":["red"]}}}

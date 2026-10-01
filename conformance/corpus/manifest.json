@@ -654,6 +654,14 @@
       "description": "Phase 1811 — a `Format` binding's pre-rename `$type` `Date` decodes as `DateTime` (the Phase 1810 dateStyle / timeStyle pair) and re-encodes canonical; both style slots ride the alias unchanged"
     },
     {
+      "id": "lenient-1962-multiselect-placeholder-value",
+      "kind": "lenient-accept",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1962-multiselect-placeholder-value.json",
+      "expectedFile": "lenient/lenient-1962-multiselect-placeholder-value.expected.json",
+      "description": "§3.2 — a multi-select (`\"multiple\":true`) carrying the empty-`Static` placeholder `value` (bare, or with `\"value\":null`) beside its `values` decodes and re-encodes WITHOUT `value`: a multi-select carries `values` and no `value`, and the placeholder every pre-1962 multi-select carried normalises away. A non-placeholder `value` there is refused (reject-1962-multiselect-bound-value) (Phase 1962)"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "decoder": "node",
@@ -3357,6 +3365,24 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.variant",
       "description": "a `Time` form field (the Phase 1811 alias, which fixes `variant` to `Time`) carrying an explicit `variant` of `Date` — refused as ambiguous rather than resolved to either spelling"
+    },
+    {
+      "id": "reject-1962-multiselect-bound-value",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-1962-multiselect-bound-value.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.value",
+      "description": "a multi-select (`\"multiple\":true`) carrying a NON-placeholder `value` beside its `values`. A multi-select's selection is `values`; the only `value` still accepted there is the empty-`Static` placeholder (lenient-1962-multiselect-placeholder-value), and any other is a second, contradicting selection, so it is refused rather than dropped (WIRE_FORMAT §3.2, Phase 1962)"
+    },
+    {
+      "id": "reject-1962-select-missing-value",
+      "kind": "reject",
+      "decoder": "node",
+      "inputFile": "reject/reject-1962-select-missing-value.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.value",
+      "description": "a single-select (`multiple` absent) with no `value`. `value` is the single-select binding and is required there; only a multi-select omits it (WIRE_FORMAT §3.2, Phase 1962)"
     },
     {
       "id": "reject-a11y-hidden-nonbool",

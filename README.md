@@ -1234,6 +1234,32 @@ observer tier), so this cannot drift again silently.
 Recorded here for the same reason the sections above are: pre-1.0, there is no
 `STABILITY.md` to record it in.
 
+## Wire vocabulary — a multi-select `Select` carries `values` and no `value` (**BREAKING in 0.9.0**)
+
+A `Select` with `"multiple": true` carries its selection in `values` and **no
+`value`**; one without `multiple` (absent or `false`) carries `value` and no
+`values`, as before (`WIRE_FORMAT.md` §3.2, Phase 1962). Until now the model
+required `value` on every `Select`, so every multi-select carried a meaningless
+empty-`Static` placeholder beside the real `values` binding, and the decoder
+refused the `values`-only shape.
+
+**What changes for you.**
+
+- `decode_node` accepts a multi-select without `value`. A multi-select still
+  carrying the placeholder (`{"$type":"Static"}` or `{"$type":"Static","value":null}`)
+  is a lenient accept that normalises it away, so every document written before
+  this release still reads — but it **re-encodes without `value`**, so the bytes
+  change. Any other `value` on a multi-select is refused `WRONG_TYPE` at
+  `….value`; a single-select without `value` is still `MISSING_FIELD`.
+- `schema.types.Select.value` and `fuaran.select(value=…)` are now optional
+  (default `None`). A multi-select passes `values` and no `value`; the
+  `controls.multi_select` helper no longer emits the placeholder.
+- A reader built on an earlier release refuses a new multi-select with
+  `MISSING_FIELD` at `value`; nothing it wrote stops reading here.
+
+Recorded here for the same reason the sections above are: pre-1.0, there is no
+`STABILITY.md` to record it in.
+
 ## Placement helpers — `fuaran_ui.ops.placement`
 
 The section above leaves every caller deriving the sibling permutation itself. That

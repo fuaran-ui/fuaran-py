@@ -1239,7 +1239,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         *,
         label: t.TextInput,
         source: Binding,
-        value: Binding,
+        value: Binding | None = None,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
         multiple: bool = False,
@@ -1250,7 +1250,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         """The select control. ``on_change=False`` OMITS the handler key, which is what
         arms a renderer's write-back default against ``value`` / ``values`` — see
         :class:`~fuaran_ui.schema.types.Select`. ``on_change_multi`` is the MULTI
-        channel's own handler (Phase 1576) and arms independently of it."""
+        channel's own handler (Phase 1576) and arms independently of it. A multi-select
+        (``multiple=True``) passes ``values`` and no ``value`` (Phase 1962)."""
         kind = t.Select(
             _text(label),
             source,

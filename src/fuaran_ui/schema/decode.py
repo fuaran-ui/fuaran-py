@@ -2727,7 +2727,10 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         # SelectOption list, a scalar string option, a string list respectively.
         # `source` aliases `options` / `data` (§3.6).
         ("source", True, _decode_binding_select_options, ("options", "data")),
-        ("value", True, _decode_binding_string_opt),
+        # Phase 1962 — `value` is required exactly when `multiple` is not `true`;
+        # the relation is enforced in `_decode_kind` (see `_select_multiple`), so
+        # the per-field flag here is only the optionality the IDL states.
+        ("value", False, _decode_binding_string_opt),
         ("disabled", False, _decode_binding_bool),
         ("placeholder", False, _decode_text_source),
         # Multi-select (Phase 291) — both optional; omitted on a single-select.
@@ -3083,11 +3086,29 @@ def _decode_kind(value: object, path: str) -> Obj:
         known.add(name)
         known.update(aliases)
     fields: dict[str, Value] = {}
+    select_multiple = _select_multiple(obj) if tag == "Select" else None
     for entry in schema:
         name, required, dec, aliases = _unpack_schema(entry)
+        if tag == "Select" and name == "value":
+            # Phase 1962 — a single-select (`multiple` absent or `false`) requires
+            # `value`; a multi-select carries none. A malformed `multiple` is its own
+            # defect, so the presence rule is not applied on top of it.
+            required = select_multiple is False
         raw, present = _alias_get(obj, name, aliases)
         if present:
             decoded = dec(raw, f"{path}.{name}")
+            if tag == "Select" and name == "value" and select_multiple is True:
+                # The empty-`Static` placeholder every pre-1962 multi-select carried is
+                # a §16 lenient accept, normalised to absent; any other `value` would
+                # be a second selection the control never reads, so it is refused.
+                if decoded == Obj("Static", {}):
+                    continue
+                _fail(
+                    WRONG_TYPE,
+                    f"{path}.value",
+                    "a multi-select Select carries its selection in 'values' and no 'value'",
+                    "omit 'value' when 'multiple' is true, or drop 'multiple' for a single-select",
+                )
             # Phase 460 omit-when-default: a `_DROP` result is omitted from the model
             # (so the generic encoder re-emits the byte-minimal canonical form).
             if decoded is not _DROP:
@@ -3103,6 +3124,14 @@ def _decode_kind(value: object, path: str) -> Obj:
         if key != "$type" and key not in known and key not in retired:
             fields[key] = from_json(raw)
     return Obj(tag, fields)
+
+
+def _select_multiple(obj: dict) -> bool | None:
+    """A ``Select``'s ``multiple`` for the Phase 1962 ``value`` rule: ``True`` / ``False``
+    as decoded (absent reads ``False``), or ``None`` when it is malformed — the field's own
+    decoder refuses that, and the presence rule is not layered over it."""
+    raw = obj.get("multiple", False)
+    return raw if isinstance(raw, bool) else None
 
 
 # ── Scoped `title` → `heading` alias (WIRE_FORMAT §3.6, decode-only) ─────────

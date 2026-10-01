@@ -2480,7 +2480,11 @@ class Button:
 class Select:
     label: TextSource
     source: Binding
-    value: Binding
+    #: Phase 1962 — the single-select value binding. A multi-select
+    #: (``multiple=True``) carries its selection in ``values`` and NO ``value``, so
+    #: this is ``None`` there and omitted from the wire; a single-select needs it
+    #: (the decoder refuses one without it).
+    value: Binding | None = None
     placeholder: TextSource | None = None
     disabled: Binding | None = None
     # Multi-select (Phase 291): ``multiple`` is emitted only when ``True`` (a

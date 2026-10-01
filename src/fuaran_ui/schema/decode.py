@@ -3098,17 +3098,11 @@ def _decode_kind(value: object, path: str) -> Obj:
         if present:
             decoded = dec(raw, f"{path}.{name}")
             if tag == "Select" and name == "value" and select_multiple is True:
-                # The empty-`Static` placeholder every pre-1962 multi-select carried is
-                # a §16 lenient accept, normalised to absent; any other `value` would
-                # be a second selection the control never reads, so it is refused.
-                if decoded == Obj("Static", {}):
-                    continue
-                _fail(
-                    WRONG_TYPE,
-                    f"{path}.value",
-                    "a multi-select Select carries its selection in 'values' and no 'value'",
-                    "omit 'value' when 'multiple' is true, or drop 'multiple' for a single-select",
-                )
+                # A multi-select carries its selection in `values`; any well-formed
+                # `value` beside it (the empty-`Static` placeholder pre-1962 documents
+                # carried, or a stray binding) is decoded — so a malformed one still
+                # refuses — then dropped: a §16 lenient accept, normalised to absent.
+                continue
             # Phase 460 omit-when-default: a `_DROP` result is omitted from the model
             # (so the generic encoder re-emits the byte-minimal canonical form).
             if decoded is not _DROP:

@@ -1246,11 +1246,12 @@ refused the `values`-only shape.
 **What changes for you.**
 
 - `decode_node` accepts a multi-select without `value`. A multi-select still
-  carrying the placeholder (`{"$type":"Static"}` or `{"$type":"Static","value":null}`)
-  is a lenient accept that normalises it away, so every document written before
-  this release still reads — but it **re-encodes without `value`**, so the bytes
-  change. Any other `value` on a multi-select is refused `WRONG_TYPE` at
-  `….value`; a single-select without `value` is still `MISSING_FIELD`.
+  carrying a `value` — the empty-`Static` placeholder or any other well-formed
+  binding — is a lenient accept: the `value` is decoded (so a malformed one is
+  still refused, as any malformed binding is) and then dropped, so every document
+  written before this release still reads — but it **re-encodes without
+  `value`**, so the bytes change. A single-select without `value` is still
+  `MISSING_FIELD` at `….value`.
 - `schema.types.Select.value` and `fuaran.select(value=…)` are now optional
   (default `None`). A multi-select passes `values` and no `value`; the
   `controls.multi_select` helper no longer emits the placeholder.

@@ -7645,24 +7645,6 @@
           "multiple"
         ]
       },
-      "then": {
-        "properties": {
-          "value": {
-            "type": "object",
-            "properties": {
-              "$type": {
-                "const": "Static"
-              },
-              "value": {
-                "type": "null"
-              }
-            },
-            "required": [
-              "$type"
-            ]
-          }
-        }
-      },
       "else": {
         "required": [
           "value"

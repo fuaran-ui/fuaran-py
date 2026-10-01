@@ -2846,6 +2846,14 @@
       "description": "Input/Select"
     },
     {
+      "id": "select-multiple-false",
+      "kind": "node-round-trip",
+      "decoder": "node",
+      "inputFile": "nodes/select-multiple-false.json",
+      "expectedFile": "nodes/select-multiple-false.json",
+      "description": "Input/Select (Phase 1962 — an explicit multiple:false, emitted as authored)"
+    },
+    {
       "id": "shared-source-seeded-pair",
       "kind": "node-round-trip",
       "decoder": "node",

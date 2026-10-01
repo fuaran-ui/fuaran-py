@@ -1257,6 +1257,10 @@ refused the `values`-only shape.
   `controls.multi_select` helper no longer emits the placeholder.
 - A reader built on an earlier release refuses a new multi-select with
   `MISSING_FIELD` at `value`; nothing it wrote stops reading here.
+- An explicit `"multiple": false` decodes as single-select and re-encodes as
+  written — `multiple` is not omit-at-default. `decode_node` / `encode_node`
+  already kept it; the bundled corpus snapshot now carries
+  `nodes/select-multiple-false.json`, which certifies that.
 
 Recorded here for the same reason the sections above are: pre-1.0, there is no
 `STABILITY.md` to record it in.

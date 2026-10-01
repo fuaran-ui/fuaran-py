@@ -3668,6 +3668,19 @@
       ],
       "omissions": []
     },
+    "select-multiple-false": {
+      "text": "Selection: Size\n",
+      "ssml": "<speak>\n<s>Selection: Size</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-multiple-false",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "shared-source-seeded-pair": {
       "text": "Table\n2\n",
       "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>2</s><break strength=\"medium\"/>\n</speak>\n",

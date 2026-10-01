@@ -1,0 +1,1 @@
+{"id":"select-multiple-false","kind":{"$type":"Select","label":"Size","multiple":false,"onChange":"<closure>","source":{"$type":"Static","value":[{"label":"Small","value":"s"},{"label":"Large","value":"l"}]},"value":{"$type":"Static","value":"s"}}}

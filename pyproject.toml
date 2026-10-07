@@ -11,7 +11,7 @@ build-backend = "hatchling.build"
 # consumer-visible gain. The `fuaran-py` project on PyPI is left exactly as it stands:
 # never re-tagged, never published to again.
 name = "fuaran-ui"
-version = "0.8.0"
+version = "0.9.0"
 description = "Python host of the Fuaran UI language — a co-equal sibling to the F# and TypeScript tiers (canonical-JSON codec, validator, and headless renderer today; ergonomic authoring surface + interactive runtime incoming)."
 readme = "README.md"
 requires-python = ">=3.12"

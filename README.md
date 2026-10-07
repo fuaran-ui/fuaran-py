@@ -1275,6 +1275,36 @@ Two behaviours are worth knowing before you rely on them:
   remaps all of them. The minting strategy is injectable — `derived_ids` (the default,
   `<id>-copy`, `-copy-2`, …) or `sequential_ids(prefix)` for deterministic replay.
 
+## Apply-time tree limits — `apply` refuses a tree no host could decode (**BREAKING in 0.9.0**)
+
+The decoder has always refused a document past the WIRE_FORMAT §21 node limits —
+**MaxDepth 24** levels and **MaxNodes 100 000** nodes. `fuaran_ui.ops.apply` did not:
+a tree assembled op by op (a progressive stream, a replay, a driven session) could
+grow past either without any single op looking unusual, and the result was a tree
+this host held happily and no host, this one included, could decode again.
+
+Since 0.9.0 every op that can grow a tree is checked on its **result** and refused
+with the new apply code **`LimitExceeded`** (`fuaran_ui.ops.apply.LIMIT_EXCEEDED`)
+when it breaches either limit. Which ops are checked is derived from what they carry:
+any op holding a node (`InsertChild`, `ReplaceRoot`, an `EditNode` whose new kind
+holds children, an `UpdateState` attaching `onLoading` / `onEmpty`), plus `MoveNode`,
+which adds no node but can stack two legal depths. A `Batch` is measured once, on the
+tree it produces, and refused whole as `LimitExceeded` rather than `BatchAborted`.
+`UpdateProp`, `ReplaceBinding`, `UpdateStyle`, `RemoveNode` and `ReorderChildren`
+cannot grow a tree and are never refused for one. Depth and count are measured the
+way the decoder measures them: every node is a level, wherever it sits — a layout
+child, a `Switch` case, an `ErrorBoundary` arm, a `State` alternative, a `fallback`.
+
+**What changes for you.** An op stream that built a tree past either limit is now
+refused at the op that crossed it, where it was accepted; and an exhaustive match over
+the apply error codes gains a case. The same code and figures are enforced by the
+.NET, Go and Rust hosts, and the shared `apply/limits-apply.json` vectors certify all
+of them — this host runs that family from its bundled snapshot
+(`tests/test_limits_apply.py`).
+
+Recorded here for the same reason the sections above are: pre-1.0, there is no
+`STABILITY.md` to record it in.
+
 ## Conformance
 
 `fuaran-ui` round-trips the shared wire-format corpus byte-for-byte and surfaces

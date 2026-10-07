@@ -26,6 +26,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from ..limits import MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
 from ..schema.decode import (
@@ -61,6 +62,11 @@ PATH_INVALID = "PathInvalid"
 PATH_NOT_SUPPORTED_YET = "PathNotSupportedYet"
 ORDERING_MISMATCH = "OrderingMismatch"
 BATCH_ABORTED = "BatchAborted"
+#: The applied tree breaches a WIRE_FORMAT §21 limit (Phase 2171). Named the same on
+#: every host, because a client recovering from it must not need to know which engine
+#: refused. Distinct from the decoder's ``LIMIT_EXCEEDED`` (a ``DecodeError`` code):
+#: apply codes are PascalCase, decode codes are SCREAMING_SNAKE, on every host.
+LIMIT_EXCEEDED = "LimitExceeded"
 
 
 @dataclass(frozen=True)
@@ -1046,6 +1052,99 @@ def _as_arr(v: Value) -> list[Value]:
     return v.items
 
 
+# ── Apply-time §21 limits (Phase 2171) ───────────────────────────────────────
+#
+# The decoder bounds what ARRIVES; nothing bounded what an apply PRODUCES. A tree
+# assembled op by op - a progressive stream of small frames, a replay, a driven
+# session - grows past MAX_NODE_DEPTH or MAX_NODES without any single op looking
+# unusual, and the result is a tree this host holds happily and no host can
+# decode, including this one on the next round trip. Checking here names the op
+# that crossed the line, at the moment it crossed it.
+#
+# The figures are the decoder's own (``fuaran_ui.limits``), counted the way the
+# decoder counts them: every ``Node`` in the tree is one node and one level,
+# wherever it sits - a layout child, a ``Switch`` case, an ``ErrorBoundary`` arm, a
+# ``State`` alternative, a ``fallback``. The generic model holds a ``Node`` only
+# where the decoder decoded one, so walking every ``Node`` value IS the decoder's
+# count; a hand list of child positions would be a second definition free to drift.
+
+
+def _nodes_in(value: Value) -> list[Node]:
+    """Every outermost ``Node`` reachable from ``value`` without passing through one."""
+    found: list[Node] = []
+    stack: list[Value] = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Node):
+            found.append(current)
+        elif isinstance(current, Obj):
+            stack.extend(current.fields.values())
+        elif isinstance(current, Arr):
+            stack.extend(current.items)
+    return found
+
+
+def _sub_nodes(node: Node) -> list[Node]:
+    """The nodes one level below ``node``: those held by its kind and its envelope."""
+    held = _nodes_in(node.kind)
+    for extra in node.extras.values():
+        held.extend(_nodes_in(extra))
+    return held
+
+
+def _tree_exceeds_limits(tree: Node) -> ApplyError | None:
+    """The typed refusal when ``tree`` breaches MaxDepth or MaxNodes, else ``None``.
+
+    One walk for both axes, ITERATIVE: §21.2 rule 5 binds every walk over a tree,
+    and a recursive one would answer an in-memory tree deeper than the interpreter's
+    stack with a ``RecursionError`` rather than the typed error. It stops at the first
+    breach, so a hostile result costs at most MAX_NODES + 1 node visits.
+    """
+    count = 0
+    stack: list[tuple[Node, int]] = [(tree, 1)]
+    while stack:
+        node, depth = stack.pop()
+        count += 1
+        if depth > MAX_NODE_DEPTH:
+            return ApplyError(
+                LIMIT_EXCEEDED,
+                f"Applying this op would nest nodes at least {depth} levels deep, past the wire limit "
+                f"MaxDepth = {MAX_NODE_DEPTH} (WIRE_FORMAT §21). The resulting tree would not decode on "
+                "any host - flatten the nesting, or split the emission across trees.",
+            )
+        if count > MAX_NODES:
+            return ApplyError(
+                LIMIT_EXCEEDED,
+                f"Applying this op would produce a tree of more than {MAX_NODES} nodes, past the wire "
+                f"limit MaxNodes = {MAX_NODES} (WIRE_FORMAT §21). The resulting tree would not decode on "
+                "any host - split the emission across trees.",
+            )
+        stack.extend((child, depth + 1) for child in _sub_nodes(node))
+    return None
+
+
+def _op_can_grow(op: Obj) -> bool:
+    """Whether ``op`` can increase the tree's depth or node count.
+
+    DERIVED FROM WHAT THE OP PUTS IN, not from a hand list: an op carrying any
+    ``Node`` is checked - ``InsertChild``, ``ReplaceRoot``, an ``EditNode`` whose new
+    kind holds children, an ``UpdateState`` attaching ``onLoading`` / ``onEmpty``, a
+    ``Batch`` containing any of them. The derivation reads NODES, never ids, because
+    a payload whose ids repeat has fewer ids than nodes. ``MoveNode`` carries no node
+    and is checked anyway: moving one legal branch under the leaf of another stacks
+    two depths that each passed. Everything else - ``UpdateProp``, ``ReplaceBinding``,
+    ``UpdateStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow the tree, is not
+    charged the walk, and still applies to a tree already over a limit it did not put
+    there.
+    """
+    if op.tag == "MoveNode":
+        return True
+    if op.tag == "Batch":
+        inner = op.fields.get("ops")
+        return isinstance(inner, Arr) and any(isinstance(o, Obj) and _op_can_grow(o) for o in inner.items)
+    return bool(_nodes_in(op))
+
+
 # ── Public entry ─────────────────────────────────────────────────────────────
 
 
@@ -1056,5 +1155,15 @@ def apply(op: Obj, tree: Node) -> ApplyResult:
     :class:`ApplyErr` carrying a typed :class:`ApplyError`. Never throws; on any
     error the original ``tree`` is left untouched (revert is implicit). Fold across
     an op list to apply many, or wrap them in a ``Batch`` op for atomicity.
+
+    An op that can grow the tree is checked on its RESULT against the WIRE_FORMAT
+    §21 node limits (``MaxDepth`` 24, ``MaxNodes`` 100 000) and refused with
+    ``LimitExceeded`` when it breaches one. A ``Batch`` is measured once, on the
+    tree it produces, and refused whole with ``LimitExceeded`` (not ``BatchAborted``).
     """
-    return _apply_one(op, tree)
+    result = _apply_one(op, tree)
+    if isinstance(result, Ok) and _op_can_grow(op):
+        breach = _tree_exceeds_limits(result.value)
+        if breach is not None:
+            return ApplyErr(breach)
+    return result

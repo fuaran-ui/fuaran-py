@@ -8,7 +8,7 @@ is the sole generator (``--emit-corpus``); this script clean-copies the
 certification payload set (``manifest.json``, ``schema.json``,
 ``render-fidelity.json``, ``render-text.json``, ``a11y-contract.json``, ``nodes/``, ``ops/``,
 ``reject/``, ``lenient/``,
-``envelope/``, ``elicitation/``, ``markdown/``) into this repo's
+``envelope/``, ``elicitation/``, ``markdown/``, ``style-observer/``, ``apply/``) into this repo's
 ``conformance/corpus/`` snapshot. The ``conformance/`` tooling subdirectory of
 the authority (its in-house cross-host gate) is intentionally NOT copied, and
 neither are the ``dag/`` / ``merge-conformance/`` / ``chain/`` sub-corpora —
@@ -166,8 +166,14 @@ _COPIES_NOTE = (
 # TypeScript sibling derives its payload directories from the manifest and so
 # picks the family up with no edit at all; this list is the one that has to be
 # told, which is the cost of the two not being derived from one source.)
+#
+# Phase 2171 - ``apply`` joins because this host now CERTIFIES the self-enumerated
+# ``apply/limits-apply.json`` family (``tests/test_limits_apply.py``). Unlike the
+# ``dag/`` / ``merge-conformance/`` precedent, that suite does not skip when its
+# manifest is absent: a host that enforces a limit must not go green without the
+# vectors that prove it, so the family travels with the snapshot.
 _FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json", "a11y-contract.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer")
+_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 

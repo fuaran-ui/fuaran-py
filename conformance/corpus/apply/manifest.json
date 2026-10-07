@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "description": "Fuaran apply-engine conformance corpus. SELF-ENUMERATED: this family is deliberately not indexed by the corpus root manifest.json, which indexes the canonical wire-format codec families only — the laws/, dag/, merge-conformance/ and devtools-relay/ precedent. `adoption` is per host and is DATA: a host whose entry reads `proposed` reports the family BY NAME rather than skipping it silently, and flips its own entry to `adopted` in the change-set that lands its leg. This manifest is authoritative for the vector count; do not restate one in prose.",
+  "families": [
+    { "id": "skeletonApply", "kind": "apply-vectors", "file": "skeleton-apply.json", "vectors": 25, "adoption": { "fuaran": "adopted", "fuaran-ts": "proposed", "fuaran-py": "proposed", "fuaran-go": "proposed", "fuaran-rs": "proposed" }, "description": "The skeleton-op apply contract over the witness surface: accept with the result's canonical bytes and hash, or reject with the class, per validator clause per op, plus Batch atomicity and the id-collision shapes." },
+    { "id": "limitsApply", "kind": "apply-vectors", "file": "limits-apply.json", "vectors": 7, "adoption": { "fuaran-dotnet": "adopted", "fuaran-go": "adopted", "fuaran-rs": "adopted", "fuaran-ts": "proposed", "fuaran-py": "proposed" }, "description": "Apply-time WireLimits over host wire trees: an EditNode or UpdateState that puts a subtree in, or a MoveNode that stacks two legal depths, past MaxDepth is refused with LimitExceeded, and the same op landing exactly at the limit applies; plus the repeated-id shape an id-set derivation would wave through. `proposed` marks a host whose apply engine enforces no apply-time limit yet." }
+  ]
+}

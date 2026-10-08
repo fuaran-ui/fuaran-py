@@ -1,0 +1,183 @@
+{
+  "family": "duplicateIdsApply",
+  "description": "Apply-time node-id uniqueness (WIRE_FORMAT section 8.1): an op that puts nodes into a tree is checked on its RESULT, and one that leaves an id it installed held by more than one node is refused with the shared code DuplicateNodeId. The decoder judges shape and does not refuse a repeated id; these vectors pin that no op can BUILD such a tree. Each vector carries `input.tree` (a wire node) and `input.op` (a wire op) as canonical JSON STRINGS, decoded by the host's own wire decoder. `expected.verdict` is `reject` or `accept`; a `reject` vector requires apply to refuse with `expected.code`, an `accept` vector requires it to apply (no result bytes are pinned). The check charges an op only for ids IT installed: a duplicate already present elsewhere in the tree before the op is not refused here (`preexisting-duplicate-not-blamed`), the same posture as the limits guard toward a tree already over a limit. Where an op breaches a tree limit as well, LimitExceeded takes precedence (limitsApply's `editnode-repeated-id-past-maxdepth`). A Batch is checked once, on the tree it produces.",
+  "vectors": [
+    {
+      "id": "replaceroot-repeated-id",
+      "case": "ReplaceRoot",
+      "description": "ReplaceRoot installs a tree whose two children share one id: the result would hold the id twice.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"ReplaceRoot\",\"node\":{\"id\":\"r2\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}},{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "replaceroot-root-id-repeated-below",
+      "case": "ReplaceRoot",
+      "description": "ReplaceRoot installs a tree whose root id reappears on a descendant.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"ReplaceRoot\",\"node\":{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"r\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"r\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "replaceroot-reuses-old-ids",
+      "case": "ReplaceRoot",
+      "description": "ReplaceRoot installs a tree reusing ids of the tree it replaces, each once: the old tree is gone, so nothing collides and the op applies.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"ReplaceRoot\",\"node\":{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b again\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}}"
+      },
+      "expected": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "editnode-collides-with-tree",
+      "case": "EditNode",
+      "description": "EditNode gives node a a kind holding a child whose id b is already held by a pre-existing node elsewhere in the tree.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "editnode-repeated-within-kind",
+      "case": "EditNode",
+      "description": "EditNode gives node a a kind whose two children share one id.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}},{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "editnode-repeats-own-id",
+      "case": "EditNode",
+      "description": "EditNode gives node a a kind holding a child whose id repeats the edited node's own id.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "editnode-restates-children",
+      "case": "EditNode",
+      "description": "EditNode replaces a kind whose child is c with one holding c and d: the old child leaves as the restated one arrives, so c is held once and the op applies.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"c\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"c\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"c\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"c again\"}},{\"id\":\"d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"d\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "updatestate-collides-with-tree",
+      "case": "UpdateState",
+      "description": "UpdateState attaches an onLoading alternative whose id b is already held by a pre-existing node.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"UpdateState\",\"state\":{\"onLoading\":{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "updatestate-replaces-own-alternative",
+      "case": "UpdateState",
+      "description": "UpdateState replaces a node's onLoading alternative with one of the same id: the old alternative leaves as the new one arrives, so the op applies.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"},\"state\":{\"onLoading\":{\"id\":\"l\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"l\"}}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"UpdateState\",\"state\":{\"onLoading\":{\"id\":\"l\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"loading again\"}}},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "insertchild-repeated-within-child",
+      "case": "InsertChild",
+      "description": "InsertChild appends a subtree whose two children share one id, neither held by the tree.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"InsertChild\",\"child\":{\"id\":\"c\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}},{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},\"parentId\":\"r\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "insertchild-collides-with-tree",
+      "case": "InsertChild",
+      "description": "InsertChild appends a child whose id b is already held by a pre-existing node.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"InsertChild\",\"child\":{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}},\"parentId\":\"r\"}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "preexisting-duplicate-not-blamed",
+      "case": "EditNode",
+      "description": "The tree already holds x twice. EditNode on z installs only a fresh id w: the check refuses an id the op installed that the result holds twice, so a duplicate the op did not put there is not charged to it, and the op applies.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}},{\"id\":\"y\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"x\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"x\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"z\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"w\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"w\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"z\"}"
+      },
+      "expected": {
+        "verdict": "accept"
+      }
+    },
+    {
+      "id": "batch-result-duplicates",
+      "case": "Batch",
+      "description": "A Batch whose EditNode installs b beside the pre-existing b and leaves it there: the batch's result holds b twice and the whole batch is refused.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"s\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"Batch\",\"ops\":[{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"}]}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "DuplicateNodeId"
+      }
+    },
+    {
+      "id": "batch-intermediate-duplicate-resolved",
+      "case": "Batch",
+      "description": "A Batch whose first EditNode installs b beside the pre-existing b, and whose second EditNode rewrites s without its b: the intermediate state holds b twice but the result holds it once, and the batch applies. The check reads the op's RESULT, as the limits guard does.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}},{\"id\":\"s\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"Batch\",\"ops\":[{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"a\"},{\"$type\":\"EditNode\",\"newKind\":{\"$type\":\"Box\",\"children\":[],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"},\"target\":\"s\"}]}"
+      },
+      "expected": {
+        "verdict": "accept"
+      }
+    }
+  ]
+}

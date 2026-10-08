@@ -1145,6 +1145,48 @@ def _op_can_grow(op: Obj) -> bool:
     return bool(_nodes_in(op))
 
 
+# ── Apply-time id uniqueness (WIRE_FORMAT §8.1, Phase 2172) ──────────────────
+#
+# Every op addresses its target by id alone, so a tree that holds one id twice
+# makes every later id-addressed op ambiguous. The decoder accepts a repeated id,
+# and an apply could BUILD one from parts that each decoded cleanly: a
+# ``ReplaceRoot`` whose payload repeats an id, an ``EditNode`` or ``UpdateState``
+# whose new nodes collide with the rest of the tree, an ``InsertChild`` whose
+# subtree repeats one.
+#
+# The check reads the RESULT and charges the op only for the ids it installed
+# (every ``Node`` the op carries), over the same child surface every other id
+# check here walks (``_all_ids``). That is what lets an ``EditNode`` restate the
+# children it replaces and an ``UpdateState`` replace an alternative with one of
+# the same id: the old node leaves as the new one arrives. A duplicate already
+# present before the op is not the op's to refuse - the decoder admits such a
+# tree, and refusing every later edit to it would strand a document the op did
+# not break, the posture the limits guard takes toward a tree already over a
+# limit.
+#
+# Cost: one walk of the result to count ids and one of the installed subtrees,
+# paid only by an op that installs nodes. This host keeps no id index, so the
+# rest of the tree must be walked to know what an installed id could collide with.
+
+
+def _installed_duplicate(op: Obj, tree: Node) -> ApplyError | None:
+    """The typed refusal when an id ``op`` installed is held twice in ``tree``, else ``None``."""
+    installed = _nodes_in(op)
+    if not installed:
+        return None
+    counts: dict[str, int] = {}
+    for node_id in _all_ids(tree):
+        counts[node_id] = counts.get(node_id, 0) + 1
+    for node in installed:
+        for node_id in _all_ids(node):
+            if counts.get(node_id, 0) > 1:
+                return ApplyError(
+                    DUPLICATE_NODE_ID,
+                    f"NodeId '{node_id}' is already present in the tree; ids must be unique.",
+                )
+    return None
+
+
 # ── Public entry ─────────────────────────────────────────────────────────────
 
 
@@ -1160,10 +1202,20 @@ def apply(op: Obj, tree: Node) -> ApplyResult:
     §21 node limits (``MaxDepth`` 24, ``MaxNodes`` 100 000) and refused with
     ``LimitExceeded`` when it breaches one. A ``Batch`` is measured once, on the
     tree it produces, and refused whole with ``LimitExceeded`` (not ``BatchAborted``).
+
+    An op that puts nodes in is then checked on its RESULT for an id it installed that
+    the tree now holds twice, and refused with ``DuplicateNodeId`` (WIRE_FORMAT §8.1);
+    a ``Batch`` is checked once, on the tree it produces.
     """
     result = _apply_one(op, tree)
     if isinstance(result, Ok) and _op_can_grow(op):
         breach = _tree_exceeds_limits(result.value)
         if breach is not None:
             return ApplyErr(breach)
+    # After the limits: an op breaching both reports LimitExceeded (the limitsApply
+    # corpus pins that order).
+    if isinstance(result, Ok):
+        duplicate = _installed_duplicate(op, result.value)
+        if duplicate is not None:
+            return ApplyErr(duplicate)
     return result

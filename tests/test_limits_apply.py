@@ -65,7 +65,7 @@ def test_the_family_pins_the_same_limits_this_host_enforces() -> None:
 
 #: The apply families this host certifies. Every other family the apply manifest lists
 #: is a declared lag here and is NAMED below, never silently absent.
-_CERTIFIED_APPLY_FAMILIES = (_FAMILY_ID,)
+_CERTIFIED_APPLY_FAMILIES = (_FAMILY_ID, "duplicateIdsApply")  # the second: tests/test_duplicate_ids_apply.py
 
 
 def test_apply_families_this_host_does_not_run_are_named(capsys: pytest.CaptureFixture[str]) -> None:

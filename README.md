@@ -1305,6 +1305,30 @@ of them — this host runs that family from its bundled snapshot
 Recorded here for the same reason the sections above are: pre-1.0, there is no
 `STABILITY.md` to record it in.
 
+## Apply-time id uniqueness — `apply` refuses an installed duplicate id (**BREAKING in 0.9.0**)
+
+Every op addresses its target by id alone (WIRE_FORMAT §8.1), so a tree that holds one
+id twice makes every later id-addressed op ambiguous. The decoder accepts a repeated id,
+and `apply` could BUILD one from parts that each decoded cleanly: a `ReplaceRoot` whose
+payload repeats an id, an `EditNode` or `UpdateState` whose new nodes collide with the
+rest of the tree, an `InsertChild` whose subtree repeats an id within itself.
+
+Since 0.9.0 (riding the same untagged draft as the limits above) the RESULT of every op
+that puts nodes in is checked, and an id the op installed that the tree now holds more
+than once is refused with **`DuplicateNodeId`** (`fuaran_ui.ops.apply.DUPLICATE_NODE_ID`,
+the code `InsertChild` already used). The check charges an op only for what it
+installed: an `EditNode` restating the children it replaces, or an `UpdateState`
+replacing an alternative with one of the same id, still applies, and a duplicate already
+in the tree before the op is not refused here — refusing every later edit to such a tree
+would strand a document the op did not break, as a tree already over a limit is not
+refused for an op that did not grow it. `LimitExceeded` takes precedence where an op
+breaches both, and a `Batch` is checked once, on the tree it produces.
+
+**What changes for you.** An op that built a duplicate, which applied before, is now
+refused; no code is new. The .NET, Go, Rust and TypeScript hosts refuse the same inputs
+with the same code, certified by the shared `apply/duplicate-ids-apply.json` vectors,
+which this host runs from its bundled snapshot (`tests/test_duplicate_ids_apply.py`).
+
 ## Conformance
 
 `fuaran-ui` round-trips the shared wire-format corpus byte-for-byte and surfaces

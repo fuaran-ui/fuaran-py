@@ -5196,7 +5196,7 @@
             "$type": {
               "const": "Checkbox"
             },
-            "onToggle": {
+            "onChange": {
               "const": "<closure>"
             },
             "value": {
@@ -5213,7 +5213,7 @@
             "$type": {
               "const": "Toggle"
             },
-            "onToggle": {
+            "onChange": {
               "const": "<closure>"
             },
             "value": {

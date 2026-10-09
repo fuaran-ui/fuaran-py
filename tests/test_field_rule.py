@@ -160,8 +160,8 @@ def test_a_field_with_no_rule_is_byte_unchanged() -> None:
         # shorthands do not — a multi-line control is not where an email lives.
         ('{"$type":"TextArea","onChange":"<closure>","rows":4}', '"minLength":3', False),
         ('{"$type":"TextArea","onChange":"<closure>","rows":4}', '"format":"email"', True),
-        ('{"$type":"Checkbox","onToggle":"<closure>"}', '"format":"email"', True),
-        ('{"$type":"Checkbox","onToggle":"<closure>"}', '"pattern":"a+"', True),
+        ('{"$type":"Checkbox","onChange":"<closure>"}', '"format":"email"', True),
+        ('{"$type":"Checkbox","onChange":"<closure>"}', '"pattern":"a+"', True),
         ('{"$type":"Number","onChange":"<closure>"}', '"maxLength":8', True),
         ('{"$type":"DateTime","onChange":"<closure>","variant":"Date"}', '"pattern":"a+"', True),
     ],
@@ -180,7 +180,7 @@ def test_compare_is_never_unhonourable() -> None:
     compares the field's VALUE, which every control has. A rule that fired on it
     would refuse the ordered-pair shape the slot exists for."""
     wire = _form(
-        '{"id":"x","kind":{"$type":"Checkbox","onToggle":"<closure>"},"label":"L","required":true,'
+        '{"id":"x","kind":{"$type":"Checkbox","onChange":"<closure>"},"label":"L","required":true,'
         '"rule":{"compare":{"against":{"$type":"State","key":"other"},"op":"eq"}}}'
     )
     assert _findings(wire, "FUARAN100") == []

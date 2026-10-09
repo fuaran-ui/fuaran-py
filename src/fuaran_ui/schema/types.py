@@ -2494,7 +2494,7 @@ class Select:
     #: at all, because a renderer arms its write-back default only for a control that
     #: declares no handler. `True` is the default so every tree authored before this
     #: flag encodes byte-identically; a control meant to WRITE its own slot passes
-    #: `on_change=False`. Same shape and same reason as `ToggleField.on_toggle`.
+    #: `on_change=False`. Same shape and same reason as `ToggleField.on_change`.
     on_change: bool = True
     #: Phase 1576 — the MULTI channel's handler, over ``values``. A separate wire
     #: key (`onChangeMulti`) and so a separate slot: a multi-select may dispatch
@@ -2837,7 +2837,9 @@ class Map:
 
 # Input — composite (Form / Filters) ------------------------------------------
 #
-# ``onChange`` / ``onToggle`` handlers are closures → the ``CLOSURE`` sentinel.
+# ``onChange`` handlers are closures → the ``CLOSURE`` sentinel. Every control
+# spells its handler ``onChange`` (Phase 2177 — ``CheckboxField`` / ``ToggleField``
+# carried ``onToggle`` / ``on_toggle`` before).
 #
 # **Both the handler and the value are OPTIONAL on every control** (Phase 1576,
 # generalising fuaran#1170's `Select` / `NumberField` pair). The schema's required
@@ -2848,7 +2850,7 @@ class Map:
 # * **No handler** is what ARMS the renderer's write-back default. A closure
 #   cannot cross the wire, so a control declaring one describes changes that go
 #   somewhere the document cannot reach; a control declaring none writes its own
-#   slot. `on_change` / `on_toggle` therefore say whether a HOST HANDLER is
+#   slot. `on_change` therefore says whether a HOST HANDLER is
 #   present, and default to `True` on every record that emitted one
 #   unconditionally before this phase — so every tree authored against the older
 #   surface encodes byte-identically, and reaching the canonical minimal control
@@ -2883,10 +2885,10 @@ class NumberField:
 @dataclass(frozen=True)
 class CheckboxField:
     value: Binding | None = None
-    on_toggle: bool = True
+    on_change: bool = True
 
     def to_wire(self) -> Value:
-        return _obj("Checkbox", {"onToggle": CLOSURE if self.on_toggle else None, "value": self.value})
+        return _obj("Checkbox", {"onChange": CLOSURE if self.on_change else None, "value": self.value})
 
 
 @dataclass(frozen=True)
@@ -2897,15 +2899,15 @@ class ToggleField:
     Mirrors the F# shape where BOTH slots are optional: an absent ``value``
     auto-binds to the field's state key at run time (the canonical minimal
     control is the bare ``{"$type":"Toggle"}``), and an absent handler arms the
-    write-back default. ``on_toggle=True`` marks a host handler as present — a
+    write-back default. ``on_change=True`` marks a host handler as present — a
     closure, emitted as the sentinel.
     """
 
     value: Binding | None = None
-    on_toggle: bool = False
+    on_change: bool = False
 
     def to_wire(self) -> Value:
-        return _obj("Toggle", {"onToggle": CLOSURE if self.on_toggle else None, "value": self.value})
+        return _obj("Toggle", {"onChange": CLOSURE if self.on_change else None, "value": self.value})
 
 
 @dataclass(frozen=True)

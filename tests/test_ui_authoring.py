@@ -817,7 +817,7 @@ def _authored() -> dict[str, t.UiNode]:
                     t.FormField(
                         "profile-agree",
                         t.LiteralText("I agree"),
-                        t.CheckboxField(binding.state("profileAgree", False), on_toggle=False),
+                        t.CheckboxField(binding.state("profileAgree", False), on_change=False),
                         True,
                     ),
                     t.FormField(
@@ -904,7 +904,7 @@ def _authored() -> dict[str, t.UiNode]:
                 fields=[
                     t.FormField("irrigation-running", t.LiteralText("Irrigation"), t.ToggleField(), False),
                     t.FormField(
-                        "accept-terms", t.LiteralText("I accept the terms"), t.CheckboxField(on_toggle=False), True
+                        "accept-terms", t.LiteralText("I accept the terms"), t.CheckboxField(on_change=False), True
                     ),
                 ],
             )
@@ -2324,7 +2324,7 @@ def test_local_keeps_the_handler_spelling_by_default() -> None:
 _HANDLER_RECORDS = [
     (t.TextField, "on_change", "onChange", ()),
     (t.NumberField, "on_change", "onChange", ()),
-    (t.CheckboxField, "on_toggle", "onToggle", ()),
+    (t.CheckboxField, "on_change", "onChange", ()),
     (t.TextAreaField, "on_change", "onChange", (None, 4)),
     (t.RangedNumber, "on_change", "onChange", ()),
     (t.RangeField, "on_change", "onChange", ()),

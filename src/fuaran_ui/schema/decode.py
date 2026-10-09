@@ -3862,11 +3862,12 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
     tag = _dispatch(obj, path, FORM_FIELD_KIND_CASES | _TEMPORAL_FORM_FIELD_ALIASES)
     fields: dict[str, Value] = {}
 
-    handler_key = "onToggle" if tag in ("Checkbox", "Toggle") else "onChange"
-    if handler_key in obj:
-        # A present handler (any spelling) decodes to the closure placeholder
-        # and re-encodes as the sentinel; an absent one arms the write-back default.
-        fields[handler_key] = "<closure>"
+    # Phase 2177 — every form-field kind spells its change handler `onChange`,
+    # Checkbox and Toggle included (they spelled it `onToggle` before).
+    if "onChange" in obj:
+        # A present handler decodes to the closure placeholder and re-encodes as
+        # the sentinel; an absent one arms the write-back default.
+        fields["onChange"] = "<closure>"
 
     def value_slot(dec: Callable[[object, str], Value], placeholders: tuple[Value, ...]) -> None:
         if "value" in obj:
@@ -4065,7 +4066,7 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
         "allowFreeText",
         "suggestions",
         "allowHalf",
-        handler_key,
+        "onChange",
     }
     for key, raw in obj.items():
         if key not in known:

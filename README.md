@@ -1329,6 +1329,26 @@ refused; no code is new. The .NET, Go, Rust and TypeScript hosts refuse the same
 with the same code, certified by the shared `apply/duplicate-ids-apply.json` vectors,
 which this host runs from its bundled snapshot (`tests/test_duplicate_ids_apply.py`).
 
+## One change-handler name per form field — `CheckboxField` / `ToggleField` take `on_change` (**BREAKING in 0.9.0**)
+
+Every form-field control now spells its change handler `onChange` on the wire, the
+checkbox and the switch included, which spelled it `onToggle` (Phase 2177). The handler
+is the `"<closure>"` sentinel exactly as before, and the `value` member is untouched on
+every control, so no value byte of any document moves.
+
+**What changes for you.** `CheckboxField` and `ToggleField` take `on_change=` where they
+took `on_toggle=`, and encode the sentinel under `onChange`; the decoder reads a
+checkbox's or a switch's handler from `onChange`. A document written before the change
+carries `onToggle`, which is no longer the handler, so such a field decodes as the
+handler-free control (the write-back default). The retired spelling is deliberately not
+accepted as an alias: the wire format's lenient profile admits a shorthand only where
+models emit it, and a model does not author a closure sentinel. `Disclosure`'s
+`on_toggle` is a different slot and keeps its name. The .NET, TypeScript, Go and Rust
+hosts made the same change, certified by the shared corpus (`nodes/form-1.json`).
+
+Recorded here for the same reason the sections above are: pre-1.0, there is no
+`STABILITY.md` to record it in.
+
 ## Conformance
 
 `fuaran-ui` round-trips the shared wire-format corpus byte-for-byte and surfaces

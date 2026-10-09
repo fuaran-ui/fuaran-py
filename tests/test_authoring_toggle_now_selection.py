@@ -58,14 +58,14 @@ def test_toggle_with_value_and_handler() -> None:
                 t.FormField(
                     "running",
                     t.LiteralText("Running"),
-                    t.ToggleField(t.Static(True), on_toggle=True),
+                    t.ToggleField(t.Static(True), on_change=True),
                     True,
                 )
             ],
         )
     )
     wire = encode(form)
-    assert '"kind":{"$type":"Toggle","onToggle":"<closure>","value":{"$type":"Static","value":true}}' in wire
+    assert '"kind":{"$type":"Toggle","onChange":"<closure>","value":{"$type":"Static","value":true}}' in wire
     _roundtrips(wire)
 
 

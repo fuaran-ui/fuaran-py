@@ -41,8 +41,12 @@ Usage::
     python conformance/sync_corpus.py --declare
     python conformance/sync_corpus.py --declare <path-to-wire-format-fixtures>
 
-The optional path argument names the authority explicitly, for a checkout whose
-directory depth is not the canonical side-by-side one (a git worktree, say).
+The authority is resolved by the repository's one resolver
+(``src/fuaran_ui/conformance/corpus_root.py``, loaded by path so this script needs
+no installed package): the optional path argument, else ``FUARAN_WIRE_FIXTURES``,
+else ``../wire-format-fixtures``. A named root holding no ``manifest.json`` is
+REFUSED, exit 1 — never ignored: from a git worktree, falling back would sync from
+the shared primary clone the override exists to leave alone.
 
 The estate declaration and ``--declare``
 ----------------------------------------
@@ -113,16 +117,33 @@ is the one state a release must not be able to enter without knowing.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+from types import ModuleType
 
-# conformance/sync_corpus.py → conformance → fuaran-py → Fuaran-UI → wire-format-fixtures
 _HERE = Path(__file__).resolve()
-AUTHORITY = _HERE.parents[2] / "wire-format-fixtures"
+
+
+def _load_resolver() -> ModuleType:
+    """This checkout's corpus-root resolver, loaded by path (standard library only)."""
+    path = _HERE.parents[1] / "src" / "fuaran_ui" / "conformance" / "corpus_root.py"
+    spec = importlib.util.spec_from_file_location("_fuaran_py_corpus_root", path)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load the corpus-root resolver from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_RESOLVER = _load_resolver()
+
+# The canonical sibling clone beside this checkout — the resolver's fallback.
+AUTHORITY: Path = _RESOLVER.sibling_corpus_root()
 SNAPSHOT = _HERE.parent / "corpus"
 
 # The provenance sentinel: which authority commit this snapshot was taken from.
@@ -342,7 +363,7 @@ def consumer_prefix(snapshot: Path) -> str:
     # The workspace root: three levels above a checkout in the canonical layout
     # (<workspace>/Fuaran/Fuaran-UI/<repo>). `roadmapctl copies` resolves every consumer
     # path against it, and there is no other root that can address a file in another repo.
-    if len(checkout.parents) < 3 or not (checkout.parent / "wire-format-fixtures" / "manifest.json").is_file():
+    if len(checkout.parents) < 3 or not (checkout.parent / _RESOLVER.CORPUS_DIR_NAME / "manifest.json").is_file():
         raise _CannotDeclare(
             f"the repository's primary checkout {checkout} does not sit in the canonical side-by-side "
             "layout (no wire-format-fixtures corpus beside it), so its workspace-relative path is unknown."
@@ -510,7 +531,11 @@ def main(argv: list[str]) -> int:
         )
         return 1
 
-    source = Path(args[0]).resolve() if args else AUTHORITY
+    try:
+        source: Path = _RESOLVER.resolve_corpus_root(args[0] if args else None, sibling=AUTHORITY)
+    except _RESOLVER.CorpusRootRefused as refused:
+        print(str(refused), file=sys.stderr)
+        return 1
     if checking:
         return check(source)
     if declaring:

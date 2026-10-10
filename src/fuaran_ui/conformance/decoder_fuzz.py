@@ -57,6 +57,7 @@ from typing import Any
 from ..ops import decode_op, encode_op
 from ..result import Ok
 from ..schema import decode_node, encode_node
+from .corpus_root import CorpusRootRefused, present_corpus_root
 
 # ─── Deterministic PRNG ─────────────────────────────────────────────────────
 
@@ -996,16 +997,6 @@ def evidence_record(stats: RunStats, cfg: Config, corpus_root: Path | None) -> d
     }
 
 
-def _default_corpus_root() -> Path | None:
-    # parents: [0] conformance, [1] fuaran_ui, [2] src, [3] fuaran-py, [4] the
-    # workspace root the corpus sits beside. Counted rather than eyeballed: an
-    # off-by-one here does not fail, it silently narrows the seed pool to the
-    # nine built-ins and every figure the run publishes is then about a corpus it
-    # never read.
-    root = Path(__file__).resolve().parents[4] / "wire-format-fixtures"
-    return root if (root / "manifest.json").is_file() else None
-
-
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Decoder robustness fuzz — this host's leg.")
     parser.add_argument("--iterations", type=int, default=4000)
@@ -1013,14 +1004,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--long", action="store_true", help="raise the payload cap past the §21 string bound")
     parser.add_argument("--evidence", type=Path, default=None, help="write the machine-readable result here")
     parser.add_argument(
-        "--corpus", type=Path, default=None, help="the shared corpus root (default: the sibling checkout)"
+        "--corpus",
+        type=Path,
+        default=None,
+        help="the shared corpus root (default: FUARAN_WIRE_FIXTURES, else the sibling checkout)",
     )
     args = parser.parse_args(argv)
 
     if args.iterations <= 0:
         parser.error(f"--iterations: {args.iterations} is not a positive iteration count")
 
-    corpus_root = args.corpus if args.corpus is not None else _default_corpus_root()
+    try:
+        corpus_root = present_corpus_root(args.corpus)
+    except CorpusRootRefused as refused:
+        print(f"decoder fuzz: {refused}", file=sys.stderr)
+        return 2
     cfg = LONG_CONFIG if args.long else BOUNDED_CONFIG
     seeds = load_seeds(corpus_root)
     vocab = load_vocabulary(corpus_root)

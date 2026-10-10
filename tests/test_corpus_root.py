@@ -164,7 +164,8 @@ def test_no_reader_spells_the_sibling_corpus_path_for_itself() -> None:
     assert len(files) > 50, "the guard is not looking at the repository"
     offenders = []
     for rel in files:
-        if rel == _RESOLVER_IN_REPO.as_posix():
+        # The resolver, and this guard (whose allowlist and self-test necessarily spell the path).
+        if rel in (_RESOLVER_IN_REPO.as_posix(), "tests/test_corpus_root.py"):
             continue
         for number, line in enumerate((_REPO / rel).read_text(encoding="utf-8").splitlines(), start=1):
             text = line.strip()

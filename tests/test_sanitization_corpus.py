@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 
+from fuaran_ui.conformance.corpus_root import resolve_corpus_root
 from fuaran_ui.renderer.markdown import to_html
 from fuaran_ui.renderer.sanitize import (
     is_allowed_extra_attribute_key,
@@ -37,11 +38,8 @@ NOT_APPLICABLE: dict[str, str] = {}
 
 
 def _manifest_path() -> Path | None:
-    for parent in [Path(__file__).resolve(), *Path(__file__).resolve().parents]:
-        candidate = parent / "wire-format-fixtures" / "sanitization" / "manifest.json"
-        if candidate.is_file():
-            return candidate
-    return None
+    candidate = resolve_corpus_root() / "sanitization" / "manifest.json"
+    return candidate if candidate.is_file() else None
 
 
 def _groups() -> list[dict[str, Any]]:

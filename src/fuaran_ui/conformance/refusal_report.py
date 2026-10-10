@@ -37,15 +37,9 @@ from typing import Any
 from ..ops import decode_op
 from ..result import Ok
 from ..schema import decode_node
+from .corpus_root import CorpusRootRefused, resolve_corpus_root
 
 HOST = "fuaran-py"
-
-
-def _default_corpus_root() -> Path | None:
-    # parents: [0] conformance, [1] fuaran_ui, [2] src, [3] fuaran-py, [4] the
-    # workspace root the corpus sits beside.
-    root = Path(__file__).resolve().parents[4] / "wire-format-fixtures"
-    return root if (root / "manifest.json").is_file() else None
 
 
 def _decode(decoder: str, text: str) -> tuple[bool, str, str, str]:
@@ -100,12 +94,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
-    corpus_root = args.corpus if args.corpus is not None else _default_corpus_root()
-    if corpus_root is None or not (corpus_root / "manifest.json").is_file():
+    try:
+        corpus_root = resolve_corpus_root(args.corpus)
+    except CorpusRootRefused as refused:
+        print(f"{HOST}: {refused}", file=sys.stderr)
+        return 2
+    if not (corpus_root / "manifest.json").is_file():
         print(
-            f"{HOST}: the wire-format corpus was not found"
-            + (f" at {corpus_root}" if corpus_root is not None else "")
-            + ". Pass --corpus, or check the repo out beside the corpus.",
+            f"{HOST}: the wire-format corpus was not found at {corpus_root}. "
+            "Pass --corpus, set FUARAN_WIRE_FIXTURES, or check the repo out beside the corpus.",
             file=sys.stderr,
         )
         return 2

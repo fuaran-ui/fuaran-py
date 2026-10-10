@@ -28,6 +28,8 @@ import pytest
 
 _SCRIPT = Path(__file__).resolve().parents[1] / "conformance" / "sync_corpus.py"
 _SCRIPT_IN_REPO = Path("conformance") / "sync_corpus.py"
+_RESOLVER_IN_REPO = Path("src") / "fuaran_ui" / "conformance" / "corpus_root.py"
+_RESOLVER = Path(__file__).resolve().parents[1] / _RESOLVER_IN_REPO
 _EXPECTED_PREFIX = "Fuaran/Fuaran-UI/fuaran-py/conformance/corpus"
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is not on PATH")
@@ -78,10 +80,17 @@ def _write_corpus(root: Path) -> None:
     (root / "copies.json").write_text(json.dumps(copies, indent=2) + "\n", encoding="utf-8", newline="")
 
 
-def _make_repo(root: Path) -> None:
-    """A fresh repository holding only the script, committed."""
+def _copy_script(root: Path) -> None:
+    """The script, and the corpus-root resolver it loads by path from its own checkout."""
     (root / _SCRIPT_IN_REPO).parent.mkdir(parents=True)
     shutil.copyfile(_SCRIPT, root / _SCRIPT_IN_REPO)
+    (root / _RESOLVER_IN_REPO).parent.mkdir(parents=True)
+    shutil.copyfile(_RESOLVER, root / _RESOLVER_IN_REPO)
+
+
+def _make_repo(root: Path) -> None:
+    """A fresh repository holding only the script (and its resolver), committed."""
+    _copy_script(root)
     _git(root, "init", "-q")
     _git(root, "add", ".")
     _git(root, "commit", "-q", "-m", "probe")
@@ -133,8 +142,7 @@ def test_worktree_and_checkout_declare_byte_identical_records(estate: Estate) ->
 
 def test_refuses_when_git_cannot_name_the_repository(estate: Estate) -> None:
     loose = estate.tmp / "loose"
-    (loose / _SCRIPT_IN_REPO).parent.mkdir(parents=True)
-    shutil.copyfile(_SCRIPT, loose / _SCRIPT_IN_REPO)
+    _copy_script(loose)
     corpus = estate.tmp / "corpus-loose"
     _write_corpus(corpus)
     before = (corpus / "copies.json").read_bytes()

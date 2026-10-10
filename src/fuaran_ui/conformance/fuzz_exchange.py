@@ -36,7 +36,8 @@ asserts this host's own ``encode ∘ decode`` is a fixed point over ≥1000 gene
 trees. That proves Python is self-consistent — never that it *agrees with another
 host*. The two are complementary and neither subsumes the other.
 
-``<dir>`` defaults to ``../wire-format-fixtures/conformance/fuzz-samples`` (the
+``<dir>`` defaults to ``conformance/fuzz-samples`` under the corpus root —
+``FUARAN_WIRE_FIXTURES`` when set, else ``../wire-format-fixtures`` (the
 canonical side-by-side workspace layout; the directory is git-ignored in the
 corpus repo — the samples are generated, never committed).
 
@@ -77,10 +78,13 @@ from typing import Any
 
 from ..ops import decode_op, encode_op
 from ..schema import decode_node, encode_node
+from .corpus_root import CorpusRootRefused, resolve_corpus_root
 
-# fuzz_exchange.py → conformance → fuaran_ui → src → fuaran-py → Fuaran-UI
-_REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_SAMPLES_DIR = _REPO_ROOT.parent / "wire-format-fixtures" / "conformance" / "fuzz-samples"
+
+def default_samples_dir() -> Path:
+    """``conformance/fuzz-samples`` under the corpus root (``FUARAN_WIRE_FIXTURES``, else the sibling)."""
+    return resolve_corpus_root() / "conformance" / "fuzz-samples"
+
 
 #: The sub-directory naming this host's canonical output — the ``<host>`` the F#
 #: converse leg is pointed at (``--check-fuzz-samples <dir> python``).
@@ -176,7 +180,11 @@ def run(
 
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
-    samples_dir = Path(args[0]).resolve() if args else DEFAULT_SAMPLES_DIR
+    try:
+        samples_dir = Path(args[0]).resolve() if args else default_samples_dir()
+    except CorpusRootRefused as refused:
+        print(f"\n  FATAL: {refused}", file=sys.stderr)
+        return 2
 
     try:
         result = run(samples_dir)

@@ -26,6 +26,7 @@ hypothesis = pytest.importorskip("hypothesis", reason="hypothesis (dev extra) dr
 from hypothesis import given, settings  # noqa: E402
 from hypothesis import strategies as st  # noqa: E402
 
+from fuaran_ui.conformance.corpus_root import resolve_corpus_root  # noqa: E402
 from fuaran_ui.schema import decode_node, encode_node  # noqa: E402
 from fuaran_ui.schema import types as t  # noqa: E402
 from fuaran_ui.ui import action, binding, encode, fuaran  # noqa: E402
@@ -224,7 +225,7 @@ def test_generated_wire_is_schema_valid(node: object) -> None:
 
     schema_path = Path(__file__).resolve().parents[1] / "conformance" / "corpus" / "schema.json"
     if not schema_path.is_file():  # fall back to the authority when the snapshot is absent
-        schema_path = Path(__file__).resolve().parents[2] / "wire-format-fixtures" / "schema.json"
+        schema_path = resolve_corpus_root() / "schema.json"
     validator = jsonschema.Draft202012Validator(json.loads(schema_path.read_text(encoding="utf-8")))
 
     wire = encode(node)

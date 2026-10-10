@@ -24,6 +24,8 @@ from pathlib import Path
 
 import pytest
 
+from fuaran_ui.conformance.corpus_root import resolve_corpus_root
+
 _SRC = Path(__file__).resolve().parents[1] / "src" / "fuaran_ui" / "validator" / "validate.py"
 _DECL = Path(__file__).resolve().parents[1] / "validator-coverage.json"
 
@@ -72,11 +74,9 @@ def test_every_declared_code_is_raised() -> None:
 def test_raised_code_is_in_the_canonical_vocabulary(code: str) -> None:
     """A code this host invented would otherwise look like coverage."""
     vocab_path = None
-    for parent in Path(__file__).resolve().parents:
-        candidate = parent / "wire-format-fixtures" / "validator" / "defect-vocabulary.json"
-        if candidate.is_file():
-            vocab_path = candidate
-            break
+    candidate = resolve_corpus_root() / "validator" / "defect-vocabulary.json"
+    if candidate.is_file():
+        vocab_path = candidate
     if vocab_path is None:
         pytest.skip("wire-format-fixtures/validator not found")
     vocab = {e["code"] for e in json.loads(vocab_path.read_text(encoding="utf-8"))["codes"]}

@@ -64,6 +64,14 @@
 # no fixture changed: confirming it costs one command, and discovering it costs a withdrawn
 # tag (the version cannot simply be re-tagged — `skip-existing` is absent above, on purpose).
 #
+# The pre-tag check runs this same refusal BEFORE the tag exists, against the specification's
+# `main` as its remote reports it now rather than the local clone's HEAD (which is whatever it last
+# fetched - a snapshot that matched the clone and was a commit behind `main` is how 0.9.0 was refused):
+#
+#     python conformance/sync_corpus.py --check --remote       # or: pwsh ./run.ps1 -ReleaseCheck
+#
+# Exit 0 means a tag will pass the refusal below; 2 means re-sync first; 1 means it could not ask.
+#
 # Do NOT "fix" this by making `--check` diff the payload instead. That would report a stale
 # snapshot as current whenever the authority's change happened to miss the copied set, which
 # is precisely the state a release must not be able to enter unknowingly.
@@ -129,7 +137,11 @@ jobs:
       #
       # Needs no install: the check is standard library plus git.
       - name: Refuse a corpus snapshot behind the authority
-        run: python conformance/sync_corpus.py --check
+        run: |
+          python conformance/sync_corpus.py --check || {
+            echo "::error::The committed corpus snapshot is behind the specification. This tag cannot publish: withdraw it, re-sync (python conformance/sync_corpus.py) and commit, then tag a NEW version. Next time run the pre-tag check BEFORE tagging: python conformance/sync_corpus.py --check --remote (or pwsh ./run.ps1 -ReleaseCheck)."
+            exit 1
+          }
 
       - name: Install
         run: |

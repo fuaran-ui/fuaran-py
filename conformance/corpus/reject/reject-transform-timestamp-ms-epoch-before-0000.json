@@ -1,0 +1,1 @@
+{"id":"reject-transform-timestamp-ms-epoch-before-0000","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"t":{"validity":[true],"values":[-62167219200001]}},"schema":[{"name":"t","type":"timestamp_ms"}]}}}}

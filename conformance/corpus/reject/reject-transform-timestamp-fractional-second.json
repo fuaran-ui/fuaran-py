@@ -1,0 +1,1 @@
+{"id":"reject-transform-timestamp-fractional-second","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"t":{"validity":[true],"values":["2025-07-08T18:40:00.5Z"]}},"schema":[{"name":"t","type":"timestamp"}]}}}}

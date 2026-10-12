@@ -27,8 +27,33 @@ BOOL = "bool"
 STRING = "string"
 DATE = "date"
 TIMESTAMP = "timestamp"
+# The three sub-second timestamp units (Phase 2206, fuaran-core#422).
+TIMESTAMP_MS = "timestamp_ms"
+TIMESTAMP_US = "timestamp_us"
+TIMESTAMP_NS = "timestamp_ns"
 
-COLUMN_TYPES: tuple[str, ...] = (INT, FLOAT, BOOL, STRING, DATE, TIMESTAMP)
+COLUMN_TYPES: tuple[str, ...] = (
+    INT,
+    FLOAT,
+    BOOL,
+    STRING,
+    DATE,
+    TIMESTAMP,
+    TIMESTAMP_MS,
+    TIMESTAMP_US,
+    TIMESTAMP_NS,
+)
+
+# The timestamp family (WIRE_FORMAT §3.6.25): each tag's unit as the fraction digits
+# it holds. Every unit carries one canonical instant text per instant, so a timestamp
+# cell's kind is ``TIMESTAMP`` whichever unit its column declares; a coarser unit
+# widens into a finer one.
+TIMESTAMP_UNIT_DIGITS: dict[str, int] = {
+    TIMESTAMP: 0,
+    TIMESTAMP_MS: 3,
+    TIMESTAMP_US: 6,
+    TIMESTAMP_NS: 9,
+}
 
 
 # ── Cell — one realized scalar, or the first-class null/NA marker ────────────
@@ -91,6 +116,9 @@ def default_for(ty: str) -> Cell:
         STRING: Cell(STRING, ""),
         DATE: Cell(DATE, ""),
         TIMESTAMP: Cell(TIMESTAMP, ""),
+        TIMESTAMP_MS: Cell(TIMESTAMP, ""),
+        TIMESTAMP_US: Cell(TIMESTAMP, ""),
+        TIMESTAMP_NS: Cell(TIMESTAMP, ""),
     }[ty]
 
 

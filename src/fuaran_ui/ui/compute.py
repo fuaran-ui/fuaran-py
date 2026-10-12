@@ -74,7 +74,7 @@ from ..dataframe import (
     eval_pipeline,
 )
 from ..dataframe import codec as _codec
-from ..dataframe.model import NULL
+from ..dataframe.model import NULL, TIMESTAMP_UNIT_DIGITS
 from ..model import Arr, Obj
 from ..model import Value as WireValue
 
@@ -493,7 +493,7 @@ def _cell_of(ty: str, v: object) -> Cell:
         return cell_bool(bool(v))
     if ty == "date":
         return cell_date(str(v))
-    if ty == "timestamp":
+    if ty in TIMESTAMP_UNIT_DIGITS:
         return cell_timestamp(str(v))
     return cell_str(str(v))
 

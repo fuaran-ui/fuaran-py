@@ -30,6 +30,7 @@ from .model import (
     FLOAT,
     INT,
     STRING,
+    TIMESTAMP_UNIT_DIGITS,
     UNBOUND_PARAM,
     UNKNOWN_COLUMN,
     UNRESOLVED_SOURCE,
@@ -291,12 +292,14 @@ def _cast_cell(ty: str, c: Cell) -> Result[Cell, EvalError]:
         if c.kind == STRING:
             return Ok(cell_date(str(c.value)))
         return Err(EvalError("TYPE_ERROR", "cannot cast to date"))
-    if ty == "timestamp":
+    if ty in TIMESTAMP_UNIT_DIGITS:
+        # Phase 2206 — a cast to any unit keeps the instant's one canonical text; the
+        # unit is a statement about the column, not the cell.
         if c.kind == "timestamp":
             return Ok(c)
         if c.kind == STRING:
             return Ok(cell_timestamp(str(c.value)))
-        return Err(EvalError("TYPE_ERROR", "cannot cast to timestamp"))
+        return Err(EvalError("TYPE_ERROR", f"cannot cast to {ty}"))
     return Err(EvalError("TYPE_ERROR", f"unknown cast type {ty}"))
 
 

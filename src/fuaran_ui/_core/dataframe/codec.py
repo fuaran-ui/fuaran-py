@@ -15,6 +15,7 @@ envelope on any wire-shape violation.
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 from ...canonical import encode_value
@@ -32,6 +33,7 @@ from .model import (
     NOT_JSON,
     NULL,
     SCALAR_FNS,
+    TIMESTAMP_UNIT_DIGITS,
     TYPE_MISMATCH,
     UNKNOWN_TYPE,
     WINDOW_FNS,
@@ -349,7 +351,9 @@ def _field_aliased(obj: object, canonical: str, alias: str) -> Result[Any, Colum
 def _iso_of_epoch_seconds(secs: int) -> str:
     days, sod = divmod(secs, 86400)
     z = days + 719468
-    era = (z if z >= 0 else z - 146096) // 146097
+    # Python's // already floors; the C-style negative bias would count one era too many
+    # (every instant before 0000-03-01 landed a day late — found by Phase 2206's 0000 vector).
+    era = z // 146097
     doe = z - era * 146097
     yoe = (doe - doe // 1460 + doe // 36524 - doe // 146096) // 365
     doy = doe - (365 * yoe + yoe // 4 - yoe // 100)
@@ -363,11 +367,96 @@ def _iso_of_epoch_seconds(secs: int) -> str:
 # ── cells / sources ──────────────────────────────────────────────────────────
 
 
+# Phase 2206 (fuaran-core#422) — the timestamp unit. The epoch seconds the canonical
+# instant text spells: 0000-01-01T00:00:00Z and 9999-12-31T23:59:59Z.
+_MIN_EPOCH_SECOND = -62_167_219_200
+_MAX_EPOCH_SECOND = 253_402_300_799
+_TIMESTAMP_TAG_OF_DIGITS = ("timestamp", "timestamp_ms", "timestamp_us", "timestamp_ns")
+
+
+def _days_in_month(y: int, m: int) -> int:
+    if m == 2:
+        return 29 if y % 4 == 0 and (y % 100 != 0 or y % 400 == 0) else 28
+    return 30 if m in (4, 6, 9, 11) else 31
+
+
+def _instant_fraction_digits(s: str) -> int | None:
+    """The fraction digits of a CANONICAL instant text (``YYYY-MM-DDThh:mm:ssZ``, or
+    ``YYYY-MM-DDThh:mm:ss.FZ`` with one to nine digits and no trailing zero, naming a
+    moment that exists), or ``None`` for any other text."""
+    n = len(s)
+    if n < 20 or s[4] != "-" or s[7] != "-" or s[10] != "T" or s[13] != ":" or s[16] != ":":
+        return None
+    parts = (s[0:4], s[5:7], s[8:10], s[11:13], s[14:16], s[17:19])
+    if not all(len(p) == len(p.encode()) and p.isdigit() for p in parts):
+        return None
+    y, mo, d, h, mi, se = (int(p) for p in parts)
+    if not (1 <= mo <= 12 and 1 <= d <= _days_in_month(y, mo) and h <= 23 and mi <= 59 and se <= 59):
+        return None
+    if n == 20:
+        return 0 if s[19] == "Z" else None
+    frac = s[20:-1]
+    if n > 30 or s[19] != "." or s[-1] != "Z" or frac.endswith("0"):
+        return None
+    if not (len(frac) == len(frac.encode()) and frac.isdigit()):
+        return None
+    return len(frac)
+
+
+def _decode_instant(col: str, ty: str, v: object) -> Result[Cell, ColumnError] | None:
+    """A timestamp column's present value at its unit (WIRE_FORMAT §3.6.25). TEXT is
+    read only in its canonical form, with a fraction no finer than the unit (a coarser
+    instant widens in unchanged — one instant has one text). An EPOCH NUMBER (whole-
+    valued, ``|x| < 9e15``) is read in a ``timestamp`` column by magnitude, as
+    fuaran-core#94 pinned it (≥ 1e11 ⇒ milliseconds, TRUNCATED to the second), and in a
+    sub-second column in its own unit with no guess; either way it must name an instant
+    in the years 0000–9999. ``None`` for a value of another JSON kind."""
+    digits = TIMESTAMP_UNIT_DIGITS[ty]
+    if isinstance(v, str):
+        n = _instant_fraction_digits(v)
+        if n is None:
+            return _err(
+                MALFORMED_SHAPE,
+                f"{col}: a {ty} value must be canonical ISO-8601 text, YYYY-MM-DDThh:mm:ssZ "
+                "or YYYY-MM-DDThh:mm:ss.FZ, naming a moment that exists",
+            )
+        if n > digits:
+            need = _TIMESTAMP_TAG_OF_DIGITS[(n + 2) // 3]
+            return _err(
+                MALFORMED_SHAPE,
+                f"{col}: a {ty} value's fraction is finer than the column's unit holds: {need} or finer is needed",
+            )
+        return Ok(cell_timestamp(v))
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    if isinstance(v, float) and not (math.isfinite(v) and v == math.floor(v)):
+        return None
+    if abs(v) >= 9e15:
+        return None
+    i = int(v)
+    if digits == 0:
+        # By magnitude; milliseconds TRUNCATE toward zero, as the reference's int64
+        # division does (a floor would move a negative instant a second earlier).
+        second, fraction = i, 0
+        if abs(i) >= 100_000_000_000:
+            second = -((-i) // 1000) if i < 0 else i // 1000
+    else:
+        second, fraction = divmod(i, 10**digits)
+    if not _MIN_EPOCH_SECOND <= second <= _MAX_EPOCH_SECOND:
+        return _err(
+            MALFORMED_SHAPE,
+            f"{col}: the epoch {i} names an instant outside the years 0000-9999 the canonical timestamp spells",
+        )
+    text = _iso_of_epoch_seconds(second)
+    if fraction:
+        text = f"{text[:19]}.{str(fraction).rjust(digits, '0').rstrip('0')}Z"
+    return Ok(cell_timestamp(text))
+
+
 def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError]:
     """Decode a present value into a cell of the declared column type. A float column
-    accepts an integer token (lossless widening); a timestamp column accepts an epoch
-    number (fuaran-core#94 — unit by magnitude: ≥ 1e11 ⇒ milliseconds, else seconds);
-    every other type requires its kind."""
+    accepts an integer token (lossless widening); a timestamp column of any unit reads
+    through ``_decode_instant``; every other type requires its kind."""
     if ty == "int" and isinstance(v, int) and not isinstance(v, bool):
         return Ok(cell_int(v))
     if ty == "float" and isinstance(v, bool) is False and isinstance(v, (int, float)):
@@ -378,14 +467,10 @@ def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError
         return Ok(cell_str(v))
     if ty == "date" and isinstance(v, str):
         return Ok(cell_date(v))
-    if ty == "timestamp" and isinstance(v, str):
-        return Ok(cell_timestamp(v))
-    if ty == "timestamp" and not isinstance(v, bool) and isinstance(v, (int, float)):
-        f = float(v)
-        if f == float(int(f)) and abs(f) < 9e15:
-            i = int(f)
-            secs = i // 1000 if abs(i) >= 100_000_000_000 else i
-            return Ok(cell_timestamp(_iso_of_epoch_seconds(secs)))
+    if ty in TIMESTAMP_UNIT_DIGITS:
+        r = _decode_instant(col, ty, v)
+        if r is not None:
+            return r
     return _err(TYPE_MISMATCH, f"column '{col}': expected {ty} value, got {_kind_name(v)}")
 
 

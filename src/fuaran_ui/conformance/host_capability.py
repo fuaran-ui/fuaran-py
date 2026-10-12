@@ -75,6 +75,7 @@ from .. import __version__
 from ..schema import types as _types
 from ..schema.decode import KNOWN_KINDS
 from ..ui import compute as _compute
+from .corpus_root import REPO_MARKER, RepoRootRefused, find_repo_root
 
 __all__ = [
     "MANIFEST_FORMAT",
@@ -308,21 +309,17 @@ def render(manifest: Mapping[str, Any]) -> str:
     return json.dumps(manifest, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+def _output_path(repo: Path) -> Path:
+    return repo / "conformance" / "host-capability-manifest.json"
 
 
-def _default_output() -> Path:
-    return _repo_root() / "conformance" / "host-capability-manifest.json"
+def _snapshot_authority(repo: Path) -> str | None:
+    """The corpus commit the snapshot in ``repo`` was taken from, when there is one.
 
-
-def _snapshot_authority() -> str | None:
-    """The corpus commit this host's bundled snapshot was taken from, when there is one.
-
-    Provenance, never a dependency: nothing in the generation reads the corpus, so an installed
-    package with no snapshot beside it produces the same tokens with ``corpusAuthority`` null.
+    Provenance, never a dependency: nothing in the generation reads the corpus, so a checkout with
+    no snapshot produces the same tokens with ``corpusAuthority`` null.
     """
-    snapshot = _repo_root() / "conformance" / "corpus" / "snapshot.json"
+    snapshot = repo / "conformance" / "corpus" / "snapshot.json"
     if not snapshot.is_file():
         return None
     try:
@@ -333,14 +330,35 @@ def _snapshot_authority() -> str | None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """``--check`` (default) compares the published artefact; ``--write`` regenerates it."""
+    """``--check`` (default) compares the published artefact; ``--write`` regenerates it.
+
+    The artefact is the one in the checkout the caller names (``--repo``) or is standing in - never
+    the one this module was imported from, which under an editable install is whichever checkout
+    the interpreter was set up in.
+    """
     parser = argparse.ArgumentParser(description="Generate or check this host's capability manifest (WIRE_FORMAT §27).")
     parser.add_argument("--write", action="store_true", help="rewrite the published artefact")
-    parser.add_argument("--out", type=Path, default=None, help="the artefact path (default: conformance/)")
+    parser.add_argument("--out", type=Path, default=None, help="the artefact path (default: conformance/ in the repo)")
+    parser.add_argument(
+        "--repo", type=Path, default=None, help="the checkout to operate on (default: the one cwd is in)"
+    )
     args = parser.parse_args(argv)
 
-    out = _default_output() if args.out is None else args.out
-    text = render(build(corpus_authority=_snapshot_authority()))
+    try:
+        repo = find_repo_root(args.repo)
+    except RepoRootRefused as refused:
+        print(refused, file=sys.stderr)
+        return 2
+    if repo is None:
+        print(
+            f"{Path.cwd()} is not inside a fuaran-py checkout (no {REPO_MARKER.as_posix()} above it). "
+            "Run this from the checkout to operate on, or name it with --repo.",
+            file=sys.stderr,
+        )
+        return 2
+
+    out = _output_path(repo) if args.out is None else args.out
+    text = render(build(corpus_authority=_snapshot_authority(repo)))
 
     if args.write:
         out.parent.mkdir(parents=True, exist_ok=True)

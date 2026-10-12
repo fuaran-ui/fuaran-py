@@ -23,6 +23,9 @@ import dataclasses
 import functools
 import json
 import operator
+import os
+import subprocess
+import sys
 import typing
 from pathlib import Path
 from types import SimpleNamespace
@@ -35,35 +38,13 @@ from fuaran_ui.conformance import host_capability as hc
 from fuaran_ui.model import Obj
 from fuaran_ui.schema import types as real_types
 
-# The published artefact and the snapshot beside it are REPOSITORY files, so they are
-# located from the test tree — the idiom `_corpus.py` already uses — and never from the
-# imported module. `hc._default_output()` / `hc._snapshot_authority()` walk four parents up
-# from `host_capability.py`, which lands on the repo root only in a src-layout CHECKOUT: CI
-# installs this package non-editably (`pip install ".[dev]"`), so under it those helpers
-# resolve `<sys.prefix>/lib/pythonX.Y/conformance/…` and every assertion below died with
-# `FileNotFoundError`. The helpers are right for what they are for — `python -m … --write`,
-# which is only ever run from a checkout — so the fix belongs on this side of the boundary.
-# Resolving the artefact here also makes the gate measure what it means: the bytes committed
-# in THIS repository against what the INSTALLED host's model generates.
+# The published artefact is a REPOSITORY file, so it is located from the test tree - the idiom
+# `_corpus.py` already uses - and the generator is asked about THAT checkout (`hc._snapshot_authority`
+# takes the repository it reads). Resolving the artefact here makes the gate measure what it means:
+# the bytes committed in THIS repository against what the INSTALLED host's model generates. CI installs
+# the package non-editably, where nothing about the module's own location names a checkout at all.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED = _REPO_ROOT / "conformance" / "host-capability-manifest.json"
-
-
-def _published_snapshot_authority() -> str | None:
-    """The corpus commit this repo's bundled snapshot records, or ``None`` when there is none.
-
-    The repo-located twin of ``hc._snapshot_authority()``; see the note above for why the
-    module-located one cannot answer under a non-editable install. Provenance only — the
-    generation reads no corpus.
-    """
-    snapshot = _REPO_ROOT / "conformance" / "corpus" / "snapshot.json"
-    if not snapshot.is_file():
-        return None
-    try:
-        recorded = json.loads(snapshot.read_text(encoding="utf-8")).get("authorityCommit")
-    except (OSError, ValueError):  # pragma: no cover — a torn snapshot is not a generation failure
-        return None
-    return recorded if isinstance(recorded, str) else None
 
 
 def _authoring_stub(**overrides: object) -> SimpleNamespace:
@@ -94,7 +75,7 @@ BASELINE = set(hc.build()["tokens"])
 def test_the_published_manifest_is_current() -> None:
     """The gate's whole job: a manifest regenerated from the model must equal the committed bytes."""
     assert PUBLISHED.is_file(), f"{PUBLISHED} is missing — run: python -m {hc.GENERATOR} --write"
-    expected = hc.render(hc.build(corpus_authority=_published_snapshot_authority()))
+    expected = hc.render(hc.build(corpus_authority=hc._snapshot_authority(_REPO_ROOT)))
     assert PUBLISHED.read_text(encoding="utf-8") == expected, (
         f"{PUBLISHED} is stale — run: python -m {hc.GENERATOR} --write"
     )
@@ -234,3 +215,104 @@ def test_the_manifest_matches_its_published_schema() -> None:
         pytest.skip(f"{schema_path} is absent — the corpus predates WIRE_FORMAT §27")
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     jsonschema.validate(json.loads(PUBLISHED.read_text(encoding="utf-8")), schema)
+
+
+# ── the generator writes to the tree it is run in (Phase 2225) ───────────────
+#
+# An editable install made in one checkout is importable from every other, so a generator that
+# located its target from `__file__` wrote into the checkout the interpreter's install pointed at.
+# From a git worktree run with the primary's interpreter that is the shared primary clone: the
+# worktree's `--write` exited 0, printed a path, and changed nothing in the worktree. These tests
+# run the REAL module as a subprocess, importing it from this checkout's `src/`, and stand in a
+# scratch checkout - so the "installed location" and the "tree it is run in" are different trees.
+
+_SYNC_MARKER = Path("conformance") / "sync_corpus.py"
+_SCRATCH_AUTHORITY = "ab" * 20
+
+
+def _scratch_checkout(root: Path) -> Path:
+    """A throwaway checkout: the marker file, and a snapshot recording a distinctive commit."""
+    (root / _SYNC_MARKER).parent.mkdir(parents=True)
+    (root / _SYNC_MARKER).write_text("# marker\n", encoding="utf-8")
+    snapshot = root / "conformance" / "corpus" / "snapshot.json"
+    snapshot.parent.mkdir()
+    snapshot.write_text(json.dumps({"authorityCommit": _SCRATCH_AUTHORITY, "kind": "corpusSnapshot"}), encoding="utf-8")
+    return root
+
+
+def _generate(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONPATH"] = str(_REPO_ROOT / "src")
+    return subprocess.run(
+        [sys.executable, "-m", hc.GENERATOR, *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+
+def _published_stamp() -> tuple[int, int]:
+    stat = PUBLISHED.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
+def test_write_lands_in_the_checkout_it_is_run_in_not_the_one_holding_the_module(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+    before = _published_stamp()
+
+    done = _generate(scratch, "--write")
+
+    target = scratch / "conformance" / "host-capability-manifest.json"
+    assert done.returncode == 0, done.stderr
+    assert target.is_file(), f"nothing was written under the invoking checkout: {done.stdout!r}"
+    assert _published_stamp() == before, "the module's own checkout was written to"
+    written = json.loads(target.read_text(encoding="utf-8"))
+    # Read from the SCRATCH snapshot, not this repository's: provenance follows the same root.
+    assert written["corpusAuthority"] == _SCRATCH_AUTHORITY
+
+
+def test_write_from_a_subdirectory_still_finds_the_enclosing_checkout(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+    (scratch / "docs" / "deep").mkdir(parents=True)
+
+    assert _generate(scratch / "docs" / "deep", "--write").returncode == 0
+    assert (scratch / "conformance" / "host-capability-manifest.json").is_file()
+
+
+def test_an_explicit_repo_wins_over_the_invoking_directory(tmp_path: Path) -> None:
+    named = _scratch_checkout(tmp_path / "named")
+    standing_in = _scratch_checkout(tmp_path / "standing-in")
+
+    assert _generate(standing_in, "--write", "--repo", str(named)).returncode == 0
+    assert (named / "conformance" / "host-capability-manifest.json").is_file()
+    assert not (standing_in / "conformance" / "host-capability-manifest.json").exists()
+
+
+def test_check_reads_the_artefact_of_the_invoking_checkout(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+
+    missing = _generate(scratch)
+    assert missing.returncode == 1 and "does not exist" in missing.stderr
+    assert _generate(scratch, "--write").returncode == 0
+    assert _generate(scratch).returncode == 0
+
+
+def test_run_outside_any_checkout_refuses_rather_than_falling_back_to_the_module(tmp_path: Path) -> None:
+    before = _published_stamp()
+    outside = tmp_path / "nowhere"
+    outside.mkdir()
+
+    done = _generate(outside, "--write")
+
+    assert done.returncode == 2
+    assert "--repo" in done.stderr
+    assert _published_stamp() == before
+    assert not (outside / "conformance").exists()
+
+
+def test_an_explicit_repo_that_is_not_a_checkout_is_refused(tmp_path: Path) -> None:
+    done = _generate(tmp_path, "--write", "--repo", str(tmp_path))
+    assert done.returncode == 2
+    assert "not a fuaran-py checkout" in done.stderr

@@ -24,78 +24,82 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
-from typing import Literal, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from ..canonical import encode_value
 from ..model import Arr, Obj, Value
 from ..model import Node as WireNode
+from . import generated as _g
 
 # ── Bare-string enum vocabularies (WIRE_FORMAT.md §3.5) ─────────────────────
 # Each encodes as the bare string itself, so a ``Literal[...]`` alias is both the
-# author-facing type and the wire value — no runtime enum object needed.
+# author-facing type and the wire value — no runtime enum object needed. Every
+# alias here is the GENERATED one (``generated.py``, from ``idl.json``, Phase 2296):
+# this module names it and documents it, and never re-lists its cases, so an enum
+# case the IDL gains reaches the authoring type by regeneration alone.
 
-Tone = Literal["Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info"]
-Weight = Literal["Compact", "Standard", "Spacious"]
-Emphasis = Literal["Quiet", "Normal", "Loud"]
-Orientation = Literal["Vertical", "Horizontal"]
-BadgeVariant = Literal["Neutral", "Brand", "Success", "Warning", "Critical", "Info"]
-HeadingVariant = Literal["Standard", "Eyebrow", "Caption", "Lead"]
-ButtonVariant = Literal["Primary", "Secondary", "Tertiary", "Destructive"]
-ChartKind = Literal["Line", "Bar", "Area", "Pie", "Scatter", "Heatmap"]
+Tone = _g.ToneVariant
+Weight = _g.StyleWeight
+Emphasis = _g.Emphasis
+Orientation = _g.Orientation
+BadgeVariant = _g.BadgeVariant
+HeadingVariant = _g.HeadingVariant
+ButtonVariant = _g.ButtonVariant
+ChartKind = _g.ChartKind
 #: Which edge of the chart the series legend occupies — or ``"None"``, which
 #: suppresses it entirely. A WIRE vocabulary: WHERE an author wants the legend is
 #: their meaning; the geometry that puts it there stays the host's chart style,
 #: which carries the default (``"Right"``). An explicit value beats it.
-ChartLegendPosition = Literal["Top", "Right", "Bottom", "None"]
+ChartLegendPosition = _g.ChartLegendPosition
 #: Data labels, with exactly two states. ``"Ends"`` names the SELECTIVE
 #: placements that read — a bar's cap, the last point of a line or area edge —
 #: and the set is closed there; an all-points case would retract the legibility
 #: guarantee the vocabulary exists for. Absent means ``"Off"``.
-ChartDataLabels = Literal["Off", "Ends"]
+ChartDataLabels = _g.ChartDataLabels
 #: What a chart's x axis MEANS — DECLARED, never sniffed. Absent means
 #: ``"Category"`` (one band per row, in row order); ``"Temporal"`` says the x
 #: column carries canonical ISO-8601 dates and the axis is continuous. The
 #: pre-emit validator grounds the declaration against the column type where the
 #: schema is statically known (FUARAN097).
-ChartXScale = Literal["Category", "Temporal"]
+ChartXScale = _g.ChartXScale
 #: Sort direction on a :class:`DefaultSort`. Lower-case on the wire, unlike the
 #: capitalised display vocabularies above — the wire's own spelling, not a style.
-SortDirection = Literal["asc", "desc"]
+SortDirection = _g.SortDirection
 #: Phase 812 — anti-scraper render strategy for a :class:`Link`. ``"email"``
 #: marks a ``mailto:`` link whose address must not appear in plaintext in emitted
 #: HTML; the renderers own the emission strategy.
-LinkProtection = Literal["email"]
-StyleRole = Literal["None", "Eyebrow", "Data", "Lede", "Caption"]
-FontVoice = Literal["Default", "Display", "Structural"]
-LiveRegion = Literal["polite", "assertive", "off"]
-ImageVariant = Literal["Default", "Avatar", "Rounded"]
+LinkProtection = _g.LinkProtection
+StyleRole = _g.StyleRole
+FontVoice = _g.FontVoice
+LiveRegion = _g.LiveRegionKind
+ImageVariant = _g.ImageVariant
 # fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). Closed
 # TOKEN vocabularies, never CSS values: `ImageAspect` names one of four ratios and
 # carries no number, pair or stylesheet spelling. `fit` says what happens to
 # pixels that do not match the box; `aspectRatio` reserves the box BEFORE the
 # image arrives; a host derives neither from the other.
-ImageFit = Literal["Natural", "Cover", "Contain"]
-ImageAspect = Literal["Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"]
+ImageFit = _g.ImageFit
+ImageAspect = _g.ImageAspect
 # `Eager` is the default deliberately, and it is not the "unoptimised" value:
 # deferring an above-the-fold image DELAYS the largest contentful paint, and only
 # the author knows where the image sits — so the format declines to guess.
-ImageLoading = Literal["Eager", "Lazy"]
-ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
+ImageLoading = _g.ImageLoading
+ScrollOrientation = _g.ScrollOrientation
 #: Phase 1811 — ``DateTimeVariant`` (was ``DateVariant``): the temporal breadth of a
 #: ``DateTime`` / ``DateTimeRange`` field. The three cases did not move.
-DateTimeVariant = Literal["Date", "Time", "DateTime"]
-MathDisplay = Literal["Inline", "Block"]
+DateTimeVariant = _g.DateTimeVariant
+MathDisplay = _g.MathDisplay
 #: Text alignment for a `Drawing`'s `Label` shape — SVG's `text-anchor`, in the
 #: wire's own capitalised spelling. Absent means the renderer's inherited default.
-TextAnchor = Literal["Start", "Middle", "End"]
+TextAnchor = _g.TextAnchor
 #: Which way a `Mount`'s guest channel carries messages. `OutOnly` is the guest
 #: bubbling up with no host→guest leg; `TwoWay` opens both.
-ChannelDirection = Literal["OutOnly", "TwoWay"]
-IconSize = Literal["Small", "Medium", "Large"]  # Phase 821 — the Icon display kind
+ChannelDirection = _g.ChannelDirection
+IconSize = _g.IconSize  # Phase 821 — the Icon display kind
 # fuaran#867 — which direction of movement is an improvement. `Neutral` is
 # RESERVED and deliberately absent: the slot is an enum precisely so that a later
 # admission is a bare-string addition rather than a type replacement.
-TrendPolarity = Literal["HigherIsBetter", "LowerIsBetter"]
+TrendPolarity = _g.TrendPolarity
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -221,7 +225,7 @@ class Selection:
         return _obj("Selection", {"defaultValue": self.default_value, "field": self.field, "nodeId": self.node_id})
 
 
-TimeGrain = Literal["Second", "Minute", "Hour", "Day"]
+TimeGrain = _g.TimeGrain
 
 
 @dataclass(frozen=True)
@@ -250,16 +254,16 @@ class Now:
 # Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
 # ``DateTime`` carries ``dateStyle`` / ``timeStyle`` (bare enums, not a format string).
 
-DateStyle = Literal["Short", "Medium", "Long", "Full"]
+DateStyle = _g.DateStyle
 # Phase 1810 — the time-of-day half of the platform formatter's style pair. The
 # same four spellings as ``DateStyle``, deliberately a separate closed set.
-TimeStyle = Literal["Short", "Medium", "Long", "Full"]
-RelativeTimeUnit = Literal["Second", "Minute", "Hour", "Day", "Week", "Month", "Year"]
+TimeStyle = _g.TimeStyle
+RelativeTimeUnit = _g.RelativeTimeUnit
 # Phase 819 — the numeric source counts this unit (Seconds = 1, Minutes = 60,
 # Hours = 3600); presentation is `Compact` "1h 20m", `Clock` "1:20:00",
 # `Long` "1 hour 20 minutes".
-DurationUnit = Literal["Seconds", "Minutes", "Hours"]
-DurationStyle = Literal["Compact", "Clock", "Long"]
+DurationUnit = _g.DurationUnit
+DurationStyle = _g.DurationStyle
 
 
 @dataclass(frozen=True)
@@ -820,7 +824,7 @@ class Focus:
         return Obj("Focus", {"nodeId": self.node_id})
 
 
-FileReadEncoding = Literal["Text", "Base64", "DataUrl"]
+FileReadEncoding = _g.FileReadEncoding
 
 
 @dataclass(frozen=True)
@@ -1226,7 +1230,7 @@ class Kind(Protocol):
 # :func:`GridLayout` / :func:`Dashboard` / :func:`Card`) survive as thin
 # Box-emitting conveniences below.
 
-BoxRole = Literal["Group", "Card", "Dashboard", "Separator"]
+BoxRole = _g.BoxRole
 """What a ``Box`` means — drives the emitted element, ARIA landmark, and chrome."""
 
 
@@ -1494,11 +1498,13 @@ class Modal:
     #: no handler.
     on_dismiss: Action | None = field(default_factory=Chain)
     heading: TextSource | None = None
-    #: fuaran#1119 — `Blocking` is the identity and omits at it, so every modal
-    #: written before this member is byte-identical. The two differ in ONE claim
-    #: a host makes: a blocking surface asserts the page behind it is inert, an
-    #: anchored one does not, because the page behind it genuinely is not.
-    modality: ModalityKind = "Blocking"
+    #: fuaran#1119 — `Modal` (the blocking surface) is the identity and omits at
+    #: it, so every modal written before this member is byte-identical. The two
+    #: differ in ONE claim a host makes: a blocking surface asserts the page behind
+    #: it is inert, an anchored one does not, because the page behind it genuinely
+    #: is not. (This host spelled the identity `Blocking` until Phase 2296, a
+    #: token the wire never had; the generated vocabulary corrected it.)
+    modality: ModalityKind = "Modal"
     #: fuaran#1119 — the node the anchored surface is positioned against. Where
     #: it sits, which way it flips at a viewport edge and how far off it stands
     #: are the RENDERER's, not the document's.
@@ -1512,7 +1518,7 @@ class Modal:
                 "children": list(self.children),
                 "dismissable": self.dismissable,
                 "heading": self.heading,
-                "modality": None if self.modality == "Blocking" else self.modality,
+                "modality": None if self.modality == "Modal" else self.modality,
                 "onDismiss": self.on_dismiss,
                 "open": self.open,
             },
@@ -1880,26 +1886,26 @@ MediaKind = Video | Audio
 #: is deliberately absent: its cues are rendered by no user agent and read only
 #: by script, so a declarative document naming it would state an intent no
 #: conformant host could honour without leaving the vocabulary.
-TrackKind = Literal["Subtitles", "Captions", "Descriptions", "Chapters"]
+TrackKind = _g.TrackKind
 
 #: fuaran#1111 — the sandbox relaxations an `Embed` may request. The EMPTY list
 #: is total denial and is the identity, so the shortest embed document is the
 #: fully-sandboxed one and every relaxation is something a caller names.
-EmbedPermission = Literal["AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"]
+EmbedPermission = _g.EmbedPermission
 
 #: fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
 #: There is no display-capture case and there will not be one by widening this:
 #: a screen capture reaches every window the reader has open rather than one
 #: device behind the picker, so it is a different class of thing.
-CaptureSource = Literal["Camera", "Microphone"]
+CaptureSource = _g.CaptureSource
 
 #: fuaran#1119 — the modal's modality. The two differ in ONE claim: a blocking
 #: surface asserts the page behind it is inert; an anchored one does not.
-ModalityKind = Literal["Blocking", "Popover"]
+ModalityKind = _g.ModalityKind
 
 #: fuaran#1472 — the declared base direction, LOWER-CASE because that is the
 #: spelling the isolation is ultimately expressed in. `auto` is the identity.
-TextDirection = Literal["auto", "ltr", "rtl"]
+TextDirection = _g.TextDirection
 
 
 @dataclass(frozen=True)
@@ -3242,10 +3248,10 @@ FormFieldKind = (
 # the CONTROL. An optional record field rather than a discriminator case, so a
 # form authored before it encodes byte-identically.
 
-CompareOp = Literal["eq", "neq", "lt", "lte", "gt", "gte"]
+CompareOp = _g.CompareOp
 
 #: The `format` shorthands a text control can honour.
-RuleFormat = Literal["email", "url", "tel"]
+RuleFormat = _g.TextFormat
 
 
 @dataclass(frozen=True)
@@ -3745,8 +3751,8 @@ class Switch:
 
 # Fragment parameterisation (holes / effect / args) — WIRE_FORMAT.md §3.2 -----
 
-HostEffect = Literal["Pure", "ReadsHost", "WritesHost"]
-Determinism = Literal["Deterministic", "Clock", "Random", "Network"]
+HostEffect = _g.HostEffect
+Determinism = _g.DeterminismSource
 
 
 @dataclass(frozen=True)

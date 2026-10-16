@@ -761,12 +761,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         dismissable: bool = False,
         on_dismiss: Action | None = _NO_OP_DISMISS,
         heading: t.TextInput | None = None,
-        modality: t.ModalityKind = "Blocking",
+        modality: t.ModalityKind = "Modal",
         anchor: str | None = None,
     ) -> UiNode:
         """A modal surface, in one of TWO modalities (fuaran#1119).
 
-        `Blocking` is the default and the identity: it asserts the page behind it
+        `Modal` is the default and the identity: it asserts the page behind it
         is INERT, and a host emits `aria-modal` to say so. `Popover` is the
         NON-BLOCKING anchored surface, and it carries the dialog role WITHOUT
         that claim — the page behind it is genuinely still available, and a host

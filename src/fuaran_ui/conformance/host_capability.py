@@ -72,8 +72,8 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .. import __version__
+from ..schema import generated as _generated
 from ..schema import types as _types
-from ..schema.decode import KNOWN_KINDS
 from ..ui import compute as _compute
 from .corpus_root import REPO_MARKER, RepoRootRefused, find_repo_root
 
@@ -100,8 +100,8 @@ GENERATOR = "fuaran_ui.conformance.host_capability"
 #:
 #: This is a NAME correspondence, not a token list: it says which of the host's aliases *is* a given
 #: wire union, and every token is still derived from the alias's members. A wrong entry cannot
-#: survive — ``tests/test_host_capability_manifest.py`` checks each declared union against the
-#: corpus IDL, and a host alias may only ever be a SUBSET of the spec union's cases.
+#: survive — :func:`build` refuses a scoped union, or a declared case, the generated vocabulary does
+#: not carry, and a host alias may only ever be a SUBSET of the spec union's cases.
 SPEC_UNION_ALIASES: Mapping[str, str] = {
     "Action": "Action",
     "Binding": "Binding",
@@ -254,11 +254,23 @@ def build(
     kind_tokens = _kind_tokens(source, frozenset(union_members))
 
     declared_kinds = {token.split(".", 1)[1] for token in kind_tokens}
-    unknown = sorted(declared_kinds - set(KNOWN_KINDS))
+    unknown = sorted(declared_kinds - set(_generated.KINDS))
     if unknown:
-        # A kind this host can author but cannot decode is not a capability, it is a defect: the
-        # round trip a manifest exists to describe is author-then-decode. Refuse to publish it.
+        # A kind this host can author but the vocabulary does not declare is not a capability, it is
+        # a defect: the round trip a manifest exists to describe is author-then-decode, and the
+        # decoder's kind set IS the generated one. Refuse to publish it.
         raise ValueError(f"authoring kinds absent from the host's decode vocabulary: {', '.join(unknown)}")
+    # §27.1's unrecoverable direction, refused at generation rather than caught by a test: a scoped
+    # union the IDL does not have, or a declared case its union does not carry, is an
+    # OVER-declaration. The generated tables are the IDL (Phase 2296), so this needs no corpus.
+    stray = sorted(set(union_scope) - set(_generated.UNION_CASES))
+    if stray:
+        raise ValueError(f"scoped unions the vocabulary does not declare: {', '.join(stray)}")
+    invented = sorted(
+        token for token in union_tokens if token.split(".", 1)[1] not in _generated.UNION_CASES[token.split(".", 1)[0]]
+    )
+    if invented:
+        raise ValueError(f"declared union cases the wire does not have: {', '.join(invented)}")
 
     families: dict[str, Any] = {
         "kinds": {"covered": True},

@@ -337,7 +337,15 @@ def test_a_metric_with_speak_says_exactly_that_and_nothing_derived() -> None:
 
 def test_speak_on_an_announced_only_kind_replaces_the_announcement() -> None:
     field = {"id": "f1", "kind": {"$type": "Text", "value": _static("")}, "label": "One", "required": False}
-    form = _n("f", {"$type": "Form", "fields": [field, {**field, "id": "f2"}]})
+    form = _n(
+        "f",
+        {
+            "$type": "Form",
+            "fields": [field, {**field, "id": "f2"}],
+            "onSubmit": {"$type": "Chain", "ops": []},
+            "submitLabel": "Send",
+        },
+    )
     assert _texts(project_speech(_decode(form))[0]) == ["Form, 2 fields"]
     assert _texts(project_speech(_decode({**form, **_speaking("A two-question survey")}))[0]) == [
         "A two-question survey"

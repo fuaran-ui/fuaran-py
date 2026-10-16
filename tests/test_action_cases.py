@@ -16,13 +16,13 @@ import pytest
 
 from fuaran_ui import decode_node, encode_node
 
-# The four cases the Python `ACTION_CASES` set previously omitted, in
-# representative canonical-ish wire shapes (decoded structurally after the
-# discriminator is validated, so the exact fields round-trip verbatim).
+# The four cases the Python `ACTION_CASES` set previously omitted, in canonical
+# wire shapes. Two of them used member names the IDL does not declare (`tool`,
+# `key`) until Phase 2296 made each case's required members binding.
 FORMERLY_MISSING = {
     "Call": {"$type": "Call", "endpoint": "/api/x", "onResult": "<closure>"},
-    "AiTool": {"$type": "AiTool", "args": {"q": "x"}, "tool": "search"},
-    "CommitLocal": {"$type": "CommitLocal", "key": "draft"},
+    "AiTool": {"$type": "AiTool", "args": {"q": "x"}, "toolName": "search"},
+    "CommitLocal": {"$type": "CommitLocal", "nodeId": "draft"},
     "Invoke": {"$type": "Invoke", "args": [{"addr": "rows", "value": "all"}], "capabilityId": "model.score"},
 }
 

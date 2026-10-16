@@ -36,6 +36,7 @@ from _corpus import CORPUS_ROOT, corpus_required
 from fuaran_ui import __version__
 from fuaran_ui.conformance import host_capability as hc
 from fuaran_ui.model import Obj
+from fuaran_ui.schema import generated
 from fuaran_ui.schema import types as real_types
 
 # The published artefact is a REPOSITORY file, so it is located from the test tree - the idiom
@@ -159,23 +160,13 @@ def test_the_two_out_of_scope_unions_are_the_recorded_ones() -> None:
     assert "CellKindErased" in reason and "ColumnWidth" in reason
 
 
-# ── the corpus attestation ───────────────────────────────────────────────────
+# ── the vocabulary attestation ──────────────────────────────────────────────
 #
-# `idl.json` and `schemas/` are NOT part of the offline snapshot `conformance/sync_corpus.py`
-# copies, so a standalone checkout resolves `CORPUS_ROOT` to the snapshot and has neither. These
-# three attest against the authority when it is beside us and skip by name when it is not —
-# `corpus_required` alone would fail there, which reads as a defect in this host rather than as an
-# absent oracle.
+# These read the GENERATED vocabulary (`fuaran_ui.schema.generated`, Phase 2296), which is the IDL
+# this checkout carries, so they run on every checkout. Before it they read the authority corpus's
+# `idl.json` and skipped by name when it was absent — on a standalone checkout, and in a worktree.
 
 
-def _idl() -> dict:
-    path = CORPUS_ROOT / "idl.json"
-    if not path.is_file():
-        pytest.skip(f"{path} is absent — the offline snapshot does not carry the IDL")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-@corpus_required
 def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     """The one direction that matters: this host may LAG a wire union, never widen it.
 
@@ -183,8 +174,7 @@ def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     unrecoverable, because a consumer reads a genuine host gap as its own lag and is sent to fix
     code that is not wrong.
     """
-    idl = _idl()
-    spec_cases = {u["name"]: {c["tag"] for c in u["cases"]} for u in idl["unions"]}
+    spec_cases = {name: set(cases) for name, cases in generated.UNION_CASES.items()}
     published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
 
     for union in published["families"]["unionCases"]["scope"]:
@@ -198,13 +188,23 @@ def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     assert not invented, f"declared union cases the wire does not have: {sorted(invented)}"
 
 
-@corpus_required
 def test_no_declared_kind_is_outside_the_corpus_vocabulary() -> None:
-    idl = _idl()
-    spec_kinds = {k["tag"] for k in idl["kinds"]}
     published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
     declared = {t.split(".", 1)[1] for t in published["tokens"] if t.startswith("Kind.")}
-    assert not declared - spec_kinds, f"declared kinds the wire does not have: {sorted(declared - spec_kinds)}"
+    assert not declared - set(generated.KINDS), (
+        f"declared kinds the wire does not have: {sorted(declared - set(generated.KINDS))}"
+    )
+
+
+def test_the_generator_refuses_an_over_declared_union_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Falsifier for the refusal in ``build``: shrink one scoped union in the vocabulary the generator
+    reads, and a case this host does author becomes an over-declaration it will not publish."""
+    union = "LocaleSource"
+    assert union in json.loads(PUBLISHED.read_text(encoding="utf-8"))["families"]["unionCases"]["scope"]
+    shrunk = {**generated.UNION_CASES, union: generated.UNION_CASES[union][:1]}
+    monkeypatch.setattr(hc._generated, "UNION_CASES", shrunk)
+    with pytest.raises(ValueError, match="declared union cases the wire does not have"):
+        hc.build()
 
 
 @corpus_required

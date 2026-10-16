@@ -17,6 +17,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from typing import cast
 
+from ..canonical import encode_value
 from ..limits import MAX_EXPR_NODES, MAX_NODE_DEPTH, MAX_NODES, MAX_SKELETON_ROWS
 from ..model import Arr, Node, Obj, Value, from_json
 from ..result import (
@@ -870,36 +871,6 @@ def _omit_default_bool(default: bool) -> Callable[[object, str], object]:
     def dec(value: object, path: str) -> object:
         b = _expect_bool(value, path)
         return _DROP if b == default else b
-
-    return dec
-
-
-def _omit_default_binding_static_int(default: int) -> Callable[[object, str], object]:
-    """Phase 1585 — a ``Binding<int>`` slot omitted at the identity
-    ``Static(<default>)``.
-
-    The sibling of :func:`_omit_default_bool`, and the differences are the whole
-    reason it is its own function. A bool default has two inhabitants, so
-    "is it the default" and "which case is it" are the same question; a binding
-    default is one inhabitant of a union whose payload domain is unbounded, so
-    the test is on the CASE **and** its PAYLOAD — a ``Static`` carrying any other
-    index must survive, and so must every ``State`` / ``Filter`` / ``Selection``
-    / ``Query`` binding. Dropping on the tag alone would silently discard a
-    document's authored tab.
-
-    ``type(...) is int`` rather than ``== default``: Python makes ``False == 0``
-    and ``0.0 == 0`` both true, and the wire decoder above has already refused a
-    mistyped payload, so the only way one reaches here is a shape this function
-    must not quietly absorb.
-    """
-
-    def dec(value: object, path: str) -> object:
-        v = _decode_binding_int(value, path)
-        if isinstance(v, Obj) and v.tag == "Static":
-            payload = v.fields.get("value")
-            if type(payload) is int and payload == default:
-                return _DROP
-        return v
 
     return dec
 
@@ -2356,6 +2327,143 @@ def _unpack_schema(entry: SchemaEntry) -> tuple[str, bool, FieldDecoder, tuple[s
     return entry[0], entry[1], entry[2], ()
 
 
+# ── Schemas assembled from the generated field tables (Phase 2296) ─────────
+#
+# A kind's schema is its GENERATED field table (``generated.KIND_FIELDS``) read in declaration
+# order: the field set, each member's requiredness and every omit-at-default value come from
+# ``idl.json``, never from this file. What this file supplies is BEHAVIOUR — a decoder for a member
+# whose reading is not the one its IDL type implies (a lenient alias table, a limit, a relational
+# check), and the decode-only NAME aliases. A member with no override takes the decoder its type
+# implies (``_generic_decoder``); a member whose type implies none is an import-time failure, so a
+# field the IDL gains cannot fall through to the structural pass-through unread.
+
+#: One override: a decoder, or a decoder and the field's decode-only name aliases.
+Override = FieldDecoder | tuple[FieldDecoder, tuple[str, ...]]
+
+#: The records and unions whose decoders this module carries, keyed by their IDL name.
+_RECORD_DECODERS: dict[str, FieldDecoder] = {
+    "ViewBox": _decode_view_box,
+    "DrawStyle": _decode_draw_style,
+    "GuestChannel": _decode_guest_channel,
+    "ContentHash": _decode_json_value,
+}
+_UNION_DECODERS: dict[str, FieldDecoder] = {
+    "TextSource": _decode_text_source,
+    "Action": _decode_action,
+    "CellFormat": _decode_cell_format,
+    "MediaKind": _decode_media_kind,
+}
+#: ``Binding<arg>`` by the spelling of its argument type.
+_BINDING_DECODERS: dict[str, FieldDecoder] = {
+    "str": _decode_binding_string,
+    "bool": _decode_binding_bool,
+    "float": _decode_binding_float,
+    "int": _decode_binding_int,
+    "list<str>": _decode_binding_string_list,
+    "list<float>": _decode_binding_float_seq,
+    "list<record:SelectOption>": _decode_binding_select_options,
+    "list<record:MapMarker>": _decode_binding_marker_seq,
+}
+#: Lists, by the spelling of their element type.
+_LIST_DECODERS: dict[str, FieldDecoder] = {
+    "node": _decode_children,
+    "str": _decode_string_list,
+    "int": _decode_int_array,
+    "union:TextSource": _decode_text_source_array,
+    "union:Shape": _decode_shape_array,
+    "record:TreeItem": _decode_tree_items,
+    "record:TabHeader": _decode_tab_headers,
+    "record:TrackEntry": _decode_tracks,
+    "record:SrcSetEntry": _decode_srcset,
+    "enum:EmbedPermission": _decode_permissions,
+}
+_SCALAR_DECODERS: dict[str, FieldDecoder] = {
+    "str": _decode_string,
+    "int": _decode_int,
+    "float": _decode_number,
+    "bool": _decode_bool,
+    "node": _decode_single_node,
+    "fn": _decode_closure_slot,
+    "json": _decode_json_value,
+}
+
+
+def _spell(t: _g.T) -> str:
+    """A type's spelling — the key the tables above are read by."""
+    head = f"{t.kind}:{t.name}" if t.name is not None else t.kind
+    if t.of is not None:
+        head += f"<{_spell(t.of)}>"
+    return head
+
+
+def _generic_decoder(t: _g.T, field: str) -> FieldDecoder | None:
+    """The decoder a member's IDL type implies, or ``None`` when this module has no reading of it."""
+    if t.kind == "enum" and t.name is not None:
+        return _enum_decoder(_g.ENUM_SETS[t.name], field)
+    if t.kind == "union" and t.name == "Binding":
+        if not t.args:
+            return _decode_binding
+        return _BINDING_DECODERS.get(_spell(t.args[0]), _decode_binding)
+    if t.kind == "union" and t.name is not None:
+        return _UNION_DECODERS.get(t.name)
+    if t.kind == "record" and t.name is not None:
+        return _RECORD_DECODERS.get(t.name)
+    if t.kind == "list" and t.of is not None:
+        return _LIST_DECODERS.get(_spell(t.of))
+    if t.kind == "map" and t.of is not None:
+        if t.of.kind == "union" and t.of.name == "FragmentArg":
+            return _decode_fragment_args
+        if t.of.kind in ("json", "hosted"):
+            return _decode_json_value
+        return None
+    return _SCALAR_DECODERS.get(t.kind)
+
+
+def _omit_at_default(dec: FieldDecoder, default: object) -> FieldDecoder:
+    """Drop a member that decodes to its IDL-declared default (Phase 460 omit-when-default).
+
+    Equality is CANONICAL — the two values' wire bytes — so ``0`` never equals ``False``, a
+    ``Static(0)`` binding equals only another ``Static(0)``, and a record default compares member
+    for member. A decoder that already returned ``_DROP`` (a behaviour override with its own
+    identity rule) passes through.
+    """
+    identity = encode_value(from_json(default))
+
+    def omitting(value: object, path: str) -> object:
+        decoded = dec(value, path)
+        if decoded is _DROP:
+            return _DROP
+        return _DROP if encode_value(cast(Value, decoded)) == identity else decoded
+
+    return omitting
+
+
+def _kind_schema(kind: str, overrides: dict[str, Override] | None = None) -> list[SchemaEntry]:
+    """The schema of ``kind``: its generated field table, with ``overrides`` as behaviour.
+
+    Raises at import when an override names a member the IDL does not declare, or when a declared
+    member has neither an override nor a decoder its type implies.
+    """
+    overrides = overrides or {}
+    fields = [f for f in _g.KIND_FIELDS[kind] if f.on_wire]
+    stray = sorted(set(overrides) - {f.name for f in fields})
+    if stray:
+        raise RuntimeError(f"{kind}: overrides for members idl.json does not declare: {', '.join(stray)}")
+    entries: list[SchemaEntry] = []
+    for f in fields:
+        override = overrides.get(f.name)
+        aliases: tuple[str, ...] = ()
+        if isinstance(override, tuple):
+            override, aliases = override
+        dec = override if override is not None else _generic_decoder(f.type, f.name)
+        if dec is None:
+            raise RuntimeError(f"{kind}.{f.name}: no decoder reads the IDL type {_spell(f.type)}; add an override")
+        if f.optionality == "omitDefault":
+            dec = _omit_at_default(dec, f.default)
+        entries.append((f.name, f.required, dec, aliases))
+    return entries
+
+
 KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     "Heading": [
         ("level", True, _decode_int),
@@ -2637,51 +2745,18 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("multiple", False, _decode_bool),
         ("values", False, _decode_binding_string_list),
     ],
-    "Modal": [
-        ("children", True, _decode_children),
-        ("dismissable", True, _decode_bool),
-        # Phase 426 — `onDismiss` is OPTIONAL (omitted when declarative). Unlike the
-        # closure-sentinel handlers it is a genuine wire-survivable Action, so it
-        # decodes through the null-strict action decoder when present.
-        ("onDismiss", False, _decode_action),
-        ("open", True, _decode_binding_bool),
-        ("heading", False, _decode_text_source, ("title",)),
-        # fuaran#1119 — the modality. `Modal` is the identity and omits at it,
-        # so every modal written before this member is byte-identical; an
-        # unrecognised token is REFUSED rather than read as the default, because
-        # a document that meant `Popover` and misspelled it would otherwise trap
-        # focus and claim the page behind it inert.
-        ("modality", False, _omit_default_enum(MODALITY_KIND, {}, "Modal", "modality")),
-        ("anchor", False, _decode_string),
-    ],
-    "ScrollArea": [
-        ("children", True, _decode_children),
-        ("orientation", True, _enum_decoder(SCROLL_ORIENTATION, "orientation")),
-        ("maxHeight", False, _decode_int),
-        ("maxWidth", False, _decode_int),
-    ],
-    # ── The rest of the child-bearing vocabulary ─────────────────────────────
-    #
-    # Every kind below carries node-valued positions that reached the structural
-    # pass-through, so their children decoded as untagged generic objects: they
-    # round-tripped byte-exactly and were invisible to `walk_nodes` / `find_node`
-    # / `inspect_tree`, and `validate_node` did not descend into them — a
-    # duplicate id inside a `Disclosure` produced no `FUARAN-DUP-ID`.
-    #
-    # These entries are DELIBERATELY MINIMAL, on the Tabs/Stepper precedent
-    # below: they type the node positions and nothing else, leaving every other
-    # key to the structural preservation it already had. `children` is required
-    # here because the corpus schema requires it on all five, matching the
-    # Modal / ScrollArea / Box entries that already did.
-    "Disclosure": [
-        ("children", True, _decode_children),
-    ],
-    "SplitPanel": [
-        ("children", True, _decode_children),
-    ],
-    "SummaryList": [
-        ("children", True, _decode_children),
-    ],
+    # Phase 426 — `onDismiss` is a genuine wire-survivable Action, decoded null-strict when present.
+    # fuaran#1119 — `modality` omits at its identity `Modal`; an unrecognised token is REFUSED rather
+    # than read as the default, because a document that meant `Popover` and misspelled it would
+    # otherwise trap focus and claim the page behind it inert.
+    "Modal": _kind_schema("Modal", {"heading": (_decode_text_source, ("title",))}),
+    "ScrollArea": _kind_schema("ScrollArea"),
+    # Disclosure / SummaryList read the scoped `title` → `heading` alias before the schema runs
+    # (`_title_to_heading`). Until Phase 2296 these three typed `children` alone and left every
+    # other member to the structural pass-through; the generated table now types all of them.
+    "Disclosure": _kind_schema("Disclosure"),
+    "SplitPanel": _kind_schema("SplitPanel"),
+    "SummaryList": _kind_schema("SummaryList"),
     # ErrorBoundary's `child` / `fallback` and FragmentDecl's `body` are single
     # nodes rather than lists. The corpus schema models no spec for either kind,
     # so there is no oracle for their requiredness and none is asserted: the
@@ -2704,56 +2779,17 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     "FragmentRef": [
         ("args", False, _decode_fragment_args),
     ],
-    # Tabs / Stepper carry the language's only two ``Binding<int>`` slots, and
-    # had no typed schema at all — so the whole kind reached the structural
-    # pass-through and `activeIndex: true` decoded happily. Phase 1064 typed the
-    # numeric slot and nothing else, DELIBERATELY: the blast radius was the slot
-    # that phase was about, and it recorded the rest as residue. Requiredness
-    # follows the reference host: `activeIndex` is optional (`tryField`),
-    # `activeStep` required (`requireField`).
-    # `children` was added to both after the audit above: minimal is not the same
-    # as blind, and leaving a node-valued position structural is the one omission
-    # that costs more than it saves.
-    # Phase 1585 — `activeIndex` is omit-at-default (`Static(0)`), so the decoder
-    # drops the identity rather than carrying it: on the generic structural model
-    # the encoder re-emits exactly the fields present, so an explicit
-    # `{"$type":"Static","value":0}` carried through would make the pre-phase
-    # spelling a SECOND canonical form. `Stepper.activeStep` is deliberately NOT
-    # given the same treatment — it is IDL-`required`, not omit-at-default, and
-    # this decoder must not invent a rule the artefact does not state.
-    #
-    # Phase 1654 — the 1064 residue: BOTH SPECS ARE NOW COMPLETE against the
-    # corpus IDL's `kinds` entry for each, every member typed to the reference
-    # host's own reading (`JsonDecode.fs`'s `"Tabs"` / `"Stepper"` arms):
-    #   * `orientation` — omit-at-default `Horizontal`, the ordinary §3.6 enum
-    #     treatment, with the `Row`/`Column` aliases every other orientation slot
-    #     in this host accepts;
-    #   * `tabHeaders` — an array of records whose `label` is REQUIRED, so a
-    #     header with no label is now a `MISSING_FIELD` rather than a document
-    #     that round-trips perfectly and renders an unnamed tab;
-    #   * `tabTags` — an array of plain strings, refused by index;
-    #   * `activeTag` — the tag-side selection, a `Binding<string>`; the second
-    #     way a `Tabs` is live, which the validator already reads;
-    #   * `onSelect` / `onSelectTag` — `fn` slots, presence-only and normalised
-    #     to the sentinel (see `_decode_closure_slot`).
-    # `Stepper` gains the one member it was missing (`onSelect`). Nothing here
-    # invents a rule the IDL does not state — a member's requiredness, its
-    # omit-at-default and its type all come from that artefact.
-    "Tabs": [
-        ("activeIndex", False, _omit_default_binding_static_int(0)),
-        ("children", True, _decode_children),
-        ("orientation", False, _omit_default_enum(ORIENTATION, ORIENTATION_ALIASES, "Horizontal", "Orientation")),
-        ("tabHeaders", False, _decode_tab_headers),
-        ("tabTags", False, _decode_string_list),
-        ("activeTag", False, _decode_binding_string),
-        ("onSelect", False, _decode_closure_slot),
-        ("onSelectTag", False, _decode_closure_slot),
-    ],
-    "Stepper": [
-        ("activeStep", True, _decode_binding_int),
-        ("children", True, _decode_children),
-        ("onSelect", False, _decode_closure_slot),
-    ],
+    # Tabs / Stepper carry the language's only two ``Binding<int>`` slots. `Tabs.activeIndex` omits at
+    # its IDL default `Static(0)` (Phase 1585: an explicit identity carried through would make the
+    # pre-phase spelling a SECOND canonical form), compared on case AND payload, so any other index
+    # and every non-Static binding survives; `Stepper.activeStep` is IDL-required, not
+    # omit-at-default. `orientation` takes the `Row`/`Column` aliases every orientation slot here
+    # accepts (Phase 1654); `tabHeaders` labels are required, `onSelect` / `onSelectTag` are
+    # presence-only `fn` slots.
+    "Tabs": _kind_schema(
+        "Tabs", {"orientation": _enum_aliased_decoder(ORIENTATION, ORIENTATION_ALIASES, "Orientation")}
+    ),
+    "Stepper": _kind_schema("Stepper"),
     # Box (Phase 390) — decoded by a dedicated builder (`_decode_box`), not a flat
     # field schema, because it re-nests `layout` and role-validates.
     # Button gets a (minimal) typed schema so its two contract-bearing fields

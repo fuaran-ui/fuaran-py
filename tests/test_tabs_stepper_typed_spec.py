@@ -15,42 +15,15 @@ about whether a tree is valid at all, not as a failure anywhere.
 The oracle is the corpus IDL's ``kinds`` entry for each tag plus the reference
 decoder's own arms; every member's type, requiredness and omit-at-default comes
 from there rather than from this host's judgement. The completeness assertion
-below is derived from the IDL, so a member added to either kind arrives as a red
-test naming it.
+below is derived from the IDL. Since Phase 2296 the schema IS the IDL's field table (``_kind_schema``), so the
+member-completeness pin that stood here was deleted: a member either kind gains is typed by
+regeneration, or refuses to import with its name.
 """
 
 from __future__ import annotations
 
-import json
-
-import pytest
-
-from _corpus import CORPUS_ROOT
 from fuaran_ui import decode_node
 from fuaran_ui.schema.encode import encode_node
-
-_IDL = CORPUS_ROOT / "idl.json"
-idl_required = pytest.mark.skipif(not _IDL.is_file(), reason=f"corpus idl.json not found at {_IDL}")
-
-
-def _decoded_members(tag: str) -> set[str]:
-    from fuaran_ui.schema.decode import KIND_SCHEMAS  # noqa: PLC0415 — test-only introspection
-
-    return {entry[0] for entry in KIND_SCHEMAS[tag]}
-
-
-@idl_required
-@pytest.mark.parametrize("tag", ["Tabs", "Stepper"])
-def test_the_typed_spec_covers_every_member_the_idl_declares(tag: str) -> None:
-    kinds = {k["tag"]: k for k in json.loads(_IDL.read_text(encoding="utf-8"))["kinds"]}
-    declared = {f["name"] for f in kinds[tag]["fields"]}
-    typed = _decoded_members(tag)
-    assert declared - typed == set(), (
-        f"{tag} declares {sorted(declared - typed)} in the corpus IDL and this host types neither — those "
-        "members decode structurally, so a wrong-typed value round-trips byte-perfectly here and is "
-        "refused by the reference host. Add them to KIND_SCHEMAS."
-    )
-    assert typed - declared == set(), f"{tag} types {sorted(typed - declared)}, which the IDL does not declare"
 
 
 def _refusal(source: str) -> tuple[str, str]:

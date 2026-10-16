@@ -4286,45 +4286,75 @@ def _decode_filters(obj: dict, path: str) -> Obj:
     return Obj("Filters", fields)
 
 
-def _decode_style(value: object, path: str) -> Obj:
-    # Phase 460 / Phase 147 — every SemanticStyle field is omitted-when-default on
-    # the wire (`Emphasis.Normal` / `ToneVariant.Default` / `StyleWeight.Standard`
-    # / `StyleRole.None` / `FontVoice.Default`); the decoder restores each default
-    # on absence and drops explicit-default values, so an all-default style decodes
-    # to an EMPTY object (which the caller omits entirely). tone/weight/emphasis
-    # accept the §3.6 lenient-ingest aliases; role/voice do not.
-    obj = _expect_object(value, path)
+# The identity token of each SemanticStyle member (§3.6's omitted-when-default rule).
+_STYLE_DEFAULTS: dict[str, str] = {
+    "direction": "auto",
+    "emphasis": "Normal",
+    "role": "None",
+    "tone": "Default",
+    "voice": "Default",
+    "weight": "Standard",
+}
+
+
+def _decode_style_members(obj: dict, path: str) -> dict[str, Value]:
+    """Every SemanticStyle member PRESENT in ``obj``, default tokens included.
+
+    The one set of per-field token decoders, shared by the whole-record
+    ``SemanticStyle`` (:func:`_decode_style`, which then drops the defaults) and the
+    Phase 2291 ``StyleDelta`` (:func:`_decode_style_delta`, which keeps them).
+    tone/weight/emphasis accept the §3.6 lenient-ingest aliases; role/voice do not.
+    """
     fields: dict[str, Value] = {}
     if "emphasis" in obj:
-        v = _decode_emphasis_enum(obj["emphasis"], f"{path}.emphasis")
-        if v != "Normal":
-            fields["emphasis"] = v
+        fields["emphasis"] = _decode_emphasis_enum(obj["emphasis"], f"{path}.emphasis")
     if "tone" in obj:
-        v = _enum_aliased(obj["tone"], f"{path}.tone", TONE, TONE_ALIASES, "tone")
-        if v != "Default":
-            fields["tone"] = v
+        fields["tone"] = _enum_aliased(obj["tone"], f"{path}.tone", TONE, TONE_ALIASES, "tone")
     if "weight" in obj:
-        v = _enum_aliased(obj["weight"], f"{path}.weight", WEIGHT, {}, "weight")
-        if v != "Standard":
-            fields["weight"] = v
+        fields["weight"] = _enum_aliased(obj["weight"], f"{path}.weight", WEIGHT, {}, "weight")
     if "role" in obj:
-        r = _enum(obj["role"], f"{path}.role", STYLE_ROLE, "role")
-        if r != "None":
-            fields["role"] = r
+        fields["role"] = _enum(obj["role"], f"{path}.role", STYLE_ROLE, "role")
     if "voice" in obj:
-        vo = _enum(obj["voice"], f"{path}.voice", FONT_VOICE, "voice")
-        if vo != "Default":
-            fields["voice"] = vo
+        fields["voice"] = _enum(obj["voice"], f"{path}.voice", FONT_VOICE, "voice")
     # fuaran#1472 — the DECLARED base direction, and the only member of this
     # record that is not presentational. `emphasis`, `role`, `tone`, `voice` and
     # `weight` are statements a host may ignore and still render a document that
     # says the same thing; this one is a CORRECTNESS statement, so a host that
     # drops it renders a document that says something else.
     if "direction" in obj:
-        d = _enum(obj["direction"], f"{path}.direction", TEXT_DIRECTION, "direction")
-        if d != "auto":
-            fields["direction"] = d
-    return Obj(None, fields)
+        fields["direction"] = _enum(obj["direction"], f"{path}.direction", TEXT_DIRECTION, "direction")
+    return fields
+
+
+def _decode_style(value: object, path: str) -> Obj:
+    # Phase 460 / Phase 147 — every SemanticStyle field is omitted-when-default on
+    # the wire (`Emphasis.Normal` / `ToneVariant.Default` / `StyleWeight.Standard`
+    # / `StyleRole.None` / `FontVoice.Default` / `auto`); the decoder restores each
+    # default on absence and drops explicit-default values, so an all-default style
+    # decodes to an EMPTY object (which the caller omits entirely).
+    obj = _expect_object(value, path)
+    members = _decode_style_members(obj, path)
+    return Obj(None, {k: v for k, v in members.items() if v != _STYLE_DEFAULTS[k]})
+
+
+def _decode_style_delta(value: object, path: str) -> Obj:
+    """Phase 2291 — the ``PatchStyle`` payload, a ``StyleDelta``.
+
+    The same six members and token sets as ``SemanticStyle``, each OPTIONAL, and an
+    absent member means *leave this field as it is*: a present member SETS the
+    field, a default token included, so nothing is dropped here. A delta naming no
+    field is not an edit and is refused, ``WRONG_TYPE`` at the delta itself.
+    """
+    obj = _expect_object(value, path)
+    members = _decode_style_members(obj, path)
+    if not members:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "a StyleDelta must set at least one style field — an empty patch is not an edit",
+            "one or more of: " + ", ".join(sorted(_STYLE_DEFAULTS)),
+        )
+    return Obj(None, members)
 
 
 def _decode_accessibility(value: object, path: str) -> Obj:

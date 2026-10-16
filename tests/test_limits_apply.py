@@ -193,11 +193,12 @@ def test_a_batch_that_ends_within_the_limits_applies() -> None:
 
 def test_ops_that_cannot_grow_the_tree_still_apply_to_an_over_limit_tree() -> None:
     # A tree already past MaxDepth (built in memory, never decoded) is not this op's doing:
-    # UpdateProp / UpdateStyle / RemoveNode / ReorderChildren are not charged the walk.
+    # UpdateProp / UpdateStyle / PatchStyle / RemoveNode / ReorderChildren are not charged the walk.
     over = _chain(MAX_NODE_DEPTH + 1)
     deepest_md = _box("p", [_md("x"), _md("y")])
     over_with_list = _box("top", [over, deepest_md])
     assert isinstance(apply(Obj("UpdateStyle", {"style": Obj(None, {}), "target": "n1"}), over), Ok)
+    assert isinstance(apply(Obj("PatchStyle", {"style": Obj(None, {"tone": "Brand"}), "target": "n1"}), over), Ok)
     assert isinstance(apply(Obj("RemoveNode", {"target": "y"}), over_with_list), Ok)
     assert isinstance(apply(Obj("ReorderChildren", {"newOrder": Arr(["y", "x"]), "parentId": "p"}), over_with_list), Ok)
 

@@ -73,6 +73,7 @@
     "EditNode",
     "InsertChild",
     "MoveNode",
+    "PatchStyle",
     "RemoveNode",
     "ReorderChildren",
     "ReplaceBinding",
@@ -3198,6 +3199,30 @@
       "description": "MoveNode"
     },
     {
+      "id": "op-patchstyle",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-patchstyle.json",
+      "expectedFile": "ops/op-patchstyle.json",
+      "description": "PatchStyle"
+    },
+    {
+      "id": "op-patchstyle (phase 2291 all six members)",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-patchstyle (phase 2291 all six members).json",
+      "expectedFile": "ops/op-patchstyle (phase 2291 all six members).json",
+      "description": "PatchStyle (Phase 2291 all six members)"
+    },
+    {
+      "id": "op-patchstyle (phase 2291 tone=default is an edit, not an omission)",
+      "kind": "op-round-trip",
+      "decoder": "op",
+      "inputFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
+      "expectedFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
+      "description": "PatchStyle (Phase 2291 tone=Default is an edit, not an omission)"
+    },
+    {
       "id": "op-removenode",
       "kind": "op-round-trip",
       "decoder": "op",
@@ -4469,6 +4494,42 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.newPosition",
       "description": "MoveNode carries the retired 'newPosition' — the migration window is closed (Phase 687)"
+    },
+    {
+      "id": "reject-op-patchstyle-direction-nonstring",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-patchstyle-direction-nonstring.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.style.direction",
+      "description": "PatchStyle style.direction not a JSON string (Phase 2291)"
+    },
+    {
+      "id": "reject-op-patchstyle-empty",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-patchstyle-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.style",
+      "description": "PatchStyle naming no style field — an empty patch is not an edit (Phase 2291)"
+    },
+    {
+      "id": "reject-op-patchstyle-missing-style",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-patchstyle-missing-style.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.style",
+      "description": "PatchStyle missing style (Phase 2291)"
+    },
+    {
+      "id": "reject-op-patchstyle-tone-unknown",
+      "kind": "reject",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-patchstyle-tone-unknown.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.style.tone",
+      "description": "PatchStyle style.tone outside the closed set (Phase 2291)"
     },
     {
       "id": "reject-op-reorderchildren-wrongtype",

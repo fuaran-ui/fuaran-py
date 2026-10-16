@@ -9552,6 +9552,30 @@
         }
       }
     },
+    "StyleDelta": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/TextDirection"
+        },
+        "emphasis": {
+          "$ref": "#/$defs/Emphasis"
+        },
+        "role": {
+          "$ref": "#/$defs/StyleRole"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "voice": {
+          "$ref": "#/$defs/FontVoice"
+        },
+        "weight": {
+          "$ref": "#/$defs/StyleWeight"
+        }
+      },
+      "minProperties": 1
+    },
     "Accessibility": {
       "type": "object",
       "properties": {
@@ -9803,6 +9827,25 @@
             },
             "style": {
               "$ref": "#/$defs/SemanticStyle"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "PatchStyle"
+            },
+            "style": {
+              "$ref": "#/$defs/StyleDelta"
             },
             "target": {
               "type": "string"

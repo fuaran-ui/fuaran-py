@@ -30,6 +30,7 @@ from ..limits import MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
 from ..schema.decode import (
+    _STYLE_DEFAULTS,
     BADGE_VARIANT,
     BINDING_CASES,
     CELL_FORMAT_CASES,
@@ -117,6 +118,20 @@ def _set_kind_field(node: Node, key: str, value: Value) -> Node:
 def _set_extra(node: Node, key: str, value: Value) -> Node:
     extras = dict(node.extras)
     extras[key] = value
+    return Node(node.id, node.kind, extras)
+
+
+def _patch_style(node: Node, delta: Value) -> Node:
+    current = node.extras.get("style")
+    merged = dict(current.fields) if isinstance(current, Obj) else {}
+    if isinstance(delta, Obj):
+        merged.update(delta.fields)
+    patched = {k: v for k, v in merged.items() if v != _STYLE_DEFAULTS.get(k)}
+    extras = dict(node.extras)
+    if patched:
+        extras["style"] = Obj(None, patched)
+    else:
+        extras.pop("style", None)
     return Node(node.id, node.kind, extras)
 
 
@@ -916,6 +931,18 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         return _ok(tree)
 
+    if tag == "PatchStyle":
+        # Phase 2291 — the field-level style edit: patch the delta over the node's
+        # CURRENT style (an absent slot is the default record), carrying every field
+        # the delta does not name. A result equal to the default record is stored as
+        # the ABSENT slot, the form a decoded all-default style takes.
+        target = _as_str(fields["target"])
+        delta = fields["style"]
+        tree = _map(target, lambda n: _patch_style(n, delta), root)
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
     if tag == "UpdateState":
         target = _as_str(fields["target"])
         state = fields["state"]
@@ -1133,9 +1160,9 @@ def _op_can_grow(op: Obj) -> bool:
     a payload whose ids repeat has fewer ids than nodes. ``MoveNode`` carries no node
     and is checked anyway: moving one legal branch under the leaf of another stacks
     two depths that each passed. Everything else - ``UpdateProp``, ``ReplaceBinding``,
-    ``UpdateStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow the tree, is not
-    charged the walk, and still applies to a tree already over a limit it did not put
-    there.
+    ``UpdateStyle``, ``PatchStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow
+    the tree, is not charged the walk, and still applies to a tree already over a limit
+    it did not put there.
     """
     if op.tag == "MoveNode":
         return True

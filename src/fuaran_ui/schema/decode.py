@@ -2464,6 +2464,10 @@ def _kind_schema(kind: str, overrides: dict[str, Override] | None = None) -> lis
     return entries
 
 
+#: Whole-spec checks a kind runs BEFORE its member decoders — relational refusals no single member
+#: can make (near-miss member names, cross-member constraints).
+KIND_PRECHECKS: dict[str, Callable[[dict, str], None]] = {}
+
 KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     "Heading": _kind_schema(
         "Heading", {"variant": _enum_aliased_decoder(HEADING_VARIANT, HEADING_VARIANT_ALIASES, "variant")}
@@ -2508,12 +2512,11 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     "Icon": _kind_schema("Icon", {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}),
     # Phase 429 — `source` is a typed Static float-series position; `data` alias (§3.6).
     "Sparkline": _kind_schema("Sparkline", {"source": (_decode_binding_float_seq, ("data",))}),
-    # Phase 429 — Map `source` is a typed Static marker-list position. The three
-    # numeric envelope fields pass through structurally like any unlisted key.
-    # `source` aliases `data` / `markers` (§3.6).
-    "Map": [
-        ("source", True, _decode_binding_marker_seq, ("data", "markers")),
-    ],
+    # Phase 429 — Map `source` is a typed Static marker-list position; `source` aliases
+    # `data` / `markers` (§3.6). The three numeric envelope fields (`centreLatitude`,
+    # `centreLongitude`, `zoom`) passed through structurally until Phase 2296; the IDL
+    # declares them required, and the generated table types them.
+    "Map": _kind_schema("Map", {"source": (_decode_binding_marker_seq, ("data", "markers"))}),
     # `emphasis` is the behavioural bool (cross-vocab coerced) — 0.2.2:
     # omitted-when-false. `format` omitted-when-default. 0.2.0 rename law:
     # the scalar value is `value` (`data` alias; retired `source` NOT accepted).
@@ -2898,20 +2901,19 @@ def _decode_kind(value: object, path: str) -> Obj:
         return _decode_box(obj, path)
     if tag == "Switch":
         return _decode_switch(obj, path)
-    if tag == "DataGrid":
-        return _decode_datagrid(obj, path)
     if tag == "Form":
         return _decode_form(obj, path)
     if tag == "Filters":
         return _decode_filters(obj, path)
-    if tag == "Chart":
-        return _decode_chart(obj, path)
     if tag in _TITLE_TO_HEADING_KINDS:
         obj = _title_to_heading(obj)
     schema = KIND_SCHEMAS.get(tag)
     if schema is None:
         # Recognised kind without a typed schema yet — accept structurally.
         return Obj(tag, {k: from_json(v) for k, v in obj.items() if k != "$type"})
+    precheck = KIND_PRECHECKS.get(tag)
+    if precheck is not None:
+        precheck(obj, path)
 
     # Schema entries are (name, required, decoder) or (name, required, decoder, aliases).
     known: set[str] = set()
@@ -3251,89 +3253,40 @@ def _validate_default_sort(default_sort: object, ds_path: str) -> None:
     _enum(ds["direction"], f"{ds_path}.direction", _SORT_DIRECTIONS, "SortDirection")
 
 
-def _decode_datagrid(obj: dict, path: str) -> Obj:
-    """DataGrid (GridSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` / ``rows`` (the
-    rows are opaque-erased), typed ``columns``. Remaining fields (``editable`` /
-    ``rowKey`` / ``rowKeyField`` / ``staticRows`` / ``onRowClick``) pass through
-    structurally, as the pre-typed decoder did — with the Phase 801 sort-intent slots
-    on ``staticRows`` validated in passing (see ``_validate_static_rows``)."""
-    fields: dict[str, Value] = {}
-    if "staticRows" in obj:
-        _validate_static_rows(obj["staticRows"], f"{path}.staticRows")
-    # fuaran#862 — `pageSize` is how many rows a page holds. A page of zero or fewer rows
-    # names no page at all, so it is WRONG_TYPE — which is also what schema.json's
-    # `minimum: 1` says. Validation only: the field still passes through structurally
-    # below, which is what keeps the round-trip byte-identical for free.
-    if "pageSize" in obj:
-        page_size = obj["pageSize"]
-        if isinstance(page_size, bool) or not isinstance(page_size, int) or page_size < 1:
-            _fail(
-                WRONG_TYPE,
-                f"{path}.pageSize",
-                "pageSize must be an integer page size of 1 or more",
-                "JSON number (integer page size of 1 or more)",
-            )
-    # fuaran#861 — the bound path's declared initial order, checked by the SAME function
-    # the staticRows spelling uses.
-    if "defaultSort" in obj:
-        _validate_default_sort(obj["defaultSort"], f"{path}.defaultSort")
+def _decode_grid_columns(value: object, path: str) -> Value:
+    """``DataGrid.columns`` — each column through the typed column decoder."""
+    return Arr([_decode_column(c, f"{path}[{i}]") for i, c in enumerate(_expect_array(value, path))])
+
+
+def _decode_static_rows(value: object, path: str) -> Value:
+    """``DataGrid.staticRows`` — carried structurally, with the Phase 801 sort-intent slots validated."""
+    _validate_static_rows(value, path)
+    return from_json(value)
+
+
+def _decode_grid_default_sort(value: object, path: str) -> Value:
+    """fuaran#861 — the bound path's declared initial order, checked by the SAME function the
+    ``staticRows`` spelling uses, and carried structurally."""
+    _validate_default_sort(value, path)
+    return from_json(value)
+
+
+def _decode_page_size(value: object, path: str) -> Value:
+    """fuaran#862 — how many rows a page holds. A page of zero or fewer rows names no page at all,
+    so it is WRONG_TYPE — which is also what schema.json's ``minimum: 1`` says."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        _fail(
+            WRONG_TYPE,
+            path,
+            "pageSize must be an integer page size of 1 or more",
+            "JSON number (integer page size of 1 or more)",
+        )
+    return value  # type: ignore[return-value]
+
+
+def _check_grid(obj: dict, path: str) -> None:
+    """The DataGrid near-miss refusals, which read the WHOLE spec rather than one member."""
     _check_near_misses(obj, path, _GRID_NEAR_MISSES)
-    src_raw, src_present = _alias_get(obj, "source", ("data", "rows"))
-    if src_present:
-        fields["source"] = _decode_grid_source(src_raw, f"{path}.source")
-    if "columns" in obj:
-        arr = _expect_array(obj["columns"], f"{path}.columns")
-        fields["columns"] = Arr([_decode_column(c, f"{path}.columns[{i}]") for i, c in enumerate(arr)])
-    # 0.2.0 — `editable` omitted-when-false on both boundaries.
-    if "editable" in obj and _expect_bool(obj["editable"], f"{path}.editable"):
-        fields["editable"] = True
-    # fuaran#818 — the grid-sort header affordance: `sortStateKey` names the
-    # State key carrying the `{column, direction}` sort descriptor a data-bound
-    # grid's runtime sorts by. Typed as a string; encode-omitted when absent.
-    if "sortStateKey" in obj:
-        fields["sortStateKey"] = _expect_string(obj["sortStateKey"], f"{path}.sortStateKey")
-    # fuaran#1123 — the two ends of ONE shared transfer key. A present member of
-    # any type other than string is WRONG_TYPE and is never coerced: the slot
-    # names a STATE KEY, so an ordinal or a boolean names no key, and a grid
-    # identified by position could not be paired with by any other grid.
-    for transfer in ("transferOutKey", "transferInKey"):
-        if transfer in obj:
-            fields[transfer] = _expect_string(obj[transfer], f"{path}.{transfer}")
-    # Phase 1892 — the row window. `windowStateKey` names a State key, so any other
-    # type is WRONG_TYPE; `rowTotal` is a `Binding<int>` and takes the integer accept
-    # set every other int Binding slot takes (`Stepper.activeStep`).
-    if "windowStateKey" in obj:
-        fields["windowStateKey"] = _expect_string(obj["windowStateKey"], f"{path}.windowStateKey")
-    if "rowTotal" in obj:
-        fields["rowTotal"] = _decode_binding_int(obj["rowTotal"], f"{path}.rowTotal")
-    # fuaran#1125 — the export declaration, and fuaran#1473's grid pair. All
-    # three omit at `False` and all three refuse a present non-boolean, on
-    # `editable`'s terms.
-    for flag in ("exportable", "keepRowsTogether", "repeatHeader"):
-        if flag in obj and _expect_bool(obj[flag], f"{path}.{flag}"):
-            fields[flag] = True
-    _grid_known = frozenset(
-        {
-            "$type",
-            "source",
-            "data",
-            "rows",
-            "columns",
-            "editable",
-            "sortStateKey",
-            "transferOutKey",
-            "transferInKey",
-            "exportable",
-            "keepRowsTogether",
-            "repeatHeader",
-            "windowStateKey",
-            "rowTotal",
-        }
-    )
-    for key, raw in obj.items():
-        if key not in _grid_known:
-            fields[key] = from_json(raw)
-    return Obj("DataGrid", fields)
 
 
 _CHART_ANNOTATION_CASES = frozenset(_g.UNION_CASES["ChartAnnotation"])
@@ -3492,36 +3445,57 @@ def _check_chart_annotation(raw: object, path: str) -> None:
         _check_chart_annotation_range(_require(o, "range", path), f"{path}.range")
 
 
-def _decode_chart(obj: dict, path: str) -> Obj:
-    """Chart (ChartSpec, WIRE_FORMAT §3.6): ``source`` ← ``data`` (opaque-erased
-    rows). ``title`` is a real canonical field here (NOT the `heading` alias).
-    Remaining fields pass through structurally."""
-    fields: dict[str, Value] = {}
-    src_raw, src_present = _alias_get(obj, "source", ("data",))
-    if src_present:
-        fields["source"] = _decode_grid_source(src_raw, f"{path}.source")
-    # Phase 1490 — ``annotations`` (§4l): the data-addressed attachments. Carried
-    # structurally like every other pass-through field, so a conformant document
-    # round-trips byte-for-byte; CHECKED here because three of its rules cannot be
-    # recovered downstream (a non-finite address poisons the whole domain, an
-    # unparseable date drags the axis to the epoch, and an unordered pair draws a
-    # band the author did not describe).
-    if "annotations" in obj:
-        for i, item in enumerate(_expect_array(obj["annotations"], f"{path}.annotations")):
-            _check_chart_annotation(item, f"{path}.annotations[{i}]")
-    _chart_known = frozenset({"$type", "source", "data"})
-    for key, raw in obj.items():
-        if key not in _chart_known:
-            fields[key] = from_json(raw)
-    # Phase 1585 — ``stacked`` is omit-at-default (`False`). This decoder is
-    # structural, so an explicit `"stacked": false` would otherwise be carried
-    # into the model and re-emitted, making the pre-phase spelling a SECOND
-    # canonical form. Dropping it here is the same `_DROP` rule the
-    # schema-driven kinds get from `_omit_default_bool`, reached by hand because
-    # `Chart` decodes through its own function.
-    if fields.get("stacked") is False:
-        del fields["stacked"]
-    return Obj("Chart", fields)
+def _decode_chart_annotations(value: object, path: str) -> Value:
+    """Phase 1490 — ``Chart.annotations`` (§4l): the data-addressed attachments.
+
+    Carried structurally, so a conformant document round-trips byte-for-byte; CHECKED here because
+    three of its rules cannot be recovered downstream (a non-finite address poisons the whole
+    domain, an unparseable date drags the axis to the epoch, and an unordered pair draws a band the
+    author did not describe).
+    """
+    for i, item in enumerate(_expect_array(value, path)):
+        _check_chart_annotation(item, f"{path}[{i}]")
+    return from_json(value)
+
+
+def _decode_format_structural(value: object, path: str) -> Value:
+    """A ``Format`` member (``Chart.valueFormat``): discriminator checked, payload preserved."""
+    obj = _expect_object(value, path)
+    _dispatch(obj, path, frozenset(_g.UNION_CASES["Format"]))
+    return _from_json_strict(value, path)
+
+
+# DataGrid (GridSpec, WIRE_FORMAT §3.6): `source` ← `data` / `rows` (the rows are opaque-erased),
+# typed `columns`. Until Phase 2296 a dedicated decoder typed eleven members by hand and passed the
+# rest through structurally — `reorderable` among them, so an explicit `"reorderable": false` was
+# re-emitted as a SECOND canonical form; the generated table now types every member and drops each
+# omit-at-false flag at its IDL default. The fuaran#1123 transfer keys, the Phase 1892 row window
+# and the state keys are plain strings and `rowTotal` a `Binding<int>`, all read by type.
+KIND_SCHEMAS["DataGrid"] = _kind_schema(
+    "DataGrid",
+    {
+        "source": (_decode_grid_source, ("data", "rows")),
+        "columns": _decode_grid_columns,
+        "staticRows": _decode_static_rows,
+        "defaultSort": _decode_grid_default_sort,
+        "pageSize": _decode_page_size,
+    },
+)
+KIND_PRECHECKS["DataGrid"] = _check_grid
+
+# Chart's schema joins the table here, below the decoders its overrides name.
+# Chart (ChartSpec, WIRE_FORMAT §3.6): `source` ← `data` reads the opaque-erased rows the grid source
+# does; `title` is a real canonical field here, never the `heading` alias. Until Phase 2296 every other
+# member passed through structurally (with `stacked` dropped at `false` by hand); the generated table
+# now types them all and supplies the `stacked` default.
+KIND_SCHEMAS["Chart"] = _kind_schema(
+    "Chart",
+    {
+        "source": (_decode_grid_source, ("data",)),
+        "valueFormat": _decode_format_structural,
+        "annotations": _decode_chart_annotations,
+    },
+)
 
 
 # ── FormFieldKind — the unified control vocabulary (0.2.0 filters-unification) ──

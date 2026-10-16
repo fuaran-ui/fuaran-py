@@ -121,18 +121,28 @@ def _set_extra(node: Node, key: str, value: Value) -> Node:
     return Node(node.id, node.kind, extras)
 
 
+def _store_style(node: Node, members: dict[str, Value]) -> Node:
+    """Store a style record in the decoder's omitted-when-default form.
+
+    Every member at its default is dropped, and a record equal to the default
+    record is stored as the ABSENT slot (WIRE_FORMAT §3.1), never an empty
+    ``style`` object — the form a decoded all-default style takes.
+    """
+    kept = {k: v for k, v in members.items() if v != _STYLE_DEFAULTS.get(k)}
+    extras = dict(node.extras)
+    if kept:
+        extras["style"] = Obj(None, kept)
+    else:
+        extras.pop("style", None)
+    return Node(node.id, node.kind, extras)
+
+
 def _patch_style(node: Node, delta: Value) -> Node:
     current = node.extras.get("style")
     merged = dict(current.fields) if isinstance(current, Obj) else {}
     if isinstance(delta, Obj):
         merged.update(delta.fields)
-    patched = {k: v for k, v in merged.items() if v != _STYLE_DEFAULTS.get(k)}
-    extras = dict(node.extras)
-    if patched:
-        extras["style"] = Obj(None, patched)
-    else:
-        extras.pop("style", None)
-    return Node(node.id, node.kind, extras)
+    return _store_style(node, merged)
 
 
 def _set_state_child(node: Node, key: str, child: Node) -> Node:
@@ -924,9 +934,12 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
         return _ok(tree)
 
     if tag == "UpdateStyle":
+        # The whole record replaces the node's style; a record equal to the
+        # default is stored as the ABSENT slot (Phase 2313), as PatchStyle stores it.
         target = _as_str(fields["target"])
         style = fields["style"]
-        tree = _map(target, lambda n: _set_extra(n, "style", style), root)
+        members = dict(style.fields) if isinstance(style, Obj) else {}
+        tree = _map(target, lambda n: _store_style(n, members), root)
         if tree is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         return _ok(tree)

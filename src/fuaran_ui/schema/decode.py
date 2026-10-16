@@ -431,7 +431,27 @@ def _decode_i18n_args(value: object, path: str) -> Value:
     return Obj(None, out)
 
 
+def _check_case_members(union: str, decoded: Value, path: str) -> Value:
+    """Refuse a decoded union case that lacks a member its GENERATED case table requires.
+
+    Run on the DECODED value, after every lenient alias and shorthand has been resolved, so it adds a
+    refusal only where a hand arm accepted a case the IDL says is incomplete — and a case the IDL
+    gains a required member on is checked by regeneration alone. A host-extra case (one no IDL case
+    table names) passes through.
+    """
+    if isinstance(decoded, Obj) and decoded.tag is not None:
+        for f in _g.UNION_CASE_FIELDS[union].get(decoded.tag, ()):
+            if f.required and f.name not in decoded.fields:
+                _fail(MISSING_FIELD, f"{path}.{f.name}", f"missing required field '{f.name}'")
+    return decoded
+
+
 def _decode_binding(value: object, path: str) -> Value:
+    """A ``Binding`` position: the case arms below, then the generated case table's requiredness."""
+    return _check_case_members("Binding", _decode_binding_case(value, path), path)
+
+
+def _decode_binding_case(value: object, path: str) -> Value:
     # §3.6 lenient shape coercion: a bare JSON array or scalar where a Binding
     # is expected is `Static` with that value (every Binding case is a
     # `$type`-discriminated object, so an array/scalar can only mean Static).
@@ -1832,6 +1852,11 @@ ACTION_CASES = frozenset(_g.UNION_CASES["Action"])
 
 
 def _decode_action(value: object, path: str) -> Value:
+    """An ``Action`` position: the case arms below, then the generated case table's requiredness."""
+    return _check_case_members("Action", _decode_action_case(value, path), path)
+
+
+def _decode_action_case(value: object, path: str) -> Value:
     obj = _expect_object(value, path)
     tag = _dispatch(obj, path, ACTION_CASES)
     # Field-name aliases (WIRE_FORMAT §3.6, decode-only): Call.endpoint ← url;
@@ -1845,7 +1870,10 @@ def _decode_action(value: object, path: str) -> Value:
                 obj = {**obj, "route": obj[a]}
                 del obj[a]
                 break
-    elif tag == "Print":
+    # The aliases above only RENAME; the arms below decode. (Until Phase 2296 the two were one
+    # if/elif chain, so an aliased `Navigate` skipped its arm: its route was never read as a
+    # `TextSource` and an explicit `"target":"Self"` was re-emitted rather than omitted.)
+    if tag == "Print":
         # fuaran#1124 — the ONE action arm that is STRICT about unrecognised
         # members, and the asymmetry is deliberate: everywhere else in this
         # format an unknown member is one the reading host has not learned yet,

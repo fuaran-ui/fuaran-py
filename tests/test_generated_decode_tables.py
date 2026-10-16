@@ -80,3 +80,27 @@ def test_every_schema_is_its_kinds_generated_member_set() -> None:
         assert [e[0] for e in entries] == expected, kind
         required = {e[0] for e in entries if e[1]}
         assert required == generated.REQUIRED_FIELDS[kind], kind
+
+
+def test_a_union_case_missing_a_member_its_case_table_requires_is_refused() -> None:
+    """The hand action arms checked members for five of fourteen cases; the rest decoded structurally
+    and accepted an empty case. Requiredness is now read from the generated case table."""
+    for action, missing in (
+        ({"$type": "Navigate"}, "route"),
+        ({"$type": "Focus"}, "nodeId"),
+        ({"$type": "Notify", "channel": "c"}, "payload"),
+        ({"$type": "AiTool", "args": {}}, "toolName"),
+    ):
+        try:
+            decode._decode_action(action, "$.a")
+        except decode._Fail as refused:
+            assert (refused.error.code, refused.error.path) == ("MISSING_FIELD", f"$.a.{missing}")
+        else:
+            raise AssertionError(f"{action} decoded")
+
+
+def test_an_aliased_navigate_reaches_its_decoding_arm() -> None:
+    """``href`` / ``url`` / ``to`` rename to ``route``, and the arm then omits ``target`` at ``Self``."""
+    decoded = decode._decode_action({"$type": "Navigate", "href": "/x", "target": "Self"}, "$")
+    assert isinstance(decoded, decode.Obj)
+    assert set(decoded.fields) == {"route"}

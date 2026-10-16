@@ -2598,29 +2598,29 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # fuaran#1115 / #1116 / #1117 — the upload control had NO typed schema at
     # all, so every member below reached the structural pass-through and each of
     # the four reject vectors decoded happily. The three ingress routes and the
-    # one egress declaration are typed here; the remaining fields (`label`,
-    # `onSelect`, `disabled`, …) keep the structural preservation they had.
-    "FileUpload": [
-        # The two gestures, both OMITTING at `false`. A present member of any
-        # other type is WRONG_TYPE and is never coerced — the slot decides
-        # whether a whole ingress route EXISTS, so a lenient truthiness read
-        # would open a drop target on `"no"` and on `"false"`.
-        ("acceptPaste", False, _omit_default_bool(False)),
-        ("dropTarget", False, _omit_default_bool(False)),
-        # fuaran#1116 — OPTIONAL, not omit-at-default, and the distinction is
-        # real: "say nothing" is a state of its own, because an upload naming no
-        # device asks for the ordinary file browser, which is not one of the two
-        # devices wearing a default. A present value outside the set is
-        # UNKNOWN_DU_CASE at the member's own path — a BARE enum, so no `.$type`
-        # suffix — and must NOT fall back to either device.
-        ("capture", False, _enum_decoder(CAPTURE_SOURCE, "capture")),
-        # fuaran#1117 — the streamed destination.
-        ("destination", False, _decode_upload_destination),
-        # fuaran#1548 — the two declared ceilings. Optional: absent declares no
-        # ceiling, which is the pre-1548 control and the wire identity.
-        ("maxBytes", False, _decode_upload_ceiling("maxBytes")),
-        ("maxFiles", False, _decode_upload_ceiling("maxFiles")),
-    ],
+    # one egress declaration were typed then; since Phase 2296 the generated
+    # table types every member (`label`, `accept`, `multiple` are required).
+    # The two gestures, both OMITTING at `false`. A present member of any
+    # other type is WRONG_TYPE and is never coerced — the slot decides
+    # whether a whole ingress route EXISTS, so a lenient truthiness read
+    # would open a drop target on `"no"` and on `"false"`.
+    # fuaran#1116 — OPTIONAL, not omit-at-default, and the distinction is
+    # real: "say nothing" is a state of its own, because an upload naming no
+    # device asks for the ordinary file browser, which is not one of the two
+    # devices wearing a default. A present value outside the set is
+    # UNKNOWN_DU_CASE at the member's own path — a BARE enum, so no `.$type`
+    # suffix — and must NOT fall back to either device.
+    # fuaran#1117 — the streamed destination.
+    # fuaran#1548 — the two declared ceilings. Optional: absent declares no
+    # ceiling, which is the pre-1548 control and the wire identity.
+    "FileUpload": _kind_schema(
+        "FileUpload",
+        {
+            "destination": _decode_upload_destination,
+            "maxBytes": _decode_upload_ceiling("maxBytes"),
+            "maxFiles": _decode_upload_ceiling("maxFiles"),
+        },
+    ),
     "List": _kind_schema("List"),
     # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
     "Toast": _kind_schema("Toast", {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}),
@@ -2629,25 +2629,21 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # Phase 524 — geometry static; the closed Shape / CurveCommand DUs
     # default-deny an unknown discriminator; DrawStyle carries the bindings.
     "Drawing": _kind_schema("Drawing"),
-    "Select": [
-        ("label", True, _decode_text_source),
-        # Phase 426 — the handler fields are OPTIONAL: omitted on the wire when the
-        # control is declarative (AI-authored), where the renderer arms a write-back
-        # default against the paired `value` slot. Present → the `"<closure>"`
-        # sentinel; absent → decodes to nothing (the field simply isn't carried).
-        ("onChange", False, _decode_string),
-        ("onChangeMulti", False, _decode_string),
-        # Phase 429 — `source`/`value`/`values` are typed Static positions: a
-        # SelectOption list, a scalar string option, a string list respectively.
-        # `source` aliases `options` / `data` (§3.6).
-        ("source", True, _decode_binding_select_options, ("options", "data")),
-        ("value", True, _decode_binding_string_opt),
-        ("disabled", False, _decode_binding_bool),
-        ("placeholder", False, _decode_text_source),
-        # Multi-select (Phase 291) — both optional; omitted on a single-select.
-        ("multiple", False, _decode_bool),
-        ("values", False, _decode_binding_string_list),
-    ],
+    # Phase 426 — the handler fields are OPTIONAL: omitted on the wire when the
+    # control is declarative (AI-authored), where the renderer arms a write-back
+    # default against the paired `value` slot. Present → the `"<closure>"`
+    # sentinel; absent → decodes to nothing (the field simply isn't carried).
+    # Phase 429 — `source`/`value`/`values` are typed Static positions: a
+    # SelectOption list, a scalar string option, a string list respectively.
+    # `source` aliases `options` / `data` (§3.6).
+    # Multi-select (Phase 291) — both optional; omitted on a single-select.
+    "Select": _kind_schema(
+        "Select",
+        {
+            "source": (_decode_binding_select_options, ("options", "data")),
+            "value": _decode_binding_string_opt,
+        },
+    ),
     # Phase 426 — `onDismiss` is a genuine wire-survivable Action, decoded null-strict when present.
     # fuaran#1119 — `modality` omits at its identity `Modal`; an unrecognised token is REFUSED rather
     # than read as the default, because a document that meant `Popover` and misspelled it would
@@ -2701,13 +2697,12 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # (rule 12 — the corpus reject-null-action-* fixtures pin the paths).
     # The remaining fields (variant / icon / disabled / tooltip / …) pass
     # through structurally like any unlisted key.
-    "Button": [
-        ("label", True, _decode_text_source),
-        ("onClick", True, _decode_action),
-        # `variant` alias-decoded (Danger→Destructive, §3.6); other fields
-        # (icon / disabled / tooltip / …) pass through structurally.
-        ("variant", False, _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant")),
-    ],
+    # `variant` alias-decoded (Danger→Destructive, §3.6). Until Phase 2296 `variant`
+    # was optional here and `icon` / `disabled` passed through structurally; the IDL
+    # declares `variant` required, and every member is now typed.
+    "Button": _kind_schema(
+        "Button", {"variant": _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant")}
+    ),
     "Custom": [
         ("moduleId", True, _decode_string),
         ("componentId", True, _decode_string),

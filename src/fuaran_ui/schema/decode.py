@@ -32,6 +32,7 @@ from ..result import (
     Ok,
 )
 from ..shapeguard import check_shape, load_bounded
+from . import generated as _g
 
 # ── Reserved unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ───────────
 OPAQUE = "<opaque>"
@@ -220,32 +221,32 @@ def _enum_aliased(value: object, path: str, allowed: frozenset[str], aliases: di
 # teach them — a `tone` field and (Phase 750) a `TonedPill` tone-map value. A second inline
 # copy is exactly how one of them comes to name six tones. `TONE` derives from it, so the
 # membership test and the taught vocabulary cannot drift.
-TONE_NAMES = ("Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info")
+TONE_NAMES = _g.ENUM_CASES["ToneVariant"]
 TONE = frozenset(TONE_NAMES)
-WEIGHT = frozenset({"Compact", "Standard", "Spacious"})
-EMPHASIS = frozenset({"Quiet", "Normal", "Loud"})
-TEXT_ANCHOR = frozenset({"Start", "Middle", "End"})
-ORIENTATION = frozenset({"Vertical", "Horizontal"})
-BADGE_VARIANT = frozenset({"Neutral", "Brand", "Success", "Warning", "Critical", "Info"})
-HEADING_VARIANT = frozenset({"Standard", "Eyebrow", "Caption", "Lead"})
-STYLE_ROLE = frozenset({"None", "Eyebrow", "Data", "Lede", "Caption"})
-FONT_VOICE = frozenset({"Default", "Display", "Structural"})
-LIVE_REGION = frozenset({"polite", "assertive", "off"})
-IMAGE_VARIANT = frozenset({"Default", "Avatar", "Rounded"})
+WEIGHT = _g.ENUM_SETS["StyleWeight"]
+EMPHASIS = _g.ENUM_SETS["Emphasis"]
+TEXT_ANCHOR = _g.ENUM_SETS["TextAnchor"]
+ORIENTATION = _g.ENUM_SETS["Orientation"]
+BADGE_VARIANT = _g.ENUM_SETS["BadgeVariant"]
+HEADING_VARIANT = _g.ENUM_SETS["HeadingVariant"]
+STYLE_ROLE = _g.ENUM_SETS["StyleRole"]
+FONT_VOICE = _g.ENUM_SETS["FontVoice"]
+LIVE_REGION = _g.ENUM_SETS["LiveRegionKind"]
+IMAGE_VARIANT = _g.ENUM_SETS["ImageVariant"]
 # fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). All
 # three are CLOSED TOKEN vocabularies, never CSS values: `aspectRatio` names one
 # of four ratios and carries no number, pair or stylesheet spelling ("16 / 9",
 # "16:9", 1.7778), because admitting an arbitrary ratio would put an
 # author-supplied value in a style attribute — the free-form escape this format
 # does not have. Each is omitted at its identity default on BOTH boundaries.
-IMAGE_FIT = frozenset({"Natural", "Cover", "Contain"})
-IMAGE_ASPECT = frozenset({"Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"})
-IMAGE_LOADING = frozenset({"Eager", "Lazy"})
+IMAGE_FIT = _g.ENUM_SETS["ImageFit"]
+IMAGE_ASPECT = _g.ENUM_SETS["ImageAspect"]
+IMAGE_LOADING = _g.ENUM_SETS["ImageLoading"]
 # fuaran#1076 — the `MediaKind` variant set (WIRE_FORMAT §3.6.6), CLOSED at two.
 # `$type`-discriminated rather than a bare enum, so an unknown case reports at
 # `<path>.$type`; a third surface is an ADDITION later, never a spelling a
 # decoder may guess at today.
-MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
+MEDIA_KIND_CASES = frozenset(_g.UNION_CASES["MediaKind"])
 # fuaran#1110 — the `TrackKind` set (WIRE_FORMAT §3.6.6), CLOSED at four and a
 # BARE enum rather than a `$type`-discriminated case, so an unknown spelling
 # reports at the slot itself. `metadata` is deliberately NOT a member: its cues
@@ -253,62 +254,63 @@ MEDIA_KIND_CASES = frozenset({"Video", "Audio"})
 # document naming it would state an intent no conformant host could honour
 # without leaving the vocabulary. A fifth kind is an ADDITION later, never a
 # spelling a decoder may guess at today.
-TRACK_KIND = frozenset({"Subtitles", "Captions", "Descriptions", "Chapters"})
+TRACK_KIND = _g.ENUM_SETS["TrackKind"]
 # fuaran#1111 — the sandbox relaxations an `Embed` may request, CLOSED at four.
 # The empty list is TOTAL DENIAL and is the identity, so the shortest embed
 # document is the fully-sandboxed one and every relaxation is named.
-EMBED_PERMISSION = frozenset({"AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"})
+EMBED_PERMISSION = _g.ENUM_SETS["EmbedPermission"]
 # fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
 # A BARE enum, so an unknown token reports at the member's own path with no
 # `.$type` suffix. There is no display-capture case and there will not be one by
 # widening this: a screen capture reaches every window the reader has open
 # rather than one device behind the picker.
-CAPTURE_SOURCE = frozenset({"Camera", "Microphone"})
-# fuaran#1119 — the modal's modality. `Blocking` is the identity and omits.
-MODALITY_KIND = frozenset({"Blocking", "Popover"})
+CAPTURE_SOURCE = _g.ENUM_SETS["CaptureSource"]
+# fuaran#1119 — the modal's modality. `Modal` is the identity and omits (this host read the
+# identity as `Blocking` — a token the wire never had — until the vocabulary was generated).
+MODALITY_KIND = _g.ENUM_SETS["ModalityKind"]
 # fuaran#1536 — which browsing context an `Action.Navigate` lands in. A BARE
 # enum; `Self` is the identity and omits. Two cases and NO lenient spelling:
 # HTML's `_self` / `_blank` / `_parent` / `_top` are not accepted as aliases,
 # because two of them are frame-busting gestures a hosted tree must not be able
 # to ask for and accepting the two harmless ones would teach an emitter that the
 # HTML vocabulary is the one in force here.
-NAVIGATE_TARGET = frozenset({"Self", "Blank"})
+NAVIGATE_TARGET = _g.ENUM_SETS["NavigateTarget"]
 # fuaran#1472 — the declared base direction, LOWER-CASE on the wire because that
 # is the spelling the isolation is ultimately expressed in. `auto` is the
 # identity and omits at it; an unrecognised token is REFUSED and never coerced to
 # it, since a document that meant `rtl` and misspelled it would otherwise render
 # as reordered digits with nothing said anywhere.
-TEXT_DIRECTION = frozenset({"auto", "ltr", "rtl"})
+TEXT_DIRECTION = _g.ENUM_SETS["TextDirection"]
 #: fuaran#1130 — the canonical `#rrggbb` form and nothing else. Deliberately
 #: STRICT: a native colour input holds exactly this, so `#fff`, `rebeccapurple`,
 #: `rgb(0 0 0)` and an alpha channel all name a colour the control could never
 #: carry. Case is ACCEPTED and never rewritten.
 _HEX_COLOUR = re.compile(r"#[0-9a-fA-F]{6}")
-SCROLL_ORIENTATION = frozenset({"Vertical", "Horizontal", "Both"})
+SCROLL_ORIENTATION = _g.ENUM_SETS["ScrollOrientation"]
 # Phase 1811 — ``DateTimeVariant`` (was ``DateVariant``); the cases did not move.
-DATE_TIME_VARIANT = frozenset({"Date", "Time", "DateTime"})
-MATH_DISPLAY = frozenset({"Inline", "Block"})
-BOX_ROLE = frozenset({"Group", "Card", "Dashboard", "Separator"})  # Phase 390
-BOX_LAYOUT_CASES = frozenset({"Flex", "Grid", "Masonry", "Auto"})  # Phase 390; Masonry §3.6.7
-BUTTON_VARIANT = frozenset({"Primary", "Secondary", "Tertiary", "Destructive"})
-LINK_PROTECTION = frozenset({"email"})  # Phase 812 — anti-scraper render strategy
+DATE_TIME_VARIANT = _g.ENUM_SETS["DateTimeVariant"]
+MATH_DISPLAY = _g.ENUM_SETS["MathDisplay"]
+BOX_ROLE = _g.ENUM_SETS["BoxRole"]  # Phase 390
+BOX_LAYOUT_CASES = frozenset(_g.UNION_CASES["BoxLayout"])  # Phase 390; Masonry §3.6.7
+BUTTON_VARIANT = _g.ENUM_SETS["ButtonVariant"]
+LINK_PROTECTION = _g.ENUM_SETS["LinkProtection"]  # Phase 812 — anti-scraper render strategy
 # Phase 819 — the Duration / RelativeTime format enums (shared by CellFormat
 # and the Binding.Format vocabulary).
-DURATION_UNIT = frozenset({"Seconds", "Minutes", "Hours"})
-DURATION_STYLE = frozenset({"Compact", "Clock", "Long"})
-RELATIVE_TIME_UNIT = frozenset({"Second", "Minute", "Hour", "Day", "Week", "Month", "Year"})
+DURATION_UNIT = _g.ENUM_SETS["DurationUnit"]
+DURATION_STYLE = _g.ENUM_SETS["DurationStyle"]
+RELATIVE_TIME_UNIT = _g.ENUM_SETS["RelativeTimeUnit"]
 # Phase 1533 — the resolution a ``Binding.Now`` declares for the host-furnished
 # instant. A strict SUBSET of RELATIVE_TIME_UNIT: ``Week`` / ``Month`` / ``Year``
 # are refused rather than quietly accepted, because this is a truncation of a
 # calendar instant and those three have no truncation every host agrees on
 # (which weekday starts a week; which calendar).
-TIME_GRAIN = frozenset({"Second", "Minute", "Hour", "Day"})
-ICON_SIZE = frozenset({"Small", "Medium", "Large"})  # Phase 821 — the Icon display kind
+TIME_GRAIN = _g.ENUM_SETS["TimeGrain"]
+ICON_SIZE = _g.ENUM_SETS["IconSize"]  # Phase 821 — the Icon display kind
 # fuaran#867 — `Metric.trendPolarity`: which direction of movement is an
 # improvement. `Neutral` is RESERVED and deliberately NOT a case — that is the
 # whole reason the slot is a two-case enum rather than an `inverted: bool`, since
 # a later admission is then a bare-string addition and not a type replacement.
-TREND_POLARITY = frozenset({"HigherIsBetter", "LowerIsBetter"})
+TREND_POLARITY = _g.ENUM_SETS["TrendPolarity"]
 
 # ── Lenient-ingest enum aliases (WIRE_FORMAT.md §3.6, decode-only) ──────────
 # The encoder never emits an alias; a re-encode normalises to the canonical DU
@@ -332,102 +334,24 @@ ORIENTATION_ALIASES = {"Row": "Horizontal", "row": "Horizontal", "Column": "Vert
 _EMPHASIS_TRUE = frozenset({"Loud", "Strong", "Bold"})
 _EMPHASIS_FALSE = frozenset({"Normal", "Quiet", "Subtle", "Muted"})
 
-TEXT_SOURCE_CASES = frozenset({"Literal", "Bound", "I18n"})
-# The Compute-layer binding cases are recognised so a data-bound node's source round-trips
-# byte-exactly: ``Transform`` (the dataframe-pipeline source) + the ``Data`` embedded-source
-# and ``Invoke`` capability bindings. They decode *structurally* (validated discriminator, fields
-# preserved) — the same pass-through every non-``Static`` binding case takes here. A fully typed
-# ``Invoke`` decode (capabilityId + typed args) lands with the capability/invoke wire surface.
-BINDING_CASES = frozenset(
-    {
-        "Static",
-        "Query",
-        "Filter",
-        "Selection",
-        "State",
-        "Computed",
-        "Now",
-        "I18n",
-        "Local",
-        "Format",
-        "Data",
-        "Transform",
-        "Expr",
-        "Invoke",
-    }
-)
-# Phase 1811 — ``DateTime`` is canonical; ``Date`` is its §16 lenient alias (the
-# pre-rename spelling), accepted here and normalised in ``_decode_cell_format``.
-CELL_FORMAT_CASES = frozenset(
-    {
-        "None",
-        "Number",
-        "Currency",
-        "Percent",
-        "SignificantDigits",
-        "DateTime",
-        "Date",
-        "Duration",
-        "RelativeTime",
-        "Custom",
-    }
-)
+TEXT_SOURCE_CASES = frozenset(_g.UNION_CASES["TextSource"])
+# The binding and cell-format discriminators are the generated union cases, plus each one's DECLARED
+# host extras: decode-only spellings the canonical vocabulary never contains.
+#
+# ``Binding.Data`` — the embedded-source binding — is recognised so a data-bound node's source
+# round-trips byte-exactly; it decodes STRUCTURALLY (validated discriminator, fields preserved), the
+# same pass-through every non-``Static`` binding case takes here. It is not a case of the IDL's
+# ``Binding`` union, so it is named here rather than generated.
+_BINDING_HOST_EXTRAS = frozenset({"Data"})
+BINDING_CASES = frozenset(_g.UNION_CASES["Binding"]) | _BINDING_HOST_EXTRAS
+# Phase 1811 — ``DateTime`` is canonical; ``Date`` is its §16 lenient alias (the pre-rename
+# spelling), accepted here and normalised in ``_decode_cell_format``.
+_CELL_FORMAT_LENIENT_ALIASES = frozenset({"Date"})
+CELL_FORMAT_CASES = frozenset(_g.UNION_CASES["CellFormat"]) | _CELL_FORMAT_LENIENT_ALIASES
 
-# Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2). A kind not in
-# this set is WRONG_NODE_KIND; a kind in this set but absent from KIND_SCHEMAS is
-# accepted structurally.
-KNOWN_KINDS = frozenset(
-    {
-        # Layout
-        "Box",  # Phase 390 — the unified container
-        "SplitPanel",
-        "Tabs",
-        "Stepper",
-        "SummaryList",
-        "Disclosure",
-        "Modal",
-        "ScrollArea",
-        # Display
-        "Heading",
-        "Markdown",
-        "Metric",
-        "Fact",
-        "Badge",
-        "Sparkline",
-        "Callout",
-        "Progress",
-        "Skeleton",
-        "Icon",  # Phase 821 — the standalone icon-only display kind
-        "LabelValueRow",
-        "Link",
-        "Image",
-        "Media",  # fuaran#1076 — the playback surface (Video | Audio)
-        "Embed",  # fuaran#1111 — the sandboxed third-party browsing context
-        "Tree",  # fuaran#1120 — recursive disclosure with tree semantics
-        "List",
-        "Toast",
-        "CodeBlock",
-        "Math",
-        "Drawing",
-        # Input
-        "Form",
-        "Button",
-        "FileUpload",
-        "Select",
-        "Filters",
-        # Visualisation
-        "DataGrid",
-        "Chart",
-        "Map",
-        # Structural
-        "Custom",
-        "ErrorBoundary",
-        "Switch",
-        "FragmentDecl",
-        "FragmentRef",
-        "Mount",
-    }
-)
+# Every recognised node-kind discriminator (WIRE_FORMAT.md §3.2) — the GENERATED kind set. A kind
+# not in it is WRONG_NODE_KIND.
+KNOWN_KINDS = frozenset(_g.KINDS)
 
 
 # ── Nested-position decoders ───────────────────────────────────────────────
@@ -759,7 +683,7 @@ def _decode_cell_format(value: object, path: str) -> Value:
     return from_json(value)
 
 
-GUEST_CHANNEL_DIRECTION = frozenset({"OutOnly", "TwoWay"})
+GUEST_CHANNEL_DIRECTION = _g.ENUM_SETS["ChannelDirection"]
 
 
 def _decode_guest_channel(value: object, path: str) -> Value:
@@ -1975,26 +1899,7 @@ def _decode_int_array(value: object, path: str) -> Value:
 # Action cases (WIRE_FORMAT.md §3.3 / §4). Wire-survivable actions (e.g. a Modal's
 # ``onDismiss``) carry a real ``$type`` — validated here, then preserved structurally
 # (the same pass-through Form.onSubmit takes, which has no typed schema).
-ACTION_CASES = frozenset(
-    {
-        "Chain",
-        "Dispatch",
-        "Navigate",
-        "SetState",
-        "Notify",
-        "WriteToClipboard",
-        # fuaran#1124 — the format's first PAYLOAD-FREE action case.
-        "Print",
-        # fuaran#1537 — the confirm-before-action dialogue and the focus move.
-        "Confirm",
-        "Focus",
-        "ReadFileBody",
-        "Call",
-        "AiTool",
-        "CommitLocal",
-        "Invoke",
-    }
-)
+ACTION_CASES = frozenset(_g.UNION_CASES["Action"])
 
 
 def _decode_action(value: object, path: str) -> Value:
@@ -2237,10 +2142,8 @@ def _decode_integer(value: object, path: str) -> Value:
 # UNKNOWN_DU_CASE via ``_dispatch`` (the typed-surface default-deny). Array
 # positions use ``[i]`` bracket paths to match the F# reference reject paths.
 
-DRAW_SHAPE_CASES = frozenset(
-    {"Group", "Rectangle", "Line", "Polyline", "Polygon", "Curve", "Circle", "Ellipse", "Label"}
-)
-CURVE_COMMAND_CASES = frozenset({"MoveTo", "LineTo", "CubicTo", "QuadraticTo", "Close"})
+DRAW_SHAPE_CASES = frozenset(_g.UNION_CASES["Shape"])
+CURVE_COMMAND_CASES = frozenset(_g.UNION_CASES["CurveCommand"])
 
 
 def _decode_view_box(value: object, path: str) -> Value:
@@ -2743,12 +2646,12 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("onDismiss", False, _decode_action),
         ("open", True, _decode_binding_bool),
         ("heading", False, _decode_text_source, ("title",)),
-        # fuaran#1119 — the modality. `Blocking` is the identity and omits at it,
+        # fuaran#1119 — the modality. `Modal` is the identity and omits at it,
         # so every modal written before this member is byte-identical; an
         # unrecognised token is REFUSED rather than read as the default, because
         # a document that meant `Popover` and misspelled it would otherwise trap
         # focus and claim the page behind it inert.
-        ("modality", False, _omit_default_enum(MODALITY_KIND, {}, "Blocking", "modality")),
+        ("modality", False, _omit_default_enum(MODALITY_KIND, {}, "Modal", "modality")),
         ("anchor", False, _decode_string),
     ],
     "ScrollArea": [
@@ -3363,7 +3266,7 @@ def _decode_column(value: object, path: str) -> Value:
     return Obj(None, fields)
 
 
-_SORT_DIRECTIONS = frozenset({"asc", "desc"})
+_SORT_DIRECTIONS = _g.ENUM_SETS["SortDirection"]
 
 
 def _validate_static_rows(raw: object, path: str) -> None:
@@ -3499,9 +3402,9 @@ def _decode_datagrid(obj: dict, path: str) -> Obj:
     return Obj("DataGrid", fields)
 
 
-_CHART_ANNOTATION_CASES = frozenset({"ReferenceLine", "EventMarker", "RangeBand"})
-_CHART_ANNOTATION_X_CASES = frozenset({"Category", "Date"})
-_CHART_ANNOTATION_RANGE_CASES = frozenset({"ValueRange", "XRange"})
+_CHART_ANNOTATION_CASES = frozenset(_g.UNION_CASES["ChartAnnotation"])
+_CHART_ANNOTATION_X_CASES = frozenset(_g.UNION_CASES["ChartAnnotationX"])
+_CHART_ANNOTATION_RANGE_CASES = frozenset(_g.UNION_CASES["ChartAnnotationRange"])
 
 
 def _is_canonical_iso_day(text: str) -> bool:
@@ -3696,31 +3599,10 @@ def _decode_chart(obj: dict, path: str) -> Obj:
 # OMITTED from the model, so the canonical minimal control carries no `value`
 # key at all; an absent `value` simply stays absent (the canonical bytes).
 
-FORM_FIELD_KIND_CASES = frozenset(
-    {
-        "Text",
-        "Number",
-        "Checkbox",
-        "Toggle",
-        "Choice",
-        "RangedNumber",
-        "SegmentedChoice",
-        "TextArea",
-        "Range",
-        # Phase 1811 — `DateTime` / `DateTimeRange` (were `Date` / `DateRange`). The
-        # old spellings and the invented `Time` / `TimeRange` are §16 lenient aliases
-        # handled in `_decode_form_field_kind`, deliberately NOT listed here: this is
-        # the CANONICAL vocabulary the corpus attests.
-        "DateTime",
-        "DateTimeRange",
-        # fuaran#1113 — the typeahead field; #1121 the multi-token one; #1130 the
-        # score and the swatch.
-        "Combobox",
-        "Tokens",
-        "Rating",
-        "Color",
-    }
-)
+# The CANONICAL control vocabulary the corpus attests. The pre-rename spellings `Date` / `DateRange`
+# and the invented `Time` / `TimeRange` (Phase 1811) are §16 lenient aliases handled in
+# `_decode_form_field_kind`, deliberately NOT members of it.
+FORM_FIELD_KIND_CASES = frozenset(_g.UNION_CASES["FormFieldKind"])
 
 # The 0.2.1 typed placeholders (the F# `ControlValueDefaults`): the values the
 # form-field auto-binding `State(field id, <placeholder>)` carries per control.
@@ -4074,8 +3956,8 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
     return Obj(tag, fields)
 
 
-TEXT_FORMATS = frozenset({"email", "url", "tel"})
-COMPARE_OPS = frozenset({"eq", "neq", "lt", "lte", "gt", "gte"})
+TEXT_FORMATS = _g.ENUM_SETS["TextFormat"]
+COMPARE_OPS = _g.ENUM_SETS["CompareOp"]
 
 #: The rule slot's rejected spellings. Small and enumerated for the same reason the
 #: grid's set is: rule 2's tolerance of unknown keys is right for a field a future

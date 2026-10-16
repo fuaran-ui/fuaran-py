@@ -2465,137 +2465,81 @@ def _kind_schema(kind: str, overrides: dict[str, Override] | None = None) -> lis
 
 
 KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
-    "Heading": [
-        ("level", True, _decode_int),
-        ("text", True, _decode_text_source),
-        ("variant", True, _enum_aliased_decoder(HEADING_VARIANT, HEADING_VARIANT_ALIASES, "variant")),
-    ],
-    "Markdown": [
-        ("text", True, _decode_text_source),
-    ],
+    "Heading": _kind_schema(
+        "Heading", {"variant": _enum_aliased_decoder(HEADING_VARIANT, HEADING_VARIANT_ALIASES, "variant")}
+    ),
+    "Markdown": _kind_schema("Markdown"),
     # Phase 460 — `format` / `tone` / `weight` / `emphasis` are omitted-when-default.
     # 0.2.0 rename law (clean break): the scalar displayed value is `value`
     # (`data` stays a web-prior alias); the retired `source` is NOT accepted.
-    "Metric": [
-        ("emphasis", False, _omit_default_emphasis_enum),
-        ("format", False, _omit_default_format),
-        ("label", True, _decode_text_source),
-        ("value", True, _decode_binding_float, ("data",)),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-        ("weight", False, _omit_default_enum(WEIGHT, {}, "Standard", "weight")),
-        ("icon", False, _decode_string),
-        ("subtext", False, _decode_text_source),
-        ("trend", False, _decode_binding_float),
-        ("trendFormat", False, _decode_cell_format),
-        # fuaran#867 — `trendPolarity` is omitted-when-`HigherIsBetter` (§3.6's
-        # omit-when-default table). An absent `trend` makes the slot inert: a
-        # Metric with no trend that declares a polarity is legal and says nothing,
-        # so nothing here couples the two.
-        ("trendPolarity", False, _omit_default_enum(TREND_POLARITY, {}, "HigherIsBetter", "trendPolarity")),
-    ],
+    # fuaran#867 — `trendPolarity` is omitted-when-`HigherIsBetter` (§3.6's
+    # omit-when-default table). An absent `trend` makes the slot inert: a
+    # Metric with no trend that declares a polarity is legal and says nothing,
+    # so nothing here couples the two.
+    "Metric": _kind_schema(
+        "Metric",
+        {
+            "emphasis": _decode_emphasis_enum,
+            "value": (_decode_binding_float, ("data",)),
+            "tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone"),
+        },
+    ),
     # The labeled TEXT fact (2026-07-17) — Metric's complementary kind: only
     # `label` + `value` required; `tone` / `emphasis` omitted-when-default on
     # BOTH boundaries; optional `help` / `icon`. `emphasis` is the behavioural
     # BOOL (cross-vocab coercion via `_decode_emphasis_flag`).
-    "Fact": [
-        ("emphasis", False, _decode_emphasis_flag),
-        ("help", False, _decode_text_source),
-        ("icon", False, _decode_string),
-        ("label", True, _decode_text_source),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-        ("value", True, _decode_text_source),
-    ],
-    "Badge": [
-        ("label", True, _decode_text_source),
-        ("variant", True, _enum_aliased_decoder(BADGE_VARIANT, BADGE_VARIANT_ALIASES, "variant")),
-    ],
-    "Callout": [
-        ("body", True, _decode_text_source),
-        # 0.2.0 — omitted-when-false on both boundaries.
-        ("dismissable", False, _omit_default_bool(False)),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-        ("heading", False, _decode_text_source, ("title",)),
-        ("icon", False, _decode_string),
-    ],
-    "Progress": [
-        ("fraction", True, _decode_binding_float),
-        # 0.2.0 — omitted-when-false on both boundaries.
-        ("indeterminate", False, _omit_default_bool(False)),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-        ("label", False, _decode_text_source),
-        ("caveat", False, _decode_text_source),
-    ],
-    "Skeleton": [
-        # Phase 1666 - the §21.9 row bound rides the field's own decoder, so the
-        # table stays the single statement of what a Skeleton's shape is.
-        ("rows", True, _decode_skeleton_rows),
-    ],
+    "Fact": _kind_schema(
+        "Fact", {"emphasis": _decode_emphasis_flag, "tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}
+    ),
+    "Badge": _kind_schema("Badge", {"variant": _enum_aliased_decoder(BADGE_VARIANT, BADGE_VARIANT_ALIASES, "variant")}),
+    # 0.2.0 — omitted-when-false on both boundaries.
+    "Callout": _kind_schema(
+        "Callout",
+        {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone"), "heading": (_decode_text_source, ("title",))},
+    ),
+    # 0.2.0 — omitted-when-false on both boundaries.
+    "Progress": _kind_schema("Progress", {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}),
+    # Phase 1666 - the §21.9 row bound rides the field's own decoder, so the
+    # table stays the single statement of what a Skeleton's shape is.
+    "Skeleton": _kind_schema("Skeleton", {"rows": _decode_skeleton_rows}),
     # Phase 821 — the standalone icon-only display kind: `size` omitted-when-
     # `Medium`, `tone` omitted-when-`Default` (the Phase 460 discipline),
     # `label` omitted-when-decorative.
-    "Icon": [
-        ("icon", True, _decode_string),
-        ("label", False, _decode_string),
-        ("size", False, _omit_default_enum(ICON_SIZE, {}, "Medium", "IconSize")),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-    ],
-    "Sparkline": [
-        # Phase 429 — `source` is a typed Static float-series position; `data` alias (§3.6).
-        ("source", True, _decode_binding_float_seq, ("data",)),
-    ],
+    "Icon": _kind_schema("Icon", {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}),
+    # Phase 429 — `source` is a typed Static float-series position; `data` alias (§3.6).
+    "Sparkline": _kind_schema("Sparkline", {"source": (_decode_binding_float_seq, ("data",))}),
     # Phase 429 — Map `source` is a typed Static marker-list position. The three
     # numeric envelope fields pass through structurally like any unlisted key.
     # `source` aliases `data` / `markers` (§3.6).
     "Map": [
         ("source", True, _decode_binding_marker_seq, ("data", "markers")),
     ],
-    "LabelValueRow": [
-        # `emphasis` is the behavioural bool (cross-vocab coerced) — 0.2.2:
-        # omitted-when-false. `format` omitted-when-default. 0.2.0 rename law:
-        # the scalar value is `value` (`data` alias; retired `source` NOT accepted).
-        ("emphasis", False, _decode_emphasis_flag),
-        ("format", False, _omit_default_format),
-        ("label", True, _decode_text_source),
-        ("value", True, _decode_binding_float, ("data",)),
-        ("help", False, _decode_text_source),
-    ],
-    "Link": [
-        ("download", True, _decode_bool),
-        ("href", True, _decode_binding_string),
-        ("label", True, _decode_text_source),
-        # Phase 812 — optional closed enumeration; unknown case rejects
-        # UNKNOWN_DU_CASE at $.kind.protection via the _enum default-deny.
-        ("protection", False, _enum_decoder(LINK_PROTECTION, "protection")),
-        ("rel", False, _decode_string),
-        ("target", False, _decode_string),
-    ],
-    "Image": [
-        ("alt", True, _decode_text_source),
-        # fuaran#1077 — the three presentation slots, omitted at their identity
-        # defaults on BOTH boundaries, so a document written before they existed
-        # decodes to today's behaviour and re-encodes to the bytes it already had.
-        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
-        # fuaran#1078 — a caption is CONTENT, so it is NOT an identity default:
-        # there is no default caption the way there is a default fit, and the slot
-        # takes the ordinary optional-field posture (omitted when absent). It is a
-        # full `TextSource`, not a string — the rule a second host is most likely
-        # to break, because a caption reads like a string and narrowing the slot
-        # costs nothing until somebody needs a locale.
-        ("caption", False, _decode_text_source),
-        # fuaran#1079 — an ordinary omit-at-`false` bool. A present non-boolean is
-        # a WRONG_TYPE, never a truthiness coercion: a decoder that guessed at
-        # `"true"` would have to rule on `"false"` and `""` too, at which point two
-        # conformant hosts can disagree about whether the document declares an
-        # affordance at all.
-        ("expandable", False, _omit_default_bool(False)),
-        ("fit", False, _omit_default_enum(IMAGE_FIT, {}, "Natural", "fit")),
-        ("loading", False, _omit_default_enum(IMAGE_LOADING, {}, "Eager", "loading")),
-        ("src", True, _decode_binding_string),
-        # fuaran#1080 — absent MEANS the empty list and `null` is refused; see
-        # `_decode_srcset`.
-        ("srcSet", False, _decode_srcset),
-        ("variant", True, _enum_decoder(IMAGE_VARIANT, "variant")),
-    ],
+    # `emphasis` is the behavioural bool (cross-vocab coerced) — 0.2.2:
+    # omitted-when-false. `format` omitted-when-default. 0.2.0 rename law:
+    # the scalar value is `value` (`data` alias; retired `source` NOT accepted).
+    "LabelValueRow": _kind_schema(
+        "LabelValueRow", {"emphasis": _decode_emphasis_flag, "value": (_decode_binding_float, ("data",))}
+    ),
+    # Phase 812 — optional closed enumeration; unknown case rejects
+    # UNKNOWN_DU_CASE at $.kind.protection via the _enum default-deny.
+    "Link": _kind_schema("Link"),
+    # fuaran#1077 — the three presentation slots, omitted at their identity
+    # defaults on BOTH boundaries, so a document written before they existed
+    # decodes to today's behaviour and re-encodes to the bytes it already had.
+    # fuaran#1078 — a caption is CONTENT, so it is NOT an identity default:
+    # there is no default caption the way there is a default fit, and the slot
+    # takes the ordinary optional-field posture (omitted when absent). It is a
+    # full `TextSource`, not a string — the rule a second host is most likely
+    # to break, because a caption reads like a string and narrowing the slot
+    # costs nothing until somebody needs a locale.
+    # fuaran#1079 — an ordinary omit-at-`false` bool. A present non-boolean is
+    # a WRONG_TYPE, never a truthiness coercion: a decoder that guessed at
+    # `"true"` would have to rule on `"false"` and `""` too, at which point two
+    # conformant hosts can disagree about whether the document declares an
+    # affordance at all.
+    # fuaran#1080 — absent MEANS the empty list and `null` is refused; see
+    # `_decode_srcset`.
+    "Image": _kind_schema("Image"),
     # fuaran#1076 — the playback surface. ONE kind, two variants: everything a
     # video surface and an audio surface SHARE is stated once on the record (the
     # source, the accessible name, whether the transport is shown, whether
@@ -2614,25 +2558,17 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # a transport cannot be paused, seeked or muted by a keyboard user at all, so
     # the accessible setting is what a document gets for free and taking it away
     # is the deviation that costs a key. `loop` takes the ordinary polarity.
-    "Media": [
-        ("controls", False, _omit_default_bool(True)),
-        ("kind", True, _decode_media_kind),
-        ("label", True, _decode_text_source),
-        ("loop", False, _omit_default_bool(False)),
-        ("src", True, _decode_binding_string),
-        # fuaran#1110 — the timed-text tracks and the text alternative, both on
-        # the SPEC rather than on the `Video` case. The second placement is the
-        # one worth explaining: a transcript is the affordance an AUDIO surface
-        # needs most, because a recording with no visual channel has nowhere else
-        # to put its words, where a video can usually be served by captions
-        # riding the timeline it already has.
-        #
-        # `tracks` is absent-MEANS-empty and refuses `null` (`_decode_tracks`);
-        # `transcript` is an ordinary optional, so absent and empty are different
-        # statements — one offers no transcript, the other offers an empty one.
-        ("tracks", False, _decode_tracks),
-        ("transcript", False, _decode_text_source),
-    ],
+    # fuaran#1110 — the timed-text tracks and the text alternative, both on
+    # the SPEC rather than on the `Video` case. The second placement is the
+    # one worth explaining: a transcript is the affordance an AUDIO surface
+    # needs most, because a recording with no visual channel has nowhere else
+    # to put its words, where a video can usually be served by captions
+    # riding the timeline it already has.
+    #
+    # `tracks` is absent-MEANS-empty and refuses `null` (`_decode_tracks`);
+    # `transcript` is an ordinary optional, so absent and empty are different
+    # statements — one offers no transcript, the other offers an empty one.
+    "Media": _kind_schema("Media"),
     # fuaran#1111 — the sandboxed third-party embed. A NEW kind rather than a
     # `Mount` variant: `Mount` composes a COOPERATING guest (a scope id, a
     # declared channel, a capability list, a host-side loader) and a third-party
@@ -2644,15 +2580,10 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # `https` and nothing else, and that is a RENDER-time obligation, as every
     # §19-class rule is. A document naming a URL the floor refuses is still a
     # valid wire document.
-    "Embed": [
-        ("aspectRatio", False, _omit_default_enum(IMAGE_ASPECT, {}, "Natural", "aspectRatio")),
-        ("permissions", False, _decode_permissions),
-        ("src", True, _decode_binding_string),
-        # REQUIRED, on `MediaSpec.label`'s argument one kind over: a frame is a
-        # focus container a reader tabs INTO, so it is never decorative, and an
-        # unnamed one is announced as "frame" and nothing more.
-        ("title", True, _decode_text_source),
-    ],
+    # REQUIRED, on `MediaSpec.label`'s argument one kind over: a frame is a
+    # focus container a reader tabs INTO, so it is never decorative, and an
+    # unnamed one is announced as "frame" and nothing more.
+    "Embed": _kind_schema("Embed"),
     # fuaran#1120 — the hierarchy, and the format's first SELF-REFERENTIAL
     # shape. This kind carries NO `expandable` and NO `selectable` boolean, and
     # none is coming: a behaviour the reader drives is declared as a named State
@@ -2663,12 +2594,7 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # grid-behaviour rule read straight across: an initial presentation without a
     # reader-driven affordance is a legitimate shape, and it is the only reading
     # under which such a tree shows its content at all.
-    "Tree": [
-        ("expandedStateKey", False, _decode_string),
-        ("items", True, _decode_tree_items),
-        ("onSelect", False, _decode_string),
-        ("selectionStateKey", False, _decode_string),
-    ],
+    "Tree": _kind_schema("Tree"),
     # fuaran#1115 / #1116 / #1117 — the upload control had NO typed schema at
     # all, so every member below reached the structural pass-through and each of
     # the four reject vectors decoded happily. The three ingress routes and the
@@ -2695,37 +2621,14 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         ("maxBytes", False, _decode_upload_ceiling("maxBytes")),
         ("maxFiles", False, _decode_upload_ceiling("maxFiles")),
     ],
-    "List": [
-        ("items", True, _decode_text_source_array),
-        ("ordered", True, _decode_bool),
-    ],
-    "Toast": [
-        # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
-        ("dismissable", False, _omit_default_bool(True)),
-        ("message", True, _decode_text_source),
-        ("open", True, _decode_binding_bool),
-        ("tone", False, _omit_default_enum(TONE, TONE_ALIASES, "Default", "tone")),
-    ],
-    "CodeBlock": [
-        ("code", True, _decode_string),
-        ("copyable", True, _decode_bool),
-        ("highlightLines", True, _decode_int_array),
-        ("language", True, _decode_string),
-        ("lineNumbers", True, _decode_bool),
-    ],
-    "Math": [
-        ("display", True, _enum_decoder(MATH_DISPLAY, "display")),
-        ("source", True, _decode_string),
-    ],
-    "Drawing": [
-        # Phase 524 — geometry static; the closed Shape / CurveCommand DUs
-        # default-deny an unknown discriminator; DrawStyle carries the bindings.
-        ("description", False, _decode_text_source),
-        ("shapes", True, _decode_shape_array),
-        ("style", True, _decode_draw_style),
-        ("title", False, _decode_text_source),
-        ("viewBox", True, _decode_view_box),
-    ],
+    "List": _kind_schema("List"),
+    # 0.2.0 — the one omit-when-TRUE (a toast is dismissable unless said otherwise).
+    "Toast": _kind_schema("Toast", {"tone": _enum_aliased_decoder(TONE, TONE_ALIASES, "tone")}),
+    "CodeBlock": _kind_schema("CodeBlock"),
+    "Math": _kind_schema("Math"),
+    # Phase 524 — geometry static; the closed Shape / CurveCommand DUs
+    # default-deny an unknown discriminator; DrawStyle carries the bindings.
+    "Drawing": _kind_schema("Drawing"),
     "Select": [
         ("label", True, _decode_text_source),
         # Phase 426 — the handler fields are OPTIONAL: omitted on the wire when the

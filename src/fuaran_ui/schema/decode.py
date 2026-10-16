@@ -4134,6 +4134,40 @@ def _decode_state(value: object, path: str) -> Obj:
 # with no lock and no change to the decoder table's signature. `_reset_walk` is
 # still called by the public entry points, so a walk that raised part-way through
 # never leaves ITS OWN counter poisoned for the next decode on the same thread.
+def _decode_style_member(value: object, path: str) -> object:
+    """The envelope ``style``: an all-default (empty) SemanticStyle is omitted entirely (§3.1 / Phase 460)."""
+    style = _decode_style(value, path)
+    return style if style.fields else _DROP
+
+
+def _decode_fallback_member(value: object, path: str) -> Value:
+    """fuaran#1812 — the author-declared ``fallback``: a full node a reader BEHIND this node's kind
+    renders in place of its placeholder (§3.1 / §15.3). This reader knows the kind, so it decodes the
+    fallback, preserves it and never renders it; the descent goes through the bounded node decoder
+    like ``state.onEmpty`` does, so the §21 limits cover the subtree."""
+    return _decode_node_value(value, path)
+
+
+#: The decoder of each on-wire node-envelope member. fuaran#1112 — ``tooltip`` is the node-level
+#: TRAIT, a full ``TextSource`` (the §16 bare string is the shorthand); fuaran#1535 — ``visible`` is
+#: an ordinary optional ``Binding<bool>``, read by the shared binding decoder (the one time a host read
+#: a node-envelope slot as its own narrower thing it took two hosts and a ruling to unwind).
+_ENVELOPE_DECODERS: dict[str, FieldDecoder] = {
+    "accessibility": _decode_accessibility,
+    "fallback": _decode_fallback_member,
+    "state": _decode_state,
+    "style": _decode_style_member,
+    "tooltip": _decode_text_source,
+    "visible": _decode_binding,
+}
+_ENVELOPE_MEMBERS = tuple(f.name for f in _g.NODE_FIELDS if f.on_wire)
+if set(_ENVELOPE_MEMBERS) != set(_ENVELOPE_DECODERS):
+    raise RuntimeError(
+        "node envelope: idl.json declares the wire members "
+        f"{sorted(_ENVELOPE_MEMBERS)} and this module decodes {sorted(_ENVELOPE_DECODERS)}"
+    )
+
+
 _walk_depth: ContextVar[int] = ContextVar("fuaran_walk_depth", default=0)
 _walk_nodes: ContextVar[int] = ContextVar("fuaran_walk_nodes", default=0)
 
@@ -4185,36 +4219,16 @@ def _decode_node_value_inner(value: object, path: str) -> Node:
         _fail(MISSING_FIELD, f"{path}.kind", "missing required field 'kind'")
     kind = _decode_kind(obj["kind"], f"{path}.kind")
 
+    # The optional envelope members are the GENERATED node fields that are on the wire (`motion` and
+    # `extraAttributes` are `hostOnly` — a host-side animation record and consumer hatch — and are
+    # tolerated and dropped, as the reference host drops them). Each is read by its decoder in
+    # `_ENVELOPE_DECODERS`, in IDL order.
     extras: dict[str, Value] = {}
-    if "state" in obj:
-        extras["state"] = _decode_state(obj["state"], f"{path}.state")
-    if "style" in obj:
-        style = _decode_style(obj["style"], f"{path}.style")
-        # An all-default (empty) SemanticStyle is omitted entirely (§3.1 / Phase 460).
-        if style.fields:
-            extras["style"] = style
-    if "accessibility" in obj:
-        extras["accessibility"] = _decode_accessibility(obj["accessibility"], f"{path}.accessibility")
-    # fuaran#1112 — the node-level tooltip TRAIT, not a field of any kind. A hint
-    # is uniform across kinds, so it lives on the envelope beside `style` and
-    # `accessibility` rather than being repeated per spec. It is a full
-    # `TextSource` (the §16 bare string is the shorthand), so a non-string,
-    # non-`$type`-tagged value is WRONG_TYPE and is never carried through.
-    if "tooltip" in obj:
-        extras["tooltip"] = _decode_text_source(obj["tooltip"], f"{path}.tooltip")
-    # fuaran#1535 — the node-level visibility predicate. An ordinary optional
-    # ``Binding<bool>``, decoded by the shared binding decoder for the reason the
-    # tooltip above states: the one time a host read a node-envelope slot as its
-    # own narrower thing it took two hosts and a ruling to unwind.
-    if "visible" in obj:
-        extras["visible"] = _decode_binding(obj["visible"], f"{path}.visible")
-    # fuaran#1812 — the author-declared `fallback`: a full node a reader BEHIND
-    # this node's kind renders in place of its placeholder (§3.1 / §15.3). This
-    # reader knows the kind, so it decodes the fallback, preserves it and never
-    # renders it; the descent goes through the bounded node decoder like
-    # `state.onEmpty` does, so the §21 limits cover the subtree.
-    if "fallback" in obj:
-        extras["fallback"] = _decode_node_value(obj["fallback"], f"{path}.fallback")
+    for member in _ENVELOPE_MEMBERS:
+        if member in obj:
+            decoded = _ENVELOPE_DECODERS[member](obj[member], f"{path}.{member}")
+            if decoded is not _DROP:
+                extras[member] = cast(Value, decoded)
 
     return Node(raw_id, kind, extras)  # type: ignore[arg-type]
 

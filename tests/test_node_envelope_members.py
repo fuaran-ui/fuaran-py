@@ -22,63 +22,31 @@ is exactly why dropping it was a defect — no fixture is owed, and dropping the
 is the CONFORMANT behaviour rather than a silent omission. Phase 1647 authored no
 fixture for them, correctly.
 
-What is genuinely worth having is the assertion that goes red if that changes,
-and it is stronger than the two-name check the finding implied: the envelope
-member set is DERIVED from ``idl.json`` and compared to what this host's decoder
-reads, in both directions. A ``hostOnly`` field promoted to the wire, or a new
-optional envelope member this host never adopted, arrives here as a red test
-naming it — which is the property the original finding was reaching for.
+What is genuinely worth having is the assertion that goes red if that changes.
+Since Phase 2296 the decoder reads its envelope member set FROM the generated
+node fields, and ``schema/decode.py`` refuses to import when the IDL declares a
+wire member it has no decoder for (or it decodes one the IDL does not declare),
+so the both-directions comparison that lived here was deleted with the hand
+literal it compared. The refutation itself stays pinned below.
 """
 
 from __future__ import annotations
 
-import json
-
-import pytest
-
-from _corpus import CORPUS_ROOT
 from fuaran_ui import decode_node
+from fuaran_ui.schema import generated
 from fuaran_ui.schema.encode import encode_node
 
-#: ``idl.json`` is not part of the bundled snapshot payload, so this file needs
-#: the authority (or a snapshot that has grown it). Skipping is honest here for
-#: the reason ``_corpus`` skips: there is no oracle to derive from.
-_IDL = CORPUS_ROOT / "idl.json"
-idl_required = pytest.mark.skipif(not _IDL.is_file(), reason=f"corpus idl.json not found at {_IDL}")
 
-#: The optional envelope keys ``schema/decode.py`` reads. Kept as a literal on
-#: PURPOSE — it is one side of a comparison whose other side is derived, so a
-#: literal here is the thing being checked rather than a second unmaintained
-#: source of truth. Deriving both sides would compare the corpus to itself.
-_DECODED_OPTIONAL_KEYS = frozenset({"state", "style", "accessibility", "tooltip", "visible", "fallback"})
-
-
-def _node_fields() -> list[dict]:
-    return json.loads(_IDL.read_text(encoding="utf-8"))["nodeFields"]
-
-
-@idl_required
-def test_the_decoder_reads_exactly_the_wire_envelope_members() -> None:
-    wire = {f["name"] for f in _node_fields() if f["optionality"].get("$type") != "hostOnly"}
-    assert wire == _DECODED_OPTIONAL_KEYS, (
-        f"the corpus IDL declares wire envelope members {sorted(wire)} while this host's decoder reads "
-        f"{sorted(_DECODED_OPTIONAL_KEYS)}. A member the IDL added is one this host silently drops; a "
-        "member it removed is one this host reads that no emitter produces. Update "
-        "schema/decode.py's `_decode_node_value_inner` and this set together."
-    )
-
-
-@idl_required
 def test_motion_and_extraattributes_are_declared_host_only() -> None:
     """The refutation, pinned against the artefact that settles it.
 
     If either is ever promoted to the wire this goes red, and at that point the
     original finding becomes correct and this host owes it a decode arm.
     """
-    by_name = {f["name"]: f for f in _node_fields()}
+    by_name = {f.name: f for f in generated.NODE_FIELDS}
     for name in ("motion", "extraAttributes"):
         assert name in by_name, f"{name!r} has left the IDL's nodeFields entirely — re-read §3.1 before acting"
-        assert by_name[name]["optionality"].get("$type") == "hostOnly", (
+        assert by_name[name].optionality == "hostOnly", (
             f"{name!r} is no longer declared hostOnly in the corpus IDL, so it is now a WIRE member and this "
             "host must decode it. See this module's docstring: it was refuted as a defect precisely because "
             "the IDL said hostOnly and the reference host drops it for that reason."

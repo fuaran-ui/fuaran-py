@@ -5,7 +5,7 @@ The Python port of ``fuaran-ts/packages/conformance/scripts/sync-corpus.mjs``.
 The authoritative corpus lives in the workspace repo at ``../wire-format-fixtures``
 (relative to this repo's root — the canonical side-by-side workspace layout). F#
 is the sole generator (``--emit-corpus``); this script clean-copies the
-certification payload set (``manifest.json``, ``schema.json``,
+certification payload set (``manifest.json``, ``schema.json``, ``idl.json``,
 ``render-fidelity.json``, ``render-text.json``, ``a11y-contract.json``, ``nodes/``, ``ops/``,
 ``reject/``, ``lenient/``,
 ``envelope/``, ``elicitation/``, ``markdown/``, ``style-observer/``, ``apply/``) into this repo's
@@ -199,10 +199,42 @@ _COPIES_NOTE = (
 # ``dag/`` / ``merge-conformance/`` precedent, that suite does not skip when its
 # manifest is absent: a host that enforces a limit must not go green without the
 # vectors that prove it, so the family travels with the snapshot.
-_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json", "a11y-contract.json")
+#
+# Phase 2296 - ``idl.json`` joins because this host's STRUCTURAL layer is generated from it
+# (``src/fuaran_ui/schema/generate.py``). The generator reads the bundled copy, never the authority,
+# so an offline checkout regenerates exactly the committed module; and a sync that moves it
+# regenerates in the same run (``main`` below), so the IDL and its projection land together.
+_FILES = (
+    "manifest.json",
+    "schema.json",
+    "idl.json",
+    "render-fidelity.json",
+    "render-text.json",
+    "a11y-contract.json",
+)
 _DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def regenerate(repo: Path) -> Path | None:
+    """Regenerate ``repo``'s structural module from ``repo``'s bundled ``idl.json``.
+
+    The generator is loaded BY PATH from the checkout being synced, never imported: an editable
+    install made in one checkout is importable from every other, and the generator that ran would
+    then be another tree's (the Phase 2225 class). Returns the path written, or ``None`` for a
+    checkout that carries no generator (a bare snapshot holder, as the sync's own tests stand up).
+    """
+    schema = repo / "src" / "fuaran_ui" / "schema"
+    if not (schema / "generate.py").is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("_fuaran_py_generate", schema / "generate.py")
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load the structural generator from {schema / 'generate.py'}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    written: Path = module.generate(repo / "conformance" / "corpus" / "idl.json", schema / "generated.py")
+    return written
 
 
 def _git(repo: Path, *args: str) -> str | None:
@@ -630,6 +662,9 @@ def main(argv: list[str]) -> int:
         f"Corpus snapshot synced: {source} -> {dest} (authority commit {recorded or 'unknown'})",
         file=sys.stderr,
     )
+    written = regenerate(repo)
+    if written is not None:
+        print(f"Structural layer regenerated: {written}", file=sys.stderr)
     return 0
 
 

@@ -77,6 +77,9 @@ from ..dataframe import codec as _codec
 from ..dataframe.model import NULL
 from ..model import Arr, Obj
 from ..model import Value as WireValue
+from ..schema.types import Query as _Query
+from ..schema.types import Selection as _Selection
+from ..schema.types import State as _State
 
 # ── Expression DSL ───────────────────────────────────────────────────────────
 
@@ -711,14 +714,23 @@ class _GroupBy:
         return self.frame._step(GroupBy(self.keys, [a.to_agg() for a in aggs]))
 
 
+#: The wire's ``TransformSource`` (Phase 2316, closing fuaran#1100's gap): the DATA a pipeline
+#: runs over (an embedded table or a named reference), or a LIVE binding the host re-derives
+#: against its current store — a ``State`` key (whose carried ``default_value`` rows are the
+#: initial snapshot), a ``Selection`` or a ``Query``. These are the three binding tags every
+#: host's decoder preserves as a live source.
+TransformSource = DataSource | _State | _Selection | _Query
+
+
 @dataclass(frozen=True)
 class TransformBinding:
     """The ``Binding.Transform`` authoring value (a source + a pipeline).
 
     Lowers to ``{"$type":"Transform","pipeline":[…],"source":{…}}`` — pass it as a node
-    ``source`` (e.g. ``fuaran.grid(..., source=fr.to_transform_binding())``)."""
+    ``source`` (e.g. ``fuaran.grid(..., source=fr.to_transform_binding())``). The source is
+    any :data:`TransformSource`; a live one lowers as the binding it is."""
 
-    source: DataSource
+    source: TransformSource
     pipeline: tuple[Transform, ...]
     #: fuaran#1170 — the declared parameters. OMITTED from the wire when empty, so a
     #: parameter-free binding is byte-identical to what this class emitted before.
@@ -727,7 +739,11 @@ class TransformBinding:
     def to_wire(self) -> WireValue:
         fields: dict[str, WireValue] = {
             "pipeline": Arr([_codec.encode_transform_value(t) for t in self.pipeline]),
-            "source": _codec.encode_source_value(self.source),
+            "source": (
+                self.source.to_wire()
+                if isinstance(self.source, (_State, _Selection, _Query))
+                else _codec.encode_source_value(self.source)
+            ),
         }
         if self.params:
             fields["params"] = Arr([p.to_wire() for p in self.params])

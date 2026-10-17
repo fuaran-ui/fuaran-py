@@ -3440,11 +3440,51 @@ class ColumnWidth:
 
 
 @dataclass(frozen=True)
-class ColumnKind:
-    kind: str = "Text"
+class ButtonGroupItem:
+    """One button of a ``ButtonGroup`` cell (Phase 2316, the fuaran#1909 grid column rules).
+
+    The click handler is a ``(row) -> …`` closure, so it rides as a flag that erases to
+    :data:`CLOSURE`, like every other handler slot in this module.
+    """
+
+    label: TextSource
+    on_click: bool = False
 
     def to_wire(self) -> Value:
-        return Obj(self.kind, {})
+        return _obj(None, {"label": self.label, "onClick": CLOSURE if self.on_click else None})
+
+
+@dataclass(frozen=True)
+class ColumnKind:
+    """A column's cell kind, named by its discriminator.
+
+    Every cell kind but the toned pill carries a ``(row) -> …`` closure that erases on the wire,
+    so the discriminator is most of what survives. Phase 2316 adds the two row-ACTION cells' wire
+    members (fuaran#1909): a ``Button`` cell's ``label`` and click flag, and a ``ButtonGroup``
+    cell's ``buttons``. Each is refused on any other kind, so a member never rides a cell whose
+    wire case does not declare it.
+    """
+
+    kind: str = "Text"
+    label: TextSource | None = None
+    on_click: bool = False
+    buttons: tuple[ButtonGroupItem, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.kind != "Button" and (self.label is not None or self.on_click):
+            raise ValueError(f"'label' / 'on_click' belong to a Button cell, not a {self.kind!r} cell")
+        if self.kind != "ButtonGroup" and self.buttons:
+            raise ValueError(f"'buttons' belong to a ButtonGroup cell, not a {self.kind!r} cell")
+
+    def to_wire(self) -> Value:
+        return _obj(
+            self.kind,
+            {
+                "buttons": list(self.buttons) if self.buttons else None,
+                "label": self.label,
+                "onClick": CLOSURE if self.on_click else None,
+            },
+        )
 
 
 @dataclass(frozen=True)
@@ -3503,6 +3543,13 @@ class Column:
     #: column, ``grid-declared-edit``'s read-only one).
     sortable: bool | None = None
     editable: bool | None = None
+    #: Phase 2316 — whether the column projects a cell value through the erased
+    #: closure. ``True`` (the default, and every column before this slot) emits
+    #: ``"value":"<closure>"`` when no ``field_name`` names the cell; ``False``
+    #: omits both, which is how a row-ACTION column reads on the wire — its
+    #: ``Button`` / ``ButtonGroup`` cell shows no row value at all
+    #: (``nodes/grid-action-column-clean.json``).
+    value: bool = True
 
     def to_wire(self) -> Value:
         # Phase 460 — `format` / `width` omitted-when-default (`CellFormat.None`
@@ -3516,7 +3563,7 @@ class Column:
                 "kind": self.kind,
                 "label": self.label,
                 "sortable": self.sortable,
-                "value": None if self.field_name is not None else CLOSURE,
+                "value": CLOSURE if self.value and self.field_name is None else None,
                 "width": None if self.width.kind == "Auto" else self.width,
             },
         )

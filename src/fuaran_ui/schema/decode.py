@@ -1704,7 +1704,7 @@ def _normalise_transform_payload(source_raw: object, pipeline_raw: object, path:
 
 def _decode_children(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_decode_node_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_decode_node_value(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 def _decode_closure_slot(_value: object, _path: str) -> Value:
@@ -1837,12 +1837,12 @@ def _decode_fragment_args(value: object, path: str) -> Value:
 
 def _decode_text_source_array(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_decode_text_source(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_decode_text_source(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 def _decode_int_array(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_expect_int(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_expect_int(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 # Action cases (WIRE_FORMAT.md §3.3 / §4). Wire-survivable actions (e.g. a Modal's

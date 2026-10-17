@@ -1,11 +1,19 @@
-"""Corpus snapshot drift guard (WIRE_FORMAT.md §11 forward-coupling, D4).
+"""Corpus snapshot drift guard (WIRE_FORMAT.md §11 forward-coupling, D4), and the corpus-family gate.
 
 The Python mirror of ``fuaran-ts``'s ``corpus-sync.test.ts``. The committed
 snapshot under ``conformance/corpus/`` (written by ``conformance/sync_corpus.py``)
 must be byte-identical to the authoritative workspace corpus. When the corpus
 regenerates under §11, this fails until ``sync_corpus.py`` is re-run and the
 snapshot re-committed — so a corpus advance can never silently leave the Python
-host pinned to a stale copy.
+host pinned to a stale copy. The payload is read from ``sync_corpus.py`` itself
+(Phase 1938): a second list here had already drifted from it, leaving two bundled
+families copied and never checked.
+
+The family gate (WIRE_FORMAT §27.7, Phase 1938) holds the capability manifest's
+``corpusFamilies`` to the family set derived from the corpus tree: a family the
+corpus has and the manifest does not name, or one the manifest names and the
+corpus no longer has, fails. It replaced a printer that logged the uncovered
+root kinds and asserted nothing.
 
 Skipped when the authority is absent (a standalone ``fuaran-py`` checkout): there
 is nothing to drift-check against, and the snapshot is then the corpus the rest
@@ -14,16 +22,28 @@ of the suite reads.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
 import pytest
 
 from _corpus import AUTHORITY_ROOT, SNAPSHOT_ROOT
+from fuaran_ui.conformance.host_capability import CORPUS_FAMILIES, corpus_families
 
-# The families the snapshot pins — must match conformance/sync_corpus.py.
-_FILES = ("manifest.json", "schema.json", "idl.json", "render-fidelity.json", "a11y-contract.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "apply")
+_SYNC = Path(__file__).resolve().parents[1] / "conformance" / "sync_corpus.py"
+_MANIFEST = Path(__file__).resolve().parents[1] / "conformance" / "host-capability-manifest.json"
+
+
+def _sync_module():  # type: ignore[no-untyped-def]
+    spec = importlib.util.spec_from_file_location("_sync_corpus", _SYNC)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_sync = _sync_module()
 
 authority_present = pytest.mark.skipif(
     not (AUTHORITY_ROOT / "manifest.json").is_file(),
@@ -44,7 +64,7 @@ def test_snapshot_exists() -> None:
 
 @authority_present
 def test_snapshot_file_set_matches_authority() -> None:
-    for name in _DIRS:
+    for name in _sync._DIRS:
         authority = _rel_files(AUTHORITY_ROOT / name)
         snapshot = _rel_files(SNAPSHOT_ROOT / name)
         assert snapshot == authority, (
@@ -55,65 +75,44 @@ def test_snapshot_file_set_matches_authority() -> None:
 
 
 @authority_present
-@pytest.mark.parametrize("name", _FILES)
-def test_snapshot_top_files_byte_identical(name: str) -> None:
-    authority = (AUTHORITY_ROOT / name).read_bytes()
-    snapshot = (SNAPSHOT_ROOT / name).read_bytes()
-    assert snapshot == authority, f"{name} snapshot drifted from the authority; run: python conformance/sync_corpus.py"
+def test_snapshot_payload_bytes_identical() -> None:
+    def same(rel: str) -> bool:
+        snap = SNAPSHOT_ROOT / rel
+        return snap.is_file() and snap.read_bytes() == (AUTHORITY_ROOT / rel).read_bytes()
+
+    drifted = [rel for rel in _sync.payload_files(AUTHORITY_ROOT) if not same(rel)]
+    assert not drifted, f"snapshot drifted from the authority: {drifted}; run: python conformance/sync_corpus.py"
+
+
+# ── the corpus families this host certifies, held to the corpus tree (§27.7) ─
 
 
 @authority_present
-@pytest.mark.parametrize("name", _DIRS)
-def test_snapshot_family_bytes_identical(name: str) -> None:
-    root_a = AUTHORITY_ROOT / name
-    for path in sorted(root_a.rglob("*")):
-        if not path.is_file():
-            continue
-        rel = path.relative_to(root_a)
-        snap = SNAPSHOT_ROOT / name / rel
-        assert snap.read_bytes() == path.read_bytes(), (
-            f"{name}/{rel.as_posix()} snapshot drifted from the authority; run: python conformance/sync_corpus.py"
-        )
+def test_the_manifest_names_every_corpus_family_and_no_other() -> None:
+    corpus = corpus_families(AUTHORITY_ROOT)
+    declared = set(CORPUS_FAMILIES)
+    missing, stale = sorted(corpus - declared), sorted(declared - corpus)
+    assert not missing, f"corpus families this host's manifest does not name: {missing}"
+    assert not stale, f"families the manifest names that the corpus no longer has: {stale}"
 
 
-# ── the families this host does not run, named rather than silently absent ───
-
-
-_COVERED_FAMILIES = (
-    "node-round-trip",
-    "op-round-trip",
-    "reject",
-    "lenient-accept",
-    "envelope-round-trip",
-    "envelope-reject",
-    "elicitation-round-trip",
-    "elicitation-reject",
-    "elicitation-answer-accept",
-    "elicitation-answer-reject",
-)
+def test_the_published_manifest_carries_the_declaration() -> None:
+    published = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    assert published["corpusFamilies"] == dict(sorted(CORPUS_FAMILIES.items()))
+    for family, answer in CORPUS_FAMILIES.items():
+        assert answer == "covered" or (
+            isinstance(answer, dict) and len(answer) == 1 and next(iter(answer)) in ("notApplicable", "pending")
+        ), f'{family}: an answer is "covered", notApplicable or pending'
 
 
 @authority_present
-def test_corpus_families_beyond_the_floor_are_named(capsys: pytest.CaptureFixture[str]) -> None:
-    """Print, by name and count, every corpus family this host does not run.
-
-    A declared lag and a silent omission are indistinguishable from a green
-    suite, and only one of them is honest. The contract-card family is a
-    deliberate lag on this host, as it is on the Go and Rust hosts — but a
-    reader has no way to tell that from a suite that simply never mentions it.
-    This test always passes; its output is the declaration, and the assertion
-    below only guards against the list of covered families going stale in the
-    other direction (a family named as covered that the corpus no longer holds).
-    """
-    manifest = json.loads((AUTHORITY_ROOT / "manifest.json").read_text(encoding="utf-8"))
-    present: dict[str, int] = {}
-    for fixture in manifest["fixtures"]:
-        present[fixture["kind"]] = present.get(fixture["kind"], 0) + 1
-
-    with capsys.disabled():
-        for kind in sorted(present):
-            if kind not in _COVERED_FAMILIES:
-                print(f"skipped family (declared lag, not covered by this host): {kind} x {present[kind]}")
-
-    stale = [k for k in _COVERED_FAMILIES if k not in present]
-    assert not stale, f"named as covered but absent from the corpus: {stale}"
+def test_the_family_derivation_sees_a_self_enumerated_family(tmp_path: Path) -> None:
+    # The falsifier: a family that exists only as a directory with its own manifest — the shape
+    # the printer could not see — must join the derived set, and so must a `families` entry.
+    (tmp_path / "manifest.json").write_text('{"fixtures":[{"kind":"node-round-trip"}]}', encoding="utf-8")
+    (tmp_path / "newfamily").mkdir()
+    (tmp_path / "newfamily" / "manifest.json").write_text('{"cases":[]}', encoding="utf-8")
+    (tmp_path / "split").mkdir()
+    (tmp_path / "split" / "manifest.json").write_text('{"families":[{"id":"a"},{"id":"b"}]}', encoding="utf-8")
+    (tmp_path / "goldens").mkdir()
+    assert corpus_families(tmp_path) == {"node-round-trip", "newfamily", "split/a", "split/b"}

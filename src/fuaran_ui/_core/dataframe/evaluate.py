@@ -498,6 +498,35 @@ def _infer_type(cells: list[Cell]) -> str:
     return STRING
 
 
+def _static_type(cols: Schema, e: ColExpr) -> str | None:  # noqa: PLR0911
+    """The column type an expression is typed at from the schema alone, where that is decidable.
+
+    A derive whose every cell is null has no value to read a type off, and the reference evaluator
+    types it from the expression (``laws/dataframeParity``'s ``derive-div-by-zero``: an int quotient
+    of all-null cells is a ``float`` column). ``None`` where the expression's type is not decided
+    here, and the caller keeps its value-inferred default.
+    """
+    if isinstance(e, Col):
+        return _col_type(cols, e.name)
+    if isinstance(e, Lit):
+        return type_of(e.cell)
+    if isinstance(e, Cast):
+        return e.type
+    if isinstance(e, Not | IsNull | InList):
+        return BOOL
+    if isinstance(e, Binary):
+        if e.op in ("eq", "ne", "lt", "le", "gt", "ge", "and", "or", "contains", "startsWith", "endsWith"):
+            return BOOL
+        if e.op == "div":
+            return FLOAT
+        if e.op in ("add", "sub", "mul", "mod"):
+            left, right = _static_type(cols, e.left), _static_type(cols, e.right)
+            if left == INT and right == INT:
+                return INT
+            return FLOAT if {left, right} <= {INT, FLOAT} else None
+    return None
+
+
 def _present_nums(cells: list[Cell]) -> list[float]:
     return [n for n in (_as_num(c) for c in cells) if n is not None]
 
@@ -614,7 +643,7 @@ def _eval_derive(f: Frame, name: str, expr: ColExpr) -> Result[Frame, EvalError]
         if not r.ok:
             return r  # type: ignore[return-value]
         new_cells.append(r.value)
-    ty = _infer_type(new_cells)
+    ty = _infer_type(new_cells) if any(not is_null(c) for c in new_cells) else _static_type(f.cols, expr) or STRING
     i = _col_index(f.cols, name)
     if i is not None:
         cols = [(n, ty if j == i else t) for j, (n, t) in enumerate(f.cols)]

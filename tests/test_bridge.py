@@ -21,6 +21,7 @@ import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
 from fuaran_ui.conformance.bridge import handle
+from fuaran_ui.conformance.harness import path_matches
 
 
 def _canon(text: str) -> str:
@@ -59,9 +60,8 @@ def test_bridge_reject(fixture: dict) -> None:
     assert decoded["error"]["code"] == fixture["expectedErrorCode"], (
         f"{fixture['id']}: code {decoded['error']['code']} != {fixture['expectedErrorCode']}"
     )
-    assert decoded["error"]["path"].startswith(fixture.get("expectedPath", "$")), (
-        f"{fixture['id']}: path {decoded['error']['path']!r} !startswith {fixture.get('expectedPath')!r}"
-    )
+    mismatch = path_matches(decoded["error"]["path"], fixture.get("expectedPath", "$"))
+    assert mismatch is None, f"{fixture['id']}: {mismatch}"
 
 
 def test_bridge_unknown_op_is_reported() -> None:

@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
+from fuaran_ui.conformance.harness import path_matches
 from fuaran_ui.envelope import (
     BEHIND,
     CURRENT,
@@ -41,7 +42,7 @@ def test_envelope_reject(fx: dict) -> None:
     result = decode_envelope(_read(fx["inputFile"]))
     assert not result.ok, f"{fx['id']} should refuse"
     assert result.error.code == fx["expectedErrorCode"]
-    assert result.error.path.startswith(fx["expectedPath"])
+    assert path_matches(result.error.path, fx["expectedPath"]) is None
 
 
 # ── Negotiation unit tests (mirror the Go wire/envelope behaviour) ──────────

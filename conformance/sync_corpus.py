@@ -200,6 +200,10 @@ _COPIES_NOTE = (
 # manifest is absent: a host that enforces a limit must not go green without the
 # vectors that prove it, so the family travels with the snapshot.
 #
+# Phase 1938 - ``laws`` joins on the same footing: the evaluator certifies against the
+# ``laws/dataframeParity`` family (``tests/test_dataframe_parity.py``), the reference's answers
+# with a recorded producer, which replaced this host's own unproduced parity fixture.
+#
 # Phase 2296 - ``idl.json`` joins because this host's STRUCTURAL layer is generated from it
 # (``src/fuaran_ui/schema/generate.py``). The generator reads the bundled copy, never the authority,
 # so an offline checkout regenerates exactly the committed module; and a sync that moves it
@@ -212,7 +216,7 @@ _FILES = (
     "render-text.json",
     "a11y-contract.json",
 )
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply")
+_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply", "laws")
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 

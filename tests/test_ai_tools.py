@@ -11,6 +11,7 @@ import typing
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
 from fuaran_ui import ai_tools
+from fuaran_ui.conformance.harness import path_matches
 from fuaran_ui.schema import decode_node
 from fuaran_ui.schema import types as t
 from fuaran_ui.schema.decode import ACTION_CASES, BINDING_CASES, KNOWN_KINDS, TEXT_SOURCE_CASES
@@ -64,7 +65,7 @@ def test_validate_emission_reports_canonical_reject() -> None:
     result = ai_tools.validate_emission(wire)
     assert not result.ok
     assert result.code == fixture["expectedErrorCode"]
-    assert result.path is not None and result.path.startswith(fixture.get("expectedPath", "$"))
+    assert result.path is not None and path_matches(result.path, fixture.get("expectedPath", "$")) is None
 
 
 # ── Round-trip a representative agent-driven emission through the codec ────────

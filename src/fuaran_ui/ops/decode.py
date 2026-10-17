@@ -120,12 +120,12 @@ def _op_state(value: object, path: str) -> Value:
 
 def _op_id_list(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_expect_string(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 def _op_list(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_decode_op_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_decode_op_value(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 OpFieldDecoder = Callable[[object, str], Value]

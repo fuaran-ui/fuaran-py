@@ -292,8 +292,84 @@ def build(
         "corpusAuthority": corpus_authority,
         "generator": GENERATOR,
         "families": families,
+        "corpusFamilies": dict(sorted(CORPUS_FAMILIES.items())),
         "tokens": sorted(set(union_tokens) | set(kind_tokens)),
     }
+
+
+# -- §27.7: the corpus families this host's suite runs (Phase 1938) ------------------------------
+#
+# A host STATEMENT, not a projection: no introspection can see which families a test suite runs. It
+# replaces the hand "skipped family" printer, and unlike that printer it is checked — the gate
+# (``tests/test_corpus_sync.py``) derives the family set from the corpus tree with
+# :func:`corpus_families` and fails on a family named here that the corpus does not have, or one the
+# corpus has that is not named here.
+
+_NO_CARD_CODEC = "this host has no contract-card codec (§25) for the card fixtures to run against yet"
+_TELEPORT_UNRUN = "the teleport module is unit-tested by hand; its suite does not yet run the corpus teleport/ fixtures"
+_LAW_UNRUN = "this host's suite does not yet run this law family's vectors"
+
+#: Every corpus family, and this host's answer for it (WIRE_FORMAT §27.7).
+CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
+    "node-round-trip": "covered",
+    "op-round-trip": "covered",
+    "reject": "covered",
+    "lenient-accept": "covered",
+    "envelope-round-trip": "covered",
+    "envelope-reject": "covered",
+    "elicitation-round-trip": "covered",
+    "elicitation-reject": "covered",
+    "elicitation-answer-accept": "covered",
+    "elicitation-answer-reject": "covered",
+    "style-observer": "covered",
+    "contract-card-round-trip": {"pending": _NO_CARD_CODEC},
+    "contract-card-reject": {"pending": _NO_CARD_CODEC},
+    "teleport-decode": {"pending": _TELEPORT_UNRUN},
+    "teleport-reject": {"pending": _TELEPORT_UNRUN},
+    "apply/duplicateIdsApply": "covered",
+    "apply/limitsApply": "covered",
+    "apply/styleNormaliseApply": "covered",
+    "apply/skeletonApply": {"pending": "the apply engine's suite does not yet run the skeleton-apply vectors"},
+    "dag": "covered",
+    "merge-conformance": "covered",
+    "sanitization": "covered",
+    "laws/dataframeParity": "covered",
+    "laws/capabilityLaws": {"pending": _LAW_UNRUN},
+    "laws/decimal": {"pending": _LAW_UNRUN},
+    "laws/fieldLaws": {"pending": _LAW_UNRUN},
+    "laws/transformLaws": {
+        "pending": (
+            "the evaluator certifies against the authored dataframeParity cases; "
+            "the drawn transform sample is not run yet"
+        )
+    },
+    "decode-policy": {"notApplicable": "this host's decoder offers no §23 kind admission policy"},
+    "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
+    "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
+    "repair": {"pending": "this host has no §28 repair function yet"},
+    "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
+}
+
+
+def corpus_families(corpus_root: Path) -> set[str]:
+    """The corpus family set, derived from the corpus tree (WIRE_FORMAT §27.7).
+
+    Each distinct ``kind`` among the root manifest's ``fixtures``; and each top-level directory
+    carrying its own ``manifest.json`` — one family named by the directory, or, where that manifest
+    carries a ``families`` array of objects, one family ``<directory>/<id>`` per entry.
+    """
+    root_manifest = json.loads((corpus_root / "manifest.json").read_text(encoding="utf-8"))
+    found = {fixture["kind"] for fixture in root_manifest["fixtures"]}
+    for directory in sorted(p for p in corpus_root.iterdir() if p.is_dir()):
+        own = directory / "manifest.json"
+        if not own.is_file():
+            continue
+        members = json.loads(own.read_text(encoding="utf-8")).get("families")
+        if isinstance(members, list) and members and all(isinstance(m, dict) for m in members):
+            found.update(f"{directory.name}/{m['id']}" for m in members)
+        else:
+            found.add(directory.name)
+    return found
 
 
 _FIELD_FAMILY_REASON = (

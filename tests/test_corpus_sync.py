@@ -116,3 +116,16 @@ def test_the_family_derivation_sees_a_self_enumerated_family(tmp_path: Path) -> 
     (tmp_path / "split" / "manifest.json").write_text('{"families":[{"id":"a"},{"id":"b"}]}', encoding="utf-8")
     (tmp_path / "goldens").mkdir()
     assert corpus_families(tmp_path) == {"node-round-trip", "newfamily", "split/a", "split/b"}
+
+
+def test_a_resync_restamps_only_the_manifest_authority(tmp_path: Path) -> None:
+    """Phase 2301: the re-sync carries the new authority commit into the capability manifest."""
+    (tmp_path / "conformance").mkdir()
+    manifest = tmp_path / "conformance" / "host-capability-manifest.json"
+    before = '{\n  "host": "x",\n  "corpusAuthority": "' + "a" * 40 + '",\n  "tokens": []\n}\n'
+    manifest.write_text(before, encoding="utf-8")
+    assert _sync.restamp_manifest_authority(tmp_path, "b" * 40) == manifest
+    assert manifest.read_text(encoding="utf-8") == before.replace("a" * 40, "b" * 40)
+    _sync.restamp_manifest_authority(tmp_path, None)
+    assert '"corpusAuthority": null,' in manifest.read_text(encoding="utf-8")
+    assert _sync.restamp_manifest_authority(tmp_path / "absent", "c" * 40) is None

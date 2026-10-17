@@ -241,6 +241,31 @@ def regenerate(repo: Path) -> Path | None:
     return written
 
 
+_AUTHORITY_MEMBER = re.compile(r'("corpusAuthority": )(null|"[0-9a-f]{40}")')
+
+
+def restamp_manifest_authority(repo: Path, commit: str | None) -> Path | None:
+    """Carry the snapshot's authority commit into the published capability manifest (Phase 2301).
+
+    The manifest's ``corpusAuthority`` is provenance copied from ``corpus/snapshot.json``, so a
+    re-sync that moves the sentinel moves it too — or the manifest's own currency test reads the
+    re-sync as staleness. Only that one member is rewritten, in place; every other byte is the
+    generator's, and ``tests/test_host_capability_manifest.py`` still holds the whole file to it.
+    Returns the path written, or ``None`` when the checkout publishes no manifest.
+    """
+    manifest = repo / "conformance" / "host-capability-manifest.json"
+    if not manifest.is_file():
+        return None
+    text = manifest.read_text(encoding="utf-8")
+    value = "null" if commit is None else f'"{commit}"'
+    updated, count = _AUTHORITY_MEMBER.subn(lambda m: m.group(1) + value, text, count=1)
+    if count != 1:
+        raise SystemExit(f"{manifest} carries no corpusAuthority member to restamp")
+    if updated != text:
+        manifest.write_text(updated, encoding="utf-8", newline="\n")
+    return manifest
+
+
 def _git(repo: Path, *args: str) -> str | None:
     """Run a read-only git command in ``repo``; ``None`` when it cannot answer.
 
@@ -669,6 +694,9 @@ def main(argv: list[str]) -> int:
     written = regenerate(repo)
     if written is not None:
         print(f"Structural layer regenerated: {written}", file=sys.stderr)
+    restamped = restamp_manifest_authority(repo, recorded)
+    if restamped is not None:
+        print(f"Capability manifest corpusAuthority restamped: {restamped}", file=sys.stderr)
     return 0
 
 

@@ -86,6 +86,7 @@
     {
       "id": "card-reject-bad-version",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-bad-version.json",
       "expectedErrorCode": "UNSUPPORTED_VERSION",
@@ -95,6 +96,7 @@
     {
       "id": "card-reject-bundle-bad-version",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card-bundle",
       "inputFile": "cards/card-reject-bundle-bad-version.json",
       "expectedErrorCode": "UNSUPPORTED_VERSION",
@@ -104,6 +106,7 @@
     {
       "id": "card-reject-bundle-duplicate",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card-bundle",
       "inputFile": "cards/card-reject-bundle-duplicate.json",
       "expectedErrorCode": "DUPLICATE_CARD",
@@ -113,6 +116,7 @@
     {
       "id": "card-reject-empty-enum",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-empty-enum.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -122,6 +126,7 @@
     {
       "id": "card-reject-hash-not-object",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-hash-not-object.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -131,6 +136,7 @@
     {
       "id": "card-reject-missing-hash",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-missing-hash.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -140,6 +146,7 @@
     {
       "id": "card-reject-missing-module",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-missing-module.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -149,6 +156,7 @@
     {
       "id": "card-reject-payload-no-language",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-payload-no-language.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -158,6 +166,7 @@
     {
       "id": "card-reject-required-not-bool",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-required-not-bool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -167,6 +176,7 @@
     {
       "id": "card-reject-stray-key",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-stray-key.json",
       "expectedErrorCode": "UNDECLARED_FIELD",
@@ -176,6 +186,7 @@
     {
       "id": "card-reject-unknown-prop-type",
       "kind": "contract-card-reject",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-reject-unknown-prop-type.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -185,6 +196,7 @@
     {
       "id": "card-bundle",
       "kind": "contract-card-round-trip",
+      "since": "0.70.0",
       "decoder": "contract-card-bundle",
       "inputFile": "cards/card-bundle.json",
       "expectedFile": "cards/card-bundle.json",
@@ -193,6 +205,7 @@
     {
       "id": "card-full",
       "kind": "contract-card-round-trip",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-full.json",
       "expectedFile": "cards/card-full.json",
@@ -201,6 +214,7 @@
     {
       "id": "card-minimal",
       "kind": "contract-card-round-trip",
+      "since": "0.70.0",
       "decoder": "contract-card",
       "inputFile": "cards/card-minimal.json",
       "expectedFile": "cards/card-minimal.json",
@@ -209,6 +223,7 @@
     {
       "id": "elc-ans-accept-full",
       "kind": "elicitation-answer-accept",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-accept-full.json",
       "expectedFile": "elicitation/elc-ans-accept-full.json",
@@ -217,6 +232,7 @@
     {
       "id": "elc-ans-accept-int-for-float",
       "kind": "elicitation-answer-accept",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-accept-int-for-float.json",
       "expectedFile": "elicitation/elc-ans-accept-int-for-float.json",
@@ -225,6 +241,7 @@
     {
       "id": "elc-ans-accept-minimal",
       "kind": "elicitation-answer-accept",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-accept-minimal.json",
       "expectedFile": "elicitation/elc-ans-accept-minimal.json",
@@ -233,6 +250,7 @@
     {
       "id": "elc-ans-reject-enum",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-enum.json",
       "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
@@ -242,6 +260,7 @@
     {
       "id": "elc-ans-reject-float-range",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-float-range.json",
       "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
@@ -251,6 +270,7 @@
     {
       "id": "elc-ans-reject-int-range",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-int-range.json",
       "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
@@ -260,6 +280,7 @@
     {
       "id": "elc-ans-reject-missing-required",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-missing-required.json",
       "expectedErrorCode": "ANSWER_MISSING_FIELD",
@@ -269,6 +290,7 @@
     {
       "id": "elc-ans-reject-string-len",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-string-len.json",
       "expectedErrorCode": "ANSWER_OUT_OF_SPACE",
@@ -278,6 +300,7 @@
     {
       "id": "elc-ans-reject-type-mismatch",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-type-mismatch.json",
       "expectedErrorCode": "ANSWER_TYPE_MISMATCH",
@@ -287,6 +310,7 @@
     {
       "id": "elc-ans-reject-undeclared",
       "kind": "elicitation-answer-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-answer",
       "inputFile": "elicitation/elc-ans-reject-undeclared.json",
       "expectedErrorCode": "ANSWER_UNDECLARED_FIELD",
@@ -296,6 +320,7 @@
     {
       "id": "elc-out-reject-empty-id",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-reject-empty-id.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -305,6 +330,7 @@
     {
       "id": "elc-out-reject-missing-answer",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-reject-missing-answer.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -314,6 +340,7 @@
     {
       "id": "elc-out-reject-stray-key",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-reject-stray-key.json",
       "expectedErrorCode": "UNDECLARED_FIELD",
@@ -323,6 +350,7 @@
     {
       "id": "elc-out-reject-unknown-type",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-reject-unknown-type.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -332,6 +360,7 @@
     {
       "id": "elc-reject-bad-space",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-bad-space.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -341,6 +370,7 @@
     {
       "id": "elc-reject-bad-timeout",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-bad-timeout.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -350,6 +380,7 @@
     {
       "id": "elc-reject-bad-version",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-bad-version.json",
       "expectedErrorCode": "UNSUPPORTED_VERSION",
@@ -359,6 +390,7 @@
     {
       "id": "elc-reject-default-nonconformant",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-default-nonconformant.json",
       "expectedErrorCode": "DEFAULT_NONCONFORMANT",
@@ -368,6 +400,7 @@
     {
       "id": "elc-reject-duplicate-field",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-duplicate-field.json",
       "expectedErrorCode": "CONTRACT_DUPLICATE_FIELD",
@@ -377,6 +410,7 @@
     {
       "id": "elc-reject-empty-contract",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-empty-contract.json",
       "expectedErrorCode": "CONTRACT_EMPTY",
@@ -386,6 +420,7 @@
     {
       "id": "elc-reject-empty-id",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-empty-id.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -395,6 +430,7 @@
     {
       "id": "elc-reject-missing-version",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-missing-version.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -404,6 +440,7 @@
     {
       "id": "elc-reject-stray-key",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-stray-key.json",
       "expectedErrorCode": "UNDECLARED_FIELD",
@@ -413,6 +450,7 @@
     {
       "id": "elc-reject-tree-decode",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-tree-decode.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -422,6 +460,7 @@
     {
       "id": "elc-reject-unknown-node",
       "kind": "elicitation-reject",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-reject-unknown-node.json",
       "expectedErrorCode": "CONTRACT_UNKNOWN_NODE",
@@ -431,6 +470,7 @@
     {
       "id": "elc-full",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-full.json",
       "expectedFile": "elicitation/elc-full.json",
@@ -439,6 +479,7 @@
     {
       "id": "elc-minimal",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation",
       "inputFile": "elicitation/elc-minimal.json",
       "expectedFile": "elicitation/elc-minimal.json",
@@ -447,6 +488,7 @@
     {
       "id": "elc-out-answered",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-answered.json",
       "expectedFile": "elicitation/elc-out-answered.json",
@@ -455,6 +497,7 @@
     {
       "id": "elc-out-declined",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-declined.json",
       "expectedFile": "elicitation/elc-out-declined.json",
@@ -463,6 +506,7 @@
     {
       "id": "elc-out-superseded-anon",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-superseded-anon.json",
       "expectedFile": "elicitation/elc-out-superseded-anon.json",
@@ -471,6 +515,7 @@
     {
       "id": "elc-out-superseded-by",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-superseded-by.json",
       "expectedFile": "elicitation/elc-out-superseded-by.json",
@@ -479,6 +524,7 @@
     {
       "id": "elc-out-timedout",
       "kind": "elicitation-round-trip",
+      "since": "0.3.0",
       "decoder": "elicitation-outcome",
       "inputFile": "elicitation/elc-out-timedout.json",
       "expectedFile": "elicitation/elc-out-timedout.json",
@@ -487,6 +533,7 @@
     {
       "id": "envelope-foreign-major",
       "kind": "envelope-reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-foreign-major.json",
       "expectedErrorCode": "FOREIGN_PROFILE",
@@ -496,6 +543,7 @@
     {
       "id": "envelope-foreign-namespace",
       "kind": "envelope-reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-foreign-namespace.json",
       "expectedErrorCode": "FOREIGN_PROFILE",
@@ -505,6 +553,7 @@
     {
       "id": "envelope-known-current",
       "kind": "envelope-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-known-current.json",
       "expectedFile": "envelope/envelope-known-current.json",
@@ -513,6 +562,7 @@
     {
       "id": "envelope-unknown-behind",
       "kind": "envelope-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-unknown-behind.json",
       "expectedFile": "envelope/envelope-unknown-behind.json",
@@ -521,6 +571,7 @@
     {
       "id": "envelope-unknown-fallback",
       "kind": "envelope-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-unknown-fallback.json",
       "expectedFile": "envelope/envelope-unknown-fallback.json",
@@ -529,6 +580,7 @@
     {
       "id": "envelope-unknown-malformed-required-profile",
       "kind": "envelope-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-unknown-malformed-required-profile.json",
       "expectedFile": "envelope/envelope-unknown-malformed-required-profile.json",
@@ -537,6 +589,7 @@
     {
       "id": "envelope-unknown-required-profile",
       "kind": "envelope-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "envelope/envelope-unknown-required-profile.json",
       "expectedFile": "envelope/envelope-unknown-required-profile.json",
@@ -545,6 +598,7 @@
     {
       "id": "lenient-022-lvr-emphasis-loud",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-022-lvr-emphasis-loud.json",
       "expectedFile": "lenient/lenient-022-lvr-emphasis-loud.expected.json",
@@ -553,6 +607,7 @@
     {
       "id": "lenient-022-lvr-emphasis-normal",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-022-lvr-emphasis-normal.json",
       "expectedFile": "lenient/lenient-022-lvr-emphasis-normal.expected.json",
@@ -561,6 +616,7 @@
     {
       "id": "lenient-1126-clipboard-literal-envelope",
       "kind": "lenient-accept",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1126-clipboard-literal-envelope.json",
       "expectedFile": "lenient/lenient-1126-clipboard-literal-envelope.expected.json",
@@ -569,6 +625,7 @@
     {
       "id": "lenient-1521-int-slot-integral-float",
       "kind": "lenient-accept",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1521-int-slot-integral-float.json",
       "expectedFile": "lenient/lenient-1521-int-slot-integral-float.expected.json",
@@ -577,6 +634,7 @@
     {
       "id": "lenient-1521-payload-integer-beyond-int53",
       "kind": "lenient-accept",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1521-payload-integer-beyond-int53.json",
       "expectedFile": "lenient/lenient-1521-payload-integer-beyond-int53.expected.json",
@@ -585,6 +643,7 @@
     {
       "id": "lenient-1656-state-default-null",
       "kind": "lenient-accept",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1656-state-default-null.json",
       "expectedFile": "lenient/lenient-1656-state-default-null.expected.json",
@@ -593,6 +652,7 @@
     {
       "id": "lenient-1661-i18n-arg-tagged-static",
       "kind": "lenient-accept",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1661-i18n-arg-tagged-static.json",
       "expectedFile": "lenient/lenient-1661-i18n-arg-tagged-static.expected.json",
@@ -601,6 +661,7 @@
     {
       "id": "lenient-1670-fragment-decl-redundant-defaults",
       "kind": "lenient-accept",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1670-fragment-decl-redundant-defaults.json",
       "expectedFile": "lenient/lenient-1670-fragment-decl-redundant-defaults.expected.json",
@@ -609,6 +670,7 @@
     {
       "id": "lenient-1811-cellformat-date-legacy",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-cellformat-date-legacy.json",
       "expectedFile": "lenient/lenient-1811-cellformat-date-legacy.expected.json",
@@ -617,6 +679,7 @@
     {
       "id": "lenient-1811-form-date-legacy",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-form-date-legacy.json",
       "expectedFile": "lenient/lenient-1811-form-date-legacy.expected.json",
@@ -625,6 +688,7 @@
     {
       "id": "lenient-1811-form-daterange-legacy",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-form-daterange-legacy.json",
       "expectedFile": "lenient/lenient-1811-form-daterange-legacy.expected.json",
@@ -633,6 +697,7 @@
     {
       "id": "lenient-1811-form-time-invented",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-form-time-invented.json",
       "expectedFile": "lenient/lenient-1811-form-time-invented.expected.json",
@@ -641,6 +706,7 @@
     {
       "id": "lenient-1811-form-timerange-invented",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-form-timerange-invented.json",
       "expectedFile": "lenient/lenient-1811-form-timerange-invented.expected.json",
@@ -649,6 +715,7 @@
     {
       "id": "lenient-1811-format-date-legacy",
       "kind": "lenient-accept",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-1811-format-date-legacy.json",
       "expectedFile": "lenient/lenient-1811-format-date-legacy.expected.json",
@@ -657,6 +724,7 @@
     {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-alias-emphasis-muted.json",
       "expectedFile": "lenient/lenient-460-alias-emphasis-muted.expected.json",
@@ -665,6 +733,7 @@
     {
       "id": "lenient-460-alias-emphasis-strong",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-alias-emphasis-strong.json",
       "expectedFile": "lenient/lenient-460-alias-emphasis-strong.expected.json",
@@ -673,6 +742,7 @@
     {
       "id": "lenient-460-alias-tone-danger",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-alias-tone-danger.json",
       "expectedFile": "lenient/lenient-460-alias-tone-danger.expected.json",
@@ -681,6 +751,7 @@
     {
       "id": "lenient-460-alias-tone-positive",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-alias-tone-positive.json",
       "expectedFile": "lenient/lenient-460-alias-tone-positive.expected.json",
@@ -689,6 +760,7 @@
     {
       "id": "lenient-460-explicit-default-column",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-explicit-default-column.json",
       "expectedFile": "lenient/lenient-460-explicit-default-column.expected.json",
@@ -697,6 +769,7 @@
     {
       "id": "lenient-460-explicit-default-metric",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-explicit-default-metric.json",
       "expectedFile": "lenient/lenient-460-explicit-default-metric.expected.json",
@@ -705,6 +778,7 @@
     {
       "id": "lenient-460-explicit-default-style",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-460-explicit-default-style.json",
       "expectedFile": "lenient/lenient-460-explicit-default-style.expected.json",
@@ -713,6 +787,7 @@
     {
       "id": "lenient-596-form-explicit-auto-state",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-596-form-explicit-auto-state.json",
       "expectedFile": "lenient/lenient-596-form-explicit-auto-state.expected.json",
@@ -721,6 +796,7 @@
     {
       "id": "lenient-665-rows-opaque-sentinel",
       "kind": "lenient-accept",
+      "since": "0.12.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-665-rows-opaque-sentinel.json",
       "expectedFile": "lenient/lenient-665-rows-opaque-sentinel.expected.json",
@@ -729,6 +805,7 @@
     {
       "id": "lenient-alias-call-url",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-call-url.json",
       "expectedFile": "lenient/lenient-alias-call-url.expected.json",
@@ -737,6 +814,7 @@
     {
       "id": "lenient-alias-card-title-metric-value",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-card-title-metric-value.json",
       "expectedFile": "lenient/lenient-alias-card-title-metric-value.expected.json",
@@ -745,6 +823,7 @@
     {
       "id": "lenient-alias-datagrid-data-column-type",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-datagrid-data-column-type.json",
       "expectedFile": "lenient/lenient-alias-datagrid-data-column-type.expected.json",
@@ -753,6 +832,7 @@
     {
       "id": "lenient-alias-form-field-name",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-form-field-name.json",
       "expectedFile": "lenient/lenient-alias-form-field-name.expected.json",
@@ -761,6 +841,7 @@
     {
       "id": "lenient-alias-grid-columns-row",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-grid-columns-row.json",
       "expectedFile": "lenient/lenient-alias-grid-columns-row.expected.json",
@@ -769,6 +850,7 @@
     {
       "id": "lenient-alias-navigate-href",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-navigate-href.json",
       "expectedFile": "lenient/lenient-alias-navigate-href.expected.json",
@@ -777,6 +859,7 @@
     {
       "id": "lenient-alias-select-options-query-deps",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-alias-select-options-query-deps.json",
       "expectedFile": "lenient/lenient-alias-select-options-query-deps.expected.json",
@@ -785,6 +868,7 @@
     {
       "id": "lenient-bare-text-button-label",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-bare-text-button-label.json",
       "expectedFile": "lenient/lenient-bare-text-button-label.expected.json",
@@ -793,6 +877,7 @@
     {
       "id": "lenient-bare-text-callout",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-bare-text-callout.json",
       "expectedFile": "lenient/lenient-bare-text-callout.expected.json",
@@ -801,6 +886,7 @@
     {
       "id": "lenient-bare-text-heading",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-bare-text-heading.json",
       "expectedFile": "lenient/lenient-bare-text-heading.expected.json",
@@ -809,6 +895,7 @@
     {
       "id": "lenient-bare-text-markdown",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-bare-text-markdown.json",
       "expectedFile": "lenient/lenient-bare-text-markdown.expected.json",
@@ -817,6 +904,7 @@
     {
       "id": "lenient-binding-bound-wrapper",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-binding-bound-wrapper.json",
       "expectedFile": "lenient/lenient-binding-bound-wrapper.expected.json",
@@ -825,6 +913,7 @@
     {
       "id": "lenient-daterange-bare-array",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-daterange-bare-array.json",
       "expectedFile": "lenient/lenient-daterange-bare-array.expected.json",
@@ -833,6 +922,7 @@
     {
       "id": "lenient-daterange-static-envelope",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-daterange-static-envelope.json",
       "expectedFile": "lenient/lenient-daterange-static-envelope.expected.json",
@@ -841,6 +931,7 @@
     {
       "id": "lenient-emphasis-cross-vocab",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-emphasis-cross-vocab.json",
       "expectedFile": "lenient/lenient-emphasis-cross-vocab.expected.json",
@@ -849,6 +940,7 @@
     {
       "id": "lenient-fact-explicit-defaults",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-fact-explicit-defaults.json",
       "expectedFile": "lenient/lenient-fact-explicit-defaults.expected.json",
@@ -857,6 +949,7 @@
     {
       "id": "lenient-filterable-static-dashboard-compact",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-filterable-static-dashboard-compact.json",
       "expectedFile": "lenient/lenient-filterable-static-dashboard-compact.expected.json",
@@ -865,6 +958,7 @@
     {
       "id": "lenient-grid-field-named-compact",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-grid-field-named-compact.json",
       "expectedFile": "lenient/lenient-grid-field-named-compact.expected.json",
@@ -873,6 +967,7 @@
     {
       "id": "lenient-grid-transform-param-compact",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-grid-transform-param-compact.json",
       "expectedFile": "lenient/lenient-grid-transform-param-compact.expected.json",
@@ -881,6 +976,7 @@
     {
       "id": "lenient-image-caption-envelope",
       "kind": "lenient-accept",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-image-caption-envelope.json",
       "expectedFile": "lenient/lenient-image-caption-envelope.expected.json",
@@ -889,6 +985,7 @@
     {
       "id": "lenient-image-empty-srcset",
       "kind": "lenient-accept",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-image-empty-srcset.json",
       "expectedFile": "lenient/lenient-image-empty-srcset.expected.json",
@@ -897,6 +994,7 @@
     {
       "id": "lenient-image-explicit-defaults",
       "kind": "lenient-accept",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-image-explicit-defaults.json",
       "expectedFile": "lenient/lenient-image-explicit-defaults.expected.json",
@@ -905,6 +1003,7 @@
     {
       "id": "lenient-image-explicit-expandable-false",
       "kind": "lenient-accept",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-image-explicit-expandable-false.json",
       "expectedFile": "lenient/lenient-image-explicit-expandable-false.expected.json",
@@ -913,6 +1012,7 @@
     {
       "id": "lenient-master-detail-preselected-compact",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-master-detail-preselected-compact.json",
       "expectedFile": "lenient/lenient-master-detail-preselected-compact.expected.json",
@@ -921,6 +1021,7 @@
     {
       "id": "lenient-navigate-target-self",
       "kind": "lenient-accept",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-navigate-target-self.json",
       "expectedFile": "lenient/lenient-navigate-target-self.expected.json",
@@ -929,6 +1030,7 @@
     {
       "id": "lenient-null-static-options",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-null-static-options.json",
       "expectedFile": "lenient/lenient-null-static-options.expected.json",
@@ -937,6 +1039,7 @@
     {
       "id": "lenient-opaque-static-markers",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-opaque-static-markers.json",
       "expectedFile": "lenient/lenient-opaque-static-markers.expected.json",
@@ -945,6 +1048,7 @@
     {
       "id": "lenient-opaque-static-options",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-opaque-static-options.json",
       "expectedFile": "lenient/lenient-opaque-static-options.expected.json",
@@ -953,6 +1057,7 @@
     {
       "id": "lenient-opaque-static-series",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-opaque-static-series.json",
       "expectedFile": "lenient/lenient-opaque-static-series.expected.json",
@@ -961,6 +1066,7 @@
     {
       "id": "lenient-opaque-static-values",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-opaque-static-values.json",
       "expectedFile": "lenient/lenient-opaque-static-values.expected.json",
@@ -969,6 +1075,7 @@
     {
       "id": "lenient-scalar-transform-composition-compact",
       "kind": "lenient-accept",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-scalar-transform-composition-compact.json",
       "expectedFile": "lenient/lenient-scalar-transform-composition-compact.expected.json",
@@ -977,6 +1084,7 @@
     {
       "id": "lenient-shape-a11y-label-bare-scalar",
       "kind": "lenient-accept",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-a11y-label-bare-scalar.json",
       "expectedFile": "lenient/lenient-shape-a11y-label-bare-scalar.expected.json",
@@ -985,6 +1093,7 @@
     {
       "id": "lenient-shape-binding-scalar-fraction",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-binding-scalar-fraction.json",
       "expectedFile": "lenient/lenient-shape-binding-scalar-fraction.expected.json",
@@ -993,6 +1102,7 @@
     {
       "id": "lenient-shape-grid-no-cols",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-grid-no-cols.json",
       "expectedFile": "lenient/lenient-shape-grid-no-cols.expected.json",
@@ -1001,6 +1111,7 @@
     {
       "id": "lenient-shape-grid-template-no-cols",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-grid-template-no-cols.json",
       "expectedFile": "lenient/lenient-shape-grid-template-no-cols.expected.json",
@@ -1009,6 +1120,7 @@
     {
       "id": "lenient-shape-options-bare-strings",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-options-bare-strings.json",
       "expectedFile": "lenient/lenient-shape-options-bare-strings.expected.json",
@@ -1017,6 +1129,7 @@
     {
       "id": "lenient-shape-params-map",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-params-map.json",
       "expectedFile": "lenient/lenient-shape-params-map.expected.json",
@@ -1025,6 +1138,7 @@
     {
       "id": "lenient-shape-segmented-orientation-omitted",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-segmented-orientation-omitted.json",
       "expectedFile": "lenient/lenient-shape-segmented-orientation-omitted.expected.json",
@@ -1033,6 +1147,7 @@
     {
       "id": "lenient-shape-static-envelope-plain-scalars",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-shape-static-envelope-plain-scalars.json",
       "expectedFile": "lenient/lenient-shape-static-envelope-plain-scalars.expected.json",
@@ -1041,6 +1156,7 @@
     {
       "id": "lenient-tonedpill-pill-tag",
       "kind": "lenient-accept",
+      "since": "0.11.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-tonedpill-pill-tag.json",
       "expectedFile": "lenient/lenient-tonedpill-pill-tag.expected.json",
@@ -1049,6 +1165,7 @@
     {
       "id": "lenient-tonedpill-tone-aliases",
       "kind": "lenient-accept",
+      "since": "0.11.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-tonedpill-tone-aliases.json",
       "expectedFile": "lenient/lenient-tonedpill-tone-aliases.expected.json",
@@ -1057,6 +1174,7 @@
     {
       "id": "lenient-tonedpill-tonemap-alias",
       "kind": "lenient-accept",
+      "since": "0.11.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-tonedpill-tonemap-alias.json",
       "expectedFile": "lenient/lenient-tonedpill-tonemap-alias.expected.json",
@@ -1065,6 +1183,7 @@
     {
       "id": "lenient-transform-bare-columns",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-bare-columns.json",
       "expectedFile": "lenient/lenient-transform-bare-columns.expected.json",
@@ -1073,6 +1192,7 @@
     {
       "id": "lenient-transform-column-member-legacy",
       "kind": "lenient-accept",
+      "since": "0.85.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-column-member-legacy.json",
       "expectedFile": "lenient/lenient-transform-column-member-legacy.expected.json",
@@ -1081,6 +1201,7 @@
     {
       "id": "lenient-transform-epoch-timestamps",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-epoch-timestamps.json",
       "expectedFile": "lenient/lenient-transform-epoch-timestamps.expected.json",
@@ -1089,6 +1210,7 @@
     {
       "id": "lenient-transform-expr-spellings",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-expr-spellings.json",
       "expectedFile": "lenient/lenient-transform-expr-spellings.expected.json",
@@ -1097,6 +1219,7 @@
     {
       "id": "lenient-transform-flat-contains",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-flat-contains.json",
       "expectedFile": "lenient/lenient-transform-flat-contains.expected.json",
@@ -1105,6 +1228,7 @@
     {
       "id": "lenient-transform-flat-filter",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-flat-filter.json",
       "expectedFile": "lenient/lenient-transform-flat-filter.expected.json",
@@ -1113,6 +1237,7 @@
     {
       "id": "lenient-transform-flat-or",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-flat-or.json",
       "expectedFile": "lenient/lenient-transform-flat-or.expected.json",
@@ -1121,6 +1246,7 @@
     {
       "id": "lenient-transform-flat-scalar-fn",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-flat-scalar-fn.json",
       "expectedFile": "lenient/lenient-transform-flat-scalar-fn.expected.json",
@@ -1129,6 +1255,7 @@
     {
       "id": "lenient-transform-schemaless",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-schemaless.json",
       "expectedFile": "lenient/lenient-transform-schemaless.expected.json",
@@ -1137,6 +1264,7 @@
     {
       "id": "lenient-transform-source-rowmajor",
       "kind": "lenient-accept",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-source-rowmajor.json",
       "expectedFile": "lenient/lenient-transform-source-rowmajor.expected.json",
@@ -1145,6 +1273,7 @@
     {
       "id": "lenient-transform-source-state-rows",
       "kind": "lenient-accept",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-source-state-rows.json",
       "expectedFile": "lenient/lenient-transform-source-state-rows.expected.json",
@@ -1153,6 +1282,7 @@
     {
       "id": "lenient-transform-step-aliases",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-step-aliases.json",
       "expectedFile": "lenient/lenient-transform-step-aliases.expected.json",
@@ -1161,6 +1291,7 @@
     {
       "id": "lenient-transform-values-only-columns",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-values-only-columns.json",
       "expectedFile": "lenient/lenient-transform-values-only-columns.expected.json",
@@ -1169,6 +1300,7 @@
     {
       "id": "lenient-window-cumsum-legacy",
       "kind": "lenient-accept",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-window-cumsum-legacy.json",
       "expectedFile": "lenient/lenient-window-cumsum-legacy.expected.json",
@@ -1177,6 +1309,7 @@
     {
       "id": "a11y-alert-assertive",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-alert-assertive.json",
       "expectedFile": "nodes/a11y-alert-assertive.json",
@@ -1185,6 +1318,7 @@
     {
       "id": "a11y-button-named",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-button-named.json",
       "expectedFile": "nodes/a11y-button-named.json",
@@ -1193,6 +1327,7 @@
     {
       "id": "a11y-image-decorative",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-image-decorative.json",
       "expectedFile": "nodes/a11y-image-decorative.json",
@@ -1201,6 +1336,7 @@
     {
       "id": "a11y-link-labelled",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-link-labelled.json",
       "expectedFile": "nodes/a11y-link-labelled.json",
@@ -1209,6 +1345,7 @@
     {
       "id": "a11y-speak",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-speak.json",
       "expectedFile": "nodes/a11y-speak.json",
@@ -1217,6 +1354,7 @@
     {
       "id": "a11y-wrapper-all-slots",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-wrapper-all-slots.json",
       "expectedFile": "nodes/a11y-wrapper-all-slots.json",
@@ -1225,6 +1363,7 @@
     {
       "id": "a11y-wrapper-state-bound",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-wrapper-state-bound.json",
       "expectedFile": "nodes/a11y-wrapper-state-bound.json",
@@ -1233,6 +1372,7 @@
     {
       "id": "a11y-wrapper-transform-label",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/a11y-wrapper-transform-label.json",
       "expectedFile": "nodes/a11y-wrapper-transform-label.json",
@@ -1241,6 +1381,7 @@
     {
       "id": "action-confirm",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/action-confirm.json",
       "expectedFile": "nodes/action-confirm.json",
@@ -1249,6 +1390,7 @@
     {
       "id": "action-confirm-cancel",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/action-confirm-cancel.json",
       "expectedFile": "nodes/action-confirm-cancel.json",
@@ -1257,6 +1399,7 @@
     {
       "id": "action-focus",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/action-focus.json",
       "expectedFile": "nodes/action-focus.json",
@@ -1265,6 +1408,7 @@
     {
       "id": "action-navigate-bound",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/action-navigate-bound.json",
       "expectedFile": "nodes/action-navigate-bound.json",
@@ -1273,6 +1417,7 @@
     {
       "id": "action-navigate-target",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/action-navigate-target.json",
       "expectedFile": "nodes/action-navigate-target.json",
@@ -1281,6 +1426,7 @@
     {
       "id": "badge-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/badge-1.json",
       "expectedFile": "nodes/badge-1.json",
@@ -1289,6 +1435,7 @@
     {
       "id": "badge-transform-live",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/badge-transform-live.json",
       "expectedFile": "nodes/badge-transform-live.json",
@@ -1297,6 +1444,7 @@
     {
       "id": "binding-check-chart-not-numeric",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-chart-not-numeric.json",
       "expectedFile": "nodes/binding-check-chart-not-numeric.json",
@@ -1305,6 +1453,7 @@
     {
       "id": "binding-check-chart-temporal-not-date",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-chart-temporal-not-date.json",
       "expectedFile": "nodes/binding-check-chart-temporal-not-date.json",
@@ -1313,6 +1462,7 @@
     {
       "id": "binding-check-chart-ungrounded",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-chart-ungrounded.json",
       "expectedFile": "nodes/binding-check-chart-ungrounded.json",
@@ -1321,6 +1471,7 @@
     {
       "id": "binding-check-control",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-control.json",
       "expectedFile": "nodes/binding-check-control.json",
@@ -1329,6 +1480,7 @@
     {
       "id": "binding-check-grid-ungrounded",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-grid-ungrounded.json",
       "expectedFile": "nodes/binding-check-grid-ungrounded.json",
@@ -1337,6 +1489,7 @@
     {
       "id": "binding-check-unchecked",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/binding-check-unchecked.json",
       "expectedFile": "nodes/binding-check-unchecked.json",
@@ -1345,6 +1498,7 @@
     {
       "id": "boundary-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/boundary-1.json",
       "expectedFile": "nodes/boundary-1.json",
@@ -1353,6 +1507,7 @@
     {
       "id": "box-break-before-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/box-break-before-1.json",
       "expectedFile": "nodes/box-break-before-1.json",
@@ -1361,6 +1516,7 @@
     {
       "id": "box-keep-together-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/box-keep-together-1.json",
       "expectedFile": "nodes/box-keep-together-1.json",
@@ -1369,6 +1525,7 @@
     {
       "id": "btn-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/btn-1.json",
       "expectedFile": "nodes/btn-1.json",
@@ -1377,6 +1534,7 @@
     {
       "id": "btn-copy-bound",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/btn-copy-bound.json",
       "expectedFile": "nodes/btn-copy-bound.json",
@@ -1385,6 +1543,7 @@
     {
       "id": "btn-copy-link",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/btn-copy-link.json",
       "expectedFile": "nodes/btn-copy-link.json",
@@ -1393,6 +1552,7 @@
     {
       "id": "btn-invoke",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/btn-invoke.json",
       "expectedFile": "nodes/btn-invoke.json",
@@ -1401,6 +1561,7 @@
     {
       "id": "btn-json-payloads",
       "kind": "node-round-trip",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "nodes/btn-json-payloads.json",
       "expectedFile": "nodes/btn-json-payloads.json",
@@ -1409,6 +1570,7 @@
     {
       "id": "btn-read-workbook",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/btn-read-workbook.json",
       "expectedFile": "nodes/btn-read-workbook.json",
@@ -1417,6 +1579,7 @@
     {
       "id": "button-print",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/button-print.json",
       "expectedFile": "nodes/button-print.json",
@@ -1425,6 +1588,7 @@
     {
       "id": "button-setstate-valuefrom",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/button-setstate-valuefrom.json",
       "expectedFile": "nodes/button-setstate-valuefrom.json",
@@ -1433,6 +1597,7 @@
     {
       "id": "call-into",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/call-into.json",
       "expectedFile": "nodes/call-into.json",
@@ -1441,6 +1606,7 @@
     {
       "id": "callout-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/callout-1.json",
       "expectedFile": "nodes/callout-1.json",
@@ -1449,6 +1615,7 @@
     {
       "id": "card-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/card-1.json",
       "expectedFile": "nodes/card-1.json",
@@ -1457,6 +1624,7 @@
     {
       "id": "chart-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/chart-1.json",
       "expectedFile": "nodes/chart-1.json",
@@ -1465,6 +1633,7 @@
     {
       "id": "chart-annotation-bands",
       "kind": "node-round-trip",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "nodes/chart-annotation-bands.json",
       "expectedFile": "nodes/chart-annotation-bands.json",
@@ -1473,6 +1642,7 @@
     {
       "id": "chart-annotation-events",
       "kind": "node-round-trip",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "nodes/chart-annotation-events.json",
       "expectedFile": "nodes/chart-annotation-events.json",
@@ -1481,6 +1651,7 @@
     {
       "id": "chart-annotations",
       "kind": "node-round-trip",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "nodes/chart-annotations.json",
       "expectedFile": "nodes/chart-annotations.json",
@@ -1489,6 +1660,7 @@
     {
       "id": "chart-axis-titles",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/chart-axis-titles.json",
       "expectedFile": "nodes/chart-axis-titles.json",
@@ -1497,6 +1669,7 @@
     {
       "id": "chart-data-labels",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/chart-data-labels.json",
       "expectedFile": "nodes/chart-data-labels.json",
@@ -1505,6 +1678,7 @@
     {
       "id": "chart-legend-position",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/chart-legend-position.json",
       "expectedFile": "nodes/chart-legend-position.json",
@@ -1513,6 +1687,7 @@
     {
       "id": "chart-state-rows",
       "kind": "node-round-trip",
+      "since": "0.12.0",
       "decoder": "node",
       "inputFile": "nodes/chart-state-rows.json",
       "expectedFile": "nodes/chart-state-rows.json",
@@ -1521,6 +1696,7 @@
     {
       "id": "chart-temporal-x",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/chart-temporal-x.json",
       "expectedFile": "nodes/chart-temporal-x.json",
@@ -1529,6 +1705,7 @@
     {
       "id": "chart-value-format",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/chart-value-format.json",
       "expectedFile": "nodes/chart-value-format.json",
@@ -1537,6 +1714,7 @@
     {
       "id": "code-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/code-1.json",
       "expectedFile": "nodes/code-1.json",
@@ -1545,6 +1723,7 @@
     {
       "id": "composite-root",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/composite-root.json",
       "expectedFile": "nodes/composite-root.json",
@@ -1553,6 +1732,7 @@
     {
       "id": "composite-tabs-panels",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/composite-tabs-panels.json",
       "expectedFile": "nodes/composite-tabs-panels.json",
@@ -1561,6 +1741,7 @@
     {
       "id": "controls-closure",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/controls-closure.json",
       "expectedFile": "nodes/controls-closure.json",
@@ -1569,6 +1750,7 @@
     {
       "id": "controls-declarative",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/controls-declarative.json",
       "expectedFile": "nodes/controls-declarative.json",
@@ -1577,6 +1759,7 @@
     {
       "id": "custom-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/custom-1.json",
       "expectedFile": "nodes/custom-1.json",
@@ -1585,6 +1768,7 @@
     {
       "id": "custom-bounded-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/custom-bounded-1.json",
       "expectedFile": "nodes/custom-bounded-1.json",
@@ -1593,6 +1777,7 @@
     {
       "id": "custom-bounded-advisory",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/custom-bounded-advisory.json",
       "expectedFile": "nodes/custom-bounded-advisory.json",
@@ -1601,6 +1786,7 @@
     {
       "id": "custom-nonascii-keys",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/custom-nonascii-keys.json",
       "expectedFile": "nodes/custom-nonascii-keys.json",
@@ -1609,6 +1795,7 @@
     {
       "id": "dash-empty",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/dash-empty.json",
       "expectedFile": "nodes/dash-empty.json",
@@ -1617,6 +1804,7 @@
     {
       "id": "discl-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/discl-1.json",
       "expectedFile": "nodes/discl-1.json",
@@ -1625,6 +1813,7 @@
     {
       "id": "drawing-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/drawing-1.json",
       "expectedFile": "nodes/drawing-1.json",
@@ -1633,6 +1822,7 @@
     {
       "id": "drawing-empty",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/drawing-empty.json",
       "expectedFile": "nodes/drawing-empty.json",
@@ -1641,6 +1831,7 @@
     {
       "id": "drawing-nonfinite-sentinels",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/drawing-nonfinite-sentinels.json",
       "expectedFile": "nodes/drawing-nonfinite-sentinels.json",
@@ -1649,6 +1840,7 @@
     {
       "id": "drawing-rotated-labels",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/drawing-rotated-labels.json",
       "expectedFile": "nodes/drawing-rotated-labels.json",
@@ -1657,6 +1849,7 @@
     {
       "id": "drawing-tipped-shapes",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/drawing-tipped-shapes.json",
       "expectedFile": "nodes/drawing-tipped-shapes.json",
@@ -1665,6 +1858,7 @@
     {
       "id": "embed-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/embed-1.json",
       "expectedFile": "nodes/embed-1.json",
@@ -1673,6 +1867,7 @@
     {
       "id": "embed-aspect-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/embed-aspect-1.json",
       "expectedFile": "nodes/embed-aspect-1.json",
@@ -1681,6 +1876,7 @@
     {
       "id": "embed-permissions-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/embed-permissions-1.json",
       "expectedFile": "nodes/embed-permissions-1.json",
@@ -1689,6 +1885,7 @@
     {
       "id": "empty-state-card",
       "kind": "node-round-trip",
+      "since": "0.15.0",
       "decoder": "node",
       "inputFile": "nodes/empty-state-card.json",
       "expectedFile": "nodes/empty-state-card.json",
@@ -1697,6 +1894,7 @@
     {
       "id": "envelope-fallback",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/envelope-fallback.json",
       "expectedFile": "nodes/envelope-fallback.json",
@@ -1705,6 +1903,7 @@
     {
       "id": "expr-params-state-selection",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/expr-params-state-selection.json",
       "expectedFile": "nodes/expr-params-state-selection.json",
@@ -1713,6 +1912,7 @@
     {
       "id": "expr-scalar",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/expr-scalar.json",
       "expectedFile": "nodes/expr-scalar.json",
@@ -1721,6 +1921,7 @@
     {
       "id": "fact-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/fact-1.json",
       "expectedFile": "nodes/fact-1.json",
@@ -1729,6 +1930,7 @@
     {
       "id": "filterable-static-dashboard",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/filterable-static-dashboard.json",
       "expectedFile": "nodes/filterable-static-dashboard.json",
@@ -1737,6 +1939,7 @@
     {
       "id": "filters-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/filters-1.json",
       "expectedFile": "nodes/filters-1.json",
@@ -1745,6 +1948,7 @@
     {
       "id": "filters-date-range",
       "kind": "node-round-trip",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "nodes/filters-date-range.json",
       "expectedFile": "nodes/filters-date-range.json",
@@ -1753,6 +1957,7 @@
     {
       "id": "filters-declarative",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/filters-declarative.json",
       "expectedFile": "nodes/filters-declarative.json",
@@ -1761,6 +1966,7 @@
     {
       "id": "filters-dependson-declared",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/filters-dependson-declared.json",
       "expectedFile": "nodes/filters-dependson-declared.json",
@@ -1769,6 +1975,7 @@
     {
       "id": "filters-dependson-undeclared",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/filters-dependson-undeclared.json",
       "expectedFile": "nodes/filters-dependson-undeclared.json",
@@ -1777,6 +1984,7 @@
     {
       "id": "filters-param-source-declared",
       "kind": "node-round-trip",
+      "since": "0.85.0",
       "decoder": "node",
       "inputFile": "nodes/filters-param-source-declared.json",
       "expectedFile": "nodes/filters-param-source-declared.json",
@@ -1785,6 +1993,7 @@
     {
       "id": "filters-param-source-undeclared",
       "kind": "node-round-trip",
+      "since": "0.85.0",
       "decoder": "node",
       "inputFile": "nodes/filters-param-source-undeclared.json",
       "expectedFile": "nodes/filters-param-source-undeclared.json",
@@ -1793,6 +2002,7 @@
     {
       "id": "filters-rating-colour",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/filters-rating-colour.json",
       "expectedFile": "nodes/filters-rating-colour.json",
@@ -1801,6 +2011,7 @@
     {
       "id": "filters-segmented",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/filters-segmented.json",
       "expectedFile": "nodes/filters-segmented.json",
@@ -1809,6 +2020,7 @@
     {
       "id": "filters-tokens",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/filters-tokens.json",
       "expectedFile": "nodes/filters-tokens.json",
@@ -1817,6 +2029,7 @@
     {
       "id": "form-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-1.json",
       "expectedFile": "nodes/form-1.json",
@@ -1825,6 +2038,7 @@
     {
       "id": "form-color",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-color.json",
       "expectedFile": "nodes/form-color.json",
@@ -1833,6 +2047,7 @@
     {
       "id": "form-combobox-freetext",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-combobox-freetext.json",
       "expectedFile": "nodes/form-combobox-freetext.json",
@@ -1841,6 +2056,7 @@
     {
       "id": "form-combobox-query",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-combobox-query.json",
       "expectedFile": "nodes/form-combobox-query.json",
@@ -1849,6 +2065,7 @@
     {
       "id": "form-combobox-static",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-combobox-static.json",
       "expectedFile": "nodes/form-combobox-static.json",
@@ -1857,6 +2074,7 @@
     {
       "id": "form-date",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-date.json",
       "expectedFile": "nodes/form-date.json",
@@ -1865,6 +2083,7 @@
     {
       "id": "form-date-range",
       "kind": "node-round-trip",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "nodes/form-date-range.json",
       "expectedFile": "nodes/form-date-range.json",
@@ -1873,6 +2092,7 @@
     {
       "id": "form-declarative",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-declarative.json",
       "expectedFile": "nodes/form-declarative.json",
@@ -1881,6 +2101,7 @@
     {
       "id": "form-declarative-minimal",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-declarative-minimal.json",
       "expectedFile": "nodes/form-declarative-minimal.json",
@@ -1889,6 +2110,7 @@
     {
       "id": "form-field-rules",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/form-field-rules.json",
       "expectedFile": "nodes/form-field-rules.json",
@@ -1897,6 +2119,7 @@
     {
       "id": "form-local-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-local-1.json",
       "expectedFile": "nodes/form-local-1.json",
@@ -1905,6 +2128,7 @@
     {
       "id": "form-local-debounce",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-local-debounce.json",
       "expectedFile": "nodes/form-local-debounce.json",
@@ -1913,6 +2137,7 @@
     {
       "id": "form-local-declared",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/form-local-declared.json",
       "expectedFile": "nodes/form-local-declared.json",
@@ -1921,6 +2146,7 @@
     {
       "id": "form-ranged",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-ranged.json",
       "expectedFile": "nodes/form-ranged.json",
@@ -1929,6 +2155,7 @@
     {
       "id": "form-rating",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-rating.json",
       "expectedFile": "nodes/form-rating.json",
@@ -1937,6 +2164,7 @@
     {
       "id": "form-rating-halves",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-rating-halves.json",
       "expectedFile": "nodes/form-rating-halves.json",
@@ -1945,6 +2173,7 @@
     {
       "id": "form-rule-tokens",
       "kind": "node-round-trip",
+      "since": "0.83.0",
       "decoder": "node",
       "inputFile": "nodes/form-rule-tokens.json",
       "expectedFile": "nodes/form-rule-tokens.json",
@@ -1953,6 +2182,7 @@
     {
       "id": "form-segmented",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/form-segmented.json",
       "expectedFile": "nodes/form-segmented.json",
@@ -1961,6 +2191,7 @@
     {
       "id": "form-toggle",
       "kind": "node-round-trip",
+      "since": "0.15.0",
       "decoder": "node",
       "inputFile": "nodes/form-toggle.json",
       "expectedFile": "nodes/form-toggle.json",
@@ -1969,6 +2200,7 @@
     {
       "id": "form-tokens-freetext",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-tokens-freetext.json",
       "expectedFile": "nodes/form-tokens-freetext.json",
@@ -1977,6 +2209,7 @@
     {
       "id": "form-tokens-query",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-tokens-query.json",
       "expectedFile": "nodes/form-tokens-query.json",
@@ -1985,6 +2218,7 @@
     {
       "id": "form-tokens-suggested",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/form-tokens-suggested.json",
       "expectedFile": "nodes/form-tokens-suggested.json",
@@ -1993,6 +2227,7 @@
     {
       "id": "format-bindings",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/format-bindings.json",
       "expectedFile": "nodes/format-bindings.json",
@@ -2001,6 +2236,7 @@
     {
       "id": "format-date-time",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/format-date-time.json",
       "expectedFile": "nodes/format-date-time.json",
@@ -2009,6 +2245,7 @@
     {
       "id": "format-since",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/format-since.json",
       "expectedFile": "nodes/format-since.json",
@@ -2017,6 +2254,7 @@
     {
       "id": "frag-decl-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/frag-decl-1.json",
       "expectedFile": "nodes/frag-decl-1.json",
@@ -2025,6 +2263,7 @@
     {
       "id": "frag-decl-param",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/frag-decl-param.json",
       "expectedFile": "nodes/frag-decl-param.json",
@@ -2033,6 +2272,7 @@
     {
       "id": "frag-ref-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/frag-ref-1.json",
       "expectedFile": "nodes/frag-ref-1.json",
@@ -2041,6 +2281,7 @@
     {
       "id": "frag-ref-args",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/frag-ref-args.json",
       "expectedFile": "nodes/frag-ref-args.json",
@@ -2049,6 +2290,7 @@
     {
       "id": "frag-stdlib-confirm-action-pair",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-confirm-action-pair.json",
       "expectedFile": "nodes/frag-stdlib-confirm-action-pair.json",
@@ -2057,6 +2299,7 @@
     {
       "id": "frag-stdlib-confirm-action-pair-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-confirm-action-pair-ref.json",
       "expectedFile": "nodes/frag-stdlib-confirm-action-pair-ref.json",
@@ -2065,6 +2308,7 @@
     {
       "id": "frag-stdlib-empty-state-panel",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-empty-state-panel.json",
       "expectedFile": "nodes/frag-stdlib-empty-state-panel.json",
@@ -2073,6 +2317,7 @@
     {
       "id": "frag-stdlib-empty-state-panel-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-empty-state-panel-ref.json",
       "expectedFile": "nodes/frag-stdlib-empty-state-panel-ref.json",
@@ -2081,6 +2326,7 @@
     {
       "id": "frag-stdlib-filter-bar",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-filter-bar.json",
       "expectedFile": "nodes/frag-stdlib-filter-bar.json",
@@ -2089,6 +2335,7 @@
     {
       "id": "frag-stdlib-filter-bar-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-filter-bar-ref.json",
       "expectedFile": "nodes/frag-stdlib-filter-bar-ref.json",
@@ -2097,6 +2344,7 @@
     {
       "id": "frag-stdlib-kpi-strip",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-kpi-strip.json",
       "expectedFile": "nodes/frag-stdlib-kpi-strip.json",
@@ -2105,6 +2353,7 @@
     {
       "id": "frag-stdlib-kpi-strip-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-kpi-strip-ref.json",
       "expectedFile": "nodes/frag-stdlib-kpi-strip-ref.json",
@@ -2113,6 +2362,7 @@
     {
       "id": "frag-stdlib-labelled-metric-row",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-labelled-metric-row.json",
       "expectedFile": "nodes/frag-stdlib-labelled-metric-row.json",
@@ -2121,6 +2371,7 @@
     {
       "id": "frag-stdlib-labelled-metric-row-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-labelled-metric-row-ref.json",
       "expectedFile": "nodes/frag-stdlib-labelled-metric-row-ref.json",
@@ -2129,6 +2380,7 @@
     {
       "id": "frag-stdlib-loading-placeholder",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-loading-placeholder.json",
       "expectedFile": "nodes/frag-stdlib-loading-placeholder.json",
@@ -2137,6 +2389,7 @@
     {
       "id": "frag-stdlib-loading-placeholder-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-loading-placeholder-ref.json",
       "expectedFile": "nodes/frag-stdlib-loading-placeholder-ref.json",
@@ -2145,6 +2398,7 @@
     {
       "id": "frag-stdlib-metric-card",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-metric-card.json",
       "expectedFile": "nodes/frag-stdlib-metric-card.json",
@@ -2153,6 +2407,7 @@
     {
       "id": "frag-stdlib-metric-card-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-metric-card-ref.json",
       "expectedFile": "nodes/frag-stdlib-metric-card-ref.json",
@@ -2161,6 +2416,7 @@
     {
       "id": "frag-stdlib-section-header",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-section-header.json",
       "expectedFile": "nodes/frag-stdlib-section-header.json",
@@ -2169,6 +2425,7 @@
     {
       "id": "frag-stdlib-section-header-ref",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-section-header-ref.json",
       "expectedFile": "nodes/frag-stdlib-section-header-ref.json",
@@ -2177,6 +2434,7 @@
     {
       "id": "glayout-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/glayout-1.json",
       "expectedFile": "nodes/glayout-1.json",
@@ -2185,6 +2443,7 @@
     {
       "id": "glayout-tpl-autofit",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/glayout-tpl-autofit.json",
       "expectedFile": "nodes/glayout-tpl-autofit.json",
@@ -2193,6 +2452,7 @@
     {
       "id": "glayout-tpl-fixed",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/glayout-tpl-fixed.json",
       "expectedFile": "nodes/glayout-tpl-fixed.json",
@@ -2201,6 +2461,7 @@
     {
       "id": "glayout-tpl-ratio",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/glayout-tpl-ratio.json",
       "expectedFile": "nodes/glayout-tpl-ratio.json",
@@ -2209,6 +2470,7 @@
     {
       "id": "grid-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/grid-1.json",
       "expectedFile": "nodes/grid-1.json",
@@ -2217,6 +2479,7 @@
     {
       "id": "grid-action-column-clean",
       "kind": "node-round-trip",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "nodes/grid-action-column-clean.json",
       "expectedFile": "nodes/grid-action-column-clean.json",
@@ -2225,6 +2488,7 @@
     {
       "id": "grid-action-column-field",
       "kind": "node-round-trip",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "nodes/grid-action-column-field.json",
       "expectedFile": "nodes/grid-action-column-field.json",
@@ -2233,6 +2497,7 @@
     {
       "id": "grid-bound-sort",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/grid-bound-sort.json",
       "expectedFile": "nodes/grid-bound-sort.json",
@@ -2241,6 +2506,7 @@
     {
       "id": "grid-declared-edit",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/grid-declared-edit.json",
       "expectedFile": "nodes/grid-declared-edit.json",
@@ -2249,6 +2515,7 @@
     {
       "id": "grid-editable-state",
       "kind": "node-round-trip",
+      "since": "0.12.0",
       "decoder": "node",
       "inputFile": "nodes/grid-editable-state.json",
       "expectedFile": "nodes/grid-editable-state.json",
@@ -2257,6 +2524,7 @@
     {
       "id": "grid-exportable-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/grid-exportable-1.json",
       "expectedFile": "nodes/grid-exportable-1.json",
@@ -2265,6 +2533,7 @@
     {
       "id": "grid-field-named",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/grid-field-named.json",
       "expectedFile": "nodes/grid-field-named.json",
@@ -2273,6 +2542,7 @@
     {
       "id": "grid-keep-rows-together-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/grid-keep-rows-together-1.json",
       "expectedFile": "nodes/grid-keep-rows-together-1.json",
@@ -2281,6 +2551,7 @@
     {
       "id": "grid-paged",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/grid-paged.json",
       "expectedFile": "nodes/grid-paged.json",
@@ -2289,6 +2560,7 @@
     {
       "id": "grid-paged-sorted",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/grid-paged-sorted.json",
       "expectedFile": "nodes/grid-paged-sorted.json",
@@ -2297,6 +2569,7 @@
     {
       "id": "grid-reorderable",
       "kind": "node-round-trip",
+      "since": "0.30.0",
       "decoder": "node",
       "inputFile": "nodes/grid-reorderable.json",
       "expectedFile": "nodes/grid-reorderable.json",
@@ -2305,6 +2578,7 @@
     {
       "id": "grid-repeat-header-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/grid-repeat-header-1.json",
       "expectedFile": "nodes/grid-repeat-header-1.json",
@@ -2313,6 +2587,7 @@
     {
       "id": "grid-sort-ascending",
       "kind": "node-round-trip",
+      "since": "0.83.0",
       "decoder": "node",
       "inputFile": "nodes/grid-sort-ascending.json",
       "expectedFile": "nodes/grid-sort-ascending.json",
@@ -2321,6 +2596,7 @@
     {
       "id": "grid-sort-state-key",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/grid-sort-state-key.json",
       "expectedFile": "nodes/grid-sort-state-key.json",
@@ -2329,6 +2605,7 @@
     {
       "id": "grid-toned-pill",
       "kind": "node-round-trip",
+      "since": "0.11.0",
       "decoder": "node",
       "inputFile": "nodes/grid-toned-pill.json",
       "expectedFile": "nodes/grid-toned-pill.json",
@@ -2337,6 +2614,7 @@
     {
       "id": "grid-toned-pill-ungrounded",
       "kind": "node-round-trip",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "nodes/grid-toned-pill-ungrounded.json",
       "expectedFile": "nodes/grid-toned-pill-ungrounded.json",
@@ -2345,6 +2623,7 @@
     {
       "id": "grid-transform",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform.json",
       "expectedFile": "nodes/grid-transform.json",
@@ -2353,6 +2632,7 @@
     {
       "id": "grid-transform-param",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-param.json",
       "expectedFile": "nodes/grid-transform-param.json",
@@ -2361,6 +2641,7 @@
     {
       "id": "grid-transform-undeclared-param",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-undeclared-param.json",
       "expectedFile": "nodes/grid-transform-undeclared-param.json",
@@ -2369,6 +2650,7 @@
     {
       "id": "grid-windowed",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/grid-windowed.json",
       "expectedFile": "nodes/grid-windowed.json",
@@ -2377,6 +2659,7 @@
     {
       "id": "grid-windowed-sorted",
       "kind": "node-round-trip",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "nodes/grid-windowed-sorted.json",
       "expectedFile": "nodes/grid-windowed-sorted.json",
@@ -2385,6 +2668,7 @@
     {
       "id": "heading-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/heading-1.json",
       "expectedFile": "nodes/heading-1.json",
@@ -2393,6 +2677,7 @@
     {
       "id": "icon-1",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/icon-1.json",
       "expectedFile": "nodes/icon-1.json",
@@ -2401,6 +2686,7 @@
     {
       "id": "image-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/image-1.json",
       "expectedFile": "nodes/image-1.json",
@@ -2409,6 +2695,7 @@
     {
       "id": "image-caption-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-caption-1.json",
       "expectedFile": "nodes/image-caption-1.json",
@@ -2417,6 +2704,7 @@
     {
       "id": "image-caption-i18n-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-caption-i18n-1.json",
       "expectedFile": "nodes/image-caption-i18n-1.json",
@@ -2425,6 +2713,7 @@
     {
       "id": "image-expandable-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-expandable-1.json",
       "expectedFile": "nodes/image-expandable-1.json",
@@ -2433,6 +2722,7 @@
     {
       "id": "image-expandable-figure-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-expandable-figure-1.json",
       "expectedFile": "nodes/image-expandable-figure-1.json",
@@ -2441,6 +2731,7 @@
     {
       "id": "image-presentation-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-presentation-1.json",
       "expectedFile": "nodes/image-presentation-1.json",
@@ -2449,6 +2740,7 @@
     {
       "id": "image-srcset-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/image-srcset-1.json",
       "expectedFile": "nodes/image-srcset-1.json",
@@ -2457,6 +2749,7 @@
     {
       "id": "limit-expr-nodes-pipeline-at-max",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
       "expectedFile": "nodes/limit-expr-nodes-pipeline-at-max.json",
@@ -2465,6 +2758,7 @@
     {
       "id": "limit-node-depth-at-max",
       "kind": "node-round-trip",
+      "since": "0.35.0",
       "decoder": "node",
       "inputFile": "nodes/limit-node-depth-at-max.json",
       "expectedFile": "nodes/limit-node-depth-at-max.json",
@@ -2473,6 +2767,7 @@
     {
       "id": "limit-skeleton-rows-at-max",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/limit-skeleton-rows-at-max.json",
       "expectedFile": "nodes/limit-skeleton-rows-at-max.json",
@@ -2481,6 +2776,7 @@
     {
       "id": "limit-tree-item-depth-at-max",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/limit-tree-item-depth-at-max.json",
       "expectedFile": "nodes/limit-tree-item-depth-at-max.json",
@@ -2489,6 +2785,7 @@
     {
       "id": "link-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/link-1.json",
       "expectedFile": "nodes/link-1.json",
@@ -2497,6 +2794,7 @@
     {
       "id": "link-protected-1",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/link-protected-1.json",
       "expectedFile": "nodes/link-protected-1.json",
@@ -2505,6 +2803,7 @@
     {
       "id": "list-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/list-1.json",
       "expectedFile": "nodes/list-1.json",
@@ -2513,6 +2812,7 @@
     {
       "id": "lvr-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/lvr-1.json",
       "expectedFile": "nodes/lvr-1.json",
@@ -2521,6 +2821,7 @@
     {
       "id": "map-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/map-1.json",
       "expectedFile": "nodes/map-1.json",
@@ -2529,6 +2830,7 @@
     {
       "id": "markdown-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/markdown-1.json",
       "expectedFile": "nodes/markdown-1.json",
@@ -2537,6 +2839,7 @@
     {
       "id": "masonry-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/masonry-1.json",
       "expectedFile": "nodes/masonry-1.json",
@@ -2545,6 +2848,7 @@
     {
       "id": "masonry-gap",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/masonry-gap.json",
       "expectedFile": "nodes/masonry-gap.json",
@@ -2553,6 +2857,7 @@
     {
       "id": "master-detail-multi-field",
       "kind": "node-round-trip",
+      "since": "0.15.0",
       "decoder": "node",
       "inputFile": "nodes/master-detail-multi-field.json",
       "expectedFile": "nodes/master-detail-multi-field.json",
@@ -2561,6 +2866,7 @@
     {
       "id": "master-detail-preselected",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/master-detail-preselected.json",
       "expectedFile": "nodes/master-detail-preselected.json",
@@ -2569,6 +2875,7 @@
     {
       "id": "master-detail-preselected-second-row",
       "kind": "node-round-trip",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "nodes/master-detail-preselected-second-row.json",
       "expectedFile": "nodes/master-detail-preselected-second-row.json",
@@ -2577,6 +2884,7 @@
     {
       "id": "math-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/math-1.json",
       "expectedFile": "nodes/math-1.json",
@@ -2585,6 +2893,7 @@
     {
       "id": "media-audio-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/media-audio-1.json",
       "expectedFile": "nodes/media-audio-1.json",
@@ -2593,6 +2902,7 @@
     {
       "id": "media-audio-transcript-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/media-audio-transcript-1.json",
       "expectedFile": "nodes/media-audio-transcript-1.json",
@@ -2601,6 +2911,7 @@
     {
       "id": "media-video-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/media-video-1.json",
       "expectedFile": "nodes/media-video-1.json",
@@ -2609,6 +2920,7 @@
     {
       "id": "media-video-autoplay-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/media-video-autoplay-1.json",
       "expectedFile": "nodes/media-video-autoplay-1.json",
@@ -2617,6 +2929,7 @@
     {
       "id": "media-video-captions-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/media-video-captions-1.json",
       "expectedFile": "nodes/media-video-captions-1.json",
@@ -2625,6 +2938,7 @@
     {
       "id": "media-video-poster-1",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/media-video-poster-1.json",
       "expectedFile": "nodes/media-video-poster-1.json",
@@ -2633,6 +2947,7 @@
     {
       "id": "media-video-tracks-2",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/media-video-tracks-2.json",
       "expectedFile": "nodes/media-video-tracks-2.json",
@@ -2641,6 +2956,7 @@
     {
       "id": "metric-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-1.json",
       "expectedFile": "nodes/metric-1.json",
@@ -2649,6 +2965,7 @@
     {
       "id": "metric-duration-1",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/metric-duration-1.json",
       "expectedFile": "nodes/metric-duration-1.json",
@@ -2657,6 +2974,7 @@
     {
       "id": "metric-float-17sig",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-float-17sig.json",
       "expectedFile": "nodes/metric-float-17sig.json",
@@ -2665,6 +2983,7 @@
     {
       "id": "metric-float-1e17",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/metric-float-1e17.json",
       "expectedFile": "nodes/metric-float-1e17.json",
@@ -2673,6 +2992,7 @@
     {
       "id": "metric-float-bigint",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-float-bigint.json",
       "expectedFile": "nodes/metric-float-bigint.json",
@@ -2681,6 +3001,7 @@
     {
       "id": "metric-float-exp-neg",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-float-exp-neg.json",
       "expectedFile": "nodes/metric-float-exp-neg.json",
@@ -2689,6 +3010,7 @@
     {
       "id": "metric-float-exp-pos",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-float-exp-pos.json",
       "expectedFile": "nodes/metric-float-exp-pos.json",
@@ -2697,6 +3019,7 @@
     {
       "id": "metric-inverted-polarity",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/metric-inverted-polarity.json",
       "expectedFile": "nodes/metric-inverted-polarity.json",
@@ -2705,6 +3028,7 @@
     {
       "id": "metric-invoke",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/metric-invoke.json",
       "expectedFile": "nodes/metric-invoke.json",
@@ -2713,6 +3037,7 @@
     {
       "id": "metric-nonfinite-sentinel",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/metric-nonfinite-sentinel.json",
       "expectedFile": "nodes/metric-nonfinite-sentinel.json",
@@ -2721,6 +3046,7 @@
     {
       "id": "modal-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/modal-1.json",
       "expectedFile": "nodes/modal-1.json",
@@ -2729,6 +3055,7 @@
     {
       "id": "mount-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/mount-1.json",
       "expectedFile": "nodes/mount-1.json",
@@ -2737,6 +3064,7 @@
     {
       "id": "mount-2",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/mount-2.json",
       "expectedFile": "nodes/mount-2.json",
@@ -2745,6 +3073,7 @@
     {
       "id": "multiselect-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/multiselect-1.json",
       "expectedFile": "nodes/multiselect-1.json",
@@ -2753,6 +3082,7 @@
     {
       "id": "multiselect-chip-list-param",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/multiselect-chip-list-param.json",
       "expectedFile": "nodes/multiselect-chip-list-param.json",
@@ -2761,6 +3091,7 @@
     {
       "id": "node-visible",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/node-visible.json",
       "expectedFile": "nodes/node-visible.json",
@@ -2769,6 +3100,7 @@
     {
       "id": "now-environment-binding",
       "kind": "node-round-trip",
+      "since": "0.15.0",
       "decoder": "node",
       "inputFile": "nodes/now-environment-binding.json",
       "expectedFile": "nodes/now-environment-binding.json",
@@ -2777,6 +3109,7 @@
     {
       "id": "now-grain",
       "kind": "node-round-trip",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "nodes/now-grain.json",
       "expectedFile": "nodes/now-grain.json",
@@ -2785,6 +3118,7 @@
     {
       "id": "popover-anchored-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/popover-anchored-1.json",
       "expectedFile": "nodes/popover-anchored-1.json",
@@ -2793,6 +3127,7 @@
     {
       "id": "popover-open-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/popover-open-1.json",
       "expectedFile": "nodes/popover-open-1.json",
@@ -2801,6 +3136,7 @@
     {
       "id": "progress-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/progress-1.json",
       "expectedFile": "nodes/progress-1.json",
@@ -2809,6 +3145,7 @@
     {
       "id": "query-dependson",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/query-dependson.json",
       "expectedFile": "nodes/query-dependson.json",
@@ -2817,6 +3154,7 @@
     {
       "id": "scalar-transform-composition",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/scalar-transform-composition.json",
       "expectedFile": "nodes/scalar-transform-composition.json",
@@ -2825,6 +3163,7 @@
     {
       "id": "scroll-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/scroll-1.json",
       "expectedFile": "nodes/scroll-1.json",
@@ -2833,6 +3172,7 @@
     {
       "id": "select-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/select-1.json",
       "expectedFile": "nodes/select-1.json",
@@ -2841,6 +3181,7 @@
     {
       "id": "shared-source-seeded-pair",
       "kind": "node-round-trip",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "nodes/shared-source-seeded-pair.json",
       "expectedFile": "nodes/shared-source-seeded-pair.json",
@@ -2849,6 +3190,7 @@
     {
       "id": "skel-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/skel-1.json",
       "expectedFile": "nodes/skel-1.json",
@@ -2857,6 +3199,7 @@
     {
       "id": "spark-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/spark-1.json",
       "expectedFile": "nodes/spark-1.json",
@@ -2865,6 +3208,7 @@
     {
       "id": "spark-nonfinite-sentinel",
       "kind": "node-round-trip",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "nodes/spark-nonfinite-sentinel.json",
       "expectedFile": "nodes/spark-nonfinite-sentinel.json",
@@ -2873,6 +3217,7 @@
     {
       "id": "split-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/split-1.json",
       "expectedFile": "nodes/split-1.json",
@@ -2881,6 +3226,7 @@
     {
       "id": "stack-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/stack-1.json",
       "expectedFile": "nodes/stack-1.json",
@@ -2889,6 +3235,7 @@
     {
       "id": "state-absent-default",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/state-absent-default.json",
       "expectedFile": "nodes/state-absent-default.json",
@@ -2897,6 +3244,7 @@
     {
       "id": "step-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/step-1.json",
       "expectedFile": "nodes/step-1.json",
@@ -2905,6 +3253,7 @@
     {
       "id": "style-direction-isolated-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/style-direction-isolated-1.json",
       "expectedFile": "nodes/style-direction-isolated-1.json",
@@ -2913,6 +3262,7 @@
     {
       "id": "style-direction-ltr-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/style-direction-ltr-1.json",
       "expectedFile": "nodes/style-direction-ltr-1.json",
@@ -2921,6 +3271,7 @@
     {
       "id": "style-role-voice-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/style-role-voice-1.json",
       "expectedFile": "nodes/style-role-voice-1.json",
@@ -2929,6 +3280,7 @@
     {
       "id": "summary-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/summary-1.json",
       "expectedFile": "nodes/summary-1.json",
@@ -2937,6 +3289,7 @@
     {
       "id": "switch-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/switch-1.json",
       "expectedFile": "nodes/switch-1.json",
@@ -2945,6 +3298,7 @@
     {
       "id": "switch-carousel-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/switch-carousel-1.json",
       "expectedFile": "nodes/switch-carousel-1.json",
@@ -2953,6 +3307,7 @@
     {
       "id": "switch-on-selection",
       "kind": "node-round-trip",
+      "since": "0.15.0",
       "decoder": "node",
       "inputFile": "nodes/switch-on-selection.json",
       "expectedFile": "nodes/switch-on-selection.json",
@@ -2961,6 +3316,7 @@
     {
       "id": "switch-on-transform-scalar",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/switch-on-transform-scalar.json",
       "expectedFile": "nodes/switch-on-transform-scalar.json",
@@ -2969,6 +3325,7 @@
     {
       "id": "switch-predicate",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/switch-predicate.json",
       "expectedFile": "nodes/switch-predicate.json",
@@ -2977,6 +3334,7 @@
     {
       "id": "switch-predicate-only",
       "kind": "node-round-trip",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "nodes/switch-predicate-only.json",
       "expectedFile": "nodes/switch-predicate-only.json",
@@ -2985,6 +3343,7 @@
     {
       "id": "table-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/table-1.json",
       "expectedFile": "nodes/table-1.json",
@@ -2993,6 +3352,7 @@
     {
       "id": "table-sortable-1",
       "kind": "node-round-trip",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "nodes/table-sortable-1.json",
       "expectedFile": "nodes/table-sortable-1.json",
@@ -3001,6 +3361,7 @@
     {
       "id": "tabs-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/tabs-1.json",
       "expectedFile": "nodes/tabs-1.json",
@@ -3009,6 +3370,7 @@
     {
       "id": "tabs-explicit-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/tabs-explicit-1.json",
       "expectedFile": "nodes/tabs-explicit-1.json",
@@ -3017,6 +3379,7 @@
     {
       "id": "text-i18n-bound-arg-1",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/text-i18n-bound-arg-1.json",
       "expectedFile": "nodes/text-i18n-bound-arg-1.json",
@@ -3025,6 +3388,7 @@
     {
       "id": "text-i18n-mixed-args-1",
       "kind": "node-round-trip",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "nodes/text-i18n-mixed-args-1.json",
       "expectedFile": "nodes/text-i18n-mixed-args-1.json",
@@ -3033,6 +3397,7 @@
     {
       "id": "toast-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/toast-1.json",
       "expectedFile": "nodes/toast-1.json",
@@ -3041,6 +3406,7 @@
     {
       "id": "tooltip-button-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tooltip-button-1.json",
       "expectedFile": "nodes/tooltip-button-1.json",
@@ -3049,6 +3415,7 @@
     {
       "id": "tooltip-icon-button-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tooltip-icon-button-1.json",
       "expectedFile": "nodes/tooltip-icon-button-1.json",
@@ -3057,6 +3424,7 @@
     {
       "id": "tooltip-metric-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tooltip-metric-1.json",
       "expectedFile": "nodes/tooltip-metric-1.json",
@@ -3065,6 +3433,7 @@
     {
       "id": "transfer-board",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/transfer-board.json",
       "expectedFile": "nodes/transfer-board.json",
@@ -3073,6 +3442,7 @@
     {
       "id": "tree-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tree-1.json",
       "expectedFile": "nodes/tree-1.json",
@@ -3081,6 +3451,7 @@
     {
       "id": "tree-expanded-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tree-expanded-1.json",
       "expectedFile": "nodes/tree-expanded-1.json",
@@ -3089,6 +3460,7 @@
     {
       "id": "tree-selection-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/tree-selection-1.json",
       "expectedFile": "nodes/tree-selection-1.json",
@@ -3097,6 +3469,7 @@
     {
       "id": "upload-1",
       "kind": "node-round-trip",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "nodes/upload-1.json",
       "expectedFile": "nodes/upload-1.json",
@@ -3105,6 +3478,7 @@
     {
       "id": "upload-capture-camera-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/upload-capture-camera-1.json",
       "expectedFile": "nodes/upload-capture-camera-1.json",
@@ -3113,6 +3487,7 @@
     {
       "id": "upload-capture-microphone-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/upload-capture-microphone-1.json",
       "expectedFile": "nodes/upload-capture-microphone-1.json",
@@ -3121,6 +3496,7 @@
     {
       "id": "upload-destination-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/upload-destination-1.json",
       "expectedFile": "nodes/upload-destination-1.json",
@@ -3129,6 +3505,7 @@
     {
       "id": "upload-drop-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/upload-drop-1.json",
       "expectedFile": "nodes/upload-drop-1.json",
@@ -3137,6 +3514,7 @@
     {
       "id": "upload-max-bytes-1",
       "kind": "node-round-trip",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "nodes/upload-max-bytes-1.json",
       "expectedFile": "nodes/upload-max-bytes-1.json",
@@ -3145,6 +3523,7 @@
     {
       "id": "upload-max-files-1",
       "kind": "node-round-trip",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "nodes/upload-max-files-1.json",
       "expectedFile": "nodes/upload-max-files-1.json",
@@ -3153,6 +3532,7 @@
     {
       "id": "upload-paste-1",
       "kind": "node-round-trip",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "nodes/upload-paste-1.json",
       "expectedFile": "nodes/upload-paste-1.json",
@@ -3161,6 +3541,7 @@
     {
       "id": "op-batch",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-batch.json",
       "expectedFile": "ops/op-batch.json",
@@ -3169,6 +3550,7 @@
     {
       "id": "op-editnode",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-editnode.json",
       "expectedFile": "ops/op-editnode.json",
@@ -3177,6 +3559,7 @@
     {
       "id": "op-editnode-action-commitlocal",
       "kind": "op-round-trip",
+      "since": "0.81.0",
       "decoder": "op",
       "inputFile": "ops/op-editnode-action-commitlocal.json",
       "expectedFile": "ops/op-editnode-action-commitlocal.json",
@@ -3185,6 +3568,7 @@
     {
       "id": "op-insertchild",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-insertchild.json",
       "expectedFile": "ops/op-insertchild.json",
@@ -3193,6 +3577,7 @@
     {
       "id": "op-movenode",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-movenode.json",
       "expectedFile": "ops/op-movenode.json",
@@ -3201,6 +3586,7 @@
     {
       "id": "op-patchstyle",
       "kind": "op-round-trip",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "ops/op-patchstyle.json",
       "expectedFile": "ops/op-patchstyle.json",
@@ -3209,6 +3595,7 @@
     {
       "id": "op-patchstyle (phase 2291 all six members)",
       "kind": "op-round-trip",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "ops/op-patchstyle (phase 2291 all six members).json",
       "expectedFile": "ops/op-patchstyle (phase 2291 all six members).json",
@@ -3217,6 +3604,7 @@
     {
       "id": "op-patchstyle (phase 2291 tone=default is an edit, not an omission)",
       "kind": "op-round-trip",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
       "expectedFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
@@ -3225,6 +3613,7 @@
     {
       "id": "op-removenode",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-removenode.json",
       "expectedFile": "ops/op-removenode.json",
@@ -3233,6 +3622,7 @@
     {
       "id": "op-reorderchildren",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-reorderchildren.json",
       "expectedFile": "ops/op-reorderchildren.json",
@@ -3241,6 +3631,7 @@
     {
       "id": "op-replacebinding",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-replacebinding.json",
       "expectedFile": "ops/op-replacebinding.json",
@@ -3249,6 +3640,7 @@
     {
       "id": "op-replaceroot",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-replaceroot.json",
       "expectedFile": "ops/op-replaceroot.json",
@@ -3257,6 +3649,7 @@
     {
       "id": "op-updateprop",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop.json",
       "expectedFile": "ops/op-updateprop.json",
@@ -3265,6 +3658,7 @@
     {
       "id": "op-updateprop-nested-badfield",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-badfield.json",
       "expectedFile": "ops/op-updateprop-nested-badfield.json",
@@ -3273,6 +3667,7 @@
     {
       "id": "op-updateprop-nested-badindex",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-badindex.json",
       "expectedFile": "ops/op-updateprop-nested-badindex.json",
@@ -3281,6 +3676,7 @@
     {
       "id": "op-updateprop-nested-column0-label",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-column0-label.json",
       "expectedFile": "ops/op-updateprop-nested-column0-label.json",
@@ -3289,6 +3685,7 @@
     {
       "id": "op-updateprop-nested-column1-label",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-column1-label.json",
       "expectedFile": "ops/op-updateprop-nested-column1-label.json",
@@ -3297,6 +3694,7 @@
     {
       "id": "op-updateprop-nested-field0-required",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-field0-required.json",
       "expectedFile": "ops/op-updateprop-nested-field0-required.json",
@@ -3305,6 +3703,7 @@
     {
       "id": "op-updateprop-nested-field1-required",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-field1-required.json",
       "expectedFile": "ops/op-updateprop-nested-field1-required.json",
@@ -3313,6 +3712,7 @@
     {
       "id": "op-updateprop-nested-malformed",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-malformed.json",
       "expectedFile": "ops/op-updateprop-nested-malformed.json",
@@ -3321,6 +3721,7 @@
     {
       "id": "op-updateprop-nested-object-value",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-object-value.json",
       "expectedFile": "ops/op-updateprop-nested-object-value.json",
@@ -3329,6 +3730,7 @@
     {
       "id": "op-updateprop-nested-yfield0",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-yfield0.json",
       "expectedFile": "ops/op-updateprop-nested-yfield0.json",
@@ -3337,6 +3739,7 @@
     {
       "id": "op-updateprop-nested-yfield1",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updateprop-nested-yfield1.json",
       "expectedFile": "ops/op-updateprop-nested-yfield1.json",
@@ -3345,6 +3748,7 @@
     {
       "id": "op-updatestate",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updatestate.json",
       "expectedFile": "ops/op-updatestate.json",
@@ -3353,6 +3757,7 @@
     {
       "id": "op-updatestyle",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updatestyle.json",
       "expectedFile": "ops/op-updatestyle.json",
@@ -3361,6 +3766,7 @@
     {
       "id": "op-updatestyle (phase 147 role=eyebrow + voice=structural)",
       "kind": "op-round-trip",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
       "expectedFile": "ops/op-updatestyle (phase 147 role=eyebrow + voice=structural).json",
@@ -3369,6 +3775,7 @@
     {
       "id": "op-updatestyle (phase 1472 direction=ltr, the only style member)",
       "kind": "op-round-trip",
+      "since": "0.70.0",
       "decoder": "op",
       "inputFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
       "expectedFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
@@ -3377,6 +3784,7 @@
     {
       "id": "reject-1811-time-alias-variant-disagrees",
       "kind": "reject",
+      "since": "0.86.0",
       "decoder": "node",
       "inputFile": "reject/reject-1811-time-alias-variant-disagrees.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3386,6 +3794,7 @@
     {
       "id": "reject-a11y-hidden-nonbool",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-hidden-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3395,6 +3804,7 @@
     {
       "id": "reject-a11y-label-nonstring",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-label-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3404,6 +3814,7 @@
     {
       "id": "reject-a11y-labelledby-nonstring",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-labelledby-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3413,6 +3824,7 @@
     {
       "id": "reject-a11y-liveregion-nonstring",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-liveregion-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3422,6 +3834,7 @@
     {
       "id": "reject-a11y-liveregion-unknown",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-liveregion-unknown.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -3431,6 +3844,7 @@
     {
       "id": "reject-a11y-not-object",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-not-object.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3440,6 +3854,7 @@
     {
       "id": "reject-a11y-role-nonstring",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-a11y-role-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3449,6 +3864,7 @@
     {
       "id": "reject-action-print-with-payload",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-action-print-with-payload.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3458,6 +3874,7 @@
     {
       "id": "reject-binding-float-bool",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-float-bool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3467,6 +3884,7 @@
     {
       "id": "reject-binding-float-sentinel-case",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-float-sentinel-case.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3476,6 +3894,7 @@
     {
       "id": "reject-binding-float-string",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-float-string.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3485,6 +3904,7 @@
     {
       "id": "reject-binding-floatseq-sentinel-case",
       "kind": "reject",
+      "since": "0.71.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-floatseq-sentinel-case.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3494,6 +3914,7 @@
     {
       "id": "reject-binding-int-bool",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-int-bool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3503,6 +3924,7 @@
     {
       "id": "reject-binding-int-sentinel-string",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-binding-int-sentinel-string.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3512,6 +3934,7 @@
     {
       "id": "reject-box-masonry-nonpositive-cols",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-box-masonry-nonpositive-cols.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3521,6 +3944,7 @@
     {
       "id": "reject-chart-annotation-date-unparseable",
       "kind": "reject",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "reject/reject-chart-annotation-date-unparseable.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3530,6 +3954,7 @@
     {
       "id": "reject-chart-annotation-nonfinite",
       "kind": "reject",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "reject/reject-chart-annotation-nonfinite.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3539,6 +3964,7 @@
     {
       "id": "reject-chart-annotation-range-unordered",
       "kind": "reject",
+      "since": "0.76.0",
       "decoder": "node",
       "inputFile": "reject/reject-chart-annotation-range-unordered.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3548,6 +3974,7 @@
     {
       "id": "reject-color-value-not-hex",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-color-value-not-hex.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3567,6 +3994,7 @@
     {
       "id": "reject-combobox-allowfreetext-nonbool",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-combobox-allowfreetext-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3586,6 +4014,7 @@
     {
       "id": "reject-confirm-missing-onconfirm",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-confirm-missing-onconfirm.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -3595,6 +4024,7 @@
     {
       "id": "reject-confirm-nested",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-confirm-nested.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3604,6 +4034,7 @@
     {
       "id": "reject-daterange-unordered",
       "kind": "reject",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "reject/reject-daterange-unordered.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3613,6 +4044,7 @@
     {
       "id": "reject-embed-missing-title",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-embed-missing-title.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -3622,6 +4054,7 @@
     {
       "id": "reject-embed-permission-nonstring",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-embed-permission-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3631,6 +4064,7 @@
     {
       "id": "reject-embed-unknown-permission",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-embed-unknown-permission.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -3640,6 +4074,7 @@
     {
       "id": "reject-emptynodeid",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-emptynodeid.json",
       "expectedErrorCode": "EMPTY_NODE_ID",
@@ -3649,6 +4084,7 @@
     {
       "id": "reject-expr-col-reference",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-expr-col-reference.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3658,6 +4094,7 @@
     {
       "id": "reject-expr-unbound-param",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-expr-unbound-param.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3667,6 +4104,7 @@
     {
       "id": "reject-fieldrule-empty",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-fieldrule-empty.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3676,6 +4114,7 @@
     {
       "id": "reject-fieldrule-length-unordered",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-fieldrule-length-unordered.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3685,6 +4124,7 @@
     {
       "id": "reject-formfield-near-miss-validation",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-formfield-near-miss-validation.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3694,6 +4134,7 @@
     {
       "id": "reject-i18n-arg-binding-missing-key",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-i18n-arg-binding-missing-key.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -3703,6 +4144,7 @@
     {
       "id": "reject-i18n-arg-unknown-binding-case",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-i18n-arg-unknown-binding-case.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -3712,6 +4154,7 @@
     {
       "id": "reject-image-expandable-nonbool",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-image-expandable-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3721,6 +4164,7 @@
     {
       "id": "reject-image-srcset-nonpositive-width",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-image-srcset-nonpositive-width.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3730,6 +4174,7 @@
     {
       "id": "reject-image-srcset-null",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-image-srcset-null.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3739,6 +4184,7 @@
     {
       "id": "reject-int-slot-fractional",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-int-slot-fractional.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3748,6 +4194,7 @@
     {
       "id": "reject-int-slot-out-of-range",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-int-slot-out-of-range.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3757,6 +4204,7 @@
     {
       "id": "reject-invalid-empty",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-invalid-empty.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3766,6 +4214,7 @@
     {
       "id": "reject-invalid-garbage",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-invalid-garbage.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3775,6 +4224,7 @@
     {
       "id": "reject-invalid-truncated",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-invalid-truncated.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3784,6 +4234,7 @@
     {
       "id": "reject-json-bare-nan",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-bare-nan.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3793,6 +4244,7 @@
     {
       "id": "reject-json-duplicate-key",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-duplicate-key.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3802,6 +4254,7 @@
     {
       "id": "reject-json-lone-high-surrogate",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-lone-high-surrogate.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3811,6 +4264,7 @@
     {
       "id": "reject-json-lone-low-surrogate",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-lone-low-surrogate.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3820,6 +4274,7 @@
     {
       "id": "reject-json-number-empty-exponent",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-number-empty-exponent.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3829,6 +4284,7 @@
     {
       "id": "reject-json-number-leading-plus",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-number-leading-plus.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3838,6 +4294,7 @@
     {
       "id": "reject-json-number-leading-zero",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-number-leading-zero.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3847,6 +4304,7 @@
     {
       "id": "reject-json-number-no-integer-part",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-number-no-integer-part.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3856,6 +4314,7 @@
     {
       "id": "reject-json-number-trailing-point",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-number-trailing-point.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3865,6 +4324,7 @@
     {
       "id": "reject-json-raw-control-char",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-raw-control-char.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3874,6 +4334,7 @@
     {
       "id": "reject-json-surrogate-pair-split",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-surrogate-pair-split.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3883,6 +4344,7 @@
     {
       "id": "reject-json-trailing-content",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-json-trailing-content.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -3892,6 +4354,7 @@
     {
       "id": "reject-limit-expr-nodes-derive",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-expr-nodes-derive.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3901,6 +4364,7 @@
     {
       "id": "reject-limit-expr-nodes-filter",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-expr-nodes-filter.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3910,6 +4374,7 @@
     {
       "id": "reject-limit-expr-nodes-transform-bypass",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-expr-nodes-transform-bypass.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3919,6 +4384,7 @@
     {
       "id": "reject-limit-json-depth",
       "kind": "reject",
+      "since": "0.35.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-json-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3928,6 +4394,7 @@
     {
       "id": "reject-limit-json-depth-at-max",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-json-depth-at-max.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3937,6 +4404,7 @@
     {
       "id": "reject-limit-node-depth",
       "kind": "reject",
+      "since": "0.35.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-node-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3946,6 +4414,7 @@
     {
       "id": "reject-limit-op-depth",
       "kind": "reject",
+      "since": "0.35.0",
       "decoder": "op",
       "inputFile": "reject/reject-limit-op-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3955,6 +4424,7 @@
     {
       "id": "reject-limit-skeleton-rows",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-skeleton-rows.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3964,6 +4434,7 @@
     {
       "id": "reject-limit-tree-item-depth",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-limit-tree-item-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -3973,6 +4444,7 @@
     {
       "id": "reject-local-codec-no-inverse",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-local-codec-no-inverse.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3982,6 +4454,7 @@
     {
       "id": "reject-local-oncommit-and-committo",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-local-oncommit-and-committo.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -3991,6 +4464,7 @@
     {
       "id": "reject-media-autoplay-nonbool",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-media-autoplay-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4000,6 +4474,7 @@
     {
       "id": "reject-media-missing-label",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-media-missing-label.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4009,6 +4484,7 @@
     {
       "id": "reject-media-track-default-nonbool",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-media-track-default-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4018,6 +4494,7 @@
     {
       "id": "reject-media-track-missing-srclang",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-media-track-missing-srclang.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4027,6 +4504,7 @@
     {
       "id": "reject-missing-binding-type",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-binding-type.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4036,6 +4514,7 @@
     {
       "id": "reject-missing-custom-moduleid",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-custom-moduleid.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4045,6 +4524,7 @@
     {
       "id": "reject-missing-markdown-text",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-markdown-text.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4054,6 +4534,7 @@
     {
       "id": "reject-missing-metric-value",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-metric-value.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4063,6 +4544,7 @@
     {
       "id": "reject-missing-mount-scopeid",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-mount-scopeid.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4072,6 +4554,7 @@
     {
       "id": "reject-missing-node-id",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-node-id.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4081,6 +4564,7 @@
     {
       "id": "reject-missing-node-kind",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-node-kind.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4090,6 +4574,7 @@
     {
       "id": "reject-missing-switch-cases",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-switch-cases.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4099,6 +4584,7 @@
     {
       "id": "reject-missing-switch-default",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-switch-default.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4108,6 +4594,7 @@
     {
       "id": "reject-missing-switch-statekey",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-missing-switch-statekey.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4117,6 +4604,7 @@
     {
       "id": "reject-modal-modality-nonstring",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-modal-modality-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4126,6 +4614,7 @@
     {
       "id": "reject-modal-modality-unknown",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-modal-modality-unknown.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4135,6 +4624,7 @@
     {
       "id": "reject-multi-box-layout-role",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-box-layout-role.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4154,6 +4644,7 @@
     {
       "id": "reject-multi-box-layout-role-missing",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-box-layout-role-missing.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4173,6 +4664,7 @@
     {
       "id": "reject-multi-context-member",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-context-member.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4192,6 +4684,7 @@
     {
       "id": "reject-multi-map-key-order",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-map-key-order.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4215,6 +4708,7 @@
     {
       "id": "reject-multi-sibling-nodes-index-order",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-sibling-nodes-index-order.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4234,6 +4728,7 @@
     {
       "id": "reject-multi-stop-invalid-json",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-stop-invalid-json.json",
       "expectedErrorCode": "INVALID_JSON",
@@ -4249,6 +4744,7 @@
     {
       "id": "reject-multi-stop-limit-depth",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-stop-limit-depth.json",
       "expectedErrorCode": "LIMIT_EXCEEDED",
@@ -4264,6 +4760,7 @@
     {
       "id": "reject-multi-stop-missing-layout-discriminator",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-stop-missing-layout-discriminator.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4279,6 +4776,7 @@
     {
       "id": "reject-multi-stop-unknown-layout",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-stop-unknown-layout.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4294,6 +4792,7 @@
     {
       "id": "reject-multi-stop-wrong-node-kind",
       "kind": "reject",
+      "since": "0.88.0",
       "decoder": "node",
       "inputFile": "reject/reject-multi-stop-wrong-node-kind.json",
       "expectedErrorCode": "WRONG_NODE_KIND",
@@ -4309,6 +4808,7 @@
     {
       "id": "reject-navigate-target-invalid",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-navigate-target-invalid.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4318,6 +4818,7 @@
     {
       "id": "reject-nearmiss-a11y-aria-hidden",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-a11y-aria-hidden.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4327,6 +4828,7 @@
     {
       "id": "reject-nearmiss-a11y-arialabel",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-a11y-arialabel.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4336,6 +4838,7 @@
     {
       "id": "reject-nearmiss-a11y-live",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-a11y-live.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4345,6 +4848,7 @@
     {
       "id": "reject-nearmiss-a11y-liveregion-case",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-a11y-liveregion-case.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4354,6 +4858,7 @@
     {
       "id": "reject-nearmiss-column-readonly",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-column-readonly.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4363,6 +4868,7 @@
     {
       "id": "reject-nearmiss-grid-behaviour-record",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-grid-behaviour-record.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4372,6 +4878,7 @@
     {
       "id": "reject-nearmiss-grid-current-page",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-grid-current-page.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4381,6 +4888,7 @@
     {
       "id": "reject-nearmiss-grid-sortable",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-nearmiss-grid-sortable.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4390,6 +4898,7 @@
     {
       "id": "reject-now-grain-invalid",
       "kind": "reject",
+      "since": "0.77.0",
       "decoder": "node",
       "inputFile": "reject/reject-now-grain-invalid.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4399,6 +4908,7 @@
     {
       "id": "reject-null-action-aitool-args",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-null-action-aitool-args.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4408,6 +4918,7 @@
     {
       "id": "reject-null-action-notify-payload",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-null-action-notify-payload.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4417,6 +4928,7 @@
     {
       "id": "reject-null-action-setstate-value",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-null-action-setstate-value.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4426,6 +4938,7 @@
     {
       "id": "reject-null-custom-prop",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-null-custom-prop.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4435,6 +4948,7 @@
     {
       "id": "reject-null-i18n-arg",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-null-i18n-arg.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4444,6 +4958,7 @@
     {
       "id": "reject-null-updateprop-value",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-null-updateprop-value.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4453,6 +4968,7 @@
     {
       "id": "reject-op-insertchild-empty-childid",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-insertchild-empty-childid.json",
       "expectedErrorCode": "EMPTY_NODE_ID",
@@ -4462,6 +4978,7 @@
     {
       "id": "reject-op-insertchild-missing-parentid",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-insertchild-missing-parentid.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4471,6 +4988,7 @@
     {
       "id": "reject-op-insertchild-retired-position",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-insertchild-retired-position.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4480,6 +4998,7 @@
     {
       "id": "reject-op-missing-type",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-missing-type.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4489,6 +5008,7 @@
     {
       "id": "reject-op-movenode-retired-newposition",
       "kind": "reject",
+      "since": "0.39.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-movenode-retired-newposition.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4498,6 +5018,7 @@
     {
       "id": "reject-op-patchstyle-direction-nonstring",
       "kind": "reject",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-patchstyle-direction-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4507,6 +5028,7 @@
     {
       "id": "reject-op-patchstyle-empty",
       "kind": "reject",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-patchstyle-empty.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4516,6 +5038,7 @@
     {
       "id": "reject-op-patchstyle-missing-style",
       "kind": "reject",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-patchstyle-missing-style.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4525,6 +5048,7 @@
     {
       "id": "reject-op-patchstyle-tone-unknown",
       "kind": "reject",
+      "since": "0.95.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-patchstyle-tone-unknown.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4534,6 +5058,7 @@
     {
       "id": "reject-op-reorderchildren-wrongtype",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-reorderchildren-wrongtype.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4543,6 +5068,7 @@
     {
       "id": "reject-op-unknown-yeet",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-unknown-yeet.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4552,6 +5078,7 @@
     {
       "id": "reject-op-updateprop-missing-path",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-updateprop-missing-path.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4561,6 +5088,7 @@
     {
       "id": "reject-op-updatestyle-direction-nonstring",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-updatestyle-direction-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4570,6 +5098,7 @@
     {
       "id": "reject-op-updatestyle-direction-unknown",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "op",
       "inputFile": "reject/reject-op-updatestyle-direction-unknown.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4579,6 +5108,7 @@
     {
       "id": "reject-rating-max-zero",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-rating-max-zero.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4598,6 +5128,7 @@
     {
       "id": "reject-setstate-value-and-valuefrom",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-setstate-value-and-valuefrom.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4607,6 +5138,7 @@
     {
       "id": "reject-spark-element-nonnumeric",
       "kind": "reject",
+      "since": "0.71.0",
       "decoder": "node",
       "inputFile": "reject/reject-spark-element-nonnumeric.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4616,6 +5148,7 @@
     {
       "id": "reject-state-default-without-key",
       "kind": "reject",
+      "since": "0.81.0",
       "decoder": "node",
       "inputFile": "reject/reject-state-default-without-key.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4625,6 +5158,7 @@
     {
       "id": "reject-style-direction-nonstring",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-style-direction-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4634,6 +5168,7 @@
     {
       "id": "reject-style-direction-unknown",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-style-direction-unknown.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4643,6 +5178,7 @@
     {
       "id": "reject-switch-autoadvance-fractional",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-switch-autoadvance-fractional.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4652,6 +5188,7 @@
     {
       "id": "reject-switch-autoadvance-negative",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-switch-autoadvance-negative.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4661,6 +5198,7 @@
     {
       "id": "reject-switch-autoadvance-zero",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-switch-autoadvance-zero.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4670,6 +5208,7 @@
     {
       "id": "reject-switch-case-match-and-when",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-switch-case-match-and-when.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4679,6 +5218,7 @@
     {
       "id": "reject-switch-case-neither",
       "kind": "reject",
+      "since": "0.78.0",
       "decoder": "node",
       "inputFile": "reject/reject-switch-case-neither.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4688,6 +5228,7 @@
     {
       "id": "reject-tokens-closed-without-suggestions",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tokens-closed-without-suggestions.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4707,6 +5248,7 @@
     {
       "id": "reject-tokens-value-not-list",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tokens-value-not-list.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4726,6 +5268,7 @@
     {
       "id": "reject-tonedpill-unknown-tone",
       "kind": "reject",
+      "since": "0.11.0",
       "decoder": "node",
       "inputFile": "reject/reject-tonedpill-unknown-tone.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4735,6 +5278,7 @@
     {
       "id": "reject-tooltip-nonstring",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tooltip-nonstring.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4744,6 +5288,7 @@
     {
       "id": "reject-transform-project-columns-and-cols",
       "kind": "reject",
+      "since": "0.85.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-project-columns-and-cols.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4753,6 +5298,7 @@
     {
       "id": "reject-transform-sort-key-column-and-col",
       "kind": "reject",
+      "since": "0.85.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-sort-key-column-and-col.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4762,6 +5308,7 @@
     {
       "id": "reject-tree-item-missing-id",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tree-item-missing-id.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4771,6 +5318,7 @@
     {
       "id": "reject-tree-item-missing-label",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tree-item-missing-label.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4780,6 +5328,7 @@
     {
       "id": "reject-tree-nested-item-missing-id",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-tree-nested-item-missing-id.json",
       "expectedErrorCode": "MISSING_FIELD",
@@ -4789,6 +5338,7 @@
     {
       "id": "reject-unknown-binding",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-binding.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4798,6 +5348,7 @@
     {
       "id": "reject-unknown-capture-source",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-capture-source.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4807,6 +5358,7 @@
     {
       "id": "reject-unknown-drawing-curve-command",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-drawing-curve-command.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4816,6 +5368,7 @@
     {
       "id": "reject-unknown-drawing-shape",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-drawing-shape.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4825,6 +5378,7 @@
     {
       "id": "reject-unknown-image-aspect",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-image-aspect.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4834,6 +5388,7 @@
     {
       "id": "reject-unknown-link-protection",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-link-protection.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4843,6 +5398,7 @@
     {
       "id": "reject-unknown-media-kind",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-media-kind.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4852,6 +5408,7 @@
     {
       "id": "reject-unknown-mount-direction",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-mount-direction.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4861,6 +5418,7 @@
     {
       "id": "reject-unknown-static-sort-direction",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-static-sort-direction.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4870,6 +5428,7 @@
     {
       "id": "reject-unknown-textsource",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-textsource.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4879,6 +5438,7 @@
     {
       "id": "reject-unknown-tone",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-tone.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4888,6 +5448,7 @@
     {
       "id": "reject-unknown-trend-polarity",
       "kind": "reject",
+      "since": "0.46.0",
       "decoder": "node",
       "inputFile": "reject/reject-unknown-trend-polarity.json",
       "expectedErrorCode": "UNKNOWN_DU_CASE",
@@ -4897,6 +5458,7 @@
     {
       "id": "reject-upload-acceptpaste-nonbool",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-acceptpaste-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4906,6 +5468,7 @@
     {
       "id": "reject-upload-destination-empty",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-destination-empty.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4915,6 +5478,7 @@
     {
       "id": "reject-upload-droptarget-nonbool",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-droptarget-nonbool.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4924,6 +5488,7 @@
     {
       "id": "reject-upload-maxbytes-nonint",
       "kind": "reject",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-maxbytes-nonint.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4933,6 +5498,7 @@
     {
       "id": "reject-upload-maxbytes-nonpositive",
       "kind": "reject",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-maxbytes-nonpositive.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4942,6 +5508,7 @@
     {
       "id": "reject-upload-maxfiles-nonint",
       "kind": "reject",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-maxfiles-nonint.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4951,6 +5518,7 @@
     {
       "id": "reject-upload-maxfiles-nonpositive",
       "kind": "reject",
+      "since": "0.79.0",
       "decoder": "node",
       "inputFile": "reject/reject-upload-maxfiles-nonpositive.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4960,6 +5528,7 @@
     {
       "id": "reject-wrongnodekind-sparkler",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongnodekind-sparkler.json",
       "expectedErrorCode": "WRONG_NODE_KIND",
@@ -4969,6 +5538,7 @@
     {
       "id": "reject-wrongnodekind-widget",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongnodekind-widget.json",
       "expectedErrorCode": "WRONG_NODE_KIND",
@@ -4978,6 +5548,7 @@
     {
       "id": "reject-wrongtype-box-break-before",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-box-break-before.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4987,6 +5558,7 @@
     {
       "id": "reject-wrongtype-box-children",
       "kind": "reject",
+      "since": "0.10.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-box-children.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -4996,6 +5568,7 @@
     {
       "id": "reject-wrongtype-box-keep-together",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-box-keep-together.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5005,6 +5578,7 @@
     {
       "id": "reject-wrongtype-clipboard-payload",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-clipboard-payload.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5014,6 +5588,7 @@
     {
       "id": "reject-wrongtype-discriminator",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-discriminator.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5023,6 +5598,7 @@
     {
       "id": "reject-wrongtype-grid-default-sort-column",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-default-sort-column.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5032,6 +5608,7 @@
     {
       "id": "reject-wrongtype-grid-exportable",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-exportable.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5041,6 +5618,7 @@
     {
       "id": "reject-wrongtype-grid-exportable-number",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-exportable-number.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5050,6 +5628,7 @@
     {
       "id": "reject-wrongtype-grid-keep-rows-together",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-keep-rows-together.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5059,6 +5638,7 @@
     {
       "id": "reject-wrongtype-grid-page-size-zero",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-page-size-zero.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5068,6 +5648,7 @@
     {
       "id": "reject-wrongtype-grid-repeat-header",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-repeat-header.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5077,6 +5658,7 @@
     {
       "id": "reject-wrongtype-grid-transfer-in-key",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-transfer-in-key.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5086,6 +5668,7 @@
     {
       "id": "reject-wrongtype-grid-transfer-out-key",
       "kind": "reject",
+      "since": "0.70.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-grid-transfer-out-key.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5095,6 +5678,7 @@
     {
       "id": "reject-wrongtype-heading-level",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-heading-level.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5104,6 +5688,7 @@
     {
       "id": "reject-wrongtype-id",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-id.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5113,6 +5698,7 @@
     {
       "id": "reject-wrongtype-kind",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-kind.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5122,6 +5708,7 @@
     {
       "id": "reject-wrongtype-static-sort-column",
       "kind": "reject",
+      "since": "0.26.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-static-sort-column.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5131,6 +5718,7 @@
     {
       "id": "reject-wrongtype-style-tone",
       "kind": "reject",
+      "since": "0.3.0",
       "decoder": "node",
       "inputFile": "reject/reject-wrongtype-style-tone.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -5140,6 +5728,7 @@
     {
       "id": "style-observer-accent-indistinct-toned-tint",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/accent-indistinct-toned-tint.json",
@@ -5148,6 +5737,7 @@
     {
       "id": "style-observer-budget-at-the-tolerance-edge",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "usage-budget",
       "inputFile": "style-observer/budget-at-the-tolerance-edge.json",
@@ -5156,6 +5746,7 @@
     {
       "id": "style-observer-budget-breached",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "usage-budget",
       "inputFile": "style-observer/budget-breached.json",
@@ -5164,6 +5755,7 @@
     {
       "id": "style-observer-budget-same-valued-tokens-attribute-path-first",
       "kind": "style-observer",
+      "since": "0.86.0",
       "decoder": "style-observer",
       "tier": "usage-budget",
       "inputFile": "style-observer/budget-same-valued-tokens-attribute-path-first.json",
@@ -5172,6 +5764,7 @@
     {
       "id": "style-observer-budget-same-valued-tokens-order-is-segment-wise",
       "kind": "style-observer",
+      "since": "0.86.0",
       "decoder": "style-observer",
       "tier": "usage-budget",
       "inputFile": "style-observer/budget-same-valued-tokens-order-is-segment-wise.json",
@@ -5180,6 +5773,7 @@
     {
       "id": "style-observer-budget-within-tolerance",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "usage-budget",
       "inputFile": "style-observer/budget-within-tolerance.json",
@@ -5188,6 +5782,7 @@
     {
       "id": "style-observer-contrast-below-aa-grey-on-white",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/contrast-below-aa-grey-on-white.json",
@@ -5196,6 +5791,7 @@
     {
       "id": "style-observer-first-opaque-layer-wins",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/first-opaque-layer-wins.json",
@@ -5204,6 +5800,7 @@
     {
       "id": "style-observer-font-role-monospace",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/font-role-monospace.json",
@@ -5212,6 +5809,7 @@
     {
       "id": "style-observer-font-role-sans-serif",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/font-role-sans-serif.json",
@@ -5220,6 +5818,7 @@
     {
       "id": "style-observer-font-role-serif",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/font-role-serif.json",
@@ -5228,6 +5827,7 @@
     {
       "id": "style-observer-font-role-unknown",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/font-role-unknown.json",
@@ -5236,6 +5836,7 @@
     {
       "id": "style-observer-invisible-and-accent-indistinct",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/invisible-and-accent-indistinct.json",
@@ -5244,6 +5845,7 @@
     {
       "id": "style-observer-invisible-white-on-white",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/invisible-white-on-white.json",
@@ -5252,6 +5854,7 @@
     {
       "id": "style-observer-legible-black-on-white",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/legible-black-on-white.json",
@@ -5260,6 +5863,7 @@
     {
       "id": "style-observer-manifest-contrast-below-declared-floor",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "per-node-manifest",
       "inputFile": "style-observer/manifest-contrast-below-declared-floor.json",
@@ -5268,6 +5872,7 @@
     {
       "id": "style-observer-manifest-off-palette-colour",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "per-node-manifest",
       "inputFile": "style-observer/manifest-off-palette-colour.json",
@@ -5276,6 +5881,7 @@
     {
       "id": "style-observer-manifest-token-resolution-failed",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "per-node-manifest",
       "inputFile": "style-observer/manifest-token-resolution-failed.json",
@@ -5284,6 +5890,7 @@
     {
       "id": "style-observer-manifest-token-resolution-failed-escaped-slot",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "per-node-manifest",
       "inputFile": "style-observer/manifest-token-resolution-failed-escaped-slot.json",
@@ -5292,6 +5899,7 @@
     {
       "id": "style-observer-manifest-untoned-node-is-exempt",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "per-node-manifest",
       "inputFile": "style-observer/manifest-untoned-node-is-exempt.json",
@@ -5300,6 +5908,7 @@
     {
       "id": "style-observer-no-layers-means-the-implicit-white-canvas",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/no-layers-means-the-implicit-white-canvas.json",
@@ -5308,6 +5917,7 @@
     {
       "id": "style-observer-toned-observation-carries-its-tone",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/toned-observation-carries-its-tone.json",
@@ -5316,6 +5926,7 @@
     {
       "id": "style-observer-transparent-layers-fall-through-to-white",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/transparent-layers-fall-through-to-white.json",
@@ -5324,6 +5935,7 @@
     {
       "id": "style-observer-untoned-tint-is-exempt",
       "kind": "style-observer",
+      "since": "0.83.0",
       "decoder": "style-observer",
       "tier": "observation",
       "inputFile": "style-observer/untoned-tint-is-exempt.json",
@@ -5332,6 +5944,7 @@
     {
       "id": "tp-wizard-step1",
       "kind": "teleport-decode",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-wizard-step1.json",
       "expectedFile": "teleport/tp-wizard-step1.expected.json",
@@ -5340,6 +5953,7 @@
     {
       "id": "tp-reject-bad-base64",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-bad-base64.json",
       "expectedErrorCode": "InvalidFormat",
@@ -5349,6 +5963,7 @@
     {
       "id": "tp-reject-chainhead-injected",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-chainhead-injected.json",
       "expectedErrorCode": "DigestMismatch",
@@ -5358,6 +5973,7 @@
     {
       "id": "tp-reject-inflate-bomb",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-inflate-bomb.json",
       "expectedErrorCode": "Oversize",
@@ -5367,6 +5983,7 @@
     {
       "id": "tp-reject-missing-digest",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-missing-digest.json",
       "expectedErrorCode": "InvalidEnvelope",
@@ -5376,6 +5993,7 @@
     {
       "id": "tp-reject-not-a-bundle",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-not-a-bundle.json",
       "expectedErrorCode": "InvalidFormat",
@@ -5385,6 +6003,7 @@
     {
       "id": "tp-reject-oversize-encoded",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-oversize-encoded.json",
       "expectedErrorCode": "Oversize",
@@ -5394,6 +6013,7 @@
     {
       "id": "tp-reject-tampered-state",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-tampered-state.json",
       "expectedErrorCode": "DigestMismatch",
@@ -5403,6 +6023,7 @@
     {
       "id": "tp-reject-unsupported-version",
       "kind": "teleport-reject",
+      "since": "0.78.0",
       "decoder": "teleport",
       "inputFile": "teleport/tp-reject-unsupported-version.json",
       "expectedErrorCode": "UnsupportedVersion",

@@ -5,12 +5,11 @@ shares (F# ``TreeOpDiff``, the sibling engines):
 
     fold(apply, before, diff(before, after)) == after      # canonical-JSON equality
 
-There is no committed cross-host *diff* corpus (the diff's op vocabulary is exercised
-by ``ops/`` round-trip fixtures, and its result is contracted only by the round-trip
-law — the F# engine emits an applyable ``TreeOp`` list, not a byte-committed artefact).
-So parity here certifies the shared contract the F# engine guarantees: the round-trip
-law over op-reachable ``after`` trees, determinism, empty-on-identical, and the
-deterministic child-op order. The corpus node fixtures are the ``before`` population;
+The committed cross-host diff corpus (``diff/goldens.json``) pins op-scripts for a
+handful of pairs and is certified in ``tests/test_diff_golden.py``. This suite certifies
+the shared contract the F# engine guarantees over the whole node corpus: the round-trip
+law over op-reachable ``after`` trees, determinism, empty-on-identical, the field-level
+style edit, and the deterministic child-op order. The corpus node fixtures are the ``before`` population;
 each ``after`` is produced by applying real ``TreeOp``\\s (so every difference is
 op-expressible — the law's domain). The suite skips cleanly when the corpus is absent.
 """
@@ -134,6 +133,62 @@ def test_multi_field_change_emits_updateprops() -> None:
     ops = diff(before, after)
     assert all(op.tag == "UpdateProp" for op in ops)
     assert {op.fields["path"] for op in ops} == {"Tone", "Icon"}
+    _round_trips(before, after)
+
+
+# ── the field-level style edit (Phase 2314) ──────────────────────────────────
+
+_STYLED = Obj(None, {"tone": "Success", "weight": "Spacious"})
+
+
+def _styled(path: Path) -> Node:
+    """The fixture carrying a known two-member style, the ``before`` of a restyle."""
+    before = _decode(path)
+    return _apply_all([Obj("UpdateStyle", {"style": _STYLED, "target": before.id})], before)
+
+
+@corpus_required
+@_FIXTURES
+def test_one_member_restyle_is_one_patchstyle(path: Path) -> None:
+    """A restyle of one member diffs to a ``PatchStyle`` naming that member alone."""
+    before = _styled(path)
+    patch = Obj("PatchStyle", {"style": Obj(None, {"tone": "Critical"}), "target": before.id})
+    after = _apply_all([patch], before)
+    assert [encode_op(op) for op in diff(before, after)] == [encode_op(patch)]
+    _round_trips(before, after)
+
+
+@corpus_required
+@_FIXTURES
+def test_all_members_restyle_is_one_updatestyle(path: Path) -> None:
+    """Only a restyle that moves all six members is the whole-record ``UpdateStyle``."""
+    before = _styled(path)
+    record = Obj(
+        None,
+        {
+            "direction": "rtl",
+            "emphasis": "Loud",
+            "role": "Lede",
+            "tone": "Info",
+            "voice": "Display",
+            "weight": "Compact",
+        },
+    )
+    update = Obj("UpdateStyle", {"style": record, "target": before.id})
+    after = _apply_all([update], before)
+    assert [encode_op(op) for op in diff(before, after)] == [encode_op(update)]
+    _round_trips(before, after)
+
+
+@corpus_required
+@_FIXTURES
+def test_style_removal_patches_members_to_default(path: Path) -> None:
+    """A style returning to the default record (the absent slot) diffs to the
+    ``PatchStyle`` spelling the moved members' default tokens, and round-trips."""
+    before = _styled(path)
+    after = Node(before.id, before.kind, {k: v for k, v in before.extras.items() if k != "style"})
+    reset = Obj("PatchStyle", {"style": Obj(None, {"tone": "Default", "weight": "Standard"}), "target": before.id})
+    assert [encode_op(op) for op in diff(before, after)] == [encode_op(reset)]
     _round_trips(before, after)
 
 

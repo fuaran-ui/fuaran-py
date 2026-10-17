@@ -164,6 +164,14 @@ own small generator is not a transpile.
   difference. The authoring dataclasses in `schema/types.py` stay hand-written (their enum
   `Literal` aliases are the generated ones): their constructors carry authoring defaults the wire
   does not, so generating them is a surface decision, not a regeneration.
+- **The hand layer is held to the generated one by a pin (Phase 2316).**
+  `src/fuaran_ui/schema/authoring_dialect.py` declares every deliberate divergence — authoring
+  defaults over wire-required members, renamed parameters, owners with no authoring class, and gaps
+  (members not authored, each with a reason) — and refuses at import a declaration naming a field
+  the IDL no longer has. `tests/test_authoring_coverage.py` fails BY NAME on an IDL field that is
+  neither a parameter nor a declared gap, and on a gap that has become authorable. So a new IDL
+  field is a red test here until someone decides how to author it: add the parameter, or declare
+  the gap with its reason. Never silence it by widening a reason into a blanket.
 
 ### Conformance coverage (v0 bootstrap)
 

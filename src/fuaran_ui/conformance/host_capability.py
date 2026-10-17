@@ -333,6 +333,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "dag": "covered",
     "merge-conformance": "covered",
     "sanitization": "covered",
+    "diff/treeDiff": "covered",
     "laws/dataframeParity": "covered",
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
     "laws/decimal": {"pending": _LAW_UNRUN},

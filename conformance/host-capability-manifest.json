@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.9.0",
-  "corpusAuthority": "0a8970c8f522492e8f5762937ed2172bca68e117",
+  "corpusAuthority": "83b6a741b73cb7fa85c87ba712058dcc6ac267e2",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -71,6 +71,7 @@
     "devtools-relay": {
       "notApplicable": "this host ships no devtools relay endpoint"
     },
+    "diff/treeDiff": "covered",
     "elicitation-answer-accept": "covered",
     "elicitation-answer-reject": "covered",
     "elicitation-reject": "covered",

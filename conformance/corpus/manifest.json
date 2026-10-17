@@ -541,6 +541,16 @@
       "description": "Foreign (major-ahead core@2.0) — hard-refuse, never silently mis-decode (WIRE_FORMAT 15.2)"
     },
     {
+      "id": "envelope-foreign-malformed-profile",
+      "kind": "envelope-reject",
+      "since": "0.96.0",
+      "decoder": "node",
+      "inputFile": "envelope/envelope-foreign-malformed-profile.json",
+      "expectedErrorCode": "FOREIGN_PROFILE",
+      "expectedPath": "$.$profile",
+      "description": "a $profile that does not parse (core@1, no minor) names no capability set — refused as Foreign, FOREIGN_PROFILE at $.$profile, never INVALID_JSON (WIRE_FORMAT 15.2, Phase 1938)"
+    },
+    {
       "id": "envelope-foreign-namespace",
       "kind": "envelope-reject",
       "since": "0.3.0",
@@ -3609,6 +3619,15 @@
       "inputFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
       "expectedFile": "ops/op-patchstyle (phase 2291 tone=default is an edit, not an omission).json",
       "description": "PatchStyle (Phase 2291 tone=Default is an edit, not an omission)"
+    },
+    {
+      "id": "op-patchstyle (phase 2302 direction=auto)",
+      "kind": "op-round-trip",
+      "since": "0.96.0",
+      "decoder": "op",
+      "inputFile": "ops/op-patchstyle (phase 2302 direction=auto).json",
+      "expectedFile": "ops/op-patchstyle (phase 2302 direction=auto).json",
+      "description": "PatchStyle (Phase 2302 direction=auto)"
     },
     {
       "id": "op-removenode",

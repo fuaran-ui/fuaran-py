@@ -13,7 +13,7 @@ The package is pre-1.0, so a minor version may break; this record is how a consu
 ones did. The wire format itself is governed by the shared specification and its conformance
 corpus, not by this file.
 
-## Unreleased (the next minor after 0.9.0)
+## 0.10.0
 
 ### breaking — a DataGrid / Chart row cell outside ±2^53, or a naive datetime, is refused (Phase 1960)
 

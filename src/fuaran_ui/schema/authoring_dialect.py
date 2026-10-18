@@ -69,10 +69,6 @@ _ROW_FN = (
     "a (row) -> ... closure of the cell kind; it erases on the wire, so the cell is authored by its "
     "discriminator alone (ColumnKind(kind))"
 )
-_UNAUTHORED_HANDLER = (
-    "a handler closure this surface models no flag for yet; it erases on the wire and the member is "
-    "optional, so a document authored here omits it"
-)
 _EMPTY = "an empty list is authored by leaving it out; the wire spells it"
 _FALSE = "False is authored by leaving it out; the wire spells it"
 _IDENTITY_STYLE = "the all-default style record is authored by leaving it out; the wire spells it"
@@ -84,6 +80,10 @@ _ERASED_CELL_BODY = (
 )
 _REFUSED_IF_ABSENT = (
     "not a default: None is refused at construction; it exists so earlier positional members keep their positions"
+)
+_WIDTH_MEMBER = (
+    "not a default: one ColumnWidth record authors all three cases, so the member is None on the cases "
+    "that lack it, and None is refused at construction on the case that requires it"
 )
 
 
@@ -110,13 +110,10 @@ UNCLASSED: Mapping[str, str] = {
     "record:DateTimeRangePair": "authored as a (from, to) tuple of ISO strings in DateTimeRangeField.value",
     "record:RangePair": "authored as a (min, max) tuple in RangeField.value",
     "record:StyleDelta": "a PatchStyle op payload, written by the tree diff (fuaran_ui.ops.diff), never authored",
-    "case:Action.CommitLocal": "not authored yet: a Local binding commits through its own commit_to / on_commit",
     "case:Binding.Computed": "a closure-valued binding; it erases on the wire and has no authoring spelling",
     "case:Binding.Expr": "declined by fuaran#1580: the predicate binding is not modelled by this host",
     "case:Binding.I18n": "authored as the TextSource.I18n case (I18n); a Binding-typed slot does not admit it yet",
     "case:CellFormat.Custom": "a closure-valued cell format; it erases on the wire and has no authoring spelling",
-    "case:LocalFlushTrigger.OnSubmit": "not authored yet: LocalFlushTrigger models OnBlur and OnDebounce",
-    "case:LocalFlushTrigger.OnCommitAction": "not authored yet: LocalFlushTrigger models OnBlur and OnDebounce",
 }
 
 #: Wire members authored under a parameter name the naming rule does not produce.
@@ -173,6 +170,8 @@ AUTHORING_DEFAULTS: Mapping[str, Mapping[str, str]] = {
     "case:BoxLayout.Masonry": {"cols": _START_VALUE},
     "case:CellKindErased.Button": {"label": _ERASED_CELL_BODY},
     "case:CellKindErased.ButtonGroup": {"buttons": _ERASED_CELL_BODY},
+    "case:ColumnWidth.Fixed": {"pixels": _WIDTH_MEMBER},
+    "case:ColumnWidth.Flex": {"weight": _WIDTH_MEMBER},
     "case:FormFieldKind.TextArea": {"rows": _REFUSED_IF_ABSENT},
     "case:FormFieldKind.SegmentedChoice": {"orientation": _COMMON_CASE},
     "case:FormFieldKind.DateTime": {"variant": _COMMON_CASE},
@@ -192,19 +191,15 @@ AUTHORING_DEFAULTS: Mapping[str, Mapping[str, str]] = {
 #: Wire members that are not a parameter of their authoring class, and why.
 GAPS: Mapping[str, Mapping[str, str]] = {
     "kind:Button": {"tooltip": _HOST_ONLY},
-    "kind:Chart": {"onPointClick": _UNAUTHORED_HANDLER},
     "kind:DataGrid": {
         "rowKey": "the erased row-key closure: emitted as <closure> unless row_key_field names the key",
         "staticRows": "authored through the Table record, which lowers to a DataGrid carrying staticRows",
-        "onRowClick": _UNAUTHORED_HANDLER,
     },
-    "kind:Map": {"onMarkerClick": _UNAUTHORED_HANDLER},
     "node": {"extraAttributes": _HOST_ONLY, "motion": _HOST_ONLY},
-    "case:Action.ReadFileBody": {"fileHandle": _HOST_ONLY, "onRead": _UNAUTHORED_HANDLER},
+    "case:Action.ReadFileBody": {"fileHandle": _HOST_ONLY},
     "case:Binding.Query": {"accessor": _HOST_ONLY},
     "case:Binding.Selection": {"accessor": _HOST_ONLY},
     "case:Binding.Now": {"accessor": _HOST_ONLY},
-    "case:Binding.Filter": {"defaultValue": "not authored yet: Filter names its source and carries no default"},
     "case:Binding.Local": {
         "format": "the format closure: this surface authors the declarative codec in its place",
         "parse": "the parse closure: this surface authors the declarative codec in its place",
@@ -215,8 +210,6 @@ GAPS: Mapping[str, Mapping[str, str]] = {
     "case:CellKindErased.Pill": {"labelFn": _ROW_FN, "toneFn": _ROW_FN},
     "case:CellKindErased.Progress": {"fractionFn": _ROW_FN, "labelFn": _ROW_FN},
     "case:CellKindErased.Custom": {"fn": _ROW_FN},
-    "case:ColumnWidth.Fixed": {"pixels": "not authored yet: ColumnWidth carries its discriminator alone"},
-    "case:ColumnWidth.Flex": {"weight": "not authored yet: ColumnWidth carries its discriminator alone"},
 }
 
 

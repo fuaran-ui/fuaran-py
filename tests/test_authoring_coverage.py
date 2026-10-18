@@ -10,12 +10,17 @@ naming no parameter, and an authoring default the wire does not require are each
 The second half carries fuaran#2025's acceptance: the Button column's label (fuaran#1909) and a
 live ``TransformSource`` (fuaran#1100) are authorable, so the four corpus fixtures that need them
 are authored here through the public surface and compared with the corpus byte for byte.
+
+The third half is Phase 2334's: the gaps 2316 declared are authorable, each certified against the
+corpus fixture that carries its member where one exists, and the authored row feed follows
+WIRE_FORMAT §5's cell rule, pinned against the corpus's row-source fixtures.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import importlib
+import json
 import keyword
 import re
 import typing
@@ -24,14 +29,16 @@ from collections.abc import Callable, Mapping
 import pytest
 
 from _corpus import CORPUS_ROOT
+from fuaran_ui.canonical import encode_value
 from fuaran_ui.conformance import host_capability
+from fuaran_ui.model import Obj, from_json
 from fuaran_ui.result import Ok
 from fuaran_ui.schema import authoring_dialect as dialect
 from fuaran_ui.schema import decode_node, encode_node
 from fuaran_ui.schema import generated as g
 from fuaran_ui.schema import types as t
+from fuaran_ui.ui import action, binding, encode, fuaran
 from fuaran_ui.ui import compute as cp
-from fuaran_ui.ui import encode
 
 # ── Resolution ───────────────────────────────────────────────────────────────────────────────
 
@@ -287,6 +294,15 @@ AUTHORED: Mapping[str, Callable[[], t.UiNode]] = {
             sort_state_key="spend-sort",
         ),
     ),
+    # Phase 2334 — `on_read` is the authored declaration of the read handler.
+    "btn-read-workbook": lambda: t.UiNode(
+        "btn-read-workbook",
+        t.Button(
+            t.LiteralText("Load workbook"),
+            on_click=t.ReadFileBody("workbook-upload:0", "Base64", on_read=True),
+            variant="Primary",
+        ),
+    ),
 }
 
 
@@ -311,3 +327,172 @@ def test_every_live_source_the_decoder_preserves_round_trips(live: t.Selection |
     assert isinstance(decoded, Ok)
     assert encode_node(decoded.value) == authored
     assert f'"source":{{"$type":"{type(live).__name__}"' in authored
+
+
+# ── Phase 2334: the declared gaps are authorable ─────────────────────────────────────────────
+
+
+def test_commit_local_is_authored_byte_identically_to_the_op_fixture() -> None:
+    expected = (CORPUS_ROOT / "ops" / "op-editnode-action-commitlocal.json").read_text(encoding="utf-8").strip()
+    button = t.Button(t.LiteralText("Apply"), on_click=action.commit_local("salary-input"), variant="Primary")
+    assert encode_value(Obj("EditNode", {"newKind": button.to_wire(), "target": "btn-apply"})) == expected
+
+
+def test_an_on_commit_action_buffer_is_authored_byte_identically_to_the_lowers_to_tree() -> None:
+    fixture = CORPUS_ROOT / "lowers-to" / "commit-local.json"
+    if not fixture.is_file():
+        pytest.skip("the lowers-to family is not in this corpus (it is not bundled); set FUARAN_WIRE_FIXTURES")
+    document = json.loads(fixture.read_text(encoding="utf-8"))
+    salary = t.Local(
+        t.State("profile.salary", 0),
+        t.OnCommitAction(),
+        commit_to="profile.salary",
+        codec=t.NumberFormat(2),
+    )
+    tree = t.UiNode(
+        "profile",
+        t.Form(
+            (t.FormField("salary-input", t.LiteralText("Salary"), t.NumberField(salary, on_change=False)),),
+            submit_label=t.LiteralText("Save"),
+        ),
+    )
+    assert encode(tree) == encode_value(from_json(document["tree"]))
+    assert encode_value(t.CommitLocal("salary-input").to_wire()) == encode_value(from_json(document["action"]))
+
+
+def _local_on_submit() -> t.UiNode:
+    buffer = t.Local(t.State("name", ""), t.OnSubmit(), commit_to="name")
+    field = t.FormField("name", t.LiteralText("Name"), t.TextField(buffer, on_change=False))
+    return t.UiNode("f", t.Form((field,)))
+
+
+#: Members no corpus fixture carries yet, each authored through the public surface with the bytes
+#: its member must take. Named for Phase 2328 (the reference emits the remaining behaviour
+#: families): until a fixture lands, these pin the authored bytes and this host's round trip.
+NO_FIXTURE_YET: Mapping[str, tuple[Callable[[], t.UiNode], str]] = {
+    "ColumnWidth.Fixed.pixels": (
+        lambda: t.UiNode("g", t.DataGrid(t.Static([]), (t.Column("A", width=t.ColumnWidth("Fixed", pixels=120)),))),
+        '"width":{"$type":"Fixed","pixels":120}',
+    ),
+    "ColumnWidth.Flex.weight": (
+        lambda: t.UiNode("g", t.DataGrid(t.Static([]), (t.Column("A", width=t.ColumnWidth("Flex", weight=1.5)),))),
+        '"width":{"$type":"Flex","weight":1.5}',
+    ),
+    "Binding.Filter.defaultValue": (
+        lambda: t.UiNode("b", t.Badge(t.Bound(binding.filter("region", default_value="EMEA")), "Info")),
+        '{"$type":"Filter","defaultValue":"EMEA","name":"region"}',
+    ),
+    "LocalFlushTrigger.OnSubmit": (_local_on_submit, '"flushOn":{"$type":"OnSubmit"}'),
+    "Chart.onPointClick": (
+        lambda: fuaran.chart("c", source=t.Static([]), x_field="x", y_fields=["y"], on_point_click=True),
+        '"onPointClick":"<closure>"',
+    ),
+    "DataGrid.onRowClick": (
+        lambda: fuaran.grid("g", source=t.Static([]), row_key_field="id", on_row_click=True),
+        '"onRowClick":"<closure>"',
+    ),
+    "Map.onMarkerClick": (
+        lambda: fuaran.map("m", source=t.Static([]), on_marker_click=True),
+        '"onMarkerClick":"<closure>"',
+    ),
+    "ReadFileBody.onRead absent": (
+        lambda: t.UiNode(
+            "r", t.Button(t.LiteralText("Read"), on_click=action.read_file_body("upload:0", on_read=False))
+        ),
+        '{"$type":"ReadFileBody","encoding":"Text","fileRef":"upload:0"}',
+    ),
+}
+
+
+@pytest.mark.parametrize("member", sorted(NO_FIXTURE_YET))
+def test_a_member_with_no_fixture_yet_is_authored_and_round_trips(member: str) -> None:
+    author, fragment = NO_FIXTURE_YET[member]
+    authored = encode(author())
+    assert fragment in authored
+    decoded = decode_node(authored)
+    assert isinstance(decoded, Ok), decoded
+    assert encode_node(decoded.value) == authored
+
+
+def test_the_handler_flags_are_omitted_by_default() -> None:
+    authored = (
+        encode(fuaran.chart("c", source=t.Static([]), x_field="x", y_fields=["y"]))
+        + encode(fuaran.grid("g", source=t.Static([]), row_key_field="id"))
+        + encode(fuaran.map("m", source=t.Static([])))
+    )
+    assert "onPointClick" not in authored
+    assert "onRowClick" not in authored
+    assert "onMarkerClick" not in authored
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: t.ColumnWidth("Fixed"),
+        lambda: t.ColumnWidth("Flex"),
+        lambda: t.ColumnWidth("Auto", pixels=10),
+        lambda: t.ColumnWidth("Flex", pixels=10, weight=1.0),
+        lambda: t.ColumnWidth("Fixed", pixels=10, weight=1.0),
+    ],
+    ids=["Fixed-bare", "Flex-bare", "Auto-pixels", "Flex-pixels", "Fixed-weight"],
+)
+def test_a_width_member_is_required_on_its_case_and_refused_on_any_other(build: Callable[[], object]) -> None:
+    with pytest.raises(ValueError, match="ColumnWidth"):
+        build()
+
+
+# ── Phase 2334, carried from fuaran#1960: the authored row feed follows WIRE_FORMAT §5 ────────
+#
+# A ``None`` cell omits its key and a nested cell writes the "<opaque>" sentinel. No corpus fixture
+# carries either in a row feed (one is named for Phase 2328), so the pin is the row-source fixtures
+# §5 names: the same feed with a ``None`` cell added encodes to the fixture's own bytes, and one with
+# a nested cell encodes to them with the sentinel in that cell, which is also what this host's
+# decoder normalises the raw cell to.
+
+ROW_SOURCE_FIXTURES = ("chart-1", "chart-state-rows", "grid-1", "grid-editable-state")
+
+
+def _row_feed_slot(document: dict[str, typing.Any]) -> str:
+    return "value" if document["kind"]["source"]["$type"] == "Static" else "defaultValue"
+
+
+def _row_feed_of(document: dict[str, typing.Any]) -> list[dict[str, object]]:
+    return document["kind"]["source"][_row_feed_slot(document)]  # type: ignore[no-any-return]
+
+
+def _with_row_feed(document: dict[str, typing.Any], rows: list[dict[str, object]]) -> dict[str, typing.Any]:
+    source = {**document["kind"]["source"], _row_feed_slot(document): rows}
+    return {**document, "kind": {**document["kind"], "source": source}}
+
+
+def _fixture(name: str) -> dict[str, typing.Any]:
+    return json.loads((CORPUS_ROOT / "nodes" / f"{name}.json").read_text(encoding="utf-8"))  # type: ignore[no-any-return]
+
+
+@pytest.mark.parametrize("fixture", ROW_SOURCE_FIXTURES)
+def test_an_authored_none_cell_omits_its_key(fixture: str) -> None:
+    rows = _row_feed_of(_fixture(fixture))
+    assert t.encode_rows(rows) == encode_value(from_json(rows))
+    assert t.encode_rows([{**row, "note": None} for row in rows]) == t.encode_rows(rows)
+
+
+def test_chart_state_rows_is_authored_byte_identically_with_none_cells() -> None:
+    expected = (CORPUS_ROOT / "nodes" / "chart-state-rows.json").read_text(encoding="utf-8").strip()
+    rows: list[dict[str, object]] = [
+        {"month": "Jan", "revenue": 980, "note": None},
+        {"month": "Feb", "revenue": 1105, "note": None},
+    ]
+    chart = t.Chart(t.State("planRows", rows), "month", ("revenue",), "Bar")
+    assert encode(t.UiNode("chart-state-rows", chart)) == expected
+
+
+@pytest.mark.parametrize("fixture", ROW_SOURCE_FIXTURES)
+@pytest.mark.parametrize("nested", [[1, 2], {"a": 1}, []], ids=["list", "dict", "empty-list"])
+def test_an_authored_nested_cell_is_the_opaque_sentinel_the_decoder_also_writes(fixture: str, nested: object) -> None:
+    document = _fixture(fixture)
+    rows = _row_feed_of(document)
+    authored = t.encode_rows([{**row, "note": nested} for row in rows])
+    assert authored == encode_value(from_json([{**row, "note": t.OPAQUE} for row in rows]))
+    decoded = decode_node(json.dumps(_with_row_feed(document, [{**row, "note": nested} for row in rows])))
+    assert isinstance(decoded, Ok), decoded
+    assert _row_feed_of(json.loads(encode_node(decoded.value))) == json.loads(authored)

@@ -216,7 +216,22 @@ _FILES = (
     "render-text.json",
     "a11y-contract.json",
 )
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply", "laws")
+
+# Phase 1960 - ``row-encode`` joins on the ``apply`` footing: ``tests/test_row_encode.py`` certifies
+# the two row-cell encode refusals against it and does not skip without it.
+_DIRS = (
+    "nodes",
+    "ops",
+    "reject",
+    "lenient",
+    "envelope",
+    "elicitation",
+    "markdown",
+    "style-observer",
+    "apply",
+    "laws",
+    "row-encode",
+)
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 

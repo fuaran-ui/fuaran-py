@@ -15,6 +15,20 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.9.0)
 
+### breaking — a DataGrid / Chart row cell outside ±2^53, or a naive datetime, is refused (Phase 1960)
+
+- A row feed's (`Chart.source`, `DataGrid.source`) `int` cell outside ±2^53 raises
+  `fuaran_ui.schema.types.RowCellRefused` (code `ROW_CELL_INEXACT_INTEGER`, with `row` and `key`) where it was
+  silently written as the nearest double, a different number. A naive `datetime` cell raises it with code
+  `ROW_CELL_UNSPECIFIED_DATETIME`: it names no instant (WIRE_FORMAT.md §5 "The two encode refusals").
+- **behavioural:** an aware `datetime` row cell encodes as its Unix seconds (rule 11), where it raised a plain
+  `TypeError`.
+- `encode_rows(rows)` is the new function that gives a row feed's canonical bytes, as a `source` writes them.
+
+Nothing else moves: the checks run on the `Static` value and the `State` default of a `source` (through a
+`Local`'s `initial_from`), and every other cell lowers as before. The `row-encode/` corpus family is the
+oracle, run by `tests/test_row_encode.py`.
+
 ### additive — the authoring surface covers every generated field (Phase 2316)
 
 - `ColumnKind` takes `label` and `on_click` for a `Button` cell, and `buttons` for a `ButtonGroup`

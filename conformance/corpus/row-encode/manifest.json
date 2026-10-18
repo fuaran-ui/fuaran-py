@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "description": "WIRE_FORMAT.md §5 'Row payloads', the two encode refusals (Phase 1960). A row feed's two hazards exist only on the way OUT: a host value no JSON document can carry is what an encoder either refuses or corrupts. So each vector is a row feed written in host-neutral CELL DESCRIPTORS, and its outcome: either the canonical bytes the feed encodes to, or the refusal, with its code and the cell it names (the row's zero-based position in the feed, and the key). A host maps each descriptor onto the native value its authoring surface uses for it and runs the row-feed encoder its node encode actually takes. A descriptor its authoring surface cannot hold (an `unspecified` dateTime on a host whose only date value is an instant) is UNREPRESENTABLE there: the host names each such vector, with the reason, in its own test, and fails when it skips one it did not name. This manifest is HAND-AUTHORED; no host emits it.",
+  "cellDescriptors": {
+    "int64": "a 64-bit signed integer, its decimal text in `value`. The integer TYPE matters, not the number: a double holding the same value is a float cell and is never refused.",
+    "dateTime": "a date-time without an offset, ISO-8601 text in `value`, and `kind`: `utc` (the value names the UTC instant) or `unspecified` (the value names no instant: a .NET DateTime of Unspecified kind, a Python naive datetime)."
+  },
+  "codes": {
+    "ROW_CELL_INEXACT_INTEGER": "an int64 cell outside +/-2^53. Every integer in that range is exactly a double, so its bytes are exact; past it, the double an encoder would widen to is a different number.",
+    "ROW_CELL_UNSPECIFIED_DATETIME": "a date-time cell that names no instant. Converting it to Unix seconds would read the encoding machine's time zone, so one value would encode to different seconds on two machines."
+  },
+  "vectors": [
+    {
+      "id": "row-encode-int64-at-plus-2-53",
+      "description": "the largest int64 every double holds exactly is admitted, in integer form (rule 5)",
+      "rows": [{ "n": { "int64": "9007199254740992" } }],
+      "expected": "[{\"n\":9007199254740992}]"
+    },
+    {
+      "id": "row-encode-int64-at-minus-2-53",
+      "description": "the negative bound is admitted too: the range is symmetric",
+      "rows": [{ "n": { "int64": "-9007199254740992" } }],
+      "expected": "[{\"n\":-9007199254740992}]"
+    },
+    {
+      "id": "row-encode-refuse-int64-past-2-53",
+      "description": "one past the bound is refused, naming the cell; the retired encoder wrote 9007199254740992, a different number. The first row is clean, so the row position is read rather than assumed",
+      "rows": [{ "a": { "int64": "1" } }, { "a": { "int64": "2" }, "n": { "int64": "9007199254740993" } }],
+      "refused": { "code": "ROW_CELL_INEXACT_INTEGER", "row": 1, "key": "n" }
+    },
+    {
+      "id": "row-encode-refuse-int64-below-minus-2-53",
+      "description": "one past the negative bound is refused the same way",
+      "rows": [{ "n": { "int64": "-9007199254740993" } }],
+      "refused": { "code": "ROW_CELL_INEXACT_INTEGER", "row": 0, "key": "n" }
+    },
+    {
+      "id": "row-encode-datetime-utc",
+      "description": "a date-time naming its UTC instant encodes as Unix seconds, on every machine",
+      "rows": [{ "at": { "dateTime": "2026-10-18T12:30:45", "kind": "utc" } }],
+      "expected": "[{\"at\":1792326645}]"
+    },
+    {
+      "id": "row-encode-refuse-datetime-unspecified",
+      "description": "the same wall-clock value naming no instant is refused, naming the cell; the retired encoder read the machine's time zone to pick the seconds",
+      "rows": [{ "a": { "int64": "1" }, "at": { "dateTime": "2026-10-18T12:30:45", "kind": "unspecified" } }],
+      "refused": { "code": "ROW_CELL_UNSPECIFIED_DATETIME", "row": 0, "key": "at" }
+    }
+  ]
+}

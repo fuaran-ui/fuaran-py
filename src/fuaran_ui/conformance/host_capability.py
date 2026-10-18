@@ -348,6 +348,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
     "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
     "repair": {"pending": "this host has no §28 repair function yet"},
+    "row-encode": "covered",  # tests/test_row_encode.py
     "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
 }
 

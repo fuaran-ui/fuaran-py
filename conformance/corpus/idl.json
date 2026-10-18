@@ -718,8 +718,8 @@
               {
                 "$type": "hosted",
                 "hostSurface": {
-                  "decode": "Fuaran.Core.RowCodec.decodeRows",
-                  "encode": "Fuaran.Core.RowCodec.encodeRows",
+                  "decode": "Fuaran.UI.RowCodec.decodeRows",
+                  "encode": "Fuaran.UI.RowCodec.encodeRows",
                   "fsharp": "Fuaran.Core.Row seq"
                 },
                 "wire": "json"
@@ -1195,8 +1195,8 @@
               {
                 "$type": "hosted",
                 "hostSurface": {
-                  "decode": "Fuaran.Core.RowCodec.decodeRows",
-                  "encode": "Fuaran.Core.RowCodec.encodeRows",
+                  "decode": "Fuaran.UI.RowCodec.decodeRows",
+                  "encode": "Fuaran.UI.RowCodec.encodeRows",
                   "fsharp": "Fuaran.Core.Row seq"
                 },
                 "wire": "json"

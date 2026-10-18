@@ -22,9 +22,11 @@ defaults + ARIA injection) live in :mod:`fuaran_ui.ui`; this module is the data.
 
 from __future__ import annotations
 
+import calendar
+import datetime as _dt
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..canonical import encode_value
 from ..model import Arr, Obj, Value
@@ -2708,6 +2710,92 @@ ChartAnnotation = ReferenceLine | EventMarker | RangeBand
 """The closed three-member annotation union (§4l)."""
 
 
+# ── The row feed (WIRE_FORMAT.md §5 "Row payloads") ────────────────────────
+#
+# Phase 1960 — "The two encode refusals". A row cell holding an ``int`` outside
+# ±2^53, or a naive ``datetime``, is REFUSED at encode with a typed
+# :class:`RowCellRefused` naming the cell, never written: past ±2^53 the double a
+# reader holds is a different number, and a naive ``datetime`` names no instant,
+# so its Unix seconds would be read from the encoding machine's time zone. An
+# aware ``datetime`` names its instant and encodes as Unix seconds (rule 11).
+# Every other cell lowers exactly as any ``Static`` payload does.
+
+EXACT_INTEGER_LIMIT = 2**53
+"""Every integer in [-2^53, 2^53] is exactly a double; past it, none is."""
+
+
+class RowCellRefused(ValueError):
+    """A row cell the row-feed encoder refuses (WIRE_FORMAT.md §5).
+
+    ``code`` is ``ROW_CELL_INEXACT_INTEGER`` or ``ROW_CELL_UNSPECIFIED_DATETIME``;
+    ``row`` is the row's zero-based position in the feed and ``key`` the cell's.
+    """
+
+    def __init__(self, code: str, row: int, key: str, why: str) -> None:
+        super().__init__(f"row {row}, cell '{key}': {why}")
+        self.code = code
+        self.row = row
+        self.key = key
+
+
+def _row_cell(value: object, row: int, key: str) -> object:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if -EXACT_INTEGER_LIMIT <= value <= EXACT_INTEGER_LIMIT:
+            return value
+        raise RowCellRefused(
+            "ROW_CELL_INEXACT_INTEGER",
+            row,
+            key,
+            f"the integer {value} is outside +/-2^53, so no JSON number holds it exactly; carry it as a string",
+        )
+    if isinstance(value, _dt.datetime):
+        if value.utcoffset() is None:
+            raise RowCellRefused(
+                "ROW_CELL_UNSPECIFIED_DATETIME",
+                row,
+                key,
+                "a naive datetime names no instant; give it a tzinfo",
+            )
+        return calendar.timegm(value.utctimetuple())
+    return value
+
+
+def _row_feed_value(value: Any) -> Any:
+    """A row feed's payload with every row cell through :func:`_row_cell`.
+
+    Cells are visited in key order, so the first refused cell is the one every
+    host names. Anything that is not a list of rows (the ``"<opaque>"`` sentinel,
+    a non-dict element the decoder refuses anyway) passes through untouched.
+    """
+    if not isinstance(value, (list, tuple)):
+        return value
+    return [
+        {k: _row_cell(row[k], i, k) for k in sorted(row)} if isinstance(row, dict) else row
+        for i, row in enumerate(value)
+    ]
+
+
+def _row_feed(binding: Binding) -> Binding:
+    """The ``source`` binding of a DataGrid / Chart, its row payloads checked."""
+    if isinstance(binding, Static):
+        return Static(_row_feed_value(binding.value))
+    if isinstance(binding, State):
+        return State(binding.key, _row_feed_value(binding.default_value))
+    if isinstance(binding, Local):
+        return replace(binding, initial_from=_row_feed(binding.initial_from))
+    return binding
+
+
+def encode_rows(rows: list[dict[str, object]]) -> str:
+    """The canonical bytes of a row feed, as a DataGrid / Chart ``source`` writes them.
+
+    Raises :class:`RowCellRefused` on a refused cell.
+    """
+    return encode_value(_lower(_row_feed_value(rows)))
+
+
 @dataclass(frozen=True)
 class Chart:
     source: Binding
@@ -2746,7 +2834,7 @@ class Chart:
                 "dataLabels": self.data_labels,
                 "kind": self.kind,
                 "legendPosition": self.legend_position,
-                "source": self.source,
+                "source": _row_feed(self.source),
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.
                 "stacked": True if self.stacked else None,
@@ -3651,7 +3739,7 @@ class DataGrid:
                 "rowKeyField": self.row_key_field,
                 "rowTotal": self.row_total,
                 "sortStateKey": self.sort_state_key,
-                "source": self.source,
+                "source": _row_feed(self.source),
                 "transferInKey": self.transfer_in_key,
                 "transferOutKey": self.transfer_out_key,
                 "windowStateKey": self.window_state_key,

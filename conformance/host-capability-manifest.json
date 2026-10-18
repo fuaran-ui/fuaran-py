@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.9.0",
-  "corpusAuthority": "83b6a741b73cb7fa85c87ba712058dcc6ac267e2",
+  "corpusAuthority": "e8dffa26e3cecced943c25f57e126298db9ddc16",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -102,6 +102,7 @@
     "repair": {
       "pending": "this host has no §28 repair function yet"
     },
+    "row-encode": "covered",
     "sanitization": "covered",
     "stored-emissions": {
       "pending": "this host's suite does not yet run the stored-emission fixtures"

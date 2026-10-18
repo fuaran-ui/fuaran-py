@@ -19,6 +19,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
+# The rounding vocabulary is the decimal module's; re-exported so the algebra's closed sets read
+# from one place.
+from .decimal_text import MAX_SCALE as MAX_SCALE
+from .decimal_text import ROUNDING_MODES as ROUNDING_MODES
+
 # ── Column scalar types (the closed, Arrow-compatible set) — wire tags ───────
 
 INT = "int"
@@ -27,8 +32,11 @@ BOOL = "bool"
 STRING = "string"
 DATE = "date"
 TIMESTAMP = "timestamp"
+#: The exact decimal (Phase 2001): a cell carries its value as CANONICAL decimal TEXT, never a
+#: host decimal or float (see :mod:`fuaran_ui.dataframe.decimal_text`).
+DECIMAL = "decimal"
 
-COLUMN_TYPES: tuple[str, ...] = (INT, FLOAT, BOOL, STRING, DATE, TIMESTAMP)
+COLUMN_TYPES: tuple[str, ...] = (INT, FLOAT, BOOL, STRING, DATE, TIMESTAMP, DECIMAL)
 
 
 # ── Cell — one realized scalar, or the first-class null/NA marker ────────────
@@ -39,7 +47,8 @@ class Cell:
     """A single scalar cell. ``kind`` is one of the column-type tags or ``"null"``;
     ``value`` is the native Python payload (``None`` for null). The explicit ``kind``
     keeps ``Date`` distinct from ``Str`` and ``bool`` distinct from ``int`` under the
-    structural equality the evaluator relies on for grouping / distinct."""
+    structural equality the evaluator relies on for grouping / distinct. A ``decimal`` cell's
+    ``value`` is its decimal TEXT (canonical wherever the codec or the evaluator produced it)."""
 
     kind: str
     value: int | float | bool | str | None
@@ -72,6 +81,12 @@ def cell_timestamp(v: str) -> Cell:
     return Cell(TIMESTAMP, v)
 
 
+def cell_decimal(v: str) -> Cell:
+    """A decimal cell carrying ``v`` as its text, as given — the codec and the evaluator only ever
+    build one from canonical text (``decimal_text.try_canonical``)."""
+    return Cell(DECIMAL, v)
+
+
 def is_null(c: Cell) -> bool:
     return c.kind == "null"
 
@@ -91,6 +106,7 @@ def default_for(ty: str) -> Cell:
         STRING: Cell(STRING, ""),
         DATE: Cell(DATE, ""),
         TIMESTAMP: Cell(TIMESTAMP, ""),
+        DECIMAL: Cell(DECIMAL, "0"),
     }[ty]
 
 
@@ -213,7 +229,42 @@ class IsNull:
     expr: ColExpr
 
 
-ColExpr = Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param | InList | InParam | IsNull
+@dataclass(frozen=True)
+class Rounding:
+    """A rounding policy (Phase 2001): a SCALE — decimal places, a literal ``int`` or a named
+    :class:`Param` — and a MODE, one of :data:`ROUNDING_MODES`. A scale outside ``0 .. 1000`` is
+    refused by name at evaluation.
+
+    Wire: ``{"mode":"half-even","scale":4}``; a param scale is ``{"$param":"<name>"}``."""
+
+    scale: int | Param
+    mode: str  # one of ROUNDING_MODES
+
+
+@dataclass(frozen=True)
+class Quotient:
+    """The quotient of two EXACT numbers (``decimal`` or ``int``; an int promotes), correctly
+    rounded to ``rounding`` — one rounding of the exact value, never two. A ``float`` operand is
+    refused by name; a zero divisor answers null; a null operand propagates. The answer is a
+    ``decimal``."""
+
+    dividend: ColExpr
+    divisor: ColExpr
+    rounding: Rounding
+
+
+@dataclass(frozen=True)
+class Rounded:
+    """An exact number (``decimal`` or ``int``) brought to ``rounding`` — the one general place a
+    decimal loses digits. A ``float`` operand is refused by name; the answer is a ``decimal``."""
+
+    expr: ColExpr
+    rounding: Rounding
+
+
+ColExpr = (
+    Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param | InList | InParam | IsNull | Quotient | Rounded
+)
 
 # Closed vocabularies (wire tags) — additive only.
 BIN_OPS: frozenset[str] = frozenset(
@@ -255,7 +306,9 @@ SCALAR_FNS: frozenset[str] = frozenset(
         "dateDiffDays",
     }
 )
-AGG_FNS: frozenset[str] = frozenset({"sum", "mean", "min", "max", "count", "median", "stddev", "first", "last"})
+AGG_FNS: frozenset[str] = frozenset(
+    {"sum", "mean", "min", "max", "count", "median", "stddev", "first", "last", "countDistinct"}
+)
 JOIN_KINDS: frozenset[str] = frozenset({"inner", "left", "right", "outer"})
 # fuaran-core#92 — `cumSum` renamed `cumulSum` (the legacy tag stays a decode alias).
 WINDOW_FNS: frozenset[str] = frozenset({"rowNumber", "rank", "lag", "lead", "cumulSum", "rollingMean"})
@@ -358,7 +411,39 @@ class Union:
     source: DataSource
 
 
-Transform = Filter | Project | Derive | GroupBy | Join | Window | Pivot | Unpivot | Sort | Distinct | Limit | Union
+@dataclass(frozen=True)
+class Intersect:
+    """Keep the left rows whose FULL ROW also appears in ``source`` (SQL ``INTERSECT ALL``): the
+    left's order and duplicate multiplicity survive, and row identity is the canonical cell token
+    ``Distinct`` dedups on, so a null matches a null."""
+
+    source: DataSource
+
+
+@dataclass(frozen=True)
+class Except:
+    """``Intersect``'s complement: keep the left rows whose full row does NOT appear in ``source``
+    (SQL ``EXCEPT ALL``)."""
+
+    source: DataSource
+
+
+Transform = (
+    Filter
+    | Project
+    | Derive
+    | GroupBy
+    | Join
+    | Window
+    | Pivot
+    | Unpivot
+    | Sort
+    | Distinct
+    | Limit
+    | Union
+    | Intersect
+    | Except
+)
 
 
 # ── Error envelopes ──────────────────────────────────────────────────────────

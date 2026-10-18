@@ -346,14 +346,11 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "diff/treeDiff": "covered",
     "laws/dataframeParity": "covered",
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
-    "laws/decimal": {"pending": _LAW_UNRUN},
+    "laws/decimal": "covered",  # tests/test_decimal_laws.py
     "laws/fieldLaws": {"pending": _LAW_UNRUN},
-    "laws/transformLaws": {
-        "pending": (
-            "the evaluator certifies against the authored dataframeParity cases; "
-            "the drawn transform sample is not run yet"
-        )
-    },
+    # tests/test_transform_laws.py — every evalPipeline vector but the `-unit-` ones (fuaran#2208),
+    # which it names; the columnOp and delta case kinds have no surface here and are named too.
+    "laws/transformLaws": "covered",
     "decode-policy": {"notApplicable": "this host's decoder offers no §23 kind admission policy"},
     "design-seam-reject": {"notApplicable": _NO_DESIGN_SEAM},
     "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},

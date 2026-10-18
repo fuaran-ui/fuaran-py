@@ -64,6 +64,27 @@ corpus, not by this file.
   written structurally or raised `TypeError`. Both are what every decoder normalises the cell to;
   `encode_rows` follows the same rule.
 
+### breaking — the dataframe algebra's closed unions gain the exact decimal (Phase 2001)
+
+- `fuaran_ui.dataframe`: the column-type set gains `decimal` (`DECIMAL`), whose cell carries its value
+  as canonical decimal TEXT (`cell_decimal`); `ColExpr` gains `Quotient(dividend, divisor, rounding)`
+  and `Rounded(expr, rounding)` over the new `Rounding(scale, mode)` record (the seven modes in
+  `ROUNDING_MODES`); `Transform` gains `Intersect(source)` and `Except(source)`; the aggregate set
+  gains `countDistinct`. Code that matches every case of one of these unions must handle the new ones.
+- `fuaran_ui.dataframe.decimal_text` is the decimal's grammar, order, exact arithmetic and the one
+  rounding kernel; `try_encode_source`, `aggregate` and `cell_token` are new beside the codec and the
+  evaluator.
+
+### behavioural — the evaluator follows the reference on typing, ordering and aggregates (Phase 2001)
+
+- A derived column is typed by its expression wherever the schema decides it — on an empty and an
+  all-null frame too — and by its cells (their widening join) only where it does not; a float beside
+  a decimal, or two cell types no column holds together, is refused by name. An `unpivot` value
+  column is typed by its value columns' declared types the same way.
+- NaN orders above every other float; grouping, distinct and window partitions key on the canonical
+  cell token; float sums and means fold left to right; `sum` / `mean` / `median` / `stddev` over a
+  non-numeric column is refused rather than answering null.
+
 ## 0.10.0
 
 ### breaking — a DataGrid / Chart row cell outside ±2^53, or a naive datetime, is refused (Phase 1960)

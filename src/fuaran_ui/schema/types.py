@@ -201,12 +201,17 @@ class State:
 
 @dataclass(frozen=True)
 class Filter:
-    """``Binding.Filter`` — a named filter source."""
+    """``Binding.Filter`` — a named filter source.
+
+    ``default_value`` (Phase 2334) yields until the filter is first set; ``None`` means
+    absent (omitted, never null), the same rule as :class:`State` and :class:`Selection`.
+    """
 
     name: str
+    default_value: Value = None
 
     def to_wire(self) -> Value:
-        return Obj("Filter", {"name": self.name})
+        return _obj("Filter", {"defaultValue": self.default_value, "name": self.name})
 
 
 @dataclass(frozen=True)
@@ -388,7 +393,23 @@ class OnDebounce:
         return Obj("OnDebounce", {"milliseconds": self.milliseconds})
 
 
-LocalFlushTrigger = OnBlur | OnDebounce
+@dataclass(frozen=True)
+class OnSubmit:
+    """Flush when the enclosing form submits (Phase 2334)."""
+
+    def to_wire(self) -> Value:
+        return Obj("OnSubmit", {})
+
+
+@dataclass(frozen=True)
+class OnCommitAction:
+    """Flush only when an :class:`CommitLocal` action names this buffer's node (Phase 2334)."""
+
+    def to_wire(self) -> Value:
+        return Obj("OnCommitAction", {})
+
+
+LocalFlushTrigger = OnBlur | OnSubmit | OnDebounce | OnCommitAction
 
 
 # ── The remaining binding cases (Format / Local) ────────────────────────────
@@ -831,13 +852,35 @@ FileReadEncoding = _g.FileReadEncoding
 
 @dataclass(frozen=True)
 class ReadFileBody:
-    """``Action.ReadFileBody`` — reads a selected file's body; ``onRead`` is a closure."""
+    """``Action.ReadFileBody`` — reads a selected file's body; ``onRead`` is a closure.
+
+    ``on_read`` (Phase 2334) says whether the emitting host holds the read handler. It defaults
+    to ``True``, what every release before it emitted; ``False`` omits the optional member.
+    """
 
     file_ref: str
     encoding: FileReadEncoding = "Text"
+    on_read: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
+        return _obj(
+            "ReadFileBody",
+            {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE if self.on_read else None},
+        )
+
+
+@dataclass(frozen=True)
+class CommitLocal:
+    """``Action.CommitLocal`` — flush the ``Binding.Local`` buffer of the node ``node_id``
+    (Phase 2334). A buffer flushed this way declares :class:`OnCommitAction` as its trigger.
+
+    A bare string, never a ``TextSource``: it addresses a node in this document.
+    """
+
+    node_id: str
+
+    def to_wire(self) -> Value:
+        return Obj("CommitLocal", {"nodeId": self.node_id})
 
 
 @dataclass(frozen=True)
@@ -949,6 +992,7 @@ Action = (
     | Confirm
     | Focus
     | ReadFileBody
+    | CommitLocal
     | Call
     | AiTool
     | Invoke
@@ -2718,7 +2762,11 @@ ChartAnnotation = ReferenceLine | EventMarker | RangeBand
 # reader holds is a different number, and a naive ``datetime`` names no instant,
 # so its Unix seconds would be read from the encoding machine's time zone. An
 # aware ``datetime`` names its instant and encodes as Unix seconds (rule 11).
-# Every other cell lowers exactly as any ``Static`` payload does.
+#
+# Phase 2334 — the rest of §5's cell rule: a ``None`` cell OMITS its key (rule 4,
+# the wire has no null), and any cell outside rule 11's recognised scalars (a
+# nested list / dict, any other host object) writes the ``"<opaque>"`` sentinel in
+# that cell position only. Both are what every decoder normalises the same cell to.
 
 EXACT_INTEGER_LIMIT = 2**53
 """Every integer in [-2^53, 2^53] is exactly a double; past it, none is."""
@@ -2759,20 +2807,23 @@ def _row_cell(value: object, row: int, key: str) -> object:
                 "a naive datetime names no instant; give it a tzinfo",
             )
         return calendar.timegm(value.utctimetuple())
-    return value
+    if isinstance(value, (float, str)):
+        return value
+    return OPAQUE
 
 
 def _row_feed_value(value: Any) -> Any:
     """A row feed's payload with every row cell through :func:`_row_cell`.
 
     Cells are visited in key order, so the first refused cell is the one every
-    host names. Anything that is not a list of rows (the ``"<opaque>"`` sentinel,
+    host names. A ``None`` cell is omitted; a non-scalar cell is the opaque
+    sentinel. Anything that is not a list of rows (the ``"<opaque>"`` sentinel,
     a non-dict element the decoder refuses anyway) passes through untouched.
     """
     if not isinstance(value, (list, tuple)):
         return value
     return [
-        {k: _row_cell(row[k], i, k) for k in sorted(row)} if isinstance(row, dict) else row
+        {k: _row_cell(row[k], i, k) for k in sorted(row) if row[k] is not None} if isinstance(row, dict) else row
         for i, row in enumerate(value)
     ]
 
@@ -2825,6 +2876,9 @@ class Chart:
     #: the key, so a chart authored before the slot existed still encodes
     #: byte-for-byte as it did.
     annotations: tuple[ChartAnnotation, ...] | None = None
+    #: Phase 2334 — whether the emitting host holds a point-click handler. A closure: it
+    #: crosses the wire as the sentinel when true and is omitted when false.
+    on_point_click: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2834,6 +2888,7 @@ class Chart:
                 "dataLabels": self.data_labels,
                 "kind": self.kind,
                 "legendPosition": self.legend_position,
+                "onPointClick": CLOSURE if self.on_point_click else None,
                 "source": _row_feed(self.source),
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.
@@ -2916,6 +2971,9 @@ class Map:
     centre_latitude: float = 0.0
     centre_longitude: float = 0.0
     zoom: float = 4.0
+    #: Phase 2334 — whether the emitting host holds a marker-click handler (the closure
+    #: sentinel when true, omitted when false).
+    on_marker_click: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2923,6 +2981,7 @@ class Map:
             {
                 "centreLatitude": self.centre_latitude,
                 "centreLongitude": self.centre_longitude,
+                "onMarkerClick": CLOSURE if self.on_marker_click else None,
                 "source": self.source,
                 "zoom": self.zoom,
             },
@@ -3521,10 +3580,27 @@ class Filters:
 
 @dataclass(frozen=True)
 class ColumnWidth:
+    """A column's width, named by its discriminator (Phase 2334 adds the two members).
+
+    ``Fixed`` takes ``pixels`` and ``Flex`` takes ``weight``; each is wire-required on its case
+    and refused on any other, so neither a bare ``Fixed`` nor a member riding the wrong case
+    can be built. ``Auto`` is the identity a column omits.
+    """
+
     kind: str = "Auto"
+    pixels: int | None = None
+    weight: float | None = None
+
+    def __post_init__(self) -> None:
+        for member, case, value in (("pixels", "Fixed", self.pixels), ("weight", "Flex", self.weight)):
+            if (value is None) == (self.kind == case):
+                raise ValueError(
+                    f"ColumnWidth '{member}' is required on a {case} width and refused on any other; "
+                    f"got kind {self.kind!r} with {member}={value!r}"
+                )
 
     def to_wire(self) -> Value:
-        return Obj(self.kind, {})
+        return _obj(self.kind, {"pixels": self.pixels, "weight": self.weight})
 
 
 @dataclass(frozen=True)
@@ -3716,6 +3792,9 @@ class DataGrid:
     #: `Binding` of an integer, like `Tabs.active_index`). Both omitted when absent.
     window_state_key: str | None = None
     row_total: Binding | None = None
+    #: Phase 2334 — whether the emitting host holds a row-click handler (the closure
+    #: sentinel when true, omitted when false).
+    on_row_click: bool = False
 
     def to_wire(self) -> Obj:
         # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 and
@@ -3731,6 +3810,7 @@ class DataGrid:
                 "editable": True if self.editable else None,
                 "exportable": True if self.exportable else None,
                 "keepRowsTogether": True if self.keep_rows_together else None,
+                "onRowClick": CLOSURE if self.on_row_click else None,
                 "pageSize": self.page_size,
                 "pageStateKey": self.page_state_key,
                 "reorderable": True if self.reorderable else None,

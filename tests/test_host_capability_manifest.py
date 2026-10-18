@@ -242,6 +242,10 @@ CORPUS_UNEXERCISED: dict[str, str] = {
     "Format.Duration": "no fixture writes it in a Format slot (Chart.valueFormat, Binding.Format, a Local codec)",
     "FragmentArg.Bool": "no FragmentRef or Mount fixture passes a boolean argument",
     "HoleValueSpace.AnyString": _NO_HOLE_FIXTURE,
+    "LocalFlushTrigger.OnCommitAction": (
+        "only the lowers-to family's commit-local trees write it, and that family is not a round-trip one"
+    ),
+    "LocalFlushTrigger.OnSubmit": "no fixture writes it in a Binding.Local flushOn slot",
     "HoleValueSpace.Enum": _NO_HOLE_FIXTURE,
     "Scalar.Bool": _NO_HOLE_FIXTURE,
     "Scalar.Float": _NO_HOLE_FIXTURE,

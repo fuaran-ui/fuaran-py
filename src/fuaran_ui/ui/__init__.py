@@ -160,8 +160,10 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         return t.State(key, default_value)
 
     @staticmethod
-    def filter(name: str) -> Binding:  # noqa: A003 — wire case name
-        return t.Filter(name)
+    def filter(name: str, *, default_value: t.Value = None) -> Binding:  # noqa: A003 — wire case name
+        """``Binding.Filter`` — a named filter source; ``default_value`` (Phase 2334)
+        yields until the filter is first set."""
+        return t.Filter(name, default_value)
 
     @staticmethod
     def selection(node_id: str, *, field: str | None = None, default_value: t.Value = None) -> Binding:
@@ -315,9 +317,16 @@ class action:  # noqa: N801 — namespace object
         return t.WriteToClipboard(_text(text))
 
     @staticmethod
-    def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text") -> Action:
-        """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure."""
-        return t.ReadFileBody(file_ref, encoding)
+    def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text", *, on_read: bool = True) -> Action:
+        """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure,
+        declared by ``on_read`` (Phase 2334), and omitted when ``False``."""
+        return t.ReadFileBody(file_ref, encoding, on_read)
+
+    @staticmethod
+    def commit_local(node_id: str) -> Action:
+        """``Action.CommitLocal`` — flush the ``Binding.Local`` buffer of ``node_id``, whose
+        trigger is ``t.OnCommitAction()`` (Phase 2334)."""
+        return t.CommitLocal(node_id)
 
     @staticmethod
     def call(endpoint: str, *, into: t.CallResultTarget | None = None, on_result: bool = False) -> Action:
@@ -1352,6 +1361,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         data_labels: t.ChartDataLabels | None = None,
         x_scale: t.ChartXScale | None = None,
         annotations: Sequence[t.ChartAnnotation] | None = None,
+        on_point_click: bool = False,
     ) -> UiNode:
         """The eight slots past ``stacked`` are each ABSENT by default, so a chart
         authored before they existed encodes byte-for-byte as it did.
@@ -1375,6 +1385,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             data_labels=data_labels,
             x_scale=x_scale,
             annotations=tuple(annotations) if annotations is not None else None,
+            on_point_click=on_point_click,
         )
         return _node(id, spec, accessibility.chart)
 
@@ -1407,8 +1418,9 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         centre_latitude: float = 0.0,
         centre_longitude: float = 0.0,
         zoom: float = 4.0,
+        on_marker_click: bool = False,
     ) -> UiNode:
-        return _node(id, t.Map(source, centre_latitude, centre_longitude, zoom), accessibility.map)
+        return _node(id, t.Map(source, centre_latitude, centre_longitude, zoom, on_marker_click), accessibility.map)
 
     @staticmethod
     def grid(
@@ -1431,6 +1443,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         repeat_header: bool = False,
         window_state_key: str | None = None,
         row_total: Binding | None = None,
+        on_row_click: bool = False,
     ) -> UiNode:
         """``row_key_field`` names the row property that identifies a row — the
         declarative sibling of the erased ``rowKey`` closure; pass it whenever the
@@ -1439,7 +1452,9 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         Every slot past it is a DECLARATIVE grid behaviour: one that survives the
         wire because it names a host State key rather than a closure. The
         constructor now reaches the whole record, so the ergonomic surface and the
-        typed one admit the same documents.
+        typed one admit the same documents. The one exception is ``on_row_click``
+        (Phase 2334): it declares a host row-click handler, which crosses the wire
+        only as the closure sentinel.
         """
         return _node(
             id,
@@ -1461,6 +1476,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
                 reorderable=reorderable,
                 window_state_key=window_state_key,
                 row_total=row_total,
+                on_row_click=on_row_click,
             ),
             accessibility.grid,
         )

@@ -11,6 +11,8 @@ and its reference evaluator:
 * :mod:`~fuaran_ui.dataframe.evaluate` — the pure columnar reference evaluator with the
   pinned null/coercion/ordering/float semantics, certified byte-identical to the
   reference over the F#-generated parity fixtures.
+* :mod:`~fuaran_ui.dataframe.decimal_text` — the exact decimal a ``decimal`` cell carries
+  as canonical text: its grammar, order, arithmetic and the one rounding kernel.
 
 The ergonomic, polars-shaped *authoring* surface that emits a ``Transform`` lives in
 :mod:`fuaran_ui.ui` (``frame`` / ``col``); this package is the data + engine.
@@ -18,7 +20,7 @@ The ergonomic, polars-shaped *authoring* surface that emits a ``Transform`` live
 
 from __future__ import annotations
 
-from . import codec, evaluate, model
+from . import codec, decimal_text, evaluate, model
 from .codec import (
     decode_pipeline,
     decode_pipeline_json,
@@ -26,10 +28,12 @@ from .codec import (
     decode_source_json,
     encode_pipeline,
     encode_source,
+    try_encode_source,
 )
-from .evaluate import eval_pipeline, eval_pipeline_with, no_resolve
+from .evaluate import aggregate, cell_token, eval_pipeline, eval_pipeline_with, no_resolve
 from .model import (
     NULL,
+    ROUNDING_MODES,
     Agg,
     ApplyFn,
     Binary,
@@ -47,10 +51,12 @@ from .model import (
     Embedded,
     Err,
     EvalError,
+    Except,
     Filter,
     GroupBy,
     InList,
     InParam,
+    Intersect,
     IsNull,
     Join,
     Limit,
@@ -61,8 +67,11 @@ from .model import (
     Pivot,
     PivotSpec,
     Project,
+    Quotient,
     Ref,
     Result,
+    Rounded,
+    Rounding,
     Schema,
     Sort,
     Table,
@@ -73,6 +82,7 @@ from .model import (
     WindowSpec,
     cell_bool,
     cell_date,
+    cell_decimal,
     cell_float,
     cell_int,
     cell_str,
@@ -83,9 +93,11 @@ __all__ = [
     # submodules
     "model",
     "codec",
+    "decimal_text",
     "evaluate",
     # codec
     "encode_source",
+    "try_encode_source",
     "decode_source",
     "decode_source_json",
     "encode_pipeline",
@@ -95,6 +107,8 @@ __all__ = [
     "eval_pipeline",
     "eval_pipeline_with",
     "no_resolve",
+    "aggregate",
+    "cell_token",
     # model — sources / tables
     "Cell",
     "Column",
@@ -110,6 +124,7 @@ __all__ = [
     "cell_str",
     "cell_date",
     "cell_timestamp",
+    "cell_decimal",
     # model — algebra
     "ColExpr",
     "Col",
@@ -124,6 +139,10 @@ __all__ = [
     "InList",
     "InParam",
     "IsNull",
+    "Quotient",
+    "Rounded",
+    "Rounding",
+    "ROUNDING_MODES",
     "Transform",
     "Filter",
     "Project",
@@ -139,6 +158,8 @@ __all__ = [
     "Distinct",
     "Limit",
     "Union",
+    "Intersect",
+    "Except",
     "Agg",
     # results / errors
     "Ok",

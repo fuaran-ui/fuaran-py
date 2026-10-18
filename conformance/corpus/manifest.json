@@ -959,6 +959,42 @@
       "description": "Phase 1811 — a `Format` binding's pre-rename `$type` `Date` decodes as `DateTime` (the Phase 1810 dateStyle / timeStyle pair) and re-encodes canonical; both style slots ride the alias unchanged"
     },
     {
+      "id": "lenient-1962-multiselect-value-dropped",
+      "kind": "lenient-accept",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-1962-multiselect-value-dropped.json",
+      "expectedFile": "lenient/lenient-1962-multiselect-value-dropped.expected.json",
+      "description": "§3.2 — a multi-select (`\"multiple\":true`) carrying a `value` beside its `values` decodes and re-encodes WITHOUT `value`: a multi-select carries `values` and no `value`, and never reads one. Three spellings, one per child: the empty-`Static` placeholder every pre-1962 multi-select carried (bare, and with `\"value\":null`) and a real State binding of the kind models wrote beside `values`. A malformed `value` still refuses as a malformed binding (Phase 1962)"
+    },
+    {
+      "id": "lenient-2300-declared-default-bindings",
+      "kind": "lenient-accept",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2300-declared-default-bindings.json",
+      "expectedFile": "lenient/lenient-2300-declared-default-bindings.expected.json",
+      "description": "§3.6 — the declared-default rule over a binding-valued initial slot: `Stepper.activeStep` omits at `Static{value=0}` (the `Tabs.activeIndex` precedent). Written explicitly at its default it re-encodes WITHOUT the member; a State-bound `activeStep` is not a default and is kept (Phase 2300)"
+    },
+    {
+      "id": "lenient-2300-declared-default-booleans",
+      "kind": "lenient-accept",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2300-declared-default-booleans.json",
+      "expectedFile": "lenient/lenient-2300-declared-default-booleans.expected.json",
+      "description": "§3.6 — the declared-default rule over the boolean and list fields Phase 2300 declared: `Flex.wrap`, `Link.download`, `List.ordered`, `CodeBlock.lineNumbers` / `highlightLines`, `FileUpload.multiple`, `FormField.required` (each `false` / `[]`), and the two that omit when TRUE — `CodeBlock.copyable` (a code block is copyable unless it says otherwise) and `Modal.dismissable` (an overlay is dismissable unless it says otherwise, the `Toast` polarity). Each written explicitly at its default decodes to the same tree and re-encodes WITHOUT the member; the same field at the non-default value is unchanged (Phase 2300)"
+    },
+    {
+      "id": "lenient-2300-declared-default-enums",
+      "kind": "lenient-accept",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2300-declared-default-enums.json",
+      "expectedFile": "lenient/lenient-2300-declared-default-enums.expected.json",
+      "description": "§3.6 — the declared-default rule over the enum-valued fields Phase 2300 declared: `Heading.variant` (`Standard`), `Badge.variant` (`Neutral`), `Button.variant` (`Secondary`), `Image.variant` (`Default`) and `SegmentedChoice.orientation` (`Horizontal`, which the decoder restored on absence since Phase 460 while the encoder still emitted it). Each written explicitly at its default re-encodes WITHOUT the member (Phase 2300)"
+    },
+    {
       "id": "lenient-460-alias-emphasis-muted",
       "kind": "lenient-accept",
       "since": "0.3.0",
@@ -3416,6 +3452,15 @@
       "description": "Input/Select"
     },
     {
+      "id": "select-multiple-false",
+      "kind": "node-round-trip",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "nodes/select-multiple-false.json",
+      "expectedFile": "nodes/select-multiple-false.json",
+      "description": "Input/Select (Phase 1962 — an explicit multiple:false, emitted as authored)"
+    },
+    {
       "id": "shared-source-seeded-pair",
       "kind": "node-round-trip",
       "since": "0.46.0",
@@ -4036,6 +4081,16 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.variant",
       "description": "a `Time` form field (the Phase 1811 alias, which fixes `variant` to `Time`) carrying an explicit `variant` of `Date` — refused as ambiguous rather than resolved to either spelling"
+    },
+    {
+      "id": "reject-1962-select-missing-value",
+      "kind": "reject",
+      "since": "0.97.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-1962-select-missing-value.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.value",
+      "description": "a single-select (`multiple` absent) with no `value`. `value` is the single-select binding and is required there; only a multi-select omits it (WIRE_FORMAT §3.2, Phase 1962)"
     },
     {
       "id": "reject-a11y-hidden-nonbool",

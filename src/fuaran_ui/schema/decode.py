@@ -2712,8 +2712,11 @@ def _decode_box_layout(value: object, path: str) -> Obj:
             "direction": _enum_aliased(
                 _require(obj, "direction", path), f"{path}.direction", ORIENTATION, ORIENTATION_ALIASES, "direction"
             ),
-            "wrap": _expect_bool(_require(obj, "wrap", path), f"{path}.wrap"),
         }
+        # Phase 2300 — `wrap` omits at its declared default `false` (WIRE_FORMAT §3.6): absent
+        # stays absent, an explicit `false` normalises away, and only `true` is carried.
+        if "wrap" in obj and _expect_bool(obj["wrap"], f"{path}.wrap"):
+            fields["wrap"] = True
         if "gap" in obj:
             fields["gap"] = _expect_int(obj["gap"], f"{path}.gap")
         return Obj("Flex", fields)
@@ -2849,11 +2852,25 @@ def _decode_kind(value: object, path: str) -> Obj:
         known.add(name)
         known.update(aliases)
     fields: dict[str, Value] = {}
+    select_multiple = _select_multiple(obj) if tag == "Select" else None
     for entry in schema:
         name, required, dec, aliases = _unpack_schema(entry)
+        if tag == "Select" and name == "value":
+            # Phase 1962 — the `value` rule (WIRE_FORMAT §3.2), a relation between two
+            # siblings the per-field table cannot state (the IDL marks `value` optional): a
+            # single-select (`multiple` absent or `False`) requires `value`; a multi-select
+            # carries none. A malformed `multiple` is its own defect, so the presence rule is
+            # not applied on top of it.
+            required = select_multiple is False
         raw, present = _alias_get(obj, name, aliases)
         if present:
             decoded = dec(raw, f"{path}.{name}")
+            if tag == "Select" and name == "value" and select_multiple is True:
+                # A multi-select carries its selection in `values`; any well-formed `value`
+                # beside it (the empty-`Static` placeholder pre-1962 documents carried, or a
+                # stray binding) is decoded — so a malformed one still refuses — then dropped: a
+                # §16 lenient accept, normalised to absent.
+                continue
             # Phase 460 omit-when-default: a `_DROP` result is omitted from the model
             # (so the generic encoder re-emits the byte-minimal canonical form).
             if decoded is not _DROP:
@@ -2869,6 +2886,14 @@ def _decode_kind(value: object, path: str) -> Obj:
         if key != "$type" and key not in known and key not in retired:
             fields[key] = from_json(raw)
     return Obj(tag, fields)
+
+
+def _select_multiple(obj: dict) -> bool | None:
+    """A ``Select``'s ``multiple`` for the Phase 1962 ``value`` rule: ``True`` / ``False``
+    as decoded (absent reads ``False``), or ``None`` when it is malformed — the field's own
+    decoder refuses that, and the presence rule is not layered over it."""
+    raw = obj.get("multiple", False)
+    return raw if isinstance(raw, bool) else None
 
 
 # ── Scoped `title` → `heading` alias (WIRE_FORMAT §3.6, decode-only) ─────────
@@ -3629,15 +3654,16 @@ def _decode_form_field_kind(value: object, path: str, auto: tuple[str, str] | No
         fields["options"] = _decode_binding_select_options(_require(obj, "options", path), f"{path}.options")
         value_slot(_decode_binding_string_opt, _AUTO_CHOICE)
         if tag == "SegmentedChoice":
-            # §3.6 — an absent `orientation` restores the language default
-            # `Horizontal` (the universal segmented-control prior); the
-            # canonical encoder always emits it.
+            # §3.6 — `orientation` omits at its declared default `Horizontal` (the universal
+            # segmented-control prior; declared in the IDL since Phase 2300, so the encoder omits
+            # it too): absent stays absent, an explicit `Horizontal` normalises away, and only
+            # `Vertical` is carried.
             if "orientation" in obj:
-                fields["orientation"] = _enum_aliased(
+                orientation = _enum_aliased(
                     obj["orientation"], f"{path}.orientation", ORIENTATION, ORIENTATION_ALIASES, "orientation"
                 )
-            else:
-                fields["orientation"] = "Horizontal"
+                if orientation != "Horizontal":
+                    fields["orientation"] = orientation
     elif tag in ("DateTimeRange", "DateRange", "TimeRange"):
         # 0.7.0 — the single-control date range: `Range`'s pair mechanics with
         # `DateTime`'s value conventions. `min` / `max` (ISO strings) + `step`
@@ -3949,7 +3975,10 @@ def _decode_form_fields(value: object, path: str) -> Value:
         ffields: dict[str, Value] = {"id": fid}
         ffields["kind"] = _decode_form_field_kind(_require(fobj, "kind", fpath), f"{fpath}.kind", ("state", fid))
         ffields["label"] = _decode_text_source(_require(fobj, "label", fpath), f"{fpath}.label")
-        ffields["required"] = _expect_bool(_require(fobj, "required", fpath), f"{fpath}.required")
+        # Phase 2300 — `required` omits at its declared default `false`: absent stays absent, an
+        # explicit `false` normalises away, and only `true` is carried.
+        if "required" in fobj and _expect_bool(fobj["required"], f"{fpath}.required"):
+            ffields["required"] = True
         if "help" in fobj:
             ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
         if "rule" in fobj:

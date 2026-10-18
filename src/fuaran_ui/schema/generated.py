@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "857888fc68ecc881b6a11e7f141e32f04ba07fd5d21d6ff47ed16538bad2d2d2"
+IDL_SHA256 = "e9ff0a22d727111d3d847a689655149081bdd1203f66ea2417905e13cd1791c7"
 IDL_VERSION = 1
 
 
@@ -489,7 +489,7 @@ KIND_CATEGORY: dict[str, str] = {
 KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "Badge": (
         F("label", "required", T_union_TextSource),
-        F("variant", "required", T_enum_BadgeVariant),
+        F("variant", "omitDefault", T_enum_BadgeVariant, default="Neutral"),
     ),
     "Box": (
         F("children", "required", T_list_node),
@@ -502,7 +502,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "Button": (
         F("label", "required", T_union_TextSource),
         F("onClick", "required", T_union_Action),
-        F("variant", "required", T_enum_ButtonVariant),
+        F("variant", "omitDefault", T_enum_ButtonVariant, default="Secondary"),
         F("icon", "optional", T_str),
         F("tooltip", "hostOnly", T_fn),
         F("disabled", "optional", T_union_Binding_bool),
@@ -533,10 +533,10 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     ),
     "CodeBlock": (
         F("code", "required", T_str),
-        F("copyable", "required", T_bool),
-        F("highlightLines", "required", T_list_int),
+        F("copyable", "omitDefault", T_bool, default=True),
+        F("highlightLines", "omitDefault", T_list_int, default=[]),
         F("language", "required", T_str),
-        F("lineNumbers", "required", T_bool),
+        F("lineNumbers", "omitDefault", T_bool, default=False),
     ),
     "Custom": (
         F("moduleId", "required", T_str),
@@ -602,7 +602,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "FileUpload": (
         F("accept", "required", T_list_str),
         F("label", "required", T_union_TextSource),
-        F("multiple", "required", T_bool),
+        F("multiple", "omitDefault", T_bool, default=False),
         F("onSelect", "optional", T_fn),
         F("disabled", "optional", T_union_Binding_bool),
         F("acceptPaste", "omitDefault", T_bool, default=False),
@@ -637,7 +637,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "Heading": (
         F("level", "required", T_int),
         F("text", "required", T_union_TextSource),
-        F("variant", "required", T_enum_HeadingVariant),
+        F("variant", "omitDefault", T_enum_HeadingVariant, default="Standard"),
     ),
     "Icon": (
         F("icon", "required", T_str),
@@ -648,7 +648,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "Image": (
         F("alt", "required", T_union_TextSource),
         F("src", "required", T_union_Binding_str),
-        F("variant", "required", T_enum_ImageVariant),
+        F("variant", "omitDefault", T_enum_ImageVariant, default="Default"),
         F("fit", "omitDefault", T_enum_ImageFit, default="Natural"),
         F("aspectRatio", "omitDefault", T_enum_ImageAspect, default="Natural"),
         F("loading", "omitDefault", T_enum_ImageLoading, default="Eager"),
@@ -666,14 +666,14 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     "Link": (
         F("href", "required", T_union_Binding_str),
         F("label", "required", T_union_TextSource),
-        F("download", "required", T_bool),
+        F("download", "omitDefault", T_bool, default=False),
         F("rel", "optional", T_str),
         F("target", "optional", T_str),
         F("protection", "optional", T_enum_LinkProtection),
     ),
     "List": (
         F("items", "required", T_list_union_TextSource),
-        F("ordered", "required", T_bool),
+        F("ordered", "omitDefault", T_bool, default=False),
     ),
     "Map": (
         F("centreLatitude", "required", T_float),
@@ -711,7 +711,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
     ),
     "Modal": (
         F("children", "required", T_list_node),
-        F("dismissable", "required", T_bool),
+        F("dismissable", "omitDefault", T_bool, default=True),
         F("onDismiss", "optional", T_union_Action),
         F("open", "required", T_union_Binding_bool),
         F("heading", "optional", T_union_TextSource),
@@ -743,7 +743,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("onChange", "optional", T_fn),
         F("onChangeMulti", "optional", T_fn),
         F("source", "required", T_union_Binding_list_record_SelectOption),
-        F("value", "required", T_union_Binding_str),
+        F("value", "optional", T_union_Binding_str),
         F("placeholder", "optional", T_union_TextSource),
         F("disabled", "optional", T_union_Binding_bool),
         F("multiple", "optional", T_bool),
@@ -756,7 +756,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("weight", "required", T_float),
     ),
     "Stepper": (
-        F("activeStep", "required", T_union_Binding_int),
+        F("activeStep", "omitDefault", T_union_Binding_int, default={"$type": "Static", "value": 0}),
         F("children", "required", T_list_node),
         F("onSelect", "optional", T_fn),
     ),
@@ -891,7 +891,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("id", "required", T_str),
         F("kind", "required", T_union_FormFieldKind),
         F("label", "required", T_union_TextSource),
-        F("required", "required", T_bool),
+        F("required", "omitDefault", T_bool, default=False),
         F("help", "optional", T_union_TextSource),
         F("rule", "optional", T_record_FieldRule),
     ),
@@ -1193,7 +1193,7 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
         "Auto": (),
         "Flex": (
             F("direction", "required", T_enum_Orientation),
-            F("wrap", "required", T_bool),
+            F("wrap", "omitDefault", T_bool, default=False),
             F("gap", "optional", T_int),
         ),
         "Grid": (
@@ -1349,7 +1349,7 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
             F("options", "required", T_union_Binding_list_record_SelectOption),
             F("value", "optional", T_hosted_as_union_Binding_str),
             F("onChange", "optional", T_fn),
-            F("orientation", "required", T_enum_Orientation),
+            F("orientation", "omitDefault", T_enum_Orientation, default="Horizontal"),
         ),
         "DateTime": (
             F("value", "optional", T_hosted_as_union_Binding_str),

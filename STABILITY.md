@@ -15,6 +15,30 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### behavioural — a field at its declared default is omitted from the wire (Phase 2300, rule 1)
+
+- Fifteen members the vocabulary moved to omit-at-default now write nothing when they hold their
+  declared default, and the decoder restores the default when they are absent: `Flex.wrap`
+  (`False`), `Link.download` (`False`), `List.ordered` (`False`), `CodeBlock.line_numbers`
+  (`False`), `CodeBlock.copyable` (`True`), `CodeBlock.highlight_lines` (`()`),
+  `FormField.required` (`False`), `FileUpload.multiple` (`False`), `Modal.dismissable` (`True`),
+  `Heading.variant` (`"Standard"`), `Image.variant` (`"Default"`), `Badge.variant` (`"Neutral"`),
+  `Button.variant` (`"Secondary"`), `SegmentedChoice.orientation` (`"Horizontal"`) and
+  `Stepper.active_step` (`Static(0)`). The same call encodes shorter bytes; an explicit default on
+  the wire is still read, and normalises to the omitted form (`lenient-2300-declared-default-*`).
+  The coverage pin's `AUTHORING_DEFAULTS` no longer names these members: the authoring default
+  and the wire default are now the same value.
+
+### breaking — a multi-select carries `values` and no `value` (Phase 1962)
+
+- `Select.value` is `Binding | None` (default `None`). `fuaran.select(..., multiple=True)` passes no
+  `value`; a single-select without one takes `Static(None)` as before, so an existing single-select
+  call encodes the same bytes. A single-select document without `value` is refused
+  (`MISSING_FIELD` at `$.kind.value`); a multi-select document carrying one is read and the
+  `value` dropped (`lenient-1962-multiselect-value-dropped`). `Select.multiple` is an ordinary
+  optional member, written as authored (`nodes/select-multiple-false.json`). A consumer that read
+  `Select.value` as always present handles `None`.
+
 ### additive — the gaps the coverage pin declared are authorable (Phase 2334)
 
 - `ColumnWidth` takes `pixels` (a `Fixed` width) and `weight` (a `Flex` width).

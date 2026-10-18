@@ -1291,7 +1291,7 @@ class FlexLayout:
     def to_wire(self) -> Value:
         # Ordinal key order (direction < gap < wrap); the canonical encoder
         # re-sorts, so ``_obj`` drops the ``None`` gap and the rest sort.
-        return _obj("Flex", {"direction": self.direction, "gap": self.gap, "wrap": self.wrap})
+        return _obj("Flex", {"direction": self.direction, "gap": self.gap, "wrap": True if self.wrap else None})
 
 
 @dataclass(frozen=True)
@@ -1490,7 +1490,8 @@ class Stepper:
         return _obj(
             "Stepper",
             {
-                "activeStep": self.active_step,
+                # Phase 2300 — omitted at its declared default, the literal Static(0).
+                "activeStep": None if self.active_step == Static(0) else self.active_step,
                 "children": list(self.children),
                 "onSelect": CLOSURE if self.on_select else None,
             },
@@ -1562,7 +1563,8 @@ class Modal:
             {
                 "anchor": self.anchor,
                 "children": list(self.children),
-                "dismissable": self.dismissable,
+                # Phase 2300 — omitted when TRUE: an overlay is dismissable unless it says otherwise.
+                "dismissable": None if self.dismissable else False,
                 "heading": self.heading,
                 "modality": None if self.modality == "Modal" else self.modality,
                 "onDismiss": self.on_dismiss,
@@ -1600,7 +1602,10 @@ class Heading:
     variant: HeadingVariant = "Standard"
 
     def to_wire(self) -> Obj:
-        return _obj("Heading", {"level": self.level, "text": self.text, "variant": self.variant})
+        return _obj(
+            "Heading",
+            {"level": self.level, "text": self.text, "variant": None if self.variant == "Standard" else self.variant},
+        )
 
 
 @dataclass(frozen=True)
@@ -1692,7 +1697,7 @@ class Badge:
     variant: BadgeVariant = "Neutral"
 
     def to_wire(self) -> Obj:
-        return _obj("Badge", {"label": self.label, "variant": self.variant})
+        return _obj("Badge", {"label": self.label, "variant": None if self.variant == "Neutral" else self.variant})
 
 
 @dataclass(frozen=True)
@@ -1822,7 +1827,7 @@ class Link:
         return _obj(
             "Link",
             {
-                "download": self.download,
+                "download": True if self.download else None,
                 "href": self.href,
                 "label": self.label,
                 "protection": self.protection,
@@ -1885,7 +1890,7 @@ class Image:
                 "loading": None if self.loading == "Eager" else self.loading,
                 "src": self.src,
                 "srcSet": list(self.src_set) if self.src_set else None,
-                "variant": self.variant,
+                "variant": None if self.variant == "Default" else self.variant,
             },
         )
 
@@ -2153,7 +2158,7 @@ class List:
     ordered: bool = False
 
     def to_wire(self) -> Obj:
-        return _obj("List", {"items": list(self.items), "ordered": self.ordered})
+        return _obj("List", {"items": list(self.items), "ordered": True if self.ordered else None})
 
 
 @dataclass(frozen=True)
@@ -2189,10 +2194,12 @@ class CodeBlock:
             "CodeBlock",
             {
                 "code": self.code,
-                "copyable": self.copyable,
-                "highlightLines": list(self.highlight_lines),
+                # Phase 2300 — the three flags omit at their declared defaults; NOTE `copyable` omits
+                # when TRUE (a code block is copyable unless it says otherwise).
+                "copyable": None if self.copyable else False,
+                "highlightLines": list(self.highlight_lines) if self.highlight_lines else None,
                 "language": self.language,
-                "lineNumbers": self.line_numbers,
+                "lineNumbers": True if self.line_numbers else None,
             },
         )
 
@@ -2523,7 +2530,7 @@ class Button:
                 "icon": self.icon,
                 "label": self.label,
                 "onClick": self.on_click,
-                "variant": self.variant,
+                "variant": None if self.variant == "Secondary" else self.variant,
             },
         )
 
@@ -2532,13 +2539,19 @@ class Button:
 class Select:
     label: TextSource
     source: Binding
-    value: Binding
+    #: Phase 1962 — the single-select value binding. A multi-select
+    #: (``multiple=True``) carries its selection in ``values`` and NO ``value``, so
+    #: this is ``None`` there and omitted from the wire; a single-select needs it
+    #: (the decoder refuses one without it).
+    value: Binding | None = None
     placeholder: TextSource | None = None
     disabled: Binding | None = None
-    # Multi-select (Phase 291): ``multiple`` is emitted only when ``True`` (a
-    # single-select stays byte-identical to the pre-multi corpus); ``values``
-    # is the ``Binding<string list>`` of selected option values, emitted only
-    # when present.
+    # Multi-select (Phase 291): this authoring surface emits ``multiple`` only when
+    # ``True`` (a single-select stays byte-identical to the pre-multi corpus); on the
+    # wire it is an ordinary optional field, kept as authored, so an explicit
+    # ``false`` a document carries round-trips through the decoder (Phase 1962).
+    # ``values`` is the ``Binding<string list>`` of selected option values, emitted
+    # only when present.
     multiple: bool = False
     values: Binding | None = None
     #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
@@ -2637,7 +2650,7 @@ class FileUpload:
                 # always was.
                 "maxBytes": self.max_bytes,
                 "maxFiles": self.max_files,
-                "multiple": self.multiple,
+                "multiple": True if self.multiple else None,
                 "onSelect": CLOSURE if self.on_select else None,
             },
         )
@@ -3229,7 +3242,7 @@ class SegmentedChoice:
             {
                 "onChange": CLOSURE if self.on_change else None,
                 "options": self.options,
-                "orientation": self.orientation,
+                "orientation": None if self.orientation == "Horizontal" else self.orientation,
                 "value": self.value,
             },
         )
@@ -3469,7 +3482,7 @@ class FormField:
                 "id": self.id,
                 "kind": self.kind,
                 "label": self.label,
-                "required": self.required,
+                "required": True if self.required else None,
                 "rule": self.rule,
             },
         )

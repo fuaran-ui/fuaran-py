@@ -1,5 +1,5 @@
 {
-  "generator": "Fuaran.UI.Renderer.Server 0.87.0 Speech.projectStatic",
+  "generator": "Fuaran.UI.Renderer.Server 0.97.0 Speech.projectStatic",
   "fixtures": {
     "a11y-alert-assertive": {
       "text": "Upload failed\nThe file exceeded the size limit.\n",
@@ -3298,8 +3298,8 @@
       "omissions": []
     },
     "metric-float-exp-pos": {
-      "text": "Revenue: GBP 1000000000000000000000.00\nvs last month\n",
-      "ssml": "<speak>\n<s>Revenue: GBP 1000000000000000000000.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "text": "Revenue: GBP 1e+21\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1e+21</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
       "utterances": [
         {
           "nodeId": "metric-float-exp-pos",
@@ -3661,6 +3661,19 @@
       "utterances": [
         {
           "nodeId": "select-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "select-multiple-false": {
+      "text": "Selection: Size\n",
+      "ssml": "<speak>\n<s>Selection: Size</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-multiple-false",
           "source": "announced",
           "emphasis": false,
           "pause": "short"

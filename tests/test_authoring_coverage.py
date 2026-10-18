@@ -174,10 +174,12 @@ def test_a_gap_that_became_authorable_must_be_retired(monkeypatch: pytest.Monkey
 
 
 def test_an_undeclared_authoring_default_is_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    # `Chart.kind` is wire-required with an authoring default. (`Badge.variant` was the probe
+    # until Phase 2300 declared its default, at which point it left the table legitimately.)
     monkeypatch.setattr(
-        dialect, "AUTHORING_DEFAULTS", {k: v for k, v in dialect.AUTHORING_DEFAULTS.items() if k != "kind:Badge"}
+        dialect, "AUTHORING_DEFAULTS", {k: v for k, v in dialect.AUTHORING_DEFAULTS.items() if k != "kind:Chart"}
     )
-    assert _findings() == ["kind:Badge.variant: wire-required, defaulted by Badge.variant, undeclared"]
+    assert _findings() == ["kind:Chart.kind: wire-required, defaulted by Chart.kind, undeclared"]
 
 
 def test_a_declaration_the_idl_no_longer_has_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:

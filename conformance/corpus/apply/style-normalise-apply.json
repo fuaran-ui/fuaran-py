@@ -64,7 +64,7 @@
       },
       "expected": {
         "verdict": "accept",
-        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}"
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}"
       }
     }
   ]

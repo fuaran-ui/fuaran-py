@@ -1248,7 +1248,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         *,
         label: t.TextInput,
         source: Binding,
-        value: Binding,
+        value: Binding | None = None,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
         multiple: bool = False,
@@ -1259,11 +1259,15 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         """The select control. ``on_change=False`` OMITS the handler key, which is what
         arms a renderer's write-back default against ``value`` / ``values`` — see
         :class:`~fuaran_ui.schema.types.Select`. ``on_change_multi`` is the MULTI
-        channel's own handler (Phase 1576) and arms independently of it."""
+        channel's own handler (Phase 1576) and arms independently of it. Phase 1962 —
+        the constructor enforces the single/multi ``value`` rule the record cannot
+        state: a multi-select (``multiple=True``) carries ``values`` and no ``value``,
+        so a ``value`` handed to it is dropped; a single-select always carries one, so
+        an absent ``value`` becomes the empty ``Static`` ("no selection")."""
         kind = t.Select(
             _text(label),
             source,
-            value,
+            None if multiple else (value if value is not None else t.Static(None)),
             _text(placeholder) if placeholder is not None else None,
             disabled,
             multiple,

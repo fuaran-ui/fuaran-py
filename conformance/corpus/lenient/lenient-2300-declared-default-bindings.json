@@ -1,0 +1,1 @@
+{"id":"len-2300-binding","kind":{"$type":"Stepper","activeStep":{"$type":"Static","value":0},"children":[{"id":"len-2300-s1","kind":{"$type":"Markdown","text":"One"}},{"id":"len-2300-s2","kind":{"$type":"Markdown","text":"Two"}}]}}

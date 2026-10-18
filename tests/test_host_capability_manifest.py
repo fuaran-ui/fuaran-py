@@ -32,9 +32,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from _corpus import CORPUS_ROOT, corpus_required
+from _corpus import CORPUS_ROOT, SNAPSHOT_ROOT, corpus_required
 from fuaran_ui import __version__
 from fuaran_ui.conformance import host_capability as hc
+from fuaran_ui.conformance import run_fixture
 from fuaran_ui.model import Obj
 from fuaran_ui.schema import generated
 from fuaran_ui.schema import types as real_types
@@ -215,6 +216,182 @@ def test_the_manifest_matches_its_published_schema() -> None:
         pytest.skip(f"{schema_path} is absent — the corpus predates WIRE_FORMAT §27")
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     jsonschema.validate(json.loads(PUBLISHED.read_text(encoding="utf-8")), schema)
+
+
+# ── every claim is exercised green by the bundled corpus (Phase 1881) ────────
+#
+# A token says this host has a spelling for a construct (§27.5), and a consumer computes its
+# expected-unmodelled set from the tokens (§27.4). So a token the host cannot actually carry is the
+# over-declaration §27.1 calls unrecoverable, and it surfaces DOWNSTREAM — in another repository's
+# conformance run, against a release. This check moves that failure here: every claimed token is
+# walked out of the BUNDLED snapshot (the corpus this release certifies against, which the manifest
+# names as its ``corpusAuthority``), and every fixture carrying it must round-trip green through this
+# host. A claim ahead of the code is then a red test in this gate, before any tag.
+
+#: The families whose documents are wire trees this host decodes and re-encodes byte-identically.
+_EXERCISING_FAMILIES = ("node-round-trip", "op-round-trip", "lenient-accept")
+
+#: Claimed tokens no fixture of the bundled corpus writes, each with the slot that would carry it.
+#: The gap is the CORPUS's (no fixture exercises the construct on any host), not this host's. The
+#: list may only shrink: an entry the corpus comes to exercise, or one this host no longer claims,
+#: is red below, so it cannot outlive the gap it names.
+_NO_HOLE_FIXTURE = "no fixture declares a FragmentDecl hole of this shape (HoleDecl.Value)"
+CORPUS_UNEXERCISED: dict[str, str] = {
+    "CellFormat.None": "only ever the omitted default of Metric.format; no fixture spells it in another slot",
+    "CellFormat.SignificantDigits": "no fixture writes it in a CellFormat slot (Metric, LabelValueRow, a column)",
+    "Format.Duration": "no fixture writes it in a Format slot (Chart.valueFormat, Binding.Format, a Local codec)",
+    "FragmentArg.Bool": "no FragmentRef or Mount fixture passes a boolean argument",
+    "HoleValueSpace.AnyString": _NO_HOLE_FIXTURE,
+    "HoleValueSpace.Enum": _NO_HOLE_FIXTURE,
+    "Scalar.Bool": _NO_HOLE_FIXTURE,
+    "Scalar.Float": _NO_HOLE_FIXTURE,
+}
+
+
+def _bind(t: generated.T, arg: generated.T | None) -> generated.T:
+    """``t`` with the generic parameter ``'T`` of an instantiated union (``Binding<float>``) bound."""
+    if arg is None:
+        return t
+    if t.kind == "var":
+        return arg
+    return dataclasses.replace(
+        t,
+        of=_bind(t.of, arg) if t.of is not None else None,
+        args=tuple(_bind(a, arg) for a in t.args),
+        wire_type=_bind(t.wire_type, arg) if t.wire_type is not None else None,
+    )
+
+
+def _walk_fields(obj: object, fields: tuple[generated.F, ...], out: set[str], arg: generated.T | None) -> None:
+    if isinstance(obj, dict):
+        for field in fields:
+            if field.name in obj:
+                _walk(obj[field.name], _bind(field.type, arg), out)
+
+
+def _walk(value: object, t: generated.T, out: set[str]) -> None:
+    """The tokens a wire value exercises, read against the generated IDL (WIRE_FORMAT §27.4)."""
+    if t.kind == "node" and isinstance(value, dict):
+        _walk(value["kind"], generated.T("kind"), out)
+        _walk_fields(value, generated.NODE_FIELDS, out, None)
+    elif t.kind == "kind" and isinstance(value, dict):
+        out.add(f"Kind.{value['$type']}")
+        _walk_fields(value, generated.KIND_FIELDS.get(value["$type"], ()), out, None)
+    elif t.kind == "op" and isinstance(value, dict):
+        _walk_fields(value, generated.OP_FIELDS.get(value["$type"], ()), out, None)
+    elif t.kind == "union" and t.name is not None:
+        if isinstance(value, dict) and "$type" in value:
+            out.add(f"{t.name}.{value['$type']}")
+            cases = generated.UNION_CASE_FIELDS.get(t.name, {})
+            _walk_fields(value, cases.get(value["$type"], ()), out, t.args[0] if t.args else None)
+        elif t.name in generated.UNION_TRANSPARENT_CASE:
+            out.add(f"{t.name}.{generated.UNION_TRANSPARENT_CASE[t.name]}")
+    elif t.kind == "hosted" and t.wire_type is not None:
+        _walk(value, t.wire_type, out)
+    elif t.kind == "record" and t.name is not None:
+        _walk_fields(value, generated.RECORD_FIELDS.get(t.name, ()), out, None)
+    elif t.kind == "list" and t.of is not None and isinstance(value, list):
+        for item in value:
+            _walk(item, t.of, out)
+    elif t.kind == "map" and t.of is not None and isinstance(value, dict):
+        for item in value.values():
+            _walk(item, t.of, out)
+
+
+def _exercising(corpus_root: Path) -> dict[str, list[dict]]:
+    """Each token, and the fixtures (of the exercising families) whose canonical document carries it."""
+    manifest = json.loads((corpus_root / "manifest.json").read_text(encoding="utf-8"))
+    by_token: dict[str, list[dict]] = {}
+    for fixture in manifest["fixtures"]:
+        if fixture["kind"] not in _EXERCISING_FAMILIES:
+            continue
+        document = json.loads((corpus_root / fixture["expectedFile"]).read_text(encoding="utf-8"))
+        found: set[str] = set()
+        _walk(document, generated.T(fixture["decoder"]), found)
+        for token in found:
+            by_token.setdefault(token, []).append(fixture)
+    return by_token
+
+
+Runner = typing.Callable[[dict, Path], typing.Any]
+
+
+def _claim_findings(
+    tokens: typing.Iterable[str],
+    corpus_root: Path,
+    run: Runner = run_fixture,
+    unexercised: typing.Mapping[str, str] = CORPUS_UNEXERCISED,
+) -> list[str]:
+    """Every way a claimed token is not exercised green by the corpus at ``corpus_root``."""
+    claimed = set(tokens)
+    exercising = _exercising(corpus_root)
+    verdicts: dict[str, bool] = {}
+    findings: list[str] = []
+    for token in sorted(claimed):
+        fixtures = exercising.get(token, [])
+        if not fixtures:
+            if token not in unexercised:
+                findings.append(f"{token}: claimed, and no fixture of the corpus exercises it")
+            continue
+        if token in unexercised:
+            findings.append(f"{token}: declared unexercised, but {fixtures[0]['id']} exercises it; retire the entry")
+        for fixture in fixtures:
+            if fixture["id"] not in verdicts:
+                verdicts[fixture["id"]] = bool(run(fixture, corpus_root).passed)
+        red = sorted(fx["id"] for fx in fixtures if not verdicts[fx["id"]])
+        if red:
+            findings.append(f"{token}: claimed, and red in {red}")
+    findings.extend(
+        f"{token}: declared unexercised, but this host no longer claims it"
+        for token in sorted(set(unexercised) - claimed)
+    )
+    return findings
+
+
+def test_the_manifest_was_attested_against_the_bundled_snapshot() -> None:
+    """The corpus the check below reads is the one this release names, not whatever is checked out."""
+    published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
+    assert published["corpusAuthority"] == hc._snapshot_authority(_REPO_ROOT)
+    assert (SNAPSHOT_ROOT / "manifest.json").is_file()
+
+
+def test_every_claimed_token_is_exercised_green_by_the_bundled_corpus() -> None:
+    published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
+    findings = _claim_findings(published["tokens"], SNAPSHOT_ROOT)
+    assert not findings, "the manifest claims ahead of what the corpus proves:\n" + "\n".join(findings)
+
+
+def test_a_claim_the_host_cannot_carry_is_red() -> None:
+    """Falsifier: a host that fails one fixture reddens exactly the claims that fixture carries."""
+    exercising = _exercising(SNAPSHOT_ROOT)
+    victim = exercising["Kind.Badge"][0]["id"]
+
+    def fails_victim(fixture: dict, corpus_root: Path) -> SimpleNamespace:
+        return SimpleNamespace(passed=fixture["id"] != victim)
+
+    findings = _claim_findings(["Kind.Badge", "Binding.Static"], SNAPSHOT_ROOT, run=fails_victim, unexercised={})
+    assert findings and all(victim in finding for finding in findings)
+    assert any(finding.startswith("Kind.Badge:") for finding in findings)
+
+
+def test_a_claim_no_fixture_exercises_is_red() -> None:
+    assert _claim_findings(["CellFormat.SignificantDigits"], SNAPSHOT_ROOT, unexercised={}) == [
+        "CellFormat.SignificantDigits: claimed, and no fixture of the corpus exercises it"
+    ]
+
+
+def test_a_residual_entry_cannot_outlive_its_gap() -> None:
+    stale = {"Kind.Badge": "pretend no fixture writes it", "Kind.NotAKind": "pretend it is claimed"}
+    findings = _claim_findings(["Kind.Badge"], SNAPSHOT_ROOT, unexercised=stale)
+    assert any(f.startswith("Kind.Badge: declared unexercised, but") for f in findings)
+    assert "Kind.NotAKind: declared unexercised, but this host no longer claims it" in findings
+
+
+def test_the_walk_reads_a_hosted_slot_through_its_wire_type() -> None:
+    """``FormFieldKind.Text.value`` is hosted with a ``Binding<string>`` wire type: a ``Local``
+    binding inside it is a claim the walk must see, or the claim is checked against nothing."""
+    assert "form-local-debounce" in {fx["id"] for fx in _exercising(SNAPSHOT_ROOT)["Binding.Local"]}
+    assert "form-local-debounce" in {fx["id"] for fx in _exercising(SNAPSHOT_ROOT)["LocalFlushTrigger.OnDebounce"]}
 
 
 # ── the generator writes to the tree it is run in (Phase 2225) ───────────────

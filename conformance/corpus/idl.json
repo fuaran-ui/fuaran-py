@@ -720,7 +720,7 @@
                 "hostSurface": {
                   "decode": "Fuaran.UI.RowCodec.decodeRows",
                   "encode": "Fuaran.UI.RowCodec.encodeRows",
-                  "fsharp": "Fuaran.Core.Row seq"
+                  "fsharp": "Map<string, obj> seq"
                 },
                 "wire": "json"
               }
@@ -869,8 +869,8 @@
           "type": {
             "$type": "fn",
             "hostSurface": {
-              "fsharp": "Fuaran.Core.Row -> Action<'Msg>",
-              "placeholder": "(fun (_: Fuaran.Core.Row) -> Action.Chain [])",
+              "fsharp": "Map<string, obj> -> Action<'Msg>",
+              "placeholder": "(fun (_: Map<string, obj>) -> Action.Chain [])",
               "typescript": "(v: unknown) => Action"
             },
             "wire": "<closure>"
@@ -1028,7 +1028,7 @@
           "type": {
             "$type": "fn",
             "hostSurface": {
-              "fsharp": "Fuaran.Core.Row -> string",
+              "fsharp": "Map<string, obj> -> string",
               "placeholder": "(fun _ -> \"\")",
               "typescript": "(row: unknown) => string"
             },
@@ -1197,7 +1197,7 @@
                 "hostSurface": {
                   "decode": "Fuaran.UI.RowCodec.decodeRows",
                   "encode": "Fuaran.UI.RowCodec.encodeRows",
-                  "fsharp": "Fuaran.Core.Row seq"
+                  "fsharp": "Map<string, obj> seq"
                 },
                 "wire": "json"
               }
@@ -1223,8 +1223,8 @@
           "type": {
             "$type": "fn",
             "hostSurface": {
-              "fsharp": "Fuaran.Core.Row -> Action<'Msg>",
-              "placeholder": "(fun (_: Fuaran.Core.Row) -> Action.Chain [])",
+              "fsharp": "Map<string, obj> -> Action<'Msg>",
+              "placeholder": "(fun (_: Map<string, obj>) -> Action.Chain [])",
               "typescript": "(v: unknown) => Action"
             },
             "wire": "<closure>"
@@ -3923,8 +3923,8 @@
           "type": {
             "$type": "fn",
             "hostSurface": {
-              "fsharp": "Fuaran.Core.Row -> Action<'Msg>",
-              "placeholder": "(fun (_: Fuaran.Core.Row) -> Action.Chain [])",
+              "fsharp": "Map<string, obj> -> Action<'Msg>",
+              "placeholder": "(fun (_: Map<string, obj>) -> Action.Chain [])",
               "typescript": "(v: unknown) => Action"
             },
             "wire": "<closure>"
@@ -4006,7 +4006,7 @@
           "type": {
             "$type": "fn",
             "hostSurface": {
-              "fsharp": "Fuaran.Core.Row -> Fuaran.UI.HostPrelude.CellValue",
+              "fsharp": "Map<string, obj> -> Fuaran.UI.HostPrelude.CellValue",
               "placeholder": "(fun _ -> Fuaran.UI.HostPrelude.CellValue.Empty)",
               "typescript": "(row: unknown) => unknown"
             },
@@ -6309,8 +6309,8 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row * Fuaran.UI.HostPrelude.CellValue -> Action<'Msg>",
-                  "placeholder": "(fun (_: Fuaran.Core.Row * Fuaran.UI.HostPrelude.CellValue) -> Action.Chain [])",
+                  "fsharp": "Map<string, obj> * Fuaran.UI.HostPrelude.CellValue -> Action<'Msg>",
+                  "placeholder": "(fun (_: Map<string, obj> * Fuaran.UI.HostPrelude.CellValue) -> Action.Chain [])",
                   "typescript": "(v: [unknown, unknown]) => Action"
                 },
                 "wire": "<closure>"
@@ -6329,7 +6329,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> bool",
+                  "fsharp": "Map<string, obj> -> bool",
                   "placeholder": "(fun _ -> false)",
                   "typescript": "(row: unknown) => boolean"
                 },
@@ -6344,8 +6344,8 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row * bool -> Action<'Msg>",
-                  "placeholder": "(fun (_: Fuaran.Core.Row * bool) -> Action.Chain [])",
+                  "fsharp": "Map<string, obj> * bool -> Action<'Msg>",
+                  "placeholder": "(fun (_: Map<string, obj> * bool) -> Action.Chain [])",
                   "typescript": "(v: [unknown, boolean]) => Action"
                 },
                 "wire": "<closure>"
@@ -6375,8 +6375,8 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> Action<'Msg>",
-                  "placeholder": "(fun (_: Fuaran.Core.Row) -> Action.Chain [])",
+                  "fsharp": "Map<string, obj> -> Action<'Msg>",
+                  "placeholder": "(fun (_: Map<string, obj>) -> Action.Chain [])",
                   "typescript": "(v: unknown) => Action"
                 },
                 "wire": "<closure>"
@@ -6413,7 +6413,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> string",
+                  "fsharp": "Map<string, obj> -> string",
                   "placeholder": "(fun _ -> \"\")",
                   "typescript": "(row: unknown) => string"
                 },
@@ -6428,7 +6428,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> TextSource",
+                  "fsharp": "Map<string, obj> -> TextSource",
                   "placeholder": "(fun _ -> TextSource.Literal \"\")",
                   "typescript": "(row: unknown) => TextSource"
                 },
@@ -6448,7 +6448,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> TextSource",
+                  "fsharp": "Map<string, obj> -> TextSource",
                   "placeholder": "(fun _ -> TextSource.Literal \"\")",
                   "typescript": "(row: unknown) => TextSource"
                 },
@@ -6463,7 +6463,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> ToneVariant",
+                  "fsharp": "Map<string, obj> -> ToneVariant",
                   "placeholder": "(fun _ -> ToneVariant.Default)",
                   "typescript": "(row: unknown) => ToneVariant"
                 },
@@ -6524,7 +6524,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> float",
+                  "fsharp": "Map<string, obj> -> float",
                   "placeholder": "(fun _ -> 0.0)",
                   "typescript": "(row: unknown) => number"
                 },
@@ -6539,7 +6539,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "Fuaran.Core.Row -> TextSource",
+                  "fsharp": "Map<string, obj> -> TextSource",
                   "placeholder": "(fun _ -> TextSource.Literal \"\")",
                   "typescript": "(row: unknown) => TextSource"
                 },
@@ -6559,7 +6559,7 @@
               "type": {
                 "$type": "fn",
                 "hostSurface": {
-                  "fsharp": "(Fuaran.Core.Row -> JVal) -> Node<'Msg>",
+                  "fsharp": "(Map<string, obj> -> JVal) -> Node<'Msg>",
                   "placeholder": "(fun _ -> Unchecked.defaultof<Node<obj>>)",
                   "typescript": "(proj: (row: unknown) => unknown) => Node"
                 },

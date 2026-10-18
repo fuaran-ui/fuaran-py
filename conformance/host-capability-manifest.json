@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.10.0",
-  "corpusAuthority": "63e2187e0c205661247ac0a399fa632550ff391c",
+  "corpusAuthority": "f8bf72c98dc5e04874123c69244c2beef26e5c7c",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -84,6 +84,9 @@
     "elicitation-round-trip": "covered",
     "envelope-reject": "covered",
     "envelope-round-trip": "covered",
+    "formatting": {
+      "pending": "the cell formatter is not yet driven from the formatting vectors, and it diverges from them on significant-digit exponent forms, ties and negative zero"
+    },
     "laws/capabilityLaws": {
       "pending": "this host's suite does not yet run this law family's vectors"
     },

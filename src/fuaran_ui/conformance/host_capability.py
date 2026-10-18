@@ -320,6 +320,12 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "reject": "covered",
     "lenient-accept": "covered",
     "envelope-round-trip": "covered",
+    "formatting": {
+        "pending": (
+            "the cell formatter is not yet driven from the formatting vectors, and it diverges "
+            "from them on significant-digit exponent forms, ties and negative zero"
+        )
+    },
     "envelope-reject": "covered",
     "elicitation-round-trip": "covered",
     "elicitation-reject": "covered",

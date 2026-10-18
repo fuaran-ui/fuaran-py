@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.9.0",
-  "corpusAuthority": "e8dffa26e3cecced943c25f57e126298db9ddc16",
+  "corpusAuthority": "5dcac0daae923e60c042bf30e949c0b86e4daeed",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -67,6 +67,12 @@
     "dag": "covered",
     "decode-policy": {
       "notApplicable": "this host's decoder offers no §23 kind admission policy"
+    },
+    "design-seam-reject": {
+      "notApplicable": "this host ships no design-provider seam: its records are read by a design-tool integration, and this host carries none"
+    },
+    "design-seam-round-trip": {
+      "notApplicable": "this host ships no design-provider seam: its records are read by a design-tool integration, and this host carries none"
     },
     "devtools-relay": {
       "notApplicable": "this host ships no devtools relay endpoint"

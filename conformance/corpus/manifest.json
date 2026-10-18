@@ -5,7 +5,7 @@
   "renderFidelity": "render-fidelity.json",
   "renderText": "render-text.json",
   "enumTokens": "enum-tokens.json",
-  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. A reject fixture carrying expectedDefects (WIRE_FORMAT 29) also lists EVERY independent defect the document holds, as {code, path} in canonical order: a host that reports defect lists asserts exactly that list; the single-error assertion holds for every host. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. style-observer fixtures (Phase 1752): resolved-style FACTS in, encoded StyleFlag / StyleObservation bytes out. Nothing here is a decoded document, so the inputFile carries the evidence AND the expectations rather than pairing with an expectedFile, and each names a tier. observation: build a StyleInput from `input` under `options`, derive the manifest-free flags and encode each, assert equal to expectedFlags, then encode the whole observation for `nodeId` and assert equal to expectedObservation. per-node-manifest: decode `manifest` — a JSON STRING, fed to the host's own theme-manifest decoder verbatim so no host re-serialises it — run the manifest-aware per-node derivation over `observation`, assert the encoded flags equal expectedManifestFlags. usage-budget: decode `manifest`, pair each nodeAreas entry's observation with its area, run the tree-level budget verification, assert the encoded flags equal expectedBudgetFlags. A tier or flag kind outside a host's vocabulary is REPORTED by name with the vector id, never skipped. Palette attribution (Phase 1727): wherever a manifest-aware derivation attributes a rendered fill to ONE token — the usage-budget arm's area share — it iterates the manifest's colour tokens in canonical token-path order and the first token whose value matches wins. Canonical token-path order compares paths segment by segment, a shorter prefix first, each segment by Unicode code point (the order a depth-first walk of the DTCG tree yields when it visits every group's members in ascending key order); DOCUMENT order plays no part, and two same-valued tokens are LEGAL, not a defect. A host may satisfy this by yielding tokens from its walk in that order or by ordering the palette at the attribution site — the attribution is the contract, the mechanism is not — and the budget-same-valued-tokens-* vectors pin it. See WIRE_FORMAT.md at this corpus root.",
+  "description": "Fuaran canonical wire-format conformance corpus. node-round-trip / op-round-trip fixtures: decode inputFile, re-encode, assert byte-equal to expectedFile. reject fixtures: decode inputFile, assert DecodeError.Code = expectedErrorCode and DecodeError.Path starts with expectedPath. A reject fixture carrying expectedDefects (WIRE_FORMAT 29) also lists EVERY independent defect the document holds, as {code, path} in canonical order: a host that reports defect lists asserts exactly that list; the single-error assertion holds for every host. lenient-accept fixtures (WIRE_FORMAT 16): decode the SHORTHAND inputFile, re-encode, assert byte-equal to expectedFile (the verbose canonical form) — a conformant host MUST accept the shorthand and normalise it; rejecting it, or decoding it to different bytes, is non-conformant. envelope-round-trip / envelope-reject fixtures (WIRE_FORMAT 15): read the $profile/$payload envelope, negotiate the authored profile against the host's own core@1.0, then either re-render byte-equal to expectedFile (Current/Behind — unknown kinds preserved verbatim, must-ignore-but-preserve) or refuse a Foreign profile with expectedErrorCode FOREIGN_PROFILE at expectedPath. elicitation-round-trip / elicitation-reject fixtures (WIRE_FORMAT 18): decode with the decoder-named entry point (elicitation = the envelope codec, elicitation-outcome = the outcome codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). elicitation-answer-accept / elicitation-answer-reject fixtures (WIRE_FORMAT 18.4): the inputFile pairs {answer, contract}; run the host's answer-conformance validation and assert acceptance or the expected refusal. contract-card-round-trip / contract-card-reject fixtures (WIRE_FORMAT 25): decode with the decoder-named entry point (contract-card = the single-card codec, contract-card-bundle = the bundle codec), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). A card is NOT a node — it is the description a host reads to label and prop-validate a Custom node it has no renderer for — so it is its own family and never appears in nodes/. teleport-decode / teleport-reject fixtures (WIRE_FORMAT 17): read the inputFile document ({encoded, limits?}), decode the encoded teleport bundle with the teleport entry point under the limits the document names (its own defaults when it names none), then either re-render the verified envelope — with its payload NORMALISED by the ordinary node decoder, so expectedFile is the decode expectation and not the carried bytes — byte-equal to expectedFile, or assert the structured refusal (expectedErrorCode at a path starting with expectedPath). The refusal vocabulary is the one WIRE_FORMAT 17.4 names (InvalidFormat / InvalidJson / InvalidEnvelope / UnsupportedVersion / DigestMismatch / Oversize / TreeDecode / HistoryDecode / TreeInvalid), NOT the eight DecodeError codes: a bundle is a container the node decoder runs inside. style-observer fixtures (Phase 1752): resolved-style FACTS in, encoded StyleFlag / StyleObservation bytes out. Nothing here is a decoded document, so the inputFile carries the evidence AND the expectations rather than pairing with an expectedFile, and each names a tier. observation: build a StyleInput from `input` under `options`, derive the manifest-free flags and encode each, assert equal to expectedFlags, then encode the whole observation for `nodeId` and assert equal to expectedObservation. per-node-manifest: decode `manifest` — a JSON STRING, fed to the host's own theme-manifest decoder verbatim so no host re-serialises it — run the manifest-aware per-node derivation over `observation`, assert the encoded flags equal expectedManifestFlags. usage-budget: decode `manifest`, pair each nodeAreas entry's observation with its area, run the tree-level budget verification, assert the encoded flags equal expectedBudgetFlags. A tier or flag kind outside a host's vocabulary is REPORTED by name with the vector id, never skipped. Palette attribution (Phase 1727): wherever a manifest-aware derivation attributes a rendered fill to ONE token — the usage-budget arm's area share — it iterates the manifest's colour tokens in canonical token-path order and the first token whose value matches wins. Canonical token-path order compares paths segment by segment, a shorter prefix first, each segment by Unicode code point (the order a depth-first walk of the DTCG tree yields when it visits every group's members in ascending key order); DOCUMENT order plays no part, and two same-valued tokens are LEGAL, not a defect. A host may satisfy this by yielding tokens from its walk in that order or by ordering the palette at the attribution site — the attribution is the contract, the mechanism is not — and the budget-same-valued-tokens-* vectors pin it. design-seam-round-trip / design-seam-reject fixtures (DESIGN_SEAM.md): the design-provider seam's records; decode with the decoder-named entry point (design-system-ref, design-brief, design-request, design-result, design-exchange), then either re-encode byte-equal to expectedFile or assert the structured refusal (expectedErrorCode exactly at expectedPath). See WIRE_FORMAT.md at this corpus root.",
   "kinds": [
     "Badge",
     "Box",
@@ -219,6 +219,233 @@
       "inputFile": "cards/card-minimal.json",
       "expectedFile": "cards/card-minimal.json",
       "description": "identity + content hash, no props and no summary (WIRE_FORMAT 25.1)"
+    },
+    {
+      "id": "design-reject-brief-ref-missing-hash",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-reject-brief-ref-missing-hash.json",
+      "expectedErrorCode": "DESIGN_MISSING_MEMBER",
+      "expectedPath": "$.designSystem.bundleHash",
+      "description": "a brief whose design-system reference is missing its hash"
+    },
+    {
+      "id": "design-reject-brief-unknown-interaction",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-reject-brief-unknown-interaction.json",
+      "expectedErrorCode": "DESIGN_UNKNOWN_INTERACTION",
+      "expectedPath": "$.interactions[1]",
+      "description": "an interaction outside the closed vocabulary: nothing in the language lowers 'Hover'"
+    },
+    {
+      "id": "design-reject-brief-unknown-member",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-reject-brief-unknown-member.json",
+      "expectedErrorCode": "DESIGN_UNKNOWN_MEMBER",
+      "expectedPath": "$.palette",
+      "description": "a brief carrying a member the record does not declare: a brief is an agreement, so an unknown member is a disagreement"
+    },
+    {
+      "id": "design-reject-brief-viewport-width",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-reject-brief-viewport-width.json",
+      "expectedErrorCode": "DESIGN_OUT_OF_RANGE",
+      "expectedPath": "$.viewports[0].width",
+      "description": "a viewport of no width"
+    },
+    {
+      "id": "design-reject-exchange-system-mismatch",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-exchange",
+      "inputFile": "design/design-reject-exchange-system-mismatch.json",
+      "expectedErrorCode": "DESIGN_SYSTEM_MISMATCH",
+      "expectedPath": "$.result.designSystem.bundleHash",
+      "description": "a result citing a different design-system bundle than the request it was fetched for"
+    },
+    {
+      "id": "design-reject-ref-bad-hash",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-system-ref",
+      "inputFile": "design/design-reject-ref-bad-hash.json",
+      "expectedErrorCode": "DESIGN_BAD_HASH",
+      "expectedPath": "$.bundleHash",
+      "description": "a hash spelled in uppercase: a hash is 'sha256:' and 64 LOWERCASE hexadecimal digits"
+    },
+    {
+      "id": "design-reject-ref-missing-hash",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-system-ref",
+      "inputFile": "design/design-reject-ref-missing-hash.json",
+      "expectedErrorCode": "DESIGN_MISSING_MEMBER",
+      "expectedPath": "$.bundleHash",
+      "description": "a reference missing its bundle hash: a design made against an unnamed bundle cannot be lowered against any"
+    },
+    {
+      "id": "design-reject-request-unknown-state",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-request",
+      "inputFile": "design/design-reject-request-unknown-state.json",
+      "expectedErrorCode": "DESIGN_UNKNOWN_TOKEN",
+      "expectedPath": "$.state",
+      "description": "a request state outside Manual, Pending and Ready"
+    },
+    {
+      "id": "design-reject-request-wrong-type",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-request",
+      "inputFile": "design/design-reject-request-wrong-type.json",
+      "expectedErrorCode": "DESIGN_WRONG_TYPE",
+      "expectedPath": "$.$type",
+      "description": "a brief handed to the request entry point: $type names the record a document is"
+    },
+    {
+      "id": "design-reject-result-annotation-missing-components",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-reject-result-annotation-missing-components.json",
+      "expectedErrorCode": "DESIGN_MISSING_MEMBER",
+      "expectedPath": "$.annotations[0].components",
+      "description": "an annotation missing its component list: annotations are lenient about UNKNOWN members, never about missing required ones"
+    },
+    {
+      "id": "design-reject-result-file-missing-hash",
+      "kind": "design-seam-reject",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-reject-result-file-missing-hash.json",
+      "expectedErrorCode": "DESIGN_MISSING_MEMBER",
+      "expectedPath": "$.screens[0].files[0].hash",
+      "description": "a screen file with no content hash"
+    },
+    {
+      "id": "design-brief-full",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-brief-full.json",
+      "expectedFile": "design/design-brief-full.json",
+      "description": "a brief with every member present, every interaction of the closed vocabulary and every cardinality"
+    },
+    {
+      "id": "design-brief-minimal",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-brief-minimal.json",
+      "expectedFile": "design/design-brief-minimal.json",
+      "description": "a brief with every optional member absent and every list empty: a list member is always present, empty or not"
+    },
+    {
+      "id": "design-brief-optional-absent",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-brief",
+      "inputFile": "design/design-brief-optional-absent.json",
+      "expectedFile": "design/design-brief-optional-absent.json",
+      "description": "a brief whose lists are populated and whose optional members (purpose, density, the reference's projectId) are absent"
+    },
+    {
+      "id": "design-exchange-same-system",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-exchange",
+      "inputFile": "design/design-exchange-same-system.json",
+      "expectedFile": "design/design-exchange-same-system.json",
+      "description": "a request and the result fetched for it, made against the same design-system bundle: the exchange rule holds"
+    },
+    {
+      "id": "design-ref-full",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-system-ref",
+      "inputFile": "design/design-ref-full.json",
+      "expectedFile": "design/design-ref-full.json",
+      "description": "a design-system reference with every member present"
+    },
+    {
+      "id": "design-ref-minimal",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-system-ref",
+      "inputFile": "design/design-ref-minimal.json",
+      "expectedFile": "design/design-ref-minimal.json",
+      "description": "a design-system reference with its one optional member (projectId) absent; for this record the minimal and the every-optional-absent vectors are the same document"
+    },
+    {
+      "id": "design-request-full",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-request",
+      "inputFile": "design/design-request-full.json",
+      "expectedFile": "design/design-request-full.json",
+      "description": "a Pending request with every member present; its briefHash is the hash of design-brief-full's bytes"
+    },
+    {
+      "id": "design-request-minimal",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-request",
+      "inputFile": "design/design-request-minimal.json",
+      "expectedFile": "design/design-request-minimal.json",
+      "description": "a Manual request (the design is made interactively and retrieved by its declared export) with no handle"
+    },
+    {
+      "id": "design-request-optional-absent",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-request",
+      "inputFile": "design/design-request-optional-absent.json",
+      "expectedFile": "design/design-request-optional-absent.json",
+      "description": "a Ready request with its optional members (handle, the reference's projectId) absent"
+    },
+    {
+      "id": "design-result-annotation-unknown-member",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-result-annotation-unknown-member.json",
+      "expectedFile": "design/design-result-full.json",
+      "description": "an annotation carrying a member its record does not declare: an annotation is evidence, so the member is ignored rather than refused, and the result re-encodes without it (expectedFile is design-result-full's bytes)"
+    },
+    {
+      "id": "design-result-full",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-result-full.json",
+      "expectedFile": "design/design-result-full.json",
+      "description": "a result with two screens of HTML, CSS and image files and a component inventory per screen, named as the bundle names its cards"
+    },
+    {
+      "id": "design-result-minimal",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-result-minimal.json",
+      "expectedFile": "design/design-result-minimal.json",
+      "description": "a result with no screens and no annotations; its contentHash is the hash of the empty file list"
+    },
+    {
+      "id": "design-result-optional-absent",
+      "kind": "design-seam-round-trip",
+      "since": "0.97.0",
+      "decoder": "design-result",
+      "inputFile": "design/design-result-optional-absent.json",
+      "expectedFile": "design/design-result-optional-absent.json",
+      "description": "a result with screens and its optional member (annotations) absent"
     },
     {
       "id": "elc-ans-accept-full",

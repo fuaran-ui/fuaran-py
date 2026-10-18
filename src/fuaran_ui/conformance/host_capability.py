@@ -307,6 +307,10 @@ def build(
 
 _NO_CARD_CODEC = "this host has no contract-card codec (§25) for the card fixtures to run against yet"
 _TELEPORT_UNRUN = "the teleport module is unit-tested by hand; its suite does not yet run the corpus teleport/ fixtures"
+_NO_DESIGN_SEAM = (
+    "this host ships no design-provider seam: its records are read by a design-tool integration, "
+    "and this host carries none"
+)
 _LAW_UNRUN = "this host's suite does not yet run this law family's vectors"
 
 #: Every corpus family, and this host's answer for it (WIRE_FORMAT §27.7).
@@ -345,6 +349,8 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
         )
     },
     "decode-policy": {"notApplicable": "this host's decoder offers no §23 kind admission policy"},
+    "design-seam-reject": {"notApplicable": _NO_DESIGN_SEAM},
+    "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
     "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
     "repair": {"pending": "this host has no §28 repair function yet"},

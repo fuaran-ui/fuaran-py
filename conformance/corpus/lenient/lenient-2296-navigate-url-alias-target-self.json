@@ -1,0 +1,1 @@
+{"id":"len-nav-url","kind":{"$type":"Button","label":{"$type":"Literal","text":"Home"},"onClick":{"$type":"Navigate","target":"Self","url":"/"},"variant":"Primary"}}

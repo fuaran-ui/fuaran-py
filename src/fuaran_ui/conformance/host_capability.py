@@ -340,6 +340,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "apply/limitsApply": "covered",
     "apply/styleNormaliseApply": "covered",
     "apply/skeletonApply": {"pending": "the apply engine's suite does not yet run the skeleton-apply vectors"},
+    "chain": "covered",  # tests/test_op_stream.py
     "dag": "covered",
     "merge-conformance": "covered",
     "sanitization": "covered",
@@ -348,6 +349,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
     "laws/decimal": "covered",  # tests/test_decimal_laws.py
     "laws/fieldLaws": {"pending": _LAW_UNRUN},
+    "laws/propagationLaws": {"pending": _LAW_UNRUN},
     # tests/test_transform_laws.py — every evalPipeline vector but the `-unit-` ones (fuaran#2208),
     # which it names; the columnOp and delta case kinds have no surface here and are named too.
     "laws/transformLaws": "covered",

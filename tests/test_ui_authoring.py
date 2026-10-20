@@ -1906,8 +1906,9 @@ def _authored() -> dict[str, t.UiNode]:
                 ],
             )
         ),
-        # ── Phase 1579 — Mount (2) ───────────────────────────────────────────
+        # ── Phase 1579 — Mount (3) ───────────────────────────────────────────
         "mount-1": fuaran.mount("mount-1", scope_id="guest-sidebar"),
+        "mount-no-onbubble": fuaran.mount("mount-no-onbubble", scope_id="guest-sidebar", on_bubble=False),
         "mount-2": fuaran.mount(
             "mount-2",
             scope_id="guest-metrics",

@@ -1,0 +1,1 @@
+{"id":"btn-invoke","kind":{"$type":"Button","label":"Run model","onClick":{"$type":"Invoke","capabilityId":"model.score"},"variant":"Primary"}}

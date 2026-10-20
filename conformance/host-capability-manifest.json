@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.10.0",
-  "corpusAuthority": "abb4f386c2585270ed2602c2b5e0cc6915d9b67c",
+  "corpusAuthority": "dd05578c2fdbd75a8ab6dfbfefcbeccbc27bf502",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -58,6 +58,7 @@
       "pending": "the apply engine's suite does not yet run the skeleton-apply vectors"
     },
     "apply/styleNormaliseApply": "covered",
+    "chain": "covered",
     "contract-card-reject": {
       "pending": "this host has no contract-card codec (§25) for the card fixtures to run against yet"
     },
@@ -93,6 +94,9 @@
     "laws/dataframeParity": "covered",
     "laws/decimal": "covered",
     "laws/fieldLaws": {
+      "pending": "this host's suite does not yet run this law family's vectors"
+    },
+    "laws/propagationLaws": {
       "pending": "this host's suite does not yet run this law family's vectors"
     },
     "laws/transformLaws": "covered",

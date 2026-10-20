@@ -1,0 +1,1 @@
+{"id":"len-grid","kind":{"$type":"DataGrid","columns":[{"field":"task","kind":{"$type":"Text"},"label":"Task"}],"rowKeyField":"task","source":{"$type":"State","defaultValue":[{"task":"Design"}],"key":"tasks"}}}

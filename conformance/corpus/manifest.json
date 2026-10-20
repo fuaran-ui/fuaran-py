@@ -968,6 +968,42 @@
       "description": "§3.2 — a multi-select (`\"multiple\":true`) carrying a `value` beside its `values` decodes and re-encodes WITHOUT `value`: a multi-select carries `values` and no `value`, and never reads one. Three spellings, one per child: the empty-`Static` placeholder every pre-1962 multi-select carried (bare, and with `\"value\":null`) and a real State binding of the kind models wrote beside `values`. A malformed `value` still refuses as a malformed binding (Phase 1962)"
     },
     {
+      "id": "lenient-2296-datagrid-reorderable-false",
+      "kind": "lenient-accept",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2296-datagrid-reorderable-false.json",
+      "expectedFile": "lenient/lenient-2296-datagrid-reorderable-false.expected.json",
+      "description": "fuaran#2296 — an explicit `reorderable: false` is the default and normalises away; a host passing the member through structurally re-emits a second canonical form"
+    },
+    {
+      "id": "lenient-2296-modal-modality-explicit",
+      "kind": "lenient-accept",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2296-modal-modality-explicit.json",
+      "expectedFile": "lenient/lenient-2296-modal-modality-explicit.expected.json",
+      "description": "fuaran#2296 — an explicit `modality: \"Modal\"` is the default modality's real token: accepted, and omitted at default in the canonical form (one host refused it and accepted an invented `Blocking`)"
+    },
+    {
+      "id": "lenient-2296-navigate-to-alias",
+      "kind": "lenient-accept",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2296-navigate-to-alias.json",
+      "expectedFile": "lenient/lenient-2296-navigate-to-alias.expected.json",
+      "description": "fuaran#2296 — the `to` alias of Navigate's `route`, beside a non-default `target` that is kept"
+    },
+    {
+      "id": "lenient-2296-navigate-url-alias-target-self",
+      "kind": "lenient-accept",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2296-navigate-url-alias-target-self.json",
+      "expectedFile": "lenient/lenient-2296-navigate-url-alias-target-self.expected.json",
+      "description": "fuaran#2296 — an ALIASED Navigate (`url`→`route`) still takes the full decoding arm: the route is read as a TextSource and the explicit `target: \"Self\"` normalises away"
+    },
+    {
       "id": "lenient-2300-declared-default-bindings",
       "kind": "lenient-accept",
       "since": "0.97.0",
@@ -3038,6 +3074,24 @@
       "description": "§21 max node depth — a tree at EXACTLY the limit (24 levels). Rule 1: every conformant host MUST decode this; refusing it is non-conformance, not conservatism"
     },
     {
+      "id": "limit-node-depth-at-max-errorboundary-fallback",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/limit-node-depth-at-max-errorboundary-fallback.json",
+      "expectedFile": "nodes/limit-node-depth-at-max-errorboundary-fallback.json",
+      "description": "§21 max node depth through an ErrorBoundary fallback — a tree at EXACTLY the limit (24 levels) whose deep path is the fallback. Rule 1: every conformant host MUST decode this. Its past-the-bound twin is `reject-limit-node-depth-errorboundary-fallback`"
+    },
+    {
+      "id": "limit-node-depth-at-max-switch-case",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/limit-node-depth-at-max-switch-case.json",
+      "expectedFile": "nodes/limit-node-depth-at-max-switch-case.json",
+      "description": "§21 max node depth through a Switch case — a tree at EXACTLY the limit (24 levels) whose deep path is the only case's child. Rule 1: every conformant host MUST decode this. Its past-the-bound twin is `reject-limit-node-depth-switch-case`"
+    },
+    {
       "id": "limit-skeleton-rows-at-max",
       "kind": "node-round-trip",
       "since": "0.81.0",
@@ -3344,6 +3398,15 @@
       "description": "Mount (§4o — capabilities + TwoWay message shape + value/slot inputs)"
     },
     {
+      "id": "mount-no-onbubble",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/mount-no-onbubble.json",
+      "expectedFile": "nodes/mount-no-onbubble.json",
+      "description": "Mount (§4o — onBubble OMITTED: no bubble handler declared)"
+    },
+    {
       "id": "multiselect-1",
       "kind": "node-round-trip",
       "since": "0.3.0",
@@ -3414,6 +3477,15 @@
       "inputFile": "nodes/progress-1.json",
       "expectedFile": "nodes/progress-1.json",
       "description": "Display/Progress"
+    },
+    {
+      "id": "proto-safe-keys",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/proto-safe-keys.json",
+      "expectedFile": "nodes/proto-safe-keys.json",
+      "description": "Prototype-safe wire keys (fuaran#1931) — `__proto__`, `constructor` and `toString` as a TonedPill map's keys, a state key, a row field and its key field, and a column label. Every host must round-trip the document byte for byte: the keys are data, never members of the host's own object model"
     },
     {
       "id": "query-dependson",
@@ -3531,6 +3603,15 @@
       "inputFile": "nodes/step-1.json",
       "expectedFile": "nodes/step-1.json",
       "description": "Layout/Stepper"
+    },
+    {
+      "id": "stepper-no-onselect",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/stepper-no-onselect.json",
+      "expectedFile": "nodes/stepper-no-onselect.json",
+      "description": "Layout/Stepper (Phase 2328 — onSelect OMITTED)"
     },
     {
       "id": "style-direction-isolated-1",
@@ -3812,6 +3893,15 @@
       "description": "Input/FileUpload (Phase 1548 — a declared selection-count ceiling on a multiple upload; maxBytes OMITTED)"
     },
     {
+      "id": "upload-no-onselect",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/upload-no-onselect.json",
+      "expectedFile": "nodes/upload-no-onselect.json",
+      "description": "Input/FileUpload (Phase 2328 — onSelect OMITTED)"
+    },
+    {
       "id": "upload-paste-1",
       "kind": "node-round-trip",
       "since": "0.70.0",
@@ -4091,6 +4181,236 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.value",
       "description": "a single-select (`multiple` absent) with no `value`. `value` is the single-select binding and is required there; only a multi-select omits it (WIRE_FORMAT §3.2, Phase 1962)"
+    },
+    {
+      "id": "reject-2296-aitool-missing-args",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-aitool-missing-args.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[2].args",
+      "description": "the IDL-required `AiTool.args` absent from an otherwise canonical document (`btn-json-payloads` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-aitool-missing-toolname",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-aitool-missing-toolname.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[2].toolName",
+      "description": "the IDL-required `AiTool.toolName` absent from an otherwise canonical document (`btn-json-payloads` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-call-missing-endpoint",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-call-missing-endpoint.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.onConfirm.endpoint",
+      "description": "the IDL-required `Call.endpoint` absent from an otherwise canonical document (`action-confirm` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-disclosure-missing-heading",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-disclosure-missing-heading.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.heading",
+      "description": "the IDL-required `Disclosure.heading` absent from an otherwise canonical document (`discl-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-errorboundary-missing-child",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-errorboundary-missing-child.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.child",
+      "description": "the IDL-required `ErrorBoundary.child` absent from an otherwise canonical document (`boundary-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-errorboundary-missing-fallback",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-errorboundary-missing-fallback.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.fallback",
+      "description": "the IDL-required `ErrorBoundary.fallback` absent from an otherwise canonical document (`boundary-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-focus-missing-nodeid",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-focus-missing-nodeid.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[1].nodeId",
+      "description": "the IDL-required `Focus.nodeId` absent from an otherwise canonical document (`action-focus` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-format-missing-format",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-format-missing-format.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.children[0].kind.text.binding.format",
+      "description": "the IDL-required `Format.format` absent from an otherwise canonical document (`format-since` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-format-missing-locale",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-format-missing-locale.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.children[0].kind.text.binding.locale",
+      "description": "the IDL-required `Format.locale` absent from an otherwise canonical document (`format-since` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-format-missing-source",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-format-missing-source.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.children[0].kind.text.binding.source",
+      "description": "the IDL-required `Format.source` absent from an otherwise canonical document (`format-since` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-i18n-missing-key",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-i18n-missing-key.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text.key",
+      "description": "the IDL-required `I18n.key` absent from an otherwise canonical document (`text-i18n-bound-arg-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-invoke-missing-args",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-invoke-missing-args.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.args",
+      "description": "the IDL-required `Invoke.args` absent from an otherwise canonical document (`btn-invoke` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-invoke-missing-capabilityid",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-invoke-missing-capabilityid.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.capabilityId",
+      "description": "the IDL-required `Invoke.capabilityId` absent from an otherwise canonical document (`btn-invoke` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-local-missing-initialfrom",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-local-missing-initialfrom.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.fields[0].kind.value.initialFrom",
+      "description": "the IDL-required `Local.initialFrom` absent from an otherwise canonical document (`form-local-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-map-missing-centrelatitude",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-map-missing-centrelatitude.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.centreLatitude",
+      "description": "the IDL-required `Map.centreLatitude` absent from an otherwise canonical document (`map-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-map-missing-centrelongitude",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-map-missing-centrelongitude.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.centreLongitude",
+      "description": "the IDL-required `Map.centreLongitude` absent from an otherwise canonical document (`map-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-map-missing-zoom",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-map-missing-zoom.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.zoom",
+      "description": "the IDL-required `Map.zoom` absent from an otherwise canonical document (`map-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-navigate-missing-route",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-navigate-missing-route.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.route",
+      "description": "the IDL-required `Navigate.route` absent from an otherwise canonical document (`action-navigate-target` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-notify-missing-channel",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-notify-missing-channel.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[1].channel",
+      "description": "the IDL-required `Notify.channel` absent from an otherwise canonical document (`button-print` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-notify-missing-payload",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-notify-missing-payload.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[1].payload",
+      "description": "the IDL-required `Notify.payload` absent from an otherwise canonical document (`button-print` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-readfilebody-missing-encoding",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-readfilebody-missing-encoding.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.encoding",
+      "description": "the IDL-required `ReadFileBody.encoding` absent from an otherwise canonical document (`btn-read-workbook` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-readfilebody-missing-fileref",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-readfilebody-missing-fileref.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.fileRef",
+      "description": "the IDL-required `ReadFileBody.fileRef` absent from an otherwise canonical document (`btn-read-workbook` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2296-splitpanel-missing-weight",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2296-splitpanel-missing-weight.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.weight",
+      "description": "the IDL-required `SplitPanel.weight` absent from an otherwise canonical document (`split-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
     },
     {
       "id": "reject-a11y-hidden-nonbool",
@@ -4713,6 +5033,26 @@
       "description": "§21 max node depth — one level past the limit (25). Refused with LIMIT_EXCEEDED, never INVALID_JSON (rule 2) and never a throw (rule 3)"
     },
     {
+      "id": "reject-limit-node-depth-errorboundary-fallback",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-node-depth-errorboundary-fallback.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$",
+      "description": "§21 max node depth through an ErrorBoundary fallback — one level past the limit (25), the deep path being the fallback. A depth walk that counts only ordered child lists never sees it (fuaran#2297)"
+    },
+    {
+      "id": "reject-limit-node-depth-switch-case",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-limit-node-depth-switch-case.json",
+      "expectedErrorCode": "LIMIT_EXCEEDED",
+      "expectedPath": "$",
+      "description": "§21 max node depth through a Switch case — one level past the limit (25), the deep path being the only case's child. A depth walk that counts only ordered child lists never sees it (fuaran#2297)"
+    },
+    {
       "id": "reject-limit-op-depth",
       "kind": "reject",
       "since": "0.35.0",
@@ -4903,6 +5243,16 @@
       "description": "Switch missing stateKey"
     },
     {
+      "id": "reject-modal-modality-blocking",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-modal-modality-blocking.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.modality",
+      "description": "a Modal `modality` of `\"Blocking\"` — the token one host once invented for the `Modal` modality and accepted while refusing the real one (fuaran#2296). The closed pair is `Modal | Popover`; the path is the bare slot, as for `reject-modal-modality-unknown`"
+    },
+    {
       "id": "reject-modal-modality-nonstring",
       "kind": "reject",
       "since": "0.70.0",
@@ -4921,6 +5271,16 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.kind.modality",
       "description": "a Modal `modality` of `\"Sheet\"` — outside the closed pair `Modal | Popover`. A sheet, a drawer and a menu are all PRESENTATIONS of one of the two modalities rather than a third one, so the answer to this document is not to widen the enum but to say which of the two it meant. The path is the bare slot, per §6 and the Phase 1073 ruling: a bare enum carries no discriminator on the wire, so there is no `.$type` to name"
+    },
+    {
+      "id": "reject-mount-direction-inonly",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-mount-direction-inonly.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.channel.direction",
+      "description": "Mount ChannelDirection value 'InOnly' (§4o) — a near-miss of the closed set (OutOnly, TwoWay) that one host once admitted (fuaran#2299)"
     },
     {
       "id": "reject-multi-box-layout-role",

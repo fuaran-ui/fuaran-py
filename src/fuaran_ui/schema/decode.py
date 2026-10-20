@@ -380,6 +380,11 @@ def _decode_text_source(value: object, path: str) -> Value:
         # refused the same document — and a tagged `Static` was re-emitted
         # tagged where they collapse it to the bare value. Both are divergences
         # this widening would have manufactured.
+        #
+        # Phase 2328 — `key` is IDL-required: an `I18n` with no key names no
+        # message, and the reference refuses it MISSING_FIELD at `<path>.key`
+        # (`reject-2296-i18n-missing-key`).
+        _require(obj, "key", path)
         fields: dict[str, Value] = {}
         for member, raw in obj.items():
             if member == "$type":

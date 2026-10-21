@@ -184,22 +184,6 @@ KNOWN_HOST_DIVERGENCES: dict[str, str] = {
 }
 
 
-# Node fixtures the reference host cannot decode yet, so its generator skips them and the
-# golden cannot cover them. The sub-second timestamp tags (Phase 2206) reach the reference
-# when it moves onto Fuaran.Core 1.0.0, whose columnar codec reads them; until then this
-# host is checked against the corpus alone for these. The set is self-retiring: once a
-# regenerated golden covers one, the coverage test below fails until it is dropped here.
-AWAITING_REFERENCE: dict[str, str] = {
-    name: "a sub-second timestamp tag the pinned reference's columnar codec does not decode yet (Phase 2206)"
-    for name in (
-        "grid-transform-timestamp-unit-ms",
-        "grid-transform-timestamp-unit-us",
-        "grid-transform-timestamp-unit-ns",
-        "grid-transform-timestamp-widening",
-    )
-}
-
-
 def _reference() -> dict[str, Any]:
     return json.loads(_REFERENCE.read_text(encoding="utf-8"))["fixtures"]
 
@@ -223,9 +207,7 @@ def test_the_reference_golden_covers_the_bundled_snapshot_exactly() -> None:
     """A snapshot re-sync that adds, drops or renames a node fixture reddens here: the golden
     is regenerated in the same change (``tests/fixtures/speech/generate_reference.fsx``)."""
     snapshot = {p.stem for p in (SNAPSHOT_ROOT / "nodes").glob("*.json")}
-    covered = set(_reference())
-    assert not covered & set(AWAITING_REFERENCE), "the golden now covers these: drop them from AWAITING_REFERENCE"
-    assert covered == snapshot - set(AWAITING_REFERENCE)
+    assert set(_reference()) == snapshot
 
 
 _GOLDEN = sorted(_reference())

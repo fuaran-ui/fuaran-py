@@ -23,47 +23,30 @@ import dataclasses
 import functools
 import json
 import operator
+import os
+import subprocess
+import sys
 import typing
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from _corpus import CORPUS_ROOT, corpus_required
+from _corpus import CORPUS_ROOT, SNAPSHOT_ROOT, corpus_required
 from fuaran_ui import __version__
 from fuaran_ui.conformance import host_capability as hc
+from fuaran_ui.conformance import run_fixture
 from fuaran_ui.model import Obj
+from fuaran_ui.schema import generated
 from fuaran_ui.schema import types as real_types
 
-# The published artefact and the snapshot beside it are REPOSITORY files, so they are
-# located from the test tree — the idiom `_corpus.py` already uses — and never from the
-# imported module. `hc._default_output()` / `hc._snapshot_authority()` walk four parents up
-# from `host_capability.py`, which lands on the repo root only in a src-layout CHECKOUT: CI
-# installs this package non-editably (`pip install ".[dev]"`), so under it those helpers
-# resolve `<sys.prefix>/lib/pythonX.Y/conformance/…` and every assertion below died with
-# `FileNotFoundError`. The helpers are right for what they are for — `python -m … --write`,
-# which is only ever run from a checkout — so the fix belongs on this side of the boundary.
-# Resolving the artefact here also makes the gate measure what it means: the bytes committed
-# in THIS repository against what the INSTALLED host's model generates.
+# The published artefact is a REPOSITORY file, so it is located from the test tree - the idiom
+# `_corpus.py` already uses - and the generator is asked about THAT checkout (`hc._snapshot_authority`
+# takes the repository it reads). Resolving the artefact here makes the gate measure what it means:
+# the bytes committed in THIS repository against what the INSTALLED host's model generates. CI installs
+# the package non-editably, where nothing about the module's own location names a checkout at all.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 PUBLISHED = _REPO_ROOT / "conformance" / "host-capability-manifest.json"
-
-
-def _published_snapshot_authority() -> str | None:
-    """The corpus commit this repo's bundled snapshot records, or ``None`` when there is none.
-
-    The repo-located twin of ``hc._snapshot_authority()``; see the note above for why the
-    module-located one cannot answer under a non-editable install. Provenance only — the
-    generation reads no corpus.
-    """
-    snapshot = _REPO_ROOT / "conformance" / "corpus" / "snapshot.json"
-    if not snapshot.is_file():
-        return None
-    try:
-        recorded = json.loads(snapshot.read_text(encoding="utf-8")).get("authorityCommit")
-    except (OSError, ValueError):  # pragma: no cover — a torn snapshot is not a generation failure
-        return None
-    return recorded if isinstance(recorded, str) else None
 
 
 def _authoring_stub(**overrides: object) -> SimpleNamespace:
@@ -94,7 +77,7 @@ BASELINE = set(hc.build()["tokens"])
 def test_the_published_manifest_is_current() -> None:
     """The gate's whole job: a manifest regenerated from the model must equal the committed bytes."""
     assert PUBLISHED.is_file(), f"{PUBLISHED} is missing — run: python -m {hc.GENERATOR} --write"
-    expected = hc.render(hc.build(corpus_authority=_published_snapshot_authority()))
+    expected = hc.render(hc.build(corpus_authority=hc._snapshot_authority(_REPO_ROOT)))
     assert PUBLISHED.read_text(encoding="utf-8") == expected, (
         f"{PUBLISHED} is stale — run: python -m {hc.GENERATOR} --write"
     )
@@ -178,23 +161,13 @@ def test_the_two_out_of_scope_unions_are_the_recorded_ones() -> None:
     assert "CellKindErased" in reason and "ColumnWidth" in reason
 
 
-# ── the corpus attestation ───────────────────────────────────────────────────
+# ── the vocabulary attestation ──────────────────────────────────────────────
 #
-# `idl.json` and `schemas/` are NOT part of the offline snapshot `conformance/sync_corpus.py`
-# copies, so a standalone checkout resolves `CORPUS_ROOT` to the snapshot and has neither. These
-# three attest against the authority when it is beside us and skip by name when it is not —
-# `corpus_required` alone would fail there, which reads as a defect in this host rather than as an
-# absent oracle.
+# These read the GENERATED vocabulary (`fuaran_ui.schema.generated`, Phase 2296), which is the IDL
+# this checkout carries, so they run on every checkout. Before it they read the authority corpus's
+# `idl.json` and skipped by name when it was absent — on a standalone checkout, and in a worktree.
 
 
-def _idl() -> dict:
-    path = CORPUS_ROOT / "idl.json"
-    if not path.is_file():
-        pytest.skip(f"{path} is absent — the offline snapshot does not carry the IDL")
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-@corpus_required
 def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     """The one direction that matters: this host may LAG a wire union, never widen it.
 
@@ -202,8 +175,7 @@ def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     unrecoverable, because a consumer reads a genuine host gap as its own lag and is sent to fix
     code that is not wrong.
     """
-    idl = _idl()
-    spec_cases = {u["name"]: {c["tag"] for c in u["cases"]} for u in idl["unions"]}
+    spec_cases = {name: set(cases) for name, cases in generated.UNION_CASES.items()}
     published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
 
     for union in published["families"]["unionCases"]["scope"]:
@@ -217,13 +189,23 @@ def test_no_scoped_union_invents_a_case_the_wire_does_not_have() -> None:
     assert not invented, f"declared union cases the wire does not have: {sorted(invented)}"
 
 
-@corpus_required
 def test_no_declared_kind_is_outside_the_corpus_vocabulary() -> None:
-    idl = _idl()
-    spec_kinds = {k["tag"] for k in idl["kinds"]}
     published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
     declared = {t.split(".", 1)[1] for t in published["tokens"] if t.startswith("Kind.")}
-    assert not declared - spec_kinds, f"declared kinds the wire does not have: {sorted(declared - spec_kinds)}"
+    assert not declared - set(generated.KINDS), (
+        f"declared kinds the wire does not have: {sorted(declared - set(generated.KINDS))}"
+    )
+
+
+def test_the_generator_refuses_an_over_declared_union_case(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Falsifier for the refusal in ``build``: shrink one scoped union in the vocabulary the generator
+    reads, and a case this host does author becomes an over-declaration it will not publish."""
+    union = "LocaleSource"
+    assert union in json.loads(PUBLISHED.read_text(encoding="utf-8"))["families"]["unionCases"]["scope"]
+    shrunk = {**generated.UNION_CASES, union: generated.UNION_CASES[union][:1]}
+    monkeypatch.setattr(hc._generated, "UNION_CASES", shrunk)
+    with pytest.raises(ValueError, match="declared union cases the wire does not have"):
+        hc.build()
 
 
 @corpus_required
@@ -234,3 +216,284 @@ def test_the_manifest_matches_its_published_schema() -> None:
         pytest.skip(f"{schema_path} is absent — the corpus predates WIRE_FORMAT §27")
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     jsonschema.validate(json.loads(PUBLISHED.read_text(encoding="utf-8")), schema)
+
+
+# ── every claim is exercised green by the bundled corpus (Phase 1881) ────────
+#
+# A token says this host has a spelling for a construct (§27.5), and a consumer computes its
+# expected-unmodelled set from the tokens (§27.4). So a token the host cannot actually carry is the
+# over-declaration §27.1 calls unrecoverable, and it surfaces DOWNSTREAM — in another repository's
+# conformance run, against a release. This check moves that failure here: every claimed token is
+# walked out of the BUNDLED snapshot (the corpus this release certifies against, which the manifest
+# names as its ``corpusAuthority``), and every fixture carrying it must round-trip green through this
+# host. A claim ahead of the code is then a red test in this gate, before any tag.
+
+#: The families whose documents are wire trees this host decodes and re-encodes byte-identically.
+_EXERCISING_FAMILIES = ("node-round-trip", "op-round-trip", "lenient-accept")
+
+#: Claimed tokens no fixture of the bundled corpus writes, each with the slot that would carry it.
+#: The gap is the CORPUS's (no fixture exercises the construct on any host), not this host's. The
+#: list may only shrink: an entry the corpus comes to exercise, or one this host no longer claims,
+#: is red below, so it cannot outlive the gap it names.
+_NO_HOLE_FIXTURE = "no fixture declares a FragmentDecl hole of this shape (HoleDecl.Value)"
+CORPUS_UNEXERCISED: dict[str, str] = {
+    "CellFormat.None": "only ever the omitted default of Metric.format; no fixture spells it in another slot",
+    "CellFormat.SignificantDigits": "no fixture writes it in a CellFormat slot (Metric, LabelValueRow, a column)",
+    "Format.Duration": "no fixture writes it in a Format slot (Chart.valueFormat, Binding.Format, a Local codec)",
+    "FragmentArg.Bool": "no FragmentRef or Mount fixture passes a boolean argument",
+    "HoleValueSpace.AnyString": _NO_HOLE_FIXTURE,
+    "LocalFlushTrigger.OnCommitAction": (
+        "only the lowers-to family's commit-local trees write it, and that family is not a round-trip one"
+    ),
+    "LocalFlushTrigger.OnSubmit": "no fixture writes it in a Binding.Local flushOn slot",
+    "HoleValueSpace.Enum": _NO_HOLE_FIXTURE,
+    "Scalar.Bool": _NO_HOLE_FIXTURE,
+    "Scalar.Float": _NO_HOLE_FIXTURE,
+}
+
+
+def _bind(t: generated.T, arg: generated.T | None) -> generated.T:
+    """``t`` with the generic parameter ``'T`` of an instantiated union (``Binding<float>``) bound."""
+    if arg is None:
+        return t
+    if t.kind == "var":
+        return arg
+    return dataclasses.replace(
+        t,
+        of=_bind(t.of, arg) if t.of is not None else None,
+        args=tuple(_bind(a, arg) for a in t.args),
+        wire_type=_bind(t.wire_type, arg) if t.wire_type is not None else None,
+    )
+
+
+def _walk_fields(obj: object, fields: tuple[generated.F, ...], out: set[str], arg: generated.T | None) -> None:
+    if isinstance(obj, dict):
+        for field in fields:
+            if field.name in obj:
+                _walk(obj[field.name], _bind(field.type, arg), out)
+
+
+def _walk(value: object, t: generated.T, out: set[str]) -> None:
+    """The tokens a wire value exercises, read against the generated IDL (WIRE_FORMAT §27.4)."""
+    if t.kind == "node" and isinstance(value, dict):
+        _walk(value["kind"], generated.T("kind"), out)
+        _walk_fields(value, generated.NODE_FIELDS, out, None)
+    elif t.kind == "kind" and isinstance(value, dict):
+        out.add(f"Kind.{value['$type']}")
+        _walk_fields(value, generated.KIND_FIELDS.get(value["$type"], ()), out, None)
+    elif t.kind == "op" and isinstance(value, dict):
+        _walk_fields(value, generated.OP_FIELDS.get(value["$type"], ()), out, None)
+    elif t.kind == "union" and t.name is not None:
+        if isinstance(value, dict) and "$type" in value:
+            out.add(f"{t.name}.{value['$type']}")
+            cases = generated.UNION_CASE_FIELDS.get(t.name, {})
+            _walk_fields(value, cases.get(value["$type"], ()), out, t.args[0] if t.args else None)
+        elif t.name in generated.UNION_TRANSPARENT_CASE:
+            out.add(f"{t.name}.{generated.UNION_TRANSPARENT_CASE[t.name]}")
+    elif t.kind == "hosted" and t.wire_type is not None:
+        _walk(value, t.wire_type, out)
+    elif t.kind == "record" and t.name is not None:
+        _walk_fields(value, generated.RECORD_FIELDS.get(t.name, ()), out, None)
+    elif t.kind == "list" and t.of is not None and isinstance(value, list):
+        for item in value:
+            _walk(item, t.of, out)
+    elif t.kind == "map" and t.of is not None and isinstance(value, dict):
+        for item in value.values():
+            _walk(item, t.of, out)
+
+
+def _exercising(corpus_root: Path) -> dict[str, list[dict]]:
+    """Each token, and the fixtures (of the exercising families) whose canonical document carries it."""
+    manifest = json.loads((corpus_root / "manifest.json").read_text(encoding="utf-8"))
+    by_token: dict[str, list[dict]] = {}
+    for fixture in manifest["fixtures"]:
+        if fixture["kind"] not in _EXERCISING_FAMILIES:
+            continue
+        document = json.loads((corpus_root / fixture["expectedFile"]).read_text(encoding="utf-8"))
+        found: set[str] = set()
+        _walk(document, generated.T(fixture["decoder"]), found)
+        for token in found:
+            by_token.setdefault(token, []).append(fixture)
+    return by_token
+
+
+Runner = typing.Callable[[dict, Path], typing.Any]
+
+
+def _claim_findings(
+    tokens: typing.Iterable[str],
+    corpus_root: Path,
+    run: Runner = run_fixture,
+    unexercised: typing.Mapping[str, str] = CORPUS_UNEXERCISED,
+) -> list[str]:
+    """Every way a claimed token is not exercised green by the corpus at ``corpus_root``."""
+    claimed = set(tokens)
+    exercising = _exercising(corpus_root)
+    verdicts: dict[str, bool] = {}
+    findings: list[str] = []
+    for token in sorted(claimed):
+        fixtures = exercising.get(token, [])
+        if not fixtures:
+            if token not in unexercised:
+                findings.append(f"{token}: claimed, and no fixture of the corpus exercises it")
+            continue
+        if token in unexercised:
+            findings.append(f"{token}: declared unexercised, but {fixtures[0]['id']} exercises it; retire the entry")
+        for fixture in fixtures:
+            if fixture["id"] not in verdicts:
+                verdicts[fixture["id"]] = bool(run(fixture, corpus_root).passed)
+        red = sorted(fx["id"] for fx in fixtures if not verdicts[fx["id"]])
+        if red:
+            findings.append(f"{token}: claimed, and red in {red}")
+    findings.extend(
+        f"{token}: declared unexercised, but this host no longer claims it"
+        for token in sorted(set(unexercised) - claimed)
+    )
+    return findings
+
+
+def test_the_manifest_was_attested_against_the_bundled_snapshot() -> None:
+    """The corpus the check below reads is the one this release names, not whatever is checked out."""
+    published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
+    assert published["corpusAuthority"] == hc._snapshot_authority(_REPO_ROOT)
+    assert (SNAPSHOT_ROOT / "manifest.json").is_file()
+
+
+def test_every_claimed_token_is_exercised_green_by_the_bundled_corpus() -> None:
+    published = json.loads(PUBLISHED.read_text(encoding="utf-8"))
+    findings = _claim_findings(published["tokens"], SNAPSHOT_ROOT)
+    assert not findings, "the manifest claims ahead of what the corpus proves:\n" + "\n".join(findings)
+
+
+def test_a_claim_the_host_cannot_carry_is_red() -> None:
+    """Falsifier: a host that fails one fixture reddens exactly the claims that fixture carries."""
+    exercising = _exercising(SNAPSHOT_ROOT)
+    victim = exercising["Kind.Badge"][0]["id"]
+
+    def fails_victim(fixture: dict, corpus_root: Path) -> SimpleNamespace:
+        return SimpleNamespace(passed=fixture["id"] != victim)
+
+    findings = _claim_findings(["Kind.Badge", "Binding.Static"], SNAPSHOT_ROOT, run=fails_victim, unexercised={})
+    assert findings and all(victim in finding for finding in findings)
+    assert any(finding.startswith("Kind.Badge:") for finding in findings)
+
+
+def test_a_claim_no_fixture_exercises_is_red() -> None:
+    assert _claim_findings(["CellFormat.SignificantDigits"], SNAPSHOT_ROOT, unexercised={}) == [
+        "CellFormat.SignificantDigits: claimed, and no fixture of the corpus exercises it"
+    ]
+
+
+def test_a_residual_entry_cannot_outlive_its_gap() -> None:
+    stale = {"Kind.Badge": "pretend no fixture writes it", "Kind.NotAKind": "pretend it is claimed"}
+    findings = _claim_findings(["Kind.Badge"], SNAPSHOT_ROOT, unexercised=stale)
+    assert any(f.startswith("Kind.Badge: declared unexercised, but") for f in findings)
+    assert "Kind.NotAKind: declared unexercised, but this host no longer claims it" in findings
+
+
+def test_the_walk_reads_a_hosted_slot_through_its_wire_type() -> None:
+    """``FormFieldKind.Text.value`` is hosted with a ``Binding<string>`` wire type: a ``Local``
+    binding inside it is a claim the walk must see, or the claim is checked against nothing."""
+    assert "form-local-debounce" in {fx["id"] for fx in _exercising(SNAPSHOT_ROOT)["Binding.Local"]}
+    assert "form-local-debounce" in {fx["id"] for fx in _exercising(SNAPSHOT_ROOT)["LocalFlushTrigger.OnDebounce"]}
+
+
+# ── the generator writes to the tree it is run in (Phase 2225) ───────────────
+#
+# An editable install made in one checkout is importable from every other, so a generator that
+# located its target from `__file__` wrote into the checkout the interpreter's install pointed at.
+# From a git worktree run with the primary's interpreter that is the shared primary clone: the
+# worktree's `--write` exited 0, printed a path, and changed nothing in the worktree. These tests
+# run the REAL module as a subprocess, importing it from this checkout's `src/`, and stand in a
+# scratch checkout - so the "installed location" and the "tree it is run in" are different trees.
+
+_SYNC_MARKER = Path("conformance") / "sync_corpus.py"
+_SCRATCH_AUTHORITY = "ab" * 20
+
+
+def _scratch_checkout(root: Path) -> Path:
+    """A throwaway checkout: the marker file, and a snapshot recording a distinctive commit."""
+    (root / _SYNC_MARKER).parent.mkdir(parents=True)
+    (root / _SYNC_MARKER).write_text("# marker\n", encoding="utf-8")
+    snapshot = root / "conformance" / "corpus" / "snapshot.json"
+    snapshot.parent.mkdir()
+    snapshot.write_text(json.dumps({"authorityCommit": _SCRATCH_AUTHORITY, "kind": "corpusSnapshot"}), encoding="utf-8")
+    return root
+
+
+def _generate(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONPATH"] = str(_REPO_ROOT / "src")
+    return subprocess.run(
+        [sys.executable, "-m", hc.GENERATOR, *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+
+
+def _published_stamp() -> tuple[int, int]:
+    stat = PUBLISHED.stat()
+    return stat.st_mtime_ns, stat.st_size
+
+
+def test_write_lands_in_the_checkout_it_is_run_in_not_the_one_holding_the_module(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+    before = _published_stamp()
+
+    done = _generate(scratch, "--write")
+
+    target = scratch / "conformance" / "host-capability-manifest.json"
+    assert done.returncode == 0, done.stderr
+    assert target.is_file(), f"nothing was written under the invoking checkout: {done.stdout!r}"
+    assert _published_stamp() == before, "the module's own checkout was written to"
+    written = json.loads(target.read_text(encoding="utf-8"))
+    # Read from the SCRATCH snapshot, not this repository's: provenance follows the same root.
+    assert written["corpusAuthority"] == _SCRATCH_AUTHORITY
+
+
+def test_write_from_a_subdirectory_still_finds_the_enclosing_checkout(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+    (scratch / "docs" / "deep").mkdir(parents=True)
+
+    assert _generate(scratch / "docs" / "deep", "--write").returncode == 0
+    assert (scratch / "conformance" / "host-capability-manifest.json").is_file()
+
+
+def test_an_explicit_repo_wins_over_the_invoking_directory(tmp_path: Path) -> None:
+    named = _scratch_checkout(tmp_path / "named")
+    standing_in = _scratch_checkout(tmp_path / "standing-in")
+
+    assert _generate(standing_in, "--write", "--repo", str(named)).returncode == 0
+    assert (named / "conformance" / "host-capability-manifest.json").is_file()
+    assert not (standing_in / "conformance" / "host-capability-manifest.json").exists()
+
+
+def test_check_reads_the_artefact_of_the_invoking_checkout(tmp_path: Path) -> None:
+    scratch = _scratch_checkout(tmp_path / "scratch")
+
+    missing = _generate(scratch)
+    assert missing.returncode == 1 and "does not exist" in missing.stderr
+    assert _generate(scratch, "--write").returncode == 0
+    assert _generate(scratch).returncode == 0
+
+
+def test_run_outside_any_checkout_refuses_rather_than_falling_back_to_the_module(tmp_path: Path) -> None:
+    before = _published_stamp()
+    outside = tmp_path / "nowhere"
+    outside.mkdir()
+
+    done = _generate(outside, "--write")
+
+    assert done.returncode == 2
+    assert "--repo" in done.stderr
+    assert _published_stamp() == before
+    assert not (outside / "conformance").exists()
+
+
+def test_an_explicit_repo_that_is_not_a_checkout_is_refused(tmp_path: Path) -> None:
+    done = _generate(tmp_path, "--write", "--repo", str(tmp_path))
+    assert done.returncode == 2
+    assert "not a fuaran-py checkout" in done.stderr

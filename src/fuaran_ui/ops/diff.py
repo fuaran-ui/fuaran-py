@@ -24,7 +24,9 @@ the same oracle the corpus commits to — *not* Python object identity.
    field-level refinement (``UpdateProp`` per differing addressable field), **propose-then-verify**
    by applying the candidates and accepting only if they reproduce ``after``'s kind; otherwise
    take the coarse-but-correct floor ``EditNode(after.kind)`` (which carries ``after``'s whole
-   subtree). Then emit ``UpdateStyle`` / ``UpdateState`` for a drifted facet.
+   subtree). Then emit the style edit and ``UpdateState`` for a drifted facet. A style edit
+   is field-level (Phase 2314, the F# engine's rule since Phase 2291): ``PatchStyle`` naming
+   exactly the members that moved, and the whole-record ``UpdateStyle`` only when all six did.
 3. **Children** (layout child list): ``RemoveNode`` for dropped ids (before-order), ``InsertChild``
    for new children appended at the growing tail, a single ``ReorderChildren`` if the post-insert
    order still differs from the target, then recurse into the children present on both sides.
@@ -33,9 +35,11 @@ the same oracle the corpus commits to — *not* Python object identity.
 law) is unconditional; the granularity of the emitted ops can regress to a wholesale ``EditNode``
 without ever breaking round-trip. Two edits are inexpressible in the op vocabulary and therefore
 not emitted (mirroring the F# engine): an **accessibility-only** change (no ``UpdateAccessibility``
-op) and a facet **removal** — a style/state present in ``before`` but absent in ``after`` (the
-``UpdateStyle`` / ``UpdateState`` ops can set a facet, never delete one). Neither arises from an
-op-reachable ``after``, which is the round-trip law's domain.
+op) and a state **removal** — a state present in ``before`` but absent in ``after`` (``UpdateState``
+can set the facet, never delete it). Neither arises from an op-reachable ``after``, which is the
+round-trip law's domain. A style removal IS expressible: an absent style slot is the all-default
+record (WIRE_FORMAT §3.1), so it diffs to the ``PatchStyle`` returning the moved members to their
+default tokens, which the apply engine stores as the absent slot (Phase 2313).
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ from __future__ import annotations
 from ..canonical import encode_value
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
+from ..schema.decode import _STYLE_DEFAULTS
 from .apply import _FIELDS, _NOT_SUPPORTED, LAYOUT_KINDS, apply
 
 # ── facet-isolation helpers (closure-safe canonical probes) ──────────────────
@@ -91,8 +96,12 @@ def _kind_canonical(node: Node) -> str:
     return encode_value(Node(node.id, _childless_kind(node.kind), {}))
 
 
-def _style_of(node: Node) -> Value | None:
-    return node.extras.get("style")
+def _style_record(node: Node) -> dict[str, Value]:
+    """The node's whole style record, every member materialised: an absent slot, or a
+    member omitted at its default, reads as that member's default token (§3.1/§3.6)."""
+    style = node.extras.get("style")
+    present = style.fields if isinstance(style, Obj) else {}
+    return {member: present.get(member, default) for member, default in _STYLE_DEFAULTS.items()}
 
 
 def _state_of(node: Node) -> Value | None:
@@ -206,13 +215,26 @@ def _try_field_level(a: Node, b: Node) -> list[Obj] | None:
     return candidates if _kind_canonical(probe) == _kind_canonical(b) else None
 
 
+def _style_ops(a: Node, b: Node) -> list[Obj]:
+    """The op taking ``a``'s style to ``b``'s: nothing when the records are equal;
+    ``PatchStyle`` naming exactly the members that moved (a member returning to its
+    default is spelled with the default token — in a delta that is an edit, not an
+    omission); and the whole-record ``UpdateStyle`` only when every member moved."""
+    before = _style_record(a)
+    after = _style_record(b)
+    moved = {member: value for member, value in after.items() if _canon(before[member]) != _canon(value)}
+    if not moved:
+        return []
+    if len(moved) == len(after):
+        record = {member: value for member, value in after.items() if value != _STYLE_DEFAULTS[member]}
+        return [Obj("UpdateStyle", {"style": Obj(None, record), "target": b.id})]
+    return [Obj("PatchStyle", {"style": Obj(None, moved), "target": b.id})]
+
+
 def _facet_ops(a: Node, b: Node) -> list[Obj]:
-    """``UpdateStyle`` / ``UpdateState`` for a facet that drifted (and is present on
-    ``b`` — a facet removal is not op-expressible)."""
-    ops: list[Obj] = []
-    b_style = _style_of(b)
-    if b_style is not None and _canon(_style_of(a)) != _canon(b_style):
-        ops.append(Obj("UpdateStyle", {"style": b_style, "target": b.id}))
+    """The style edit, then ``UpdateState`` for a state that drifted (and is present on
+    ``b`` — a state removal is not op-expressible)."""
+    ops = _style_ops(a, b)
     b_state = _state_of(b)
     if b_state is not None and _canon(_state_of(a)) != _canon(b_state):
         ops.append(Obj("UpdateState", {"state": b_state, "target": b.id}))

@@ -1,0 +1,71 @@
+{
+  "family": "styleNormaliseApply",
+  "description": "The absent style slot and the all-default SemanticStyle record are ONE value (WIRE_FORMAT section 3.1: `style` is omitted entirely when every member is at its default; section 3.6: each member is omitted at its identity). An apply engine therefore stores a style result equal to the default record as the ABSENT slot, whichever op produced it - UpdateStyle, which writes the whole record, or PatchStyle (section 3.4). A host that stores an empty style object instead encodes the tree as `\"style\":{}`, so two hosts applying one op to one tree disagree on its canonical bytes, and any equality, merge or footprint computed over those bytes sees a difference where there is none. Each vector carries `input.tree` (a wire node) and `input.op` (a wire op) as canonical JSON STRINGS, decoded by the host's own wire decoder. Every vector is an `accept`: apply must succeed AND the host's canonical re-encoding of the applied tree must equal `expected.tree` byte for byte. Unlike the limitsApply and duplicateIdsApply families, this one pins RESULT bytes, because the bytes are the property under test.",
+  "vectors": [
+    {
+      "id": "updatestyle-default-clears-a-styled-node",
+      "case": "UpdateStyle",
+      "description": "A node carrying all six style members off their defaults is restyled to the all-default record: the result stores the ABSENT slot, so the node encodes with no `style` member at all - never `\"style\":{}`.",
+      "input": {
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"},\"style\":{\"direction\":\"rtl\",\"emphasis\":\"Loud\",\"role\":\"Eyebrow\",\"tone\":\"Success\",\"voice\":\"Display\",\"weight\":\"Spacious\"}}",
+        "op": "{\"$type\":\"UpdateStyle\",\"style\":{},\"target\":\"m\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"}}"
+      }
+    },
+    {
+      "id": "updatestyle-default-on-an-unstyled-node",
+      "case": "UpdateStyle",
+      "description": "A node whose style is already absent is restyled to the all-default record: the tree is byte-identical to the input.",
+      "input": {
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"}}",
+        "op": "{\"$type\":\"UpdateStyle\",\"style\":{},\"target\":\"m\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"}}"
+      }
+    },
+    {
+      "id": "updatestyle-nondefault-replaces-the-record",
+      "case": "UpdateStyle",
+      "description": "The control: a styled node restyled to a non-default record stores that record as given. The op replaces the WHOLE record, so the three members the payload omits return to their defaults and are omitted (section 3.6), leaving only the two it names.",
+      "input": {
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}",
+        "op": "{\"$type\":\"UpdateStyle\",\"style\":{\"role\":\"Eyebrow\",\"voice\":\"Structural\"},\"target\":\"m\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"},\"style\":{\"role\":\"Eyebrow\",\"voice\":\"Structural\"}}"
+      }
+    },
+    {
+      "id": "patchstyle-back-to-default-clears",
+      "case": "PatchStyle",
+      "description": "A PatchStyle that sets every non-default member of a styled node back to its default token leaves the default record, which is stored as the absent slot exactly as UpdateStyle stores it (Phase 2291's rule).",
+      "input": {
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}",
+        "op": "{\"$type\":\"PatchStyle\",\"style\":{\"emphasis\":\"Normal\",\"tone\":\"Default\",\"weight\":\"Standard\"},\"target\":\"m\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"m\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"m\"}}"
+      }
+    },
+    {
+      "id": "updatestyle-default-clears-a-nested-node",
+      "case": "UpdateStyle",
+      "description": "The first vector one level down: a styled child of a layout parent is restyled to the all-default record and stores the absent slot, while its styled sibling is carried through unchanged.",
+      "input": {
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"},\"style\":{\"direction\":\"rtl\",\"emphasis\":\"Loud\",\"role\":\"Eyebrow\",\"tone\":\"Success\",\"voice\":\"Display\",\"weight\":\"Spacious\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\",\"wrap\":false},\"role\":\"Group\"}}",
+        "op": "{\"$type\":\"UpdateStyle\",\"style\":{},\"target\":\"a\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"r\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"a\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"b\"},\"style\":{\"emphasis\":\"Loud\",\"tone\":\"Success\",\"weight\":\"Spacious\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}"
+      }
+    }
+  ]
+}

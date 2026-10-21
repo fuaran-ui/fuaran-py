@@ -160,8 +160,10 @@ class binding:  # noqa: N801 — namespace object, mirrors the cross-tier `bindi
         return t.State(key, default_value)
 
     @staticmethod
-    def filter(name: str) -> Binding:  # noqa: A003 — wire case name
-        return t.Filter(name)
+    def filter(name: str, *, default_value: t.Value = None) -> Binding:  # noqa: A003 — wire case name
+        """``Binding.Filter`` — a named filter source; ``default_value`` (Phase 2334)
+        yields until the filter is first set."""
+        return t.Filter(name, default_value)
 
     @staticmethod
     def selection(node_id: str, *, field: str | None = None, default_value: t.Value = None) -> Binding:
@@ -315,9 +317,16 @@ class action:  # noqa: N801 — namespace object
         return t.WriteToClipboard(_text(text))
 
     @staticmethod
-    def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text") -> Action:
-        """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure."""
-        return t.ReadFileBody(file_ref, encoding)
+    def read_file_body(file_ref: str, encoding: t.FileReadEncoding = "Text", *, on_read: bool = True) -> Action:
+        """``Action.ReadFileBody`` — read a selected file's body; ``onRead`` is a closure,
+        declared by ``on_read`` (Phase 2334), and omitted when ``False``."""
+        return t.ReadFileBody(file_ref, encoding, on_read)
+
+    @staticmethod
+    def commit_local(node_id: str) -> Action:
+        """``Action.CommitLocal`` — flush the ``Binding.Local`` buffer of ``node_id``, whose
+        trigger is ``t.OnCommitAction()`` (Phase 2334)."""
+        return t.CommitLocal(node_id)
 
     @staticmethod
     def call(endpoint: str, *, into: t.CallResultTarget | None = None, on_result: bool = False) -> Action:
@@ -761,12 +770,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         dismissable: bool = False,
         on_dismiss: Action | None = _NO_OP_DISMISS,
         heading: t.TextInput | None = None,
-        modality: t.ModalityKind = "Blocking",
+        modality: t.ModalityKind = "Modal",
         anchor: str | None = None,
     ) -> UiNode:
         """A modal surface, in one of TWO modalities (fuaran#1119).
 
-        `Blocking` is the default and the identity: it asserts the page behind it
+        `Modal` is the default and the identity: it asserts the page behind it
         is INERT, and a host emits `aria-modal` to say so. `Popover` is the
         NON-BLOCKING anchored surface, and it carries the dialog role WITHOUT
         that claim — the page behind it is genuinely still available, and a host
@@ -1239,7 +1248,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         *,
         label: t.TextInput,
         source: Binding,
-        value: Binding,
+        value: Binding | None = None,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
         multiple: bool = False,
@@ -1250,11 +1259,15 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         """The select control. ``on_change=False`` OMITS the handler key, which is what
         arms a renderer's write-back default against ``value`` / ``values`` — see
         :class:`~fuaran_ui.schema.types.Select`. ``on_change_multi`` is the MULTI
-        channel's own handler (Phase 1576) and arms independently of it."""
+        channel's own handler (Phase 1576) and arms independently of it. Phase 1962 —
+        the constructor enforces the single/multi ``value`` rule the record cannot
+        state: a multi-select (``multiple=True``) carries ``values`` and no ``value``,
+        so a ``value`` handed to it is dropped; a single-select always carries one, so
+        an absent ``value`` becomes the empty ``Static`` ("no selection")."""
         kind = t.Select(
             _text(label),
             source,
-            value,
+            None if multiple else (value if value is not None else t.Static(None)),
             _text(placeholder) if placeholder is not None else None,
             disabled,
             multiple,
@@ -1352,6 +1365,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         data_labels: t.ChartDataLabels | None = None,
         x_scale: t.ChartXScale | None = None,
         annotations: Sequence[t.ChartAnnotation] | None = None,
+        on_point_click: bool = False,
     ) -> UiNode:
         """The eight slots past ``stacked`` are each ABSENT by default, so a chart
         authored before they existed encodes byte-for-byte as it did.
@@ -1375,6 +1389,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             data_labels=data_labels,
             x_scale=x_scale,
             annotations=tuple(annotations) if annotations is not None else None,
+            on_point_click=on_point_click,
         )
         return _node(id, spec, accessibility.chart)
 
@@ -1407,8 +1422,9 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         centre_latitude: float = 0.0,
         centre_longitude: float = 0.0,
         zoom: float = 4.0,
+        on_marker_click: bool = False,
     ) -> UiNode:
-        return _node(id, t.Map(source, centre_latitude, centre_longitude, zoom), accessibility.map)
+        return _node(id, t.Map(source, centre_latitude, centre_longitude, zoom, on_marker_click), accessibility.map)
 
     @staticmethod
     def grid(
@@ -1431,6 +1447,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         repeat_header: bool = False,
         window_state_key: str | None = None,
         row_total: Binding | None = None,
+        on_row_click: bool = False,
     ) -> UiNode:
         """``row_key_field`` names the row property that identifies a row — the
         declarative sibling of the erased ``rowKey`` closure; pass it whenever the
@@ -1439,7 +1456,9 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         Every slot past it is a DECLARATIVE grid behaviour: one that survives the
         wire because it names a host State key rather than a closure. The
         constructor now reaches the whole record, so the ergonomic surface and the
-        typed one admit the same documents.
+        typed one admit the same documents. The one exception is ``on_row_click``
+        (Phase 2334): it declares a host row-click handler, which crosses the wire
+        only as the closure sentinel.
         """
         return _node(
             id,
@@ -1461,6 +1480,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
                 reorderable=reorderable,
                 window_state_key=window_state_key,
                 row_total=row_total,
+                on_row_click=on_row_click,
             ),
             accessibility.grid,
         )

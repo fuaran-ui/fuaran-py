@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -218,3 +219,198 @@ def test_check_cannot_measure_a_non_clone(tmp_path: Path, sentinel: Path) -> Non
     (plain / "manifest.json").write_text('{"fixtures": []}\n', encoding="utf-8")
     sentinel.write_text(json.dumps({"authorityCommit": "a" * 40, "kind": sync_corpus.SENTINEL_KIND}), encoding="utf-8")
     assert sync_corpus.check(plain) == 1
+
+
+# ── the pre-tag check: --check --remote (Phase 2225) ─────────────────────────
+#
+# `--check` measures the snapshot against the authority clone's HEAD, and a clone's HEAD is
+# whatever it last fetched. The 0.9.0 tag was cut on a snapshot that matched the maintainer's
+# clone and was behind the authority's `main` by one commit: the local check was green, and the
+# publish job - which checks the authority out fresh - refused. `--remote` asks the authority's
+# own remote what `main` is NOW (`git ls-remote`, which writes nothing, so a read-only clone is
+# fine), so the question a tag must answer is the one that gets asked.
+
+
+@pytest.fixture
+def published(authority: Path, tmp_path: Path) -> tuple[Path, Path]:
+    """``authority`` with an ``origin`` it has pushed to, and a second clone that can move it."""
+    origin = tmp_path / "origin.git"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(origin))
+    _git(authority, "remote", "add", "origin", str(origin))
+    _git(authority, "push", "-q", "origin", "main")
+    other = tmp_path / "other"
+    _git(tmp_path, "clone", "-q", str(origin), str(other))
+    _git(other, "config", "user.email", "tests@example.invalid")
+    _git(other, "config", "user.name", "fuaran-py tests")
+    return origin, other
+
+
+@git_available
+def test_remote_check_is_green_when_the_snapshot_records_the_remote_main(
+    authority: Path, sentinel: Path, published: tuple[Path, Path]
+) -> None:
+    sync_corpus.write_sentinel(authority, sentinel)
+    assert sync_corpus.check(authority, remote=True) == 0
+
+
+@git_available
+def test_remote_check_refuses_a_snapshot_the_local_clone_cannot_see_is_behind(
+    authority: Path, sentinel: Path, published: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The 0.9.0 case: the snapshot equals the clone's HEAD, and the remote has moved on."""
+    _, other = published
+    snapshot_sha = sync_corpus.write_sentinel(authority, sentinel)
+    remote_tip = _commit(other, "second.json", "{}\n")
+    _git(other, "push", "-q", "origin", "main")
+
+    assert sync_corpus.check(authority) == 0, "the local check is blind to the moved remote - that is the trap"
+    capsys.readouterr()
+
+    assert sync_corpus.check(authority, remote=True) == 2
+    reported = capsys.readouterr().err
+    assert f"authority {remote_tip}" in reported
+    assert f"snapshot {snapshot_sha}" in reported
+    assert "origin/main" in reported
+    # The clone never fetched the tip, so the distance is not invented - and the way to get it is named.
+    assert "an unknown number of commits" in reported
+    assert "git -C" in reported and "fetch" in reported
+
+
+@git_available
+def test_remote_check_reports_the_distance_once_the_clone_has_fetched(
+    authority: Path, sentinel: Path, published: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    _, other = published
+    sync_corpus.write_sentinel(authority, sentinel)
+    _commit(other, "second.json", "{}\n")
+    _git(other, "push", "-q", "origin", "main")
+    _git(authority, "fetch", "-q", "origin")
+
+    assert sync_corpus.check(authority, remote=True) == 2
+    assert "snapshot behind authority by 1 commit " in capsys.readouterr().err
+
+
+@git_available
+def test_remote_check_cannot_measure_an_unreachable_remote(
+    authority: Path, sentinel: Path, published: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Offline is UNMEASURED (1), never a pass: a pre-tag check that could not ask must not let a tag through."""
+    sync_corpus.write_sentinel(authority, sentinel)
+    _git(authority, "remote", "set-url", "origin", str(tmp_path / "no-such-remote.git"))
+
+    assert sync_corpus.check(authority, remote=True) == 1
+    assert "UNMEASURED" in capsys.readouterr().err
+
+
+@git_available
+def test_remote_check_cannot_measure_a_clone_with_no_origin(
+    authority: Path, sentinel: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sync_corpus.write_sentinel(authority, sentinel)
+    assert sync_corpus.check(authority, remote=True) == 1
+    assert "UNMEASURED" in capsys.readouterr().err
+
+
+# ── the script operates on the checkout it is run in (Phase 2225) ────────────
+
+_SCRIPT_IN_REPO = Path("conformance") / "sync_corpus.py"
+_RESOLVER_IN_REPO = Path("src") / "fuaran_ui" / "conformance" / "corpus_root.py"
+
+
+def _probe_checkout(root: Path) -> Path:
+    """A throwaway checkout holding the sync script and the resolver it loads."""
+    for rel in (_SCRIPT_IN_REPO, _RESOLVER_IN_REPO):
+        (root / rel).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(_REPO_ROOT / rel, root / rel)
+    return root
+
+
+def _script_env(corpus: Path | None) -> dict[str, str]:
+    env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_") and k != "FUARAN_WIRE_FIXTURES"}
+    if corpus is not None:
+        env["FUARAN_WIRE_FIXTURES"] = str(corpus)
+    return env
+
+
+def _run_script(script: Path, cwd: Path, corpus: Path | None, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(script), *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        env=_script_env(corpus),
+        check=False,
+    )
+
+
+def _bundled(root: Path) -> Path:
+    return root / "conformance" / "corpus" / "manifest.json"
+
+
+@pytest.fixture
+def corpus(tmp_path: Path) -> Path:
+    """A complete corpus to sync from: the bundled snapshot, minus its own sentinel."""
+    root = tmp_path / "authority-corpus"
+    shutil.copytree(_REPO_ROOT / "conformance" / "corpus", root)
+    (root / "snapshot.json").unlink()
+    return root
+
+
+def test_sync_writes_the_checkout_the_caller_stands_in_not_the_one_holding_the_script(
+    tmp_path: Path, corpus: Path
+) -> None:
+    holding = _probe_checkout(tmp_path / "holding")
+    standing_in = _probe_checkout(tmp_path / "standing-in")
+
+    done = _run_script(holding / _SCRIPT_IN_REPO, standing_in, corpus)
+
+    assert done.returncode == 0, done.stderr
+    assert _bundled(standing_in).is_file()
+    assert not _bundled(holding).exists(), "the checkout holding the script was written to"
+
+
+def test_an_explicit_repo_wins_over_the_directory_the_caller_stands_in(tmp_path: Path, corpus: Path) -> None:
+    holding = _probe_checkout(tmp_path / "holding")
+    named = _probe_checkout(tmp_path / "named")
+    standing_in = _probe_checkout(tmp_path / "standing-in")
+
+    done = _run_script(holding / _SCRIPT_IN_REPO, standing_in, corpus, "--repo", str(named))
+
+    assert done.returncode == 0, done.stderr
+    assert _bundled(named).is_file()
+    assert not _bundled(standing_in).exists()
+    assert not _bundled(holding).exists()
+
+
+def test_run_from_outside_any_checkout_falls_back_to_the_checkout_holding_the_script(
+    tmp_path: Path, corpus: Path
+) -> None:
+    holding = _probe_checkout(tmp_path / "holding")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+
+    done = _run_script(holding / _SCRIPT_IN_REPO, outside, corpus)
+
+    assert done.returncode == 0, done.stderr
+    assert _bundled(holding).is_file()
+
+
+def test_an_explicit_repo_that_is_not_a_checkout_is_refused(tmp_path: Path, corpus: Path) -> None:
+    holding = _probe_checkout(tmp_path / "holding")
+
+    done = _run_script(holding / _SCRIPT_IN_REPO, tmp_path, corpus, "--repo", str(tmp_path))
+
+    assert done.returncode == 1
+    assert "not a fuaran-py checkout" in done.stderr
+    assert not _bundled(holding).exists()
+
+
+def test_the_sibling_authority_is_looked_for_beside_the_checkout_being_operated_on(tmp_path: Path) -> None:
+    """With no corpus named, the fallback is the clone beside the CHECKOUT, not beside the script."""
+    holding = _probe_checkout(tmp_path / "ws-a" / "holding")
+    standing_in = _probe_checkout(tmp_path / "ws-b" / "standing-in")
+
+    done = _run_script(holding / _SCRIPT_IN_REPO, standing_in, None, "--check")
+
+    assert done.returncode == 1
+    assert str(tmp_path / "ws-b") in done.stderr and str(tmp_path / "ws-a") not in done.stderr

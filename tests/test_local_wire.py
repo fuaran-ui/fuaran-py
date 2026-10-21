@@ -44,14 +44,14 @@ _DECLARED = (
     '"kind":{"$type":"Number","value":{"$type":"Local","codec":{"$type":"Number","decimals":2},'
     '"commitTo":"order.unitPrice","flushOn":{"$type":"OnBlur"},"format":"<closure>","initialFrom":'
     '{"$type":"State","defaultValue":0,"key":"order.unitPrice"},"parse":"<closure>"}},'
-    '"label":"Unit price","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}'
+    '"label":"Unit price"}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}'
 )
 
 _CURRENCY_CODEC = (
     '{"id":"f","kind":{"$type":"Form","fields":[{"id":"amount","kind":{"$type":"Number","value":'
     '{"$type":"Local","codec":{"$type":"Currency","isoCode":"GBP"},"commitTo":"order.amount",'
     '"flushOn":{"$type":"OnBlur"},"format":"<closure>","initialFrom":{"$type":"State",'
-    '"defaultValue":0,"key":"order.amount"},"parse":"<closure>"}},"label":"Amount","required":false}],'
+    '"defaultValue":0,"key":"order.amount"},"parse":"<closure>"}},"label":"Amount"}],'
     '"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}'
 )
 
@@ -59,7 +59,7 @@ _BOTH_DESTINATIONS = (
     '{"id":"f","kind":{"$type":"Form","fields":[{"id":"email","kind":{"$type":"Text","value":'
     '{"$type":"Local","commitTo":"form.email","flushOn":{"$type":"OnBlur"},"format":"<closure>",'
     '"initialFrom":{"$type":"Static","value":"a@b.c"},"onCommit":"<closure>","parse":"<closure>"}},'
-    '"label":"Email","required":false}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}'
+    '"label":"Email"}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}'
 )
 
 

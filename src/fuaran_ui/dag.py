@@ -237,7 +237,7 @@ def _decode_dag_value(value: object, path: str) -> DagOpRecord:
             _fail(MISSING_FIELD, f"{path}.{required}", f"missing required field '{required}'")
 
     parents_raw = _expect_array(obj["parents"], f"{path}.parents")
-    parents = tuple(_expect_string(item, f"{path}.parents.{i}") for i, item in enumerate(parents_raw))
+    parents = tuple(_expect_string(item, f"{path}.parents[{i}]") for i, item in enumerate(parents_raw))
 
     envelope = _decode_envelope(obj["resultEnvelope"], f"{path}.resultEnvelope") if "resultEnvelope" in obj else SUCCESS
     tombstoned = _expect_bool(obj["tombstoned"], f"{path}.tombstoned") if "tombstoned" in obj else False

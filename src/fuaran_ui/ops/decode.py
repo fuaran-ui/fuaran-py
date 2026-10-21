@@ -28,6 +28,7 @@ from ..schema.decode import (
     _decode_node_value,
     _decode_state,
     _decode_style,
+    _decode_style_delta,
     _dispatch,
     _expect_array,
     _expect_int,
@@ -48,6 +49,7 @@ OP_CASES = frozenset(
         "UpdateProp",
         "ReplaceBinding",
         "UpdateStyle",
+        "PatchStyle",
         "UpdateState",
         "InsertChild",
         "RemoveNode",
@@ -106,18 +108,24 @@ def _op_style(value: object, path: str) -> Value:
     return _decode_style(value, path)
 
 
+def _op_style_delta(value: object, path: str) -> Value:
+    # Phase 2291 — PatchStyle's payload: the SemanticStyle token decoders, every
+    # present member kept (a default token is an edit), an empty delta refused.
+    return _decode_style_delta(value, path)
+
+
 def _op_state(value: object, path: str) -> Value:
     return _decode_state(value, path)
 
 
 def _op_id_list(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_expect_string(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 def _op_list(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
-    return Arr([_decode_op_value(item, f"{path}.{i}") for i, item in enumerate(arr)])
+    return Arr([_decode_op_value(item, f"{path}[{i}]") for i, item in enumerate(arr)])
 
 
 OpFieldDecoder = Callable[[object, str], Value]
@@ -127,6 +135,7 @@ OP_SCHEMAS: dict[str, list[tuple[str, bool, OpFieldDecoder]]] = {
     "UpdateProp": [("path", True, _op_string), ("target", True, _op_target), ("value", True, _op_json_value)],
     "ReplaceBinding": [("binding", True, _op_binding), ("slot", True, _op_string), ("target", True, _op_target)],
     "UpdateStyle": [("style", True, _op_style), ("target", True, _op_target)],
+    "PatchStyle": [("style", True, _op_style_delta), ("target", True, _op_target)],
     "UpdateState": [("state", True, _op_state), ("target", True, _op_target)],
     "InsertChild": [("child", True, _op_node), ("parentId", True, _op_target)],
     "RemoveNode": [("target", True, _op_target)],

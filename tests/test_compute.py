@@ -415,3 +415,58 @@ def test_param_pipeline_codec_round_trips() -> None:
     # a Param survived the decode (the filter predicate's right operand)
     filt = next(s for s in decoded.value if isinstance(s, Filter))
     assert isinstance(filt.pred.right, Param)  # type: ignore[attr-defined]
+
+
+# ── a rounding scale bound from a param (Phase 2001) ─────────────────────────
+
+
+def _rounded_by_param_node() -> Node:
+    """A grid whose derive rounds a decimal column to a scale named by a param."""
+    doc = {
+        "id": "rounded-by-param",
+        "kind": {
+            "$type": "DataGrid",
+            "columns": [],
+            "rowKey": "<closure>",
+            "source": {
+                "$type": "Transform",
+                "params": [{"from": {"$type": "Filter", "name": "places"}, "name": "places"}],
+                "pipeline": [
+                    {
+                        "$type": "derive",
+                        "expr": {
+                            "$type": "rounded",
+                            "expr": {"$type": "col", "name": "m"},
+                            "rounding": {"mode": "half-even", "scale": {"$param": "places"}},
+                        },
+                        "name": "r",
+                    }
+                ],
+                "source": {
+                    "columns": {"m": {"validity": [True, True], "values": ["2.25", "-0.35"]}},
+                    "schema": [{"name": "m", "type": "decimal"}],
+                },
+            },
+        },
+    }
+    result = decode_node(json.dumps(doc))
+    assert result.ok, f"decode: {result.error}"
+    return result.value
+
+
+@pytest.mark.parametrize(("places", "expected"), [(1, ["2.2", "-0.4"]), (0, ["2", "0"])])
+def test_a_rounding_scale_binds_from_a_param(places: int, expected: list[str]) -> None:
+    """The scale slot binds like any other param: the substituted pipeline rounds to it,
+    rather than reaching the evaluator as an unbound param."""
+    node = _rounded_by_param_node()
+    result = evaluate_transform(node.kind.fields["source"], {"places": places})
+    assert isinstance(result, ComputeOk), result
+    assert [row["r"] for row in result.rows] == expected
+
+
+def test_an_unset_rounding_scale_param_is_refused_by_name() -> None:
+    """A derive is never pruned, so an unset scale param reaches the evaluator's UNBOUND_PARAM."""
+    node = _rounded_by_param_node()
+    result = evaluate_transform(node.kind.fields["source"], {})
+    assert not isinstance(result, ComputeOk)
+    assert result.error.code == UNBOUND_PARAM

@@ -16,6 +16,7 @@ CI leg, and generative parity) is a follow-up.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +49,27 @@ def _first_diff(a: str, b: str) -> str:
     if len(a) != len(b):
         return f"length differs: got {len(a)}, expected {len(b)}"
     return "identical"
+
+
+# A dotted segment that is all digits is an array index spelled `.0` where the
+# WIRE_FORMAT §6 path form is `[0]` (Phase 1938).
+_DOTTED_INDEX = re.compile(r"\.[0-9]+(?=$|[.\[])")
+
+
+def path_matches(path: str, expected: str) -> str | None:
+    """Return why ``path`` fails ``expected``, or ``None`` when it matches.
+
+    ``expectedPath`` is a prefix (§6: an entry pins "an expectedPath prefix", and
+    seventeen reject fixtures name a shallower position than the one a host
+    reports), so the comparison is a prefix one — but at a SEGMENT boundary, so
+    ``$.kind.items`` never matches ``$.kind.itemsX``, and over a WELL-FORMED path,
+    so an index spelled ``.0`` is refused rather than hidden behind the prefix.
+    """
+    if _DOTTED_INDEX.search(path):
+        return f"path {path!r} spells an array index as a dotted segment; §6 writes it [i]"
+    if path != expected and not (path.startswith(expected) and path[len(expected)] in ".["):
+        return f"path {path!r} does not extend {expected!r} at a segment boundary"
+    return None
 
 
 def run_fixture(fixture: dict, corpus_root: Path) -> FixtureResult:
@@ -92,8 +114,9 @@ def run_fixture(fixture: dict, corpus_root: Path) -> FixtureResult:
         err = result.error
         if err.code != want_code:
             return FixtureResult(fid, kind, False, f"code {err.code} != expected {want_code}")
-        if not err.path.startswith(want_path):
-            return FixtureResult(fid, kind, False, f"path {err.path!r} does not start with {want_path!r}")
+        mismatch = path_matches(err.path, want_path)
+        if mismatch is not None:
+            return FixtureResult(fid, kind, False, mismatch)
         return FixtureResult(fid, kind, True, f"{err.code} at {err.path}")
 
     return FixtureResult(fid, kind, False, f"unknown fixture kind {kind!r}")

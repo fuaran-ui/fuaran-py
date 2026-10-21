@@ -1149,7 +1149,6 @@ def _authored() -> dict[str, t.UiNode]:
                         "closure-multiselect",
                         label="Tags",
                         source=binding.static([t.SelectOption("Red", "red")]),
-                        value=t.Static(None),
                         multiple=True,
                         values=binding.static(["red"]),
                         on_change_multi=True,
@@ -1173,7 +1172,6 @@ def _authored() -> dict[str, t.UiNode]:
                                     t.SelectOption("Operations", "ops"),
                                 ]
                             ),
-                            value=t.Static(None),
                             multiple=True,
                             values=binding.filter("depts"),
                             on_change=False,
@@ -1908,8 +1906,9 @@ def _authored() -> dict[str, t.UiNode]:
                 ],
             )
         ),
-        # ── Phase 1579 — Mount (2) ───────────────────────────────────────────
+        # ── Phase 1579 — Mount (3) ───────────────────────────────────────────
         "mount-1": fuaran.mount("mount-1", scope_id="guest-sidebar"),
+        "mount-no-onbubble": fuaran.mount("mount-no-onbubble", scope_id="guest-sidebar", on_bubble=False),
         "mount-2": fuaran.mount(
             "mount-2",
             scope_id="guest-metrics",
@@ -2424,7 +2423,6 @@ def test_select_multi_channel_arms_independently_of_the_single_one() -> None:
             "s",
             label="Tags",
             source=binding.static([]),
-            value=t.Static(None),
             multiple=True,
             values=binding.static([]),
             on_change_multi=True,

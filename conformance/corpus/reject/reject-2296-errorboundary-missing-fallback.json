@@ -1,0 +1,1 @@
+{"id":"boundary-1","kind":{"$type":"ErrorBoundary","child":{"id":"boundary-child","kind":{"$type":"Markdown","text":"Child body"}}}}

@@ -22,16 +22,19 @@ from ...canonical import encode_value
 from ...model import Arr, Obj, Value
 from ...result import INVALID_JSON
 from ...shapeguard import check_shape, load_bounded
+from . import decimal_text
 from .model import (
     AGG_FNS,
     BIN_OPS,
     COLUMN_TYPES,
+    DECIMAL,
     JOIN_KINDS,
     LIMIT_EXCEEDED,
     MALFORMED_SHAPE,
     MISSING_FIELD,
     NOT_JSON,
     NULL,
+    ROUNDING_MODES,
     SCALAR_FNS,
     TIMESTAMP_UNIT_DIGITS,
     TYPE_MISMATCH,
@@ -53,10 +56,12 @@ from .model import (
     Distinct,
     Embedded,
     Err,
+    Except,
     Filter,
     GroupBy,
     InList,
     InParam,
+    Intersect,
     IsNull,
     Join,
     Limit,
@@ -67,8 +72,11 @@ from .model import (
     Pivot,
     PivotSpec,
     Project,
+    Quotient,
     Ref,
     Result,
+    Rounded,
+    Rounding,
     Schema,
     Sort,
     Table,
@@ -79,6 +87,7 @@ from .model import (
     WindowSpec,
     cell_bool,
     cell_date,
+    cell_decimal,
     cell_float,
     cell_int,
     cell_str,
@@ -106,6 +115,8 @@ def _cell_value(ty: str, c: Cell) -> Value:
     present = default_for(ty) if is_null(c) else c
     if present.kind == "int" and ty == "float":
         return float(present.value)  # type: ignore[arg-type]
+    if present.kind == "int" and ty == DECIMAL:
+        return str(present.value)  # an int widens into a decimal column as its digits
     return present.value
 
 
@@ -132,8 +143,37 @@ def encode_source_value(src: DataSource) -> Value:
 
 
 def encode_source(src: DataSource) -> str:
-    """Canonical wire string for a :class:`DataSource`."""
+    """Canonical wire string for a :class:`DataSource`. Assumes a table whose cells belong to their
+    columns — :func:`try_encode_source` is the guarded entry point for derived or untrusted data."""
     return encode_value(encode_source_value(src))
+
+
+def _cell_fault(name: str, ty: str, c: Cell) -> ColumnError | None:
+    """Why a present cell cannot be written into column ``name`` of type ``ty``, if it cannot: a
+    cell of another type (an ``int`` widens into ``float`` and ``decimal``), a non-finite float, or
+    decimal text that is not canonical."""
+    if is_null(c):
+        return None
+    if c.kind != ty and not (c.kind == "int" and ty in ("float", DECIMAL)):
+        return ColumnError(TYPE_MISMATCH, f"column '{name}': a {c.kind} cell in a {ty} column")
+    if c.kind == "float" and not math.isfinite(c.value):  # type: ignore[arg-type]
+        return ColumnError(MALFORMED_SHAPE, f"column '{name}': a non-finite float has no wire form")
+    if c.kind == DECIMAL and not decimal_text.is_canonical(c.value):
+        return ColumnError(MALFORMED_SHAPE, f"column '{name}': decimal text '{c.value}' is not canonical")
+    return None
+
+
+def try_encode_source(src: DataSource) -> Result[str, ColumnError]:
+    """Total, guarded encode: every present cell is checked against its column first, so over a
+    table whose cells belong to their columns it is exactly ``Ok(encode_source(src))``, and a cell
+    that does not — decimal text that is not canonical included — is refused by name."""
+    if isinstance(src, Embedded):
+        for col in src.table.columns:
+            for c in col.cells:
+                fault = _cell_fault(col.name, col.type, c)
+                if fault is not None:
+                    return Err(fault)
+    return Ok(encode_source(src))
 
 
 # ── literals ──────────────────────────────────────────────────────────────────
@@ -149,6 +189,8 @@ def _cell_literal(c: Cell) -> Obj:
         "string": "Str",
         "date": "Date",
         "timestamp": "Timestamp",
+        # Phase 2001: the decimal TEXT, a JSON string — a number token would have been a float.
+        "decimal": "Decimal",
     }[c.kind]
     return _typed(tag, {"value": c.value})
 
@@ -189,7 +231,24 @@ def encode_expr_value(e: ColExpr) -> Value:
         return _typed("in", {"expr": encode_expr_value(e.expr), "param": e.param})
     if isinstance(e, IsNull):
         return _typed("isNull", {"expr": encode_expr_value(e.expr)})
+    if isinstance(e, Quotient):
+        return _typed(
+            "quotient",
+            {
+                "dividend": encode_expr_value(e.dividend),
+                "divisor": encode_expr_value(e.divisor),
+                "rounding": _rounding_obj(e.rounding),
+            },
+        )
+    if isinstance(e, Rounded):
+        return _typed("rounded", {"expr": encode_expr_value(e.expr), "rounding": _rounding_obj(e.rounding)})
     raise TypeError(f"cannot encode ColExpr {type(e)!r}")
+
+
+def _rounding_obj(r: Rounding) -> Obj:
+    # The scale is an integer slot: the literal, or `{"$param": name}` where a parameter binds it.
+    scale: Value = Obj(None, {"$param": r.scale.name}) if isinstance(r.scale, Param) else r.scale
+    return Obj(None, {"mode": r.mode, "scale": scale})
 
 
 # ── Transform ─────────────────────────────────────────────────────────────────
@@ -253,6 +312,10 @@ def encode_transform_value(t: Transform) -> Value:
         return _typed("limit", {"n": t.n, "offset": t.offset})
     if isinstance(t, Union):
         return _typed("union", {"source": encode_source_value(t.source)})
+    if isinstance(t, Intersect):
+        return _typed("intersect", {"source": encode_source_value(t.source)})
+    if isinstance(t, Except):
+        return _typed("except", {"source": encode_source_value(t.source)})
     raise TypeError(f"cannot encode Transform {type(t)!r}")
 
 
@@ -471,7 +534,34 @@ def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError
         r = _decode_instant(col, ty, v)
         if r is not None:
             return r
+    if ty == DECIMAL:
+        return _decode_decimal_value(col, v)
     return _err(TYPE_MISMATCH, f"column '{col}': expected {ty} value, got {_kind_name(v)}")
+
+
+#: The largest magnitude a whole-valued number token carries exactly: 2^53.
+_INT53_MAX = 9007199254740992
+
+
+def _decode_decimal_value(col: str, v: object) -> Result[Cell, ColumnError]:
+    """A decimal column reads a STRING of decimal text and canonicalises it (``12.50`` decodes to
+    ``12.5``), and a whole number token within 2^53, which is exact. A fractional token, or a whole
+    one past 2^53, has been through a float by the time it arrives, so it is refused: a type whose
+    purpose is exactness cannot vouch for it. An emitter writes a decimal as a string."""
+    if isinstance(v, str):
+        canonical = decimal_text.try_canonical(v)
+        if canonical is None:
+            return _err(
+                MALFORMED_SHAPE,
+                f"column '{col}': a decimal value must be decimal text — an optional '-', digits, and an "
+                "optional '.' followed by digits, with no exponent, sign '+', separator or white space",
+            )
+        return Ok(cell_decimal(canonical))
+    if isinstance(v, int) and not isinstance(v, bool) and abs(v) <= _INT53_MAX:
+        return Ok(cell_decimal(str(v)))
+    if isinstance(v, float) and math.isfinite(v) and v == math.floor(v) and abs(v) <= _INT53_MAX:
+        return Ok(cell_decimal(str(int(v))))
+    return _err(TYPE_MISMATCH, f"column '{col}': expected decimal value, got {_kind_name(v)}")
 
 
 def _decode_schema(el: object) -> Result[Schema, ColumnError]:
@@ -655,6 +745,14 @@ def _decode_cell_literal(el: object) -> Result[Cell, ColumnError]:
         return Ok(cell_date(v))
     if tag == "Timestamp" and isinstance(v, str):
         return Ok(cell_timestamp(v))
+    # Decimal text, canonicalised on read; an integer token is exact and read too, and anything
+    # else — a fractional number token included — is refused.
+    if tag == "Decimal" and isinstance(v, str):
+        canonical = decimal_text.try_canonical(v)
+        if canonical is not None:
+            return Ok(cell_decimal(canonical))
+    if tag == "Decimal" and isinstance(v, int) and not isinstance(v, bool):
+        return Ok(cell_decimal(str(v)))
     return _err(TYPE_MISMATCH, f"lit: bad value for {tag}")
 
 
@@ -797,6 +895,40 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
             return r  # type: ignore[return-value]
         inner = decode_expr(r.value)
         return inner if not inner.ok else Ok(IsNull(inner.value))  # type: ignore[return-value]
+    if k == "quotient":
+        rdd = _field(el, "dividend")
+        if not rdd.ok:
+            return rdd  # type: ignore[return-value]
+        dividend = decode_expr(rdd.value)
+        if not dividend.ok:
+            return dividend
+        rdv = _field(el, "divisor")
+        if not rdv.ok:
+            return rdv  # type: ignore[return-value]
+        divisor = decode_expr(rdv.value)
+        if not divisor.ok:
+            return divisor
+        rr = _field(el, "rounding")
+        if not rr.ok:
+            return rr  # type: ignore[return-value]
+        rounding = _decode_rounding(rr.value)
+        if not rounding.ok:
+            return rounding  # type: ignore[return-value]
+        return Ok(Quotient(dividend.value, divisor.value, rounding.value))
+    if k == "rounded":
+        r = _field(el, "expr")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        inner = decode_expr(r.value)
+        if not inner.ok:
+            return inner
+        rr = _field(el, "rounding")
+        if not rr.ok:
+            return rr  # type: ignore[return-value]
+        rounding = _decode_rounding(rr.value)
+        if not rounding.ok:
+            return rounding  # type: ignore[return-value]
+        return Ok(Rounded(inner.value, rounding.value))
     if k in ("contains", "startsWith", "endsWith"):
         # fuaran-core#93 — expression-level string-predicate spellings:
         # {"$type":"contains","expr":X,"other":Y} (also left/right) denotes
@@ -837,6 +969,31 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
         inner = decode_expr(r.value)
         return inner if not inner.ok else Ok(ApplyFn(k, [inner.value]))  # type: ignore[return-value]
     return _err(UNKNOWN_TYPE, f"unknown ColExpr '{k}'")
+
+
+def _decode_rounding(el: object) -> Result[Rounding, ColumnError]:
+    """A rounding policy: ``mode`` one of the seven spellings (anything else is ``UNKNOWN_TYPE``
+    naming them), ``scale`` an integer slot — the literal, or ``{"$param": name}``."""
+    rm = _field(el, "mode")
+    if not rm.ok:
+        return rm  # type: ignore[return-value]
+    if not isinstance(rm.value, str):
+        return _err(MALFORMED_SHAPE, "rounding mode: expected string")
+    if rm.value not in ROUNDING_MODES:
+        return _err(UNKNOWN_TYPE, f"unknown rounding mode '{rm.value}'; expected one of: {', '.join(ROUNDING_MODES)}")
+    rs = _field(el, "scale")
+    if not rs.ok:
+        return rs  # type: ignore[return-value]
+    scale = rs.value
+    if isinstance(scale, dict):
+        if "$param" not in scale:
+            return _err(MALFORMED_SHAPE, 'rounding scale: an object here is a parameter slot and must carry "$param"')
+        if not isinstance(scale["$param"], str):
+            return _err(MALFORMED_SHAPE, '"$param" must be a JSON string (rounding scale)')
+        return Ok(Rounding(Param(scale["$param"]), rm.value))
+    if isinstance(scale, bool) or not isinstance(scale, int):
+        return _err(MALFORMED_SHAPE, "rounding scale: expected int")
+    return Ok(Rounding(scale, rm.value))
 
 
 def _decode_flat_binary(el: object, op: str) -> Result[ColExpr, ColumnError]:
@@ -1167,6 +1324,14 @@ def decode_transform(el: object) -> Result[Transform, ColumnError]:  # noqa: C90
             return r  # type: ignore[return-value]
         src = decode_source_json(r.value)
         return src if not src.ok else Ok(Union(src.value))  # type: ignore[return-value]
+    if k in ("intersect", "except"):
+        r = _field(el, "source")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        src = decode_source_json(r.value)
+        if not src.ok:
+            return src  # type: ignore[return-value]
+        return Ok(Intersect(src.value) if k == "intersect" else Except(src.value))
     return _err(UNKNOWN_TYPE, f"unknown Transform '{k}'")
 
 

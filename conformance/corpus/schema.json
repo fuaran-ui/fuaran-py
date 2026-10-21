@@ -5325,8 +5325,7 @@
           },
           "required": [
             "$type",
-            "options",
-            "orientation"
+            "options"
           ]
         },
         {
@@ -5789,8 +5788,7 @@
       },
       "required": [
         "level",
-        "text",
-        "variant"
+        "text"
       ]
     },
     "MarkdownSpec": {
@@ -5815,8 +5813,7 @@
         }
       },
       "required": [
-        "label",
-        "variant"
+        "label"
       ]
     },
     "LinkSpec": {
@@ -5842,7 +5839,6 @@
         }
       },
       "required": [
-        "download",
         "href",
         "label"
       ]
@@ -5883,8 +5879,7 @@
       },
       "required": [
         "alt",
-        "src",
-        "variant"
+        "src"
       ]
     },
     "SrcSetEntry": {
@@ -6080,8 +6075,7 @@
         }
       },
       "required": [
-        "items",
-        "ordered"
+        "items"
       ]
     },
     "ToastSpec": {
@@ -6129,10 +6123,7 @@
       },
       "required": [
         "code",
-        "copyable",
-        "highlightLines",
-        "language",
-        "lineNumbers"
+        "language"
       ]
     },
     "MathSpec": {
@@ -7504,8 +7495,7 @@
       "required": [
         "id",
         "kind",
-        "label",
-        "required"
+        "label"
       ],
       "allOf": [
         {
@@ -7596,8 +7586,7 @@
       },
       "required": [
         "label",
-        "onClick",
-        "variant"
+        "onClick"
       ]
     },
     "SelectSpec": {
@@ -7633,9 +7622,23 @@
       },
       "required": [
         "label",
-        "source",
-        "value"
-      ]
+        "source"
+      ],
+      "if": {
+        "properties": {
+          "multiple": {
+            "const": true
+          }
+        },
+        "required": [
+          "multiple"
+        ]
+      },
+      "else": {
+        "required": [
+          "value"
+        ]
+      }
     },
     "FileUploadSpec": {
       "type": "object",
@@ -7682,8 +7685,7 @@
       },
       "required": [
         "accept",
-        "label",
-        "multiple"
+        "label"
       ]
     },
     "InputKind": {
@@ -8401,8 +8403,7 @@
         }
       },
       "required": [
-        "direction",
-        "wrap"
+        "direction"
       ]
     },
     "GridTemplate": {
@@ -8610,7 +8611,6 @@
         }
       },
       "required": [
-        "activeStep",
         "children"
       ]
     },
@@ -8690,7 +8690,6 @@
       },
       "required": [
         "children",
-        "dismissable",
         "open"
       ]
     },
@@ -9552,6 +9551,30 @@
         }
       }
     },
+    "StyleDelta": {
+      "type": "object",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/TextDirection"
+        },
+        "emphasis": {
+          "$ref": "#/$defs/Emphasis"
+        },
+        "role": {
+          "$ref": "#/$defs/StyleRole"
+        },
+        "tone": {
+          "$ref": "#/$defs/ToneVariant"
+        },
+        "voice": {
+          "$ref": "#/$defs/FontVoice"
+        },
+        "weight": {
+          "$ref": "#/$defs/StyleWeight"
+        }
+      },
+      "minProperties": 1
+    },
     "Accessibility": {
       "type": "object",
       "properties": {
@@ -9803,6 +9826,25 @@
             },
             "style": {
               "$ref": "#/$defs/SemanticStyle"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "style",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "PatchStyle"
+            },
+            "style": {
+              "$ref": "#/$defs/StyleDelta"
             },
             "target": {
               "type": "string"

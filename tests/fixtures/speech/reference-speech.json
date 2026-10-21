@@ -1,5 +1,5 @@
 {
-  "generator": "Fuaran.UI.Renderer.Server 0.87.0 Speech.projectStatic",
+  "generator": "Fuaran.UI.Renderer.Server 0.97.0 Speech.projectStatic",
   "fixtures": {
     "a11y-alert-assertive": {
       "text": "Upload failed\nThe file exceeded the size limit.\n",
@@ -2664,6 +2664,298 @@
       ],
       "omissions": []
     },
+    "limit-node-depth-at-max-errorboundary-fallback": {
+      "text": "Other arm\n",
+      "ssml": "<speak>\n<s>Other arm</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "eb-other",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "eb-n0",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n1",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n2",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n3",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n4",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n5",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n6",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n7",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n8",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n9",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n10",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n11",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n12",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n13",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n14",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n15",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n16",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n17",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n18",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n19",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-n20",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        },
+        {
+          "nodeId": "eb-leaf",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "eb"
+        }
+      ]
+    },
+    "limit-node-depth-at-max-switch-case": {
+      "text": "Other arm\n",
+      "ssml": "<speak>\n<s>Other arm</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "sw-other",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "sw-n0",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n1",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n2",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n3",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n4",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n5",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n6",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n7",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n8",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n9",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n10",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n11",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n12",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n13",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n14",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n15",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n16",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n17",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n18",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n19",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-n20",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        },
+        {
+          "nodeId": "sw-leaf",
+          "kind": "Box",
+          "reason": "not-taken",
+          "decidedAt": "sw"
+        }
+      ]
+    },
     "limit-node-depth-at-max": {
       "text": "",
       "ssml": "<speak>\n</speak>\n",
@@ -3311,8 +3603,8 @@
       "omissions": []
     },
     "metric-float-exp-pos": {
-      "text": "Revenue: GBP 1000000000000000000000.00\nvs last month\n",
-      "ssml": "<speak>\n<s>Revenue: GBP 1000000000000000000000.00</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
+      "text": "Revenue: GBP 1e+21\nvs last month\n",
+      "ssml": "<speak>\n<s>Revenue: GBP 1e+21</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
       "utterances": [
         {
           "nodeId": "metric-float-exp-pos",
@@ -3425,6 +3717,19 @@
       "utterances": [
         {
           "nodeId": "mount-2",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "mount-no-onbubble": {
+      "text": "Embedded view\n",
+      "ssml": "<speak>\n<s>Embedded view</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "mount-no-onbubble",
           "source": "announced",
           "emphasis": false,
           "pause": "short"
@@ -3605,6 +3910,19 @@
       ],
       "omissions": []
     },
+    "proto-safe-keys": {
+      "text": "Table\n",
+      "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "proto-safe-keys",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "query-dependson": {
       "text": "Revenue: no value\nvs last month\n",
       "ssml": "<speak>\n<s>Revenue: no value</s><break strength=\"medium\"/>\n<s>vs last month</s><break strength=\"medium\"/>\n</speak>\n",
@@ -3674,6 +3992,19 @@
       "utterances": [
         {
           "nodeId": "select-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "select-multiple-false": {
+      "text": "Selection: Size\n",
+      "ssml": "<speak>\n<s>Selection: Size</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-multiple-false",
           "source": "announced",
           "emphasis": false,
           "pause": "short"
@@ -3856,6 +4187,32 @@
           "kind": "Markdown",
           "reason": "inside-announced",
           "decidedAt": "step-1"
+        }
+      ]
+    },
+    "stepper-no-onselect": {
+      "text": "Step-by-step section, 2 steps\n",
+      "ssml": "<speak>\n<s>Step-by-step section, 2 steps</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "stepper-no-onselect",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": [
+        {
+          "nodeId": "markdown-1",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "stepper-no-onselect"
+        },
+        {
+          "nodeId": "markdown-2",
+          "kind": "Markdown",
+          "reason": "inside-announced",
+          "decidedAt": "stepper-no-onselect"
         }
       ]
     },
@@ -4395,6 +4752,19 @@
       "utterances": [
         {
           "nodeId": "upload-max-files-1",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "upload-no-onselect": {
+      "text": "File upload: Upload CSV\n",
+      "ssml": "<speak>\n<s>File upload: Upload CSV</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "upload-no-onselect",
           "source": "announced",
           "emphasis": false,
           "pause": "short"

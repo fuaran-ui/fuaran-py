@@ -18,10 +18,18 @@
 .PARAMETER SkipLint      Skip the `ruff check` lint gate.
 .PARAMETER SkipTypecheck Skip the `mypy` gate.
 .PARAMETER SkipTests     Skip `pytest`.
+.PARAMETER ReleaseCheck  The PRE-TAG check, and nothing else: refuse when the committed corpus
+                         snapshot is behind the specification's `main` as its remote reports it
+                         now (`sync_corpus.py --check --remote`). Run it before `git tag`; it needs
+                         no .venv (standard library + git) and no gate stage runs.
 
 .EXAMPLE
     .\run.ps1
     Provision (first run) + lint + format-check + type-check + test.
+
+.EXAMPLE
+    .\run.ps1 -ReleaseCheck
+    Before tagging a release: exit 0 only when the corpus snapshot is the specification's `main`.
 
 .EXAMPLE
     .\run.ps1 -SkipInstall -SkipLint -SkipFormat -SkipTypecheck
@@ -35,7 +43,8 @@ param(
     [switch] $SkipFormat,
     [switch] $SkipLint,
     [switch] $SkipTypecheck,
-    [switch] $SkipTests
+    [switch] $SkipTests,
+    [switch] $ReleaseCheck
 )
 
 $ErrorActionPreference = 'Stop'
@@ -78,6 +87,18 @@ function Find-Python {
 }
 
 $python = Find-Python
+
+if ($ReleaseCheck) {
+    # The pre-tag check. A `v*` tag publishes, and the publish job refuses a snapshot behind the
+    # specification's main - it checks that out fresh, so the question is about main NOW, not about
+    # what the local clone last fetched. A version cannot be re-tagged once it is refused, so ask
+    # before the tag exists. Exit 1 means it could not ask, 2 means behind; both refuse the tag.
+    Write-Host "==> release check: corpus snapshot vs the specification's main" -ForegroundColor Cyan
+    $global:LASTEXITCODE = 0
+    & $python conformance/sync_corpus.py --check --remote
+    exit $LASTEXITCODE
+}
+
 $venvDir = Join-Path $PSScriptRoot '.venv'
 $venvPython = Join-Path $venvDir 'Scripts\python.exe'
 

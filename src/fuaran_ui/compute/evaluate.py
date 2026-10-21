@@ -83,6 +83,9 @@ from ..dataframe import (
     Lit,
     Not,
     Param,
+    Quotient,
+    Rounded,
+    Rounding,
     Table,
     Transform,
     cell_bool,
@@ -331,7 +334,26 @@ def _expr_param_names(expr: ColExpr) -> set[str]:
         return _expr_param_names(expr.expr) | {expr.param}
     if isinstance(expr, IsNull):
         return _expr_param_names(expr.expr)
+    if isinstance(expr, Quotient):
+        return _expr_param_names(expr.dividend) | _expr_param_names(expr.divisor) | _rounding_param_names(expr.rounding)
+    if isinstance(expr, Rounded):
+        return _expr_param_names(expr.expr) | _rounding_param_names(expr.rounding)
     return set()  # Col, Lit
+
+
+def _rounding_param_names(rounding: Rounding) -> set[str]:
+    return {rounding.scale.name} if isinstance(rounding.scale, Param) else set()
+
+
+def _bind_scale(rounding: Rounding, env: dict[str, Cell]) -> Rounding:
+    """A rounding's scale slot bound from ``env`` — only to an ``int`` cell, as the reference's
+    ``bindScale`` binds it; a cell of another shape leaves the param, so evaluation names the
+    slot (Phase 2001)."""
+    if isinstance(rounding.scale, Param):
+        cell = env.get(rounding.scale.name)
+        if cell is not None and cell.kind == "int" and isinstance(cell.value, int):
+            return Rounding(cell.value, rounding.mode)
+    return rounding
 
 
 def _substitute_expr(expr: ColExpr, env: dict[str, Cell]) -> ColExpr:
@@ -360,6 +382,14 @@ def _substitute_expr(expr: ColExpr, env: dict[str, Cell]) -> ColExpr:
         return InParam(_substitute_expr(expr.expr, env), expr.param)
     if isinstance(expr, IsNull):
         return IsNull(_substitute_expr(expr.expr, env))
+    if isinstance(expr, Quotient):
+        return Quotient(
+            _substitute_expr(expr.dividend, env),
+            _substitute_expr(expr.divisor, env),
+            _bind_scale(expr.rounding, env),
+        )
+    if isinstance(expr, Rounded):
+        return Rounded(_substitute_expr(expr.expr, env), _bind_scale(expr.rounding, env))
     return expr  # Col, Lit
 
 
@@ -404,6 +434,14 @@ def _substitute_list_params_expr(expr: ColExpr, list_env: dict[str, list[Cell]])
         )
     if isinstance(expr, IsNull):
         return IsNull(_substitute_list_params_expr(expr.expr, list_env))
+    if isinstance(expr, Quotient):
+        return Quotient(
+            _substitute_list_params_expr(expr.dividend, list_env),
+            _substitute_list_params_expr(expr.divisor, list_env),
+            expr.rounding,
+        )
+    if isinstance(expr, Rounded):
+        return Rounded(_substitute_list_params_expr(expr.expr, list_env), expr.rounding)
     return expr  # Col, Lit, Param
 
 

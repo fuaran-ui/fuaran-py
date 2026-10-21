@@ -5,7 +5,7 @@ The Python port of ``fuaran-ts/packages/conformance/scripts/sync-corpus.mjs``.
 The authoritative corpus lives in the workspace repo at ``../wire-format-fixtures``
 (relative to this repo's root — the canonical side-by-side workspace layout). F#
 is the sole generator (``--emit-corpus``); this script clean-copies the
-certification payload set (``manifest.json``, ``schema.json``,
+certification payload set (``manifest.json``, ``schema.json``, ``idl.json``,
 ``render-fidelity.json``, ``render-text.json``, ``a11y-contract.json``, ``nodes/``, ``ops/``,
 ``reject/``, ``lenient/``,
 ``envelope/``, ``elicitation/``, ``markdown/``, ``style-observer/``, ``apply/``) into this repo's
@@ -37,6 +37,7 @@ Usage::
     python conformance/sync_corpus.py
     python conformance/sync_corpus.py <path-to-wire-format-fixtures>
     python conformance/sync_corpus.py --check
+    python conformance/sync_corpus.py --check --remote
     python conformance/sync_corpus.py --check <path-to-wire-format-fixtures>
     python conformance/sync_corpus.py --declare
     python conformance/sync_corpus.py --declare <path-to-wire-format-fixtures>
@@ -155,6 +156,11 @@ SENTINEL_KIND = "corpusSnapshot"
 
 _RESYNC_COMMAND = "python conformance/sync_corpus.py"
 
+# What ``--check --remote`` asks: the authority's own remote, and the branch every publishing
+# workflow checks out. Named once so the question and its report cannot drift apart.
+REMOTE = "origin"
+REMOTE_BRANCH = "main"
+
 # The `regen` clause the estate sweep quotes verbatim on a stale finding. Rooted at
 # the workspace, because that is where the reader of a `roadmapctl copies` finding is.
 _REGEN_COMMAND = f"cd Fuaran/Fuaran-UI/fuaran-py; {_RESYNC_COMMAND}"
@@ -193,10 +199,86 @@ _COPIES_NOTE = (
 # ``dag/`` / ``merge-conformance/`` precedent, that suite does not skip when its
 # manifest is absent: a host that enforces a limit must not go green without the
 # vectors that prove it, so the family travels with the snapshot.
-_FILES = ("manifest.json", "schema.json", "render-fidelity.json", "render-text.json", "a11y-contract.json")
-_DIRS = ("nodes", "ops", "reject", "lenient", "envelope", "elicitation", "markdown", "style-observer", "apply")
+#
+# Phase 1938 - ``laws`` joins on the same footing: the evaluator certifies against the
+# ``laws/dataframeParity`` family (``tests/test_dataframe_parity.py``), the reference's answers
+# with a recorded producer, which replaced this host's own unproduced parity fixture.
+#
+# Phase 2296 - ``idl.json`` joins because this host's STRUCTURAL layer is generated from it
+# (``src/fuaran_ui/schema/generate.py``). The generator reads the bundled copy, never the authority,
+# so an offline checkout regenerates exactly the committed module; and a sync that moves it
+# regenerates in the same run (``main`` below), so the IDL and its projection land together.
+_FILES = (
+    "manifest.json",
+    "schema.json",
+    "idl.json",
+    "render-fidelity.json",
+    "render-text.json",
+    "a11y-contract.json",
+)
+
+# Phase 1960 - ``row-encode`` joins on the ``apply`` footing: ``tests/test_row_encode.py`` certifies
+# the two row-cell encode refusals against it and does not skip without it.
+_DIRS = (
+    "nodes",
+    "ops",
+    "reject",
+    "lenient",
+    "envelope",
+    "elicitation",
+    "markdown",
+    "style-observer",
+    "apply",
+    "laws",
+    "row-encode",
+)
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def regenerate(repo: Path) -> Path | None:
+    """Regenerate ``repo``'s structural module from ``repo``'s bundled ``idl.json``.
+
+    The generator is loaded BY PATH from the checkout being synced, never imported: an editable
+    install made in one checkout is importable from every other, and the generator that ran would
+    then be another tree's (the Phase 2225 class). Returns the path written, or ``None`` for a
+    checkout that carries no generator (a bare snapshot holder, as the sync's own tests stand up).
+    """
+    schema = repo / "src" / "fuaran_ui" / "schema"
+    if not (schema / "generate.py").is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("_fuaran_py_generate", schema / "generate.py")
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load the structural generator from {schema / 'generate.py'}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    written: Path = module.generate(repo / "conformance" / "corpus" / "idl.json", schema / "generated.py")
+    return written
+
+
+_AUTHORITY_MEMBER = re.compile(r'("corpusAuthority": )(null|"[0-9a-f]{40}")')
+
+
+def restamp_manifest_authority(repo: Path, commit: str | None) -> Path | None:
+    """Carry the snapshot's authority commit into the published capability manifest (Phase 2301).
+
+    The manifest's ``corpusAuthority`` is provenance copied from ``corpus/snapshot.json``, so a
+    re-sync that moves the sentinel moves it too — or the manifest's own currency test reads the
+    re-sync as staleness. Only that one member is rewritten, in place; every other byte is the
+    generator's, and ``tests/test_host_capability_manifest.py`` still holds the whole file to it.
+    Returns the path written, or ``None`` when the checkout publishes no manifest.
+    """
+    manifest = repo / "conformance" / "host-capability-manifest.json"
+    if not manifest.is_file():
+        return None
+    text = manifest.read_text(encoding="utf-8")
+    value = "null" if commit is None else f'"{commit}"'
+    updated, count = _AUTHORITY_MEMBER.subn(lambda m: m.group(1) + value, text, count=1)
+    if count != 1:
+        raise SystemExit(f"{manifest} carries no corpusAuthority member to restamp")
+    if updated != text:
+        manifest.write_text(updated, encoding="utf-8", newline="\n")
+    return manifest
 
 
 def _git(repo: Path, *args: str) -> str | None:
@@ -241,8 +323,23 @@ def recorded_commit(sentinel: Path | None = None) -> str | None:
     return sha if isinstance(sha, str) and _SHA_RE.match(sha) else None
 
 
-def commits_behind(authority: Path, snapshot_sha: str) -> int | None:
-    """How many authority commits land after ``snapshot_sha``.
+def remote_head(authority: Path) -> str | None:
+    """The commit ``main`` points at on the authority's own remote RIGHT NOW, or ``None``.
+
+    ``git ls-remote`` asks the remote and writes nothing - no fetch, no ref update - so it is safe
+    against a clone this checkout must not modify, and it answers for the remote's ``main`` whether
+    or not the clone has ever fetched it. ``None`` covers every way of not getting an answer
+    (offline, no ``origin``, no ``main`` there); the caller reports it UNMEASURED.
+    """
+    listed = _git(authority, "ls-remote", REMOTE, f"refs/heads/{REMOTE_BRANCH}")
+    if not listed:
+        return None
+    sha = listed.split()[0]
+    return sha if _SHA_RE.match(sha) else None
+
+
+def commits_behind(authority: Path, snapshot_sha: str, tip: str = "HEAD") -> int | None:
+    """How many authority commits land after ``snapshot_sha``, up to ``tip``.
 
     ``None`` when the clone cannot answer — most commonly a shallow checkout
     (``actions/checkout`` defaults to depth 1), which holds HEAD but not the
@@ -250,7 +347,7 @@ def commits_behind(authority: Path, snapshot_sha: str) -> int | None:
     out at full depth; where a caller has not, the check says the distance is
     unknown rather than guessing at it.
     """
-    count = _git(authority, "rev-list", "--count", f"{snapshot_sha}..HEAD")
+    count = _git(authority, "rev-list", "--count", f"{snapshot_sha}..{tip}")
     if count is None or not count.isdigit():
         return None
     return int(count)
@@ -458,8 +555,12 @@ def declare(authority: Path | None = None, snapshot: Path | None = None) -> int:
     return 0
 
 
-def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
-    """Report the snapshot's distance from the authority. See the module docstring."""
+def check(authority: Path | None = None, sentinel: Path | None = None, *, remote: bool = False) -> int:
+    """Report the snapshot's distance from the authority. See the module docstring.
+
+    ``remote`` measures against the authority remote's ``main`` as it is NOW instead of the clone's
+    HEAD - the question a tag has to answer, because the publish job checks out the former.
+    """
     authority = AUTHORITY if authority is None else Path(authority).resolve()
     sentinel = SENTINEL if sentinel is None else sentinel
 
@@ -481,20 +582,32 @@ def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
         )
         return 1
 
-    head = authority_head(authority)
+    named = f"{REMOTE}/{REMOTE_BRANCH}"
+    head = remote_head(authority) if remote else authority_head(authority)
     if head is None:
-        print(
-            f"corpus drift UNMEASURED: cannot read HEAD of the authority at {authority} "
-            "(not a git clone, or git is unavailable)",
-            file=sys.stderr,
-        )
+        if remote:
+            print(
+                f"corpus drift UNMEASURED: cannot ask {named} what {REMOTE_BRANCH} is now "
+                f"(authority at {authority}: offline, no {REMOTE!r} remote, or no {REMOTE_BRANCH!r} there). "
+                "A tag is not cut on a check that could not ask.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"corpus drift UNMEASURED: cannot read HEAD of the authority at {authority} "
+                "(not a git clone, or git is unavailable)",
+                file=sys.stderr,
+            )
         return 1
 
     if snapshot_sha == head:
-        print(f"corpus snapshot in sync with the authority ({head})", file=sys.stderr)
+        print(
+            f"corpus snapshot in sync with the authority ({head}{f', {named}' if remote else ''})",
+            file=sys.stderr,
+        )
         return 0
 
-    behind = commits_behind(authority, snapshot_sha)
+    behind = commits_behind(authority, snapshot_sha, head)
     if behind is None:
         headline = "snapshot behind authority by an unknown number of commits"
     elif behind == 0:
@@ -506,7 +619,23 @@ def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
         headline = f"snapshot behind authority by {behind} commit{'' if behind == 1 else 's'}"
 
     print(f"{headline} (authority {head}, snapshot {snapshot_sha})", file=sys.stderr)
-    print(f"re-sync and commit the snapshot: {_RESYNC_COMMAND}", file=sys.stderr)
+    if remote:
+        print(
+            f"  (authority here is {named} as the remote reports it now, not this clone's HEAD)",
+            file=sys.stderr,
+        )
+        if behind is None:
+            print(
+                f"  this clone has not fetched that commit: git -C {authority} fetch {REMOTE} {REMOTE_BRANCH}",
+                file=sys.stderr,
+            )
+        print(
+            f"update the authority clone (git -C {authority} pull --ff-only), then re-sync and commit the snapshot: "
+            f"{_RESYNC_COMMAND}",
+            file=sys.stderr,
+        )
+    else:
+        print(f"re-sync and commit the snapshot: {_RESYNC_COMMAND}", file=sys.stderr)
     # The commonest instance, said out loud so it is not read as a fixture change
     # that this host has failed to adopt: the comparison is by COMMIT, so an
     # authority commit touching none of the copied families lands here with the
@@ -519,34 +648,70 @@ def check(authority: Path | None = None, sentinel: Path | None = None) -> int:
     return 2
 
 
+def _take_repo_option(args: list[str]) -> tuple[list[str], str | None]:
+    """Split ``--repo <path>`` / ``--repo=<path>`` out of ``args``."""
+    rest: list[str] = []
+    named: str | None = None
+    it = iter(args)
+    for arg in it:
+        if arg == "--repo":
+            named = next(it, "")
+        elif arg.startswith("--repo="):
+            named = arg.partition("=")[2]
+        else:
+            rest.append(arg)
+    return rest, named
+
+
 def main(argv: list[str]) -> int:
-    args = list(argv)
+    args, repo_arg = _take_repo_option(list(argv))
     checking = "--check" in args
     declaring = "--declare" in args
-    args = [a for a in args if a not in ("--check", "--declare")]
-    if len(args) > 1 or (checking and declaring):
+    remote = "--remote" in args
+    args = [a for a in args if a not in ("--check", "--declare", "--remote")]
+    if len(args) > 1 or (checking and declaring) or (remote and not checking) or repo_arg == "":
         print(
-            f"usage: {_RESYNC_COMMAND} [--check | --declare] [<path-to-wire-format-fixtures>]",
+            f"usage: {_RESYNC_COMMAND} [--check [--remote] | --declare] [--repo <checkout>] "
+            "[<path-to-wire-format-fixtures>]",
             file=sys.stderr,
         )
         return 1
 
+    # The checkout to operate on is the one named, else the one the caller is standing in - and only
+    # when neither names one, the checkout this script sits in. Locating it from the script alone
+    # wrote the snapshot into whichever tree the script was run BY PATH from, whatever the caller's cwd.
     try:
-        source: Path = _RESOLVER.resolve_corpus_root(args[0] if args else None, sibling=AUTHORITY)
+        found = _RESOLVER.find_repo_root(repo_arg)
+    except _RESOLVER.RepoRootRefused as refused:
+        print(str(refused), file=sys.stderr)
+        return 1
+    repo = _HERE.parents[1] if found is None else found
+    snapshot = repo / "conformance" / "corpus"
+    sentinel = snapshot / SENTINEL.name
+    sibling = _RESOLVER.sibling_corpus_root(repo)
+
+    try:
+        source: Path = _RESOLVER.resolve_corpus_root(args[0] if args else None, sibling=sibling)
     except _RESOLVER.CorpusRootRefused as refused:
         print(str(refused), file=sys.stderr)
         return 1
     if checking:
-        return check(source)
+        return check(source, sentinel, remote=remote)
     if declaring:
-        return declare(source)
+        return declare(source, snapshot)
 
-    dest = sync(source)
-    recorded = recorded_commit()
+    dest = sync(source, snapshot)
+    recorded = recorded_commit(sentinel)
     print(
         f"Corpus snapshot synced: {source} -> {dest} (authority commit {recorded or 'unknown'})",
         file=sys.stderr,
     )
+    written = regenerate(repo)
+    if written is not None:
+        print(f"Structural layer regenerated: {written}", file=sys.stderr)
+    restamped = restamp_manifest_authority(repo, recorded)
+    if restamped is not None:
+        print(f"Capability manifest corpusAuthority restamped: {restamped}", file=sys.stderr)
     return 0
 
 

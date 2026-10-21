@@ -65,7 +65,11 @@ def test_the_family_pins_the_same_limits_this_host_enforces() -> None:
 
 #: The apply families this host certifies. Every other family the apply manifest lists
 #: is a declared lag here and is NAMED below, never silently absent.
-_CERTIFIED_APPLY_FAMILIES = (_FAMILY_ID, "duplicateIdsApply")  # the second: tests/test_duplicate_ids_apply.py
+_CERTIFIED_APPLY_FAMILIES = (
+    _FAMILY_ID,
+    "duplicateIdsApply",  # tests/test_duplicate_ids_apply.py
+    "styleNormaliseApply",  # tests/test_style_normalise_apply.py
+)
 
 
 def test_apply_families_this_host_does_not_run_are_named(capsys: pytest.CaptureFixture[str]) -> None:
@@ -193,11 +197,12 @@ def test_a_batch_that_ends_within_the_limits_applies() -> None:
 
 def test_ops_that_cannot_grow_the_tree_still_apply_to_an_over_limit_tree() -> None:
     # A tree already past MaxDepth (built in memory, never decoded) is not this op's doing:
-    # UpdateProp / UpdateStyle / RemoveNode / ReorderChildren are not charged the walk.
+    # UpdateProp / UpdateStyle / PatchStyle / RemoveNode / ReorderChildren are not charged the walk.
     over = _chain(MAX_NODE_DEPTH + 1)
     deepest_md = _box("p", [_md("x"), _md("y")])
     over_with_list = _box("top", [over, deepest_md])
     assert isinstance(apply(Obj("UpdateStyle", {"style": Obj(None, {}), "target": "n1"}), over), Ok)
+    assert isinstance(apply(Obj("PatchStyle", {"style": Obj(None, {"tone": "Brand"}), "target": "n1"}), over), Ok)
     assert isinstance(apply(Obj("RemoveNode", {"target": "y"}), over_with_list), Ok)
     assert isinstance(apply(Obj("ReorderChildren", {"newOrder": Arr(["y", "x"]), "parentId": "p"}), over_with_list), Ok)
 

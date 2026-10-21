@@ -1,0 +1,1 @@
+{"id":"proto-safe-keys","kind":{"$type":"DataGrid","columns":[{"field":"constructor","kind":{"$type":"TonedPill","field":"constructor","map":{"__proto__":"Info","constructor":"Success","toString":"Warning"}},"label":"__proto__"}],"rowKeyField":"constructor","source":{"$type":"State","defaultValue":[{"constructor":"__proto__"}],"key":"__proto__"}}}

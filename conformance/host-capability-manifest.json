@@ -1,8 +1,8 @@
 {
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
-  "hostVersion": "0.9.0",
-  "corpusAuthority": "7e938e81f94ec004ea3dbfcc35b7fc71a7eb557e",
+  "hostVersion": "0.10.0",
+  "corpusAuthority": "7aa287e92b5b2bc733b1a816f093095a1f6a0c83",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -51,10 +51,84 @@
       "reason": "the compute layer lowers through an isinstance ladder in fuaran_ui.dataframe.codec rather than through per-record to_wire, so neither the discriminators it writes nor their absence can be read off this host's type model"
     }
   },
+  "corpusFamilies": {
+    "apply/duplicateIdsApply": "covered",
+    "apply/limitsApply": "covered",
+    "apply/skeletonApply": {
+      "pending": "the apply engine's suite does not yet run the skeleton-apply vectors"
+    },
+    "apply/styleNormaliseApply": "covered",
+    "chain": "covered",
+    "contract-card-reject": {
+      "pending": "this host has no contract-card codec (§25) for the card fixtures to run against yet"
+    },
+    "contract-card-round-trip": {
+      "pending": "this host has no contract-card codec (§25) for the card fixtures to run against yet"
+    },
+    "dag": "covered",
+    "decode-policy": {
+      "notApplicable": "this host's decoder offers no §23 kind admission policy"
+    },
+    "design-seam-reject": {
+      "notApplicable": "this host ships no design-provider seam: its records are read by a design-tool integration, and this host carries none"
+    },
+    "design-seam-round-trip": {
+      "notApplicable": "this host ships no design-provider seam: its records are read by a design-tool integration, and this host carries none"
+    },
+    "devtools-relay": {
+      "notApplicable": "this host ships no devtools relay endpoint"
+    },
+    "diff/treeDiff": "covered",
+    "elicitation-answer-accept": "covered",
+    "elicitation-answer-reject": "covered",
+    "elicitation-reject": "covered",
+    "elicitation-round-trip": "covered",
+    "envelope-reject": "covered",
+    "envelope-round-trip": "covered",
+    "formatting": {
+      "pending": "the cell formatter is not yet driven from the formatting vectors, and it diverges from them on significant-digit exponent forms, ties and negative zero"
+    },
+    "laws/capabilityLaws": {
+      "pending": "this host's suite does not yet run this law family's vectors"
+    },
+    "laws/dataframeParity": "covered",
+    "laws/decimal": "covered",
+    "laws/fieldLaws": {
+      "pending": "this host's suite does not yet run this law family's vectors"
+    },
+    "laws/propagationLaws": {
+      "pending": "this host's suite does not yet run this law family's vectors"
+    },
+    "laws/transformLaws": "covered",
+    "lenient-accept": "covered",
+    "lowers-to": {
+      "notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"
+    },
+    "merge-conformance": "covered",
+    "node-round-trip": "covered",
+    "op-round-trip": "covered",
+    "reject": "covered",
+    "repair": {
+      "pending": "this host has no §28 repair function yet"
+    },
+    "row-encode": "covered",
+    "sanitization": "covered",
+    "stored-emissions": {
+      "pending": "this host's suite does not yet run the stored-emission fixtures"
+    },
+    "style-observer": "covered",
+    "teleport-decode": {
+      "pending": "the teleport module is unit-tested by hand; its suite does not yet run the corpus teleport/ fixtures"
+    },
+    "teleport-reject": {
+      "pending": "the teleport module is unit-tested by hand; its suite does not yet run the corpus teleport/ fixtures"
+    }
+  },
   "tokens": [
     "Action.AiTool",
     "Action.Call",
     "Action.Chain",
+    "Action.CommitLocal",
     "Action.Confirm",
     "Action.Dispatch",
     "Action.Focus",
@@ -180,7 +254,9 @@
     "Kind.Toast",
     "Kind.Tree",
     "LocalFlushTrigger.OnBlur",
+    "LocalFlushTrigger.OnCommitAction",
     "LocalFlushTrigger.OnDebounce",
+    "LocalFlushTrigger.OnSubmit",
     "LocaleSource.Ambient",
     "LocaleSource.Explicit",
     "MediaKind.Audio",

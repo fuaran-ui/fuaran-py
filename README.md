@@ -1290,8 +1290,8 @@ any op holding a node (`InsertChild`, `ReplaceRoot`, an `EditNode` whose new kin
 holds children, an `UpdateState` attaching `onLoading` / `onEmpty`), plus `MoveNode`,
 which adds no node but can stack two legal depths. A `Batch` is measured once, on the
 tree it produces, and refused whole as `LimitExceeded` rather than `BatchAborted`.
-`UpdateProp`, `ReplaceBinding`, `UpdateStyle`, `RemoveNode` and `ReorderChildren`
-cannot grow a tree and are never refused for one. Depth and count are measured the
+`UpdateProp`, `ReplaceBinding`, `UpdateStyle`, `PatchStyle`, `RemoveNode` and
+`ReorderChildren` cannot grow a tree and are never refused for one. Depth and count are measured the
 way the decoder measures them: every node is a level, wherever it sits — a layout
 child, a `Switch` case, an `ErrorBoundary` arm, a `State` alternative, a `fallback`.
 
@@ -1403,6 +1403,15 @@ python -m fuaran_ui.conformance.host_capability            # is the published ar
 python -m fuaran_ui.conformance.host_capability --write    # regenerate it
 ```
 
+Both act on **the checkout you are standing in** (the nearest directory above the
+working directory that holds `conformance/sync_corpus.py`), or on the one named with
+`--repo <checkout>`; run outside any checkout and with no `--repo`, they refuse. They
+never act on the checkout the interpreter's install happens to point at. That matters
+from a git worktree: an editable install made in the primary clone is importable
+everywhere, and a generator that found its target from its own location would write the
+primary clone's artefact and report success. `conformance/sync_corpus.py` follows the
+same rule, so `python conformance/sync_corpus.py` from a worktree syncs the worktree.
+
 Three things about it are worth knowing before you read it:
 
 - **It is generated from this host's authoring model, never written by hand**, and
@@ -1421,6 +1430,34 @@ Three things about it are worth knowing before you read it:
 A consumer must check `hostVersion` against the release it is actually running:
 the manifest describes one release, and applying it to another is exactly the
 stale claim it replaces, made harder to see because it looks computed.
+
+### Cutting a release — the pre-tag check
+
+A `v*` tag publishes, and the publish job refuses a corpus snapshot that is behind the
+specification's `main`. It checks the specification out fresh, so the question it asks is
+about `main` *now*, not about whatever your local clone last fetched. A snapshot that
+matches your clone can be behind `main` by a commit you have never pulled; the default
+`--check` cannot see that, and the first symptom is a published-nothing failure after the
+tag exists (a version cannot simply be re-tagged). Before `git tag`:
+
+```bash
+python conformance/sync_corpus.py --check --remote
+```
+
+or, from the repository root on Windows, `pwsh ./run.ps1 -ReleaseCheck`. It asks the
+specification's own remote what `main` is (`git ls-remote`, which fetches and modifies
+nothing) and exits `0` only when the committed snapshot records exactly that commit.
+
+- `2` — the snapshot is behind. Update the specification clone (`git pull --ff-only`),
+  run `python conformance/sync_corpus.py`, and commit what it writes. This is often
+  `conformance/corpus/snapshot.json` alone, because the comparison is by commit and a
+  specification commit touching nothing bundled still moves `main`; then regenerate the
+  capability manifest above, which records the snapshot commit.
+- `1` — the check could not ask (offline, no `origin`, no `main`). A tag is not cut on a
+  check that did not run.
+
+The tag must also equal `pyproject.toml`'s version; the publish workflow's version gate
+refuses a mismatch.
 
 ## License
 

@@ -22,80 +22,86 @@ defaults + ARIA injection) live in :mod:`fuaran_ui.ui`; this module is the data.
 
 from __future__ import annotations
 
+import calendar
+import datetime as _dt
 from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
-from typing import Literal, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..canonical import encode_value
 from ..model import Arr, Obj, Value
 from ..model import Node as WireNode
+from . import generated as _g
 
 # ── Bare-string enum vocabularies (WIRE_FORMAT.md §3.5) ─────────────────────
 # Each encodes as the bare string itself, so a ``Literal[...]`` alias is both the
-# author-facing type and the wire value — no runtime enum object needed.
+# author-facing type and the wire value — no runtime enum object needed. Every
+# alias here is the GENERATED one (``generated.py``, from ``idl.json``, Phase 2296):
+# this module names it and documents it, and never re-lists its cases, so an enum
+# case the IDL gains reaches the authoring type by regeneration alone.
 
-Tone = Literal["Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info"]
-Weight = Literal["Compact", "Standard", "Spacious"]
-Emphasis = Literal["Quiet", "Normal", "Loud"]
-Orientation = Literal["Vertical", "Horizontal"]
-BadgeVariant = Literal["Neutral", "Brand", "Success", "Warning", "Critical", "Info"]
-HeadingVariant = Literal["Standard", "Eyebrow", "Caption", "Lead"]
-ButtonVariant = Literal["Primary", "Secondary", "Tertiary", "Destructive"]
-ChartKind = Literal["Line", "Bar", "Area", "Pie", "Scatter", "Heatmap"]
+Tone = _g.ToneVariant
+Weight = _g.StyleWeight
+Emphasis = _g.Emphasis
+Orientation = _g.Orientation
+BadgeVariant = _g.BadgeVariant
+HeadingVariant = _g.HeadingVariant
+ButtonVariant = _g.ButtonVariant
+ChartKind = _g.ChartKind
 #: Which edge of the chart the series legend occupies — or ``"None"``, which
 #: suppresses it entirely. A WIRE vocabulary: WHERE an author wants the legend is
 #: their meaning; the geometry that puts it there stays the host's chart style,
 #: which carries the default (``"Right"``). An explicit value beats it.
-ChartLegendPosition = Literal["Top", "Right", "Bottom", "None"]
+ChartLegendPosition = _g.ChartLegendPosition
 #: Data labels, with exactly two states. ``"Ends"`` names the SELECTIVE
 #: placements that read — a bar's cap, the last point of a line or area edge —
 #: and the set is closed there; an all-points case would retract the legibility
 #: guarantee the vocabulary exists for. Absent means ``"Off"``.
-ChartDataLabels = Literal["Off", "Ends"]
+ChartDataLabels = _g.ChartDataLabels
 #: What a chart's x axis MEANS — DECLARED, never sniffed. Absent means
 #: ``"Category"`` (one band per row, in row order); ``"Temporal"`` says the x
 #: column carries canonical ISO-8601 dates and the axis is continuous. The
 #: pre-emit validator grounds the declaration against the column type where the
 #: schema is statically known (FUARAN097).
-ChartXScale = Literal["Category", "Temporal"]
+ChartXScale = _g.ChartXScale
 #: Sort direction on a :class:`DefaultSort`. Lower-case on the wire, unlike the
 #: capitalised display vocabularies above — the wire's own spelling, not a style.
-SortDirection = Literal["asc", "desc"]
+SortDirection = _g.SortDirection
 #: Phase 812 — anti-scraper render strategy for a :class:`Link`. ``"email"``
 #: marks a ``mailto:`` link whose address must not appear in plaintext in emitted
 #: HTML; the renderers own the emission strategy.
-LinkProtection = Literal["email"]
-StyleRole = Literal["None", "Eyebrow", "Data", "Lede", "Caption"]
-FontVoice = Literal["Default", "Display", "Structural"]
-LiveRegion = Literal["polite", "assertive", "off"]
-ImageVariant = Literal["Default", "Avatar", "Rounded"]
+LinkProtection = _g.LinkProtection
+StyleRole = _g.StyleRole
+FontVoice = _g.FontVoice
+LiveRegion = _g.LiveRegionKind
+ImageVariant = _g.ImageVariant
 # fuaran#1077 — the three `Image` presentation slots (WIRE_FORMAT §3.6.2). Closed
 # TOKEN vocabularies, never CSS values: `ImageAspect` names one of four ratios and
 # carries no number, pair or stylesheet spelling. `fit` says what happens to
 # pixels that do not match the box; `aspectRatio` reserves the box BEFORE the
 # image arrives; a host derives neither from the other.
-ImageFit = Literal["Natural", "Cover", "Contain"]
-ImageAspect = Literal["Natural", "Square", "FourThree", "ThreeTwo", "SixteenNine"]
+ImageFit = _g.ImageFit
+ImageAspect = _g.ImageAspect
 # `Eager` is the default deliberately, and it is not the "unoptimised" value:
 # deferring an above-the-fold image DELAYS the largest contentful paint, and only
 # the author knows where the image sits — so the format declines to guess.
-ImageLoading = Literal["Eager", "Lazy"]
-ScrollOrientation = Literal["Vertical", "Horizontal", "Both"]
+ImageLoading = _g.ImageLoading
+ScrollOrientation = _g.ScrollOrientation
 #: Phase 1811 — ``DateTimeVariant`` (was ``DateVariant``): the temporal breadth of a
 #: ``DateTime`` / ``DateTimeRange`` field. The three cases did not move.
-DateTimeVariant = Literal["Date", "Time", "DateTime"]
-MathDisplay = Literal["Inline", "Block"]
+DateTimeVariant = _g.DateTimeVariant
+MathDisplay = _g.MathDisplay
 #: Text alignment for a `Drawing`'s `Label` shape — SVG's `text-anchor`, in the
 #: wire's own capitalised spelling. Absent means the renderer's inherited default.
-TextAnchor = Literal["Start", "Middle", "End"]
+TextAnchor = _g.TextAnchor
 #: Which way a `Mount`'s guest channel carries messages. `OutOnly` is the guest
 #: bubbling up with no host→guest leg; `TwoWay` opens both.
-ChannelDirection = Literal["OutOnly", "TwoWay"]
-IconSize = Literal["Small", "Medium", "Large"]  # Phase 821 — the Icon display kind
+ChannelDirection = _g.ChannelDirection
+IconSize = _g.IconSize  # Phase 821 — the Icon display kind
 # fuaran#867 — which direction of movement is an improvement. `Neutral` is
 # RESERVED and deliberately absent: the slot is an enum precisely so that a later
 # admission is a bare-string addition rather than a type replacement.
-TrendPolarity = Literal["HigherIsBetter", "LowerIsBetter"]
+TrendPolarity = _g.TrendPolarity
 
 # ── Unobservable-slot sentinels (WIRE_FORMAT.md §4 / §5) ────────────────────
 
@@ -195,12 +201,17 @@ class State:
 
 @dataclass(frozen=True)
 class Filter:
-    """``Binding.Filter`` — a named filter source."""
+    """``Binding.Filter`` — a named filter source.
+
+    ``default_value`` (Phase 2334) yields until the filter is first set; ``None`` means
+    absent (omitted, never null), the same rule as :class:`State` and :class:`Selection`.
+    """
 
     name: str
+    default_value: Value = None
 
     def to_wire(self) -> Value:
-        return Obj("Filter", {"name": self.name})
+        return _obj("Filter", {"defaultValue": self.default_value, "name": self.name})
 
 
 @dataclass(frozen=True)
@@ -221,7 +232,7 @@ class Selection:
         return _obj("Selection", {"defaultValue": self.default_value, "field": self.field, "nodeId": self.node_id})
 
 
-TimeGrain = Literal["Second", "Minute", "Hour", "Day"]
+TimeGrain = _g.TimeGrain
 
 
 @dataclass(frozen=True)
@@ -250,16 +261,16 @@ class Now:
 # Distinct from CellFormat: ``Currency`` carries ``isoCode`` (not ``code``),
 # ``DateTime`` carries ``dateStyle`` / ``timeStyle`` (bare enums, not a format string).
 
-DateStyle = Literal["Short", "Medium", "Long", "Full"]
+DateStyle = _g.DateStyle
 # Phase 1810 — the time-of-day half of the platform formatter's style pair. The
 # same four spellings as ``DateStyle``, deliberately a separate closed set.
-TimeStyle = Literal["Short", "Medium", "Long", "Full"]
-RelativeTimeUnit = Literal["Second", "Minute", "Hour", "Day", "Week", "Month", "Year"]
+TimeStyle = _g.TimeStyle
+RelativeTimeUnit = _g.RelativeTimeUnit
 # Phase 819 — the numeric source counts this unit (Seconds = 1, Minutes = 60,
 # Hours = 3600); presentation is `Compact` "1h 20m", `Clock` "1:20:00",
 # `Long` "1 hour 20 minutes".
-DurationUnit = Literal["Seconds", "Minutes", "Hours"]
-DurationStyle = Literal["Compact", "Clock", "Long"]
+DurationUnit = _g.DurationUnit
+DurationStyle = _g.DurationStyle
 
 
 @dataclass(frozen=True)
@@ -382,7 +393,23 @@ class OnDebounce:
         return Obj("OnDebounce", {"milliseconds": self.milliseconds})
 
 
-LocalFlushTrigger = OnBlur | OnDebounce
+@dataclass(frozen=True)
+class OnSubmit:
+    """Flush when the enclosing form submits (Phase 2334)."""
+
+    def to_wire(self) -> Value:
+        return Obj("OnSubmit", {})
+
+
+@dataclass(frozen=True)
+class OnCommitAction:
+    """Flush only when an :class:`CommitLocal` action names this buffer's node (Phase 2334)."""
+
+    def to_wire(self) -> Value:
+        return Obj("OnCommitAction", {})
+
+
+LocalFlushTrigger = OnBlur | OnSubmit | OnDebounce | OnCommitAction
 
 
 # ── The remaining binding cases (Format / Local) ────────────────────────────
@@ -820,18 +847,40 @@ class Focus:
         return Obj("Focus", {"nodeId": self.node_id})
 
 
-FileReadEncoding = Literal["Text", "Base64", "DataUrl"]
+FileReadEncoding = _g.FileReadEncoding
 
 
 @dataclass(frozen=True)
 class ReadFileBody:
-    """``Action.ReadFileBody`` — reads a selected file's body; ``onRead`` is a closure."""
+    """``Action.ReadFileBody`` — reads a selected file's body; ``onRead`` is a closure.
+
+    ``on_read`` (Phase 2334) says whether the emitting host holds the read handler. It defaults
+    to ``True``, what every release before it emitted; ``False`` omits the optional member.
+    """
 
     file_ref: str
     encoding: FileReadEncoding = "Text"
+    on_read: bool = True
 
     def to_wire(self) -> Value:
-        return Obj("ReadFileBody", {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE})
+        return _obj(
+            "ReadFileBody",
+            {"encoding": self.encoding, "fileRef": self.file_ref, "onRead": CLOSURE if self.on_read else None},
+        )
+
+
+@dataclass(frozen=True)
+class CommitLocal:
+    """``Action.CommitLocal`` — flush the ``Binding.Local`` buffer of the node ``node_id``
+    (Phase 2334). A buffer flushed this way declares :class:`OnCommitAction` as its trigger.
+
+    A bare string, never a ``TextSource``: it addresses a node in this document.
+    """
+
+    node_id: str
+
+    def to_wire(self) -> Value:
+        return Obj("CommitLocal", {"nodeId": self.node_id})
 
 
 @dataclass(frozen=True)
@@ -943,6 +992,7 @@ Action = (
     | Confirm
     | Focus
     | ReadFileBody
+    | CommitLocal
     | Call
     | AiTool
     | Invoke
@@ -1226,7 +1276,7 @@ class Kind(Protocol):
 # :func:`GridLayout` / :func:`Dashboard` / :func:`Card`) survive as thin
 # Box-emitting conveniences below.
 
-BoxRole = Literal["Group", "Card", "Dashboard", "Separator"]
+BoxRole = _g.BoxRole
 """What a ``Box`` means — drives the emitted element, ARIA landmark, and chrome."""
 
 
@@ -1241,7 +1291,7 @@ class FlexLayout:
     def to_wire(self) -> Value:
         # Ordinal key order (direction < gap < wrap); the canonical encoder
         # re-sorts, so ``_obj`` drops the ``None`` gap and the rest sort.
-        return _obj("Flex", {"direction": self.direction, "gap": self.gap, "wrap": self.wrap})
+        return _obj("Flex", {"direction": self.direction, "gap": self.gap, "wrap": True if self.wrap else None})
 
 
 @dataclass(frozen=True)
@@ -1440,7 +1490,8 @@ class Stepper:
         return _obj(
             "Stepper",
             {
-                "activeStep": self.active_step,
+                # Phase 2300 — omitted at its declared default, the literal Static(0).
+                "activeStep": None if self.active_step == Static(0) else self.active_step,
                 "children": list(self.children),
                 "onSelect": CLOSURE if self.on_select else None,
             },
@@ -1494,11 +1545,13 @@ class Modal:
     #: no handler.
     on_dismiss: Action | None = field(default_factory=Chain)
     heading: TextSource | None = None
-    #: fuaran#1119 — `Blocking` is the identity and omits at it, so every modal
-    #: written before this member is byte-identical. The two differ in ONE claim
-    #: a host makes: a blocking surface asserts the page behind it is inert, an
-    #: anchored one does not, because the page behind it genuinely is not.
-    modality: ModalityKind = "Blocking"
+    #: fuaran#1119 — `Modal` (the blocking surface) is the identity and omits at
+    #: it, so every modal written before this member is byte-identical. The two
+    #: differ in ONE claim a host makes: a blocking surface asserts the page behind
+    #: it is inert, an anchored one does not, because the page behind it genuinely
+    #: is not. (This host spelled the identity `Blocking` until Phase 2296, a
+    #: token the wire never had; the generated vocabulary corrected it.)
+    modality: ModalityKind = "Modal"
     #: fuaran#1119 — the node the anchored surface is positioned against. Where
     #: it sits, which way it flips at a viewport edge and how far off it stands
     #: are the RENDERER's, not the document's.
@@ -1510,9 +1563,10 @@ class Modal:
             {
                 "anchor": self.anchor,
                 "children": list(self.children),
-                "dismissable": self.dismissable,
+                # Phase 2300 — omitted when TRUE: an overlay is dismissable unless it says otherwise.
+                "dismissable": None if self.dismissable else False,
                 "heading": self.heading,
-                "modality": None if self.modality == "Blocking" else self.modality,
+                "modality": None if self.modality == "Modal" else self.modality,
                 "onDismiss": self.on_dismiss,
                 "open": self.open,
             },
@@ -1548,7 +1602,10 @@ class Heading:
     variant: HeadingVariant = "Standard"
 
     def to_wire(self) -> Obj:
-        return _obj("Heading", {"level": self.level, "text": self.text, "variant": self.variant})
+        return _obj(
+            "Heading",
+            {"level": self.level, "text": self.text, "variant": None if self.variant == "Standard" else self.variant},
+        )
 
 
 @dataclass(frozen=True)
@@ -1640,7 +1697,7 @@ class Badge:
     variant: BadgeVariant = "Neutral"
 
     def to_wire(self) -> Obj:
-        return _obj("Badge", {"label": self.label, "variant": self.variant})
+        return _obj("Badge", {"label": self.label, "variant": None if self.variant == "Neutral" else self.variant})
 
 
 @dataclass(frozen=True)
@@ -1770,7 +1827,7 @@ class Link:
         return _obj(
             "Link",
             {
-                "download": self.download,
+                "download": True if self.download else None,
                 "href": self.href,
                 "label": self.label,
                 "protection": self.protection,
@@ -1833,7 +1890,7 @@ class Image:
                 "loading": None if self.loading == "Eager" else self.loading,
                 "src": self.src,
                 "srcSet": list(self.src_set) if self.src_set else None,
-                "variant": self.variant,
+                "variant": None if self.variant == "Default" else self.variant,
             },
         )
 
@@ -1880,26 +1937,26 @@ MediaKind = Video | Audio
 #: is deliberately absent: its cues are rendered by no user agent and read only
 #: by script, so a declarative document naming it would state an intent no
 #: conformant host could honour without leaving the vocabulary.
-TrackKind = Literal["Subtitles", "Captions", "Descriptions", "Chapters"]
+TrackKind = _g.TrackKind
 
 #: fuaran#1111 — the sandbox relaxations an `Embed` may request. The EMPTY list
 #: is total denial and is the identity, so the shortest embed document is the
 #: fully-sandboxed one and every relaxation is something a caller names.
-EmbedPermission = Literal["AllowScripts", "AllowSameOrigin", "AllowForms", "AllowFullscreen"]
+EmbedPermission = _g.EmbedPermission
 
 #: fuaran#1116 — the recording device a `FileUpload` asks the platform to open.
 #: There is no display-capture case and there will not be one by widening this:
 #: a screen capture reaches every window the reader has open rather than one
 #: device behind the picker, so it is a different class of thing.
-CaptureSource = Literal["Camera", "Microphone"]
+CaptureSource = _g.CaptureSource
 
 #: fuaran#1119 — the modal's modality. The two differ in ONE claim: a blocking
 #: surface asserts the page behind it is inert; an anchored one does not.
-ModalityKind = Literal["Blocking", "Popover"]
+ModalityKind = _g.ModalityKind
 
 #: fuaran#1472 — the declared base direction, LOWER-CASE because that is the
 #: spelling the isolation is ultimately expressed in. `auto` is the identity.
-TextDirection = Literal["auto", "ltr", "rtl"]
+TextDirection = _g.TextDirection
 
 
 @dataclass(frozen=True)
@@ -2101,7 +2158,7 @@ class List:
     ordered: bool = False
 
     def to_wire(self) -> Obj:
-        return _obj("List", {"items": list(self.items), "ordered": self.ordered})
+        return _obj("List", {"items": list(self.items), "ordered": True if self.ordered else None})
 
 
 @dataclass(frozen=True)
@@ -2137,10 +2194,12 @@ class CodeBlock:
             "CodeBlock",
             {
                 "code": self.code,
-                "copyable": self.copyable,
-                "highlightLines": list(self.highlight_lines),
+                # Phase 2300 — the three flags omit at their declared defaults; NOTE `copyable` omits
+                # when TRUE (a code block is copyable unless it says otherwise).
+                "copyable": None if self.copyable else False,
+                "highlightLines": list(self.highlight_lines) if self.highlight_lines else None,
                 "language": self.language,
-                "lineNumbers": self.line_numbers,
+                "lineNumbers": True if self.line_numbers else None,
             },
         )
 
@@ -2471,7 +2530,7 @@ class Button:
                 "icon": self.icon,
                 "label": self.label,
                 "onClick": self.on_click,
-                "variant": self.variant,
+                "variant": None if self.variant == "Secondary" else self.variant,
             },
         )
 
@@ -2480,13 +2539,19 @@ class Button:
 class Select:
     label: TextSource
     source: Binding
-    value: Binding
+    #: Phase 1962 — the single-select value binding. A multi-select
+    #: (``multiple=True``) carries its selection in ``values`` and NO ``value``, so
+    #: this is ``None`` there and omitted from the wire; a single-select needs it
+    #: (the decoder refuses one without it).
+    value: Binding | None = None
     placeholder: TextSource | None = None
     disabled: Binding | None = None
-    # Multi-select (Phase 291): ``multiple`` is emitted only when ``True`` (a
-    # single-select stays byte-identical to the pre-multi corpus); ``values``
-    # is the ``Binding<string list>`` of selected option values, emitted only
-    # when present.
+    # Multi-select (Phase 291): this authoring surface emits ``multiple`` only when
+    # ``True`` (a single-select stays byte-identical to the pre-multi corpus); on the
+    # wire it is an ordinary optional field, kept as authored, so an explicit
+    # ``false`` a document carries round-trips through the decoder (Phase 1962).
+    # ``values`` is the ``Binding<string list>`` of selected option values, emitted
+    # only when present.
     multiple: bool = False
     values: Binding | None = None
     #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
@@ -2585,7 +2650,7 @@ class FileUpload:
                 # always was.
                 "maxBytes": self.max_bytes,
                 "maxFiles": self.max_files,
-                "multiple": self.multiple,
+                "multiple": True if self.multiple else None,
                 "onSelect": CLOSURE if self.on_select else None,
             },
         )
@@ -2702,6 +2767,99 @@ ChartAnnotation = ReferenceLine | EventMarker | RangeBand
 """The closed three-member annotation union (§4l)."""
 
 
+# ── The row feed (WIRE_FORMAT.md §5 "Row payloads") ────────────────────────
+#
+# Phase 1960 — "The two encode refusals". A row cell holding an ``int`` outside
+# ±2^53, or a naive ``datetime``, is REFUSED at encode with a typed
+# :class:`RowCellRefused` naming the cell, never written: past ±2^53 the double a
+# reader holds is a different number, and a naive ``datetime`` names no instant,
+# so its Unix seconds would be read from the encoding machine's time zone. An
+# aware ``datetime`` names its instant and encodes as Unix seconds (rule 11).
+#
+# Phase 2334 — the rest of §5's cell rule: a ``None`` cell OMITS its key (rule 4,
+# the wire has no null), and any cell outside rule 11's recognised scalars (a
+# nested list / dict, any other host object) writes the ``"<opaque>"`` sentinel in
+# that cell position only. Both are what every decoder normalises the same cell to.
+
+EXACT_INTEGER_LIMIT = 2**53
+"""Every integer in [-2^53, 2^53] is exactly a double; past it, none is."""
+
+
+class RowCellRefused(ValueError):
+    """A row cell the row-feed encoder refuses (WIRE_FORMAT.md §5).
+
+    ``code`` is ``ROW_CELL_INEXACT_INTEGER`` or ``ROW_CELL_UNSPECIFIED_DATETIME``;
+    ``row`` is the row's zero-based position in the feed and ``key`` the cell's.
+    """
+
+    def __init__(self, code: str, row: int, key: str, why: str) -> None:
+        super().__init__(f"row {row}, cell '{key}': {why}")
+        self.code = code
+        self.row = row
+        self.key = key
+
+
+def _row_cell(value: object, row: int, key: str) -> object:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        if -EXACT_INTEGER_LIMIT <= value <= EXACT_INTEGER_LIMIT:
+            return value
+        raise RowCellRefused(
+            "ROW_CELL_INEXACT_INTEGER",
+            row,
+            key,
+            f"the integer {value} is outside +/-2^53, so no JSON number holds it exactly; carry it as a string",
+        )
+    if isinstance(value, _dt.datetime):
+        if value.utcoffset() is None:
+            raise RowCellRefused(
+                "ROW_CELL_UNSPECIFIED_DATETIME",
+                row,
+                key,
+                "a naive datetime names no instant; give it a tzinfo",
+            )
+        return calendar.timegm(value.utctimetuple())
+    if isinstance(value, (float, str)):
+        return value
+    return OPAQUE
+
+
+def _row_feed_value(value: Any) -> Any:
+    """A row feed's payload with every row cell through :func:`_row_cell`.
+
+    Cells are visited in key order, so the first refused cell is the one every
+    host names. A ``None`` cell is omitted; a non-scalar cell is the opaque
+    sentinel. Anything that is not a list of rows (the ``"<opaque>"`` sentinel,
+    a non-dict element the decoder refuses anyway) passes through untouched.
+    """
+    if not isinstance(value, (list, tuple)):
+        return value
+    return [
+        {k: _row_cell(row[k], i, k) for k in sorted(row) if row[k] is not None} if isinstance(row, dict) else row
+        for i, row in enumerate(value)
+    ]
+
+
+def _row_feed(binding: Binding) -> Binding:
+    """The ``source`` binding of a DataGrid / Chart, its row payloads checked."""
+    if isinstance(binding, Static):
+        return Static(_row_feed_value(binding.value))
+    if isinstance(binding, State):
+        return State(binding.key, _row_feed_value(binding.default_value))
+    if isinstance(binding, Local):
+        return replace(binding, initial_from=_row_feed(binding.initial_from))
+    return binding
+
+
+def encode_rows(rows: list[dict[str, object]]) -> str:
+    """The canonical bytes of a row feed, as a DataGrid / Chart ``source`` writes them.
+
+    Raises :class:`RowCellRefused` on a refused cell.
+    """
+    return encode_value(_lower(_row_feed_value(rows)))
+
+
 @dataclass(frozen=True)
 class Chart:
     source: Binding
@@ -2731,6 +2889,9 @@ class Chart:
     #: the key, so a chart authored before the slot existed still encodes
     #: byte-for-byte as it did.
     annotations: tuple[ChartAnnotation, ...] | None = None
+    #: Phase 2334 — whether the emitting host holds a point-click handler. A closure: it
+    #: crosses the wire as the sentinel when true and is omitted when false.
+    on_point_click: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2740,7 +2901,8 @@ class Chart:
                 "dataLabels": self.data_labels,
                 "kind": self.kind,
                 "legendPosition": self.legend_position,
-                "source": self.source,
+                "onPointClick": CLOSURE if self.on_point_click else None,
+                "source": _row_feed(self.source),
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.
                 "stacked": True if self.stacked else None,
@@ -2822,6 +2984,9 @@ class Map:
     centre_latitude: float = 0.0
     centre_longitude: float = 0.0
     zoom: float = 4.0
+    #: Phase 2334 — whether the emitting host holds a marker-click handler (the closure
+    #: sentinel when true, omitted when false).
+    on_marker_click: bool = False
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2829,6 +2994,7 @@ class Map:
             {
                 "centreLatitude": self.centre_latitude,
                 "centreLongitude": self.centre_longitude,
+                "onMarkerClick": CLOSURE if self.on_marker_click else None,
                 "source": self.source,
                 "zoom": self.zoom,
             },
@@ -3076,7 +3242,7 @@ class SegmentedChoice:
             {
                 "onChange": CLOSURE if self.on_change else None,
                 "options": self.options,
-                "orientation": self.orientation,
+                "orientation": None if self.orientation == "Horizontal" else self.orientation,
                 "value": self.value,
             },
         )
@@ -3242,10 +3408,10 @@ FormFieldKind = (
 # the CONTROL. An optional record field rather than a discriminator case, so a
 # form authored before it encodes byte-identically.
 
-CompareOp = Literal["eq", "neq", "lt", "lte", "gt", "gte"]
+CompareOp = _g.CompareOp
 
 #: The `format` shorthands a text control can honour.
-RuleFormat = Literal["email", "url", "tel"]
+RuleFormat = _g.TextFormat
 
 
 @dataclass(frozen=True)
@@ -3316,7 +3482,7 @@ class FormField:
                 "id": self.id,
                 "kind": self.kind,
                 "label": self.label,
-                "required": self.required,
+                "required": True if self.required else None,
                 "rule": self.rule,
             },
         )
@@ -3427,18 +3593,75 @@ class Filters:
 
 @dataclass(frozen=True)
 class ColumnWidth:
+    """A column's width, named by its discriminator (Phase 2334 adds the two members).
+
+    ``Fixed`` takes ``pixels`` and ``Flex`` takes ``weight``; each is wire-required on its case
+    and refused on any other, so neither a bare ``Fixed`` nor a member riding the wrong case
+    can be built. ``Auto`` is the identity a column omits.
+    """
+
     kind: str = "Auto"
+    pixels: int | None = None
+    weight: float | None = None
+
+    def __post_init__(self) -> None:
+        for member, case, value in (("pixels", "Fixed", self.pixels), ("weight", "Flex", self.weight)):
+            if (value is None) == (self.kind == case):
+                raise ValueError(
+                    f"ColumnWidth '{member}' is required on a {case} width and refused on any other; "
+                    f"got kind {self.kind!r} with {member}={value!r}"
+                )
 
     def to_wire(self) -> Value:
-        return Obj(self.kind, {})
+        return _obj(self.kind, {"pixels": self.pixels, "weight": self.weight})
+
+
+@dataclass(frozen=True)
+class ButtonGroupItem:
+    """One button of a ``ButtonGroup`` cell (Phase 2316, the fuaran#1909 grid column rules).
+
+    The click handler is a ``(row) -> …`` closure, so it rides as a flag that erases to
+    :data:`CLOSURE`, like every other handler slot in this module.
+    """
+
+    label: TextSource
+    on_click: bool = False
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"label": self.label, "onClick": CLOSURE if self.on_click else None})
 
 
 @dataclass(frozen=True)
 class ColumnKind:
+    """A column's cell kind, named by its discriminator.
+
+    Every cell kind but the toned pill carries a ``(row) -> …`` closure that erases on the wire,
+    so the discriminator is most of what survives. Phase 2316 adds the two row-ACTION cells' wire
+    members (fuaran#1909): a ``Button`` cell's ``label`` and click flag, and a ``ButtonGroup``
+    cell's ``buttons``. Each is refused on any other kind, so a member never rides a cell whose
+    wire case does not declare it.
+    """
+
     kind: str = "Text"
+    label: TextSource | None = None
+    on_click: bool = False
+    buttons: tuple[ButtonGroupItem, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.kind != "Button" and (self.label is not None or self.on_click):
+            raise ValueError(f"'label' / 'on_click' belong to a Button cell, not a {self.kind!r} cell")
+        if self.kind != "ButtonGroup" and self.buttons:
+            raise ValueError(f"'buttons' belong to a ButtonGroup cell, not a {self.kind!r} cell")
 
     def to_wire(self) -> Value:
-        return Obj(self.kind, {})
+        return _obj(
+            self.kind,
+            {
+                "buttons": list(self.buttons) if self.buttons else None,
+                "label": self.label,
+                "onClick": CLOSURE if self.on_click else None,
+            },
+        )
 
 
 @dataclass(frozen=True)
@@ -3497,6 +3720,13 @@ class Column:
     #: column, ``grid-declared-edit``'s read-only one).
     sortable: bool | None = None
     editable: bool | None = None
+    #: Phase 2316 — whether the column projects a cell value through the erased
+    #: closure. ``True`` (the default, and every column before this slot) emits
+    #: ``"value":"<closure>"`` when no ``field_name`` names the cell; ``False``
+    #: omits both, which is how a row-ACTION column reads on the wire — its
+    #: ``Button`` / ``ButtonGroup`` cell shows no row value at all
+    #: (``nodes/grid-action-column-clean.json``).
+    value: bool = True
 
     def to_wire(self) -> Value:
         # Phase 460 — `format` / `width` omitted-when-default (`CellFormat.None`
@@ -3510,7 +3740,7 @@ class Column:
                 "kind": self.kind,
                 "label": self.label,
                 "sortable": self.sortable,
-                "value": None if self.field_name is not None else CLOSURE,
+                "value": CLOSURE if self.value and self.field_name is None else None,
                 "width": None if self.width.kind == "Auto" else self.width,
             },
         )
@@ -3575,6 +3805,9 @@ class DataGrid:
     #: `Binding` of an integer, like `Tabs.active_index`). Both omitted when absent.
     window_state_key: str | None = None
     row_total: Binding | None = None
+    #: Phase 2334 — whether the emitting host holds a row-click handler (the closure
+    #: sentinel when true, omitted when false).
+    on_row_click: bool = False
 
     def to_wire(self) -> Obj:
         # 0.2.0 — `editable` omitted-when-false; fuaran#1125 / #1473 and
@@ -3590,6 +3823,7 @@ class DataGrid:
                 "editable": True if self.editable else None,
                 "exportable": True if self.exportable else None,
                 "keepRowsTogether": True if self.keep_rows_together else None,
+                "onRowClick": CLOSURE if self.on_row_click else None,
                 "pageSize": self.page_size,
                 "pageStateKey": self.page_state_key,
                 "reorderable": True if self.reorderable else None,
@@ -3598,7 +3832,7 @@ class DataGrid:
                 "rowKeyField": self.row_key_field,
                 "rowTotal": self.row_total,
                 "sortStateKey": self.sort_state_key,
-                "source": self.source,
+                "source": _row_feed(self.source),
                 "transferInKey": self.transfer_in_key,
                 "transferOutKey": self.transfer_out_key,
                 "windowStateKey": self.window_state_key,
@@ -3745,8 +3979,8 @@ class Switch:
 
 # Fragment parameterisation (holes / effect / args) — WIRE_FORMAT.md §3.2 -----
 
-HostEffect = Literal["Pure", "ReadsHost", "WritesHost"]
-Determinism = Literal["Deterministic", "Clock", "Random", "Network"]
+HostEffect = _g.HostEffect
+Determinism = _g.DeterminismSource
 
 
 @dataclass(frozen=True)

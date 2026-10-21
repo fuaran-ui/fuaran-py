@@ -129,6 +129,50 @@ rule** (`WIRE_FORMAT.md` §11) means a new `NodeKind` / `Spec` / `TreeOp` /
 `Binding` / `Action` case must move every host in one change — `fuaran-py` is now
 one of those hosts.
 
+### The structural layer is generated from `idl.json` (Phase 2296)
+
+**Ruling (2026-10-16): the generator is host-owned, over the published `idl.json`, never a
+Core build target.** The vocabulary is declared once, in the specification corpus's `idl.json`;
+everything STRUCTURAL here is a projection of it. Hosts stay siblings: generated structure plus
+hand behaviour, no codec code shared across hosts, and a language-neutral IDL read by this host's
+own small generator is not a transpile.
+
+- **Placement.** `src/fuaran_ui/schema/generate.py` (standard library only) writes ONE module,
+  `src/fuaran_ui/schema/generated.py`, from the BUNDLED snapshot's `conformance/corpus/idl.json`,
+  so an offline checkout regenerates exactly what is committed. `python
+  conformance/sync_corpus.py` regenerates after every re-sync, so a moved IDL and its projection
+  land together; `python -m fuaran_ui.schema.generate` regenerates in place, and `--check`
+  exits 1 on a stale module.
+- **Never hand-edit `generated.py`.** `tests/test_generated_structural.py` fails when the committed
+  module differs from a regeneration, and when its recorded `IDL_SHA256` is not the bundled IDL's.
+- **What is generated:** enum vocabularies (`Literal` aliases + case tables), the kind set and its
+  categories, every kind / record / union-case / op field table (optionality, type, declared
+  default), the node envelope, and the derived required, omit-at-default, child-slot and
+  binding-slot tables. **What stays by hand:** decode policy (leniency, aliases, refusal
+  messages, relational and limit checks), the authoring dataclasses, rendering, and anything the
+  IDL marks `hostSurface`.
+- **The decoder consults it.** `schema/decode.py` derives its enum sets, union discriminator sets
+  and `KNOWN_KINDS` from the generated tables, and builds every `KIND_SCHEMAS` entry with
+  `_kind_schema` from the kind's generated field table — member set, requiredness and every
+  omit-at-default value come from the IDL, a member with no hand override gets the decoder its
+  IDL type implies, and a member no decoder can read fails the IMPORT by name. A kind the IDL gains
+  takes its generated schema with no edit here; `Switch` alone keeps a dedicated decoder (its
+  selector is relational). Every decoded `Binding` / `Action` case is checked against its
+  generated case table, and the node envelope's members are the generated node fields.
+- **A host deviation is a DECLARED table beside the code that uses it** — `_BINDING_HOST_EXTRAS`,
+  `_CELL_FORMAT_LENIENT_ALIASES`, the per-kind overrides and `KIND_PRECHECKS` — never a silent
+  difference. The authoring dataclasses in `schema/types.py` stay hand-written (their enum
+  `Literal` aliases are the generated ones): their constructors carry authoring defaults the wire
+  does not, so generating them is a surface decision, not a regeneration.
+- **The hand layer is held to the generated one by a pin (Phase 2316).**
+  `src/fuaran_ui/schema/authoring_dialect.py` declares every deliberate divergence — authoring
+  defaults over wire-required members, renamed parameters, owners with no authoring class, and gaps
+  (members not authored, each with a reason) — and refuses at import a declaration naming a field
+  the IDL no longer has. `tests/test_authoring_coverage.py` fails BY NAME on an IDL field that is
+  neither a parameter nor a declared gap, and on a gap that has become authorable. So a new IDL
+  field is a red test here until someone decides how to author it: add the parameter, or declare
+  the gap with its reason. Never silence it by widening a reason into a blanket.
+
 ### Conformance coverage (v0 bootstrap)
 
 The codec **runs the full four-family corpus green** — node round-trips, op

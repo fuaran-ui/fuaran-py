@@ -1,0 +1,1 @@
+{"id":"form-local-1","kind":{"$type":"Form","fields":[{"id":"salary-input","kind":{"$type":"Text","onChange":"<closure>","value":{"$type":"Local","flushOn":{"$type":"OnBlur"},"format":"<closure>","onCommit":"<closure>","parse":"<closure>"}},"label":"Salary"}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Save"}}

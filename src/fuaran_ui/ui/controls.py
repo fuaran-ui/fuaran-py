@@ -208,15 +208,15 @@ def multi_select(
     everything shows the unfiltered table — which is why the default is the empty list
     and not "everything".
 
-    The single-value slot carries a value-less ``Static``: a multi-select's selection is
-    the list, and a scalar beside it would be a second answer to the same question.
+    There is no single-value slot: a multi-select's selection is the list, and a scalar
+    beside it would be a second answer to the same question (Phase 1962 — the wire
+    carries ``values`` and no ``value``).
     """
     slot = _state(name, Arr([str(v) for v in default]))
     node = fuaran.select(
         derive_id("multiselect", name, occurrence),
         label=label if label is not None else _label_of(name),
         source=_options_binding(options, source),
-        value=t.Static(None),
         multiple=True,
         values=slot,
         on_change=False,

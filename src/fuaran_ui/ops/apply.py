@@ -30,6 +30,7 @@ from ..limits import MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
 from ..schema.decode import (
+    _STYLE_DEFAULTS,
     BADGE_VARIANT,
     BINDING_CASES,
     CELL_FORMAT_CASES,
@@ -118,6 +119,30 @@ def _set_extra(node: Node, key: str, value: Value) -> Node:
     extras = dict(node.extras)
     extras[key] = value
     return Node(node.id, node.kind, extras)
+
+
+def _store_style(node: Node, members: dict[str, Value]) -> Node:
+    """Store a style record in the decoder's omitted-when-default form.
+
+    Every member at its default is dropped, and a record equal to the default
+    record is stored as the ABSENT slot (WIRE_FORMAT §3.1), never an empty
+    ``style`` object — the form a decoded all-default style takes.
+    """
+    kept = {k: v for k, v in members.items() if v != _STYLE_DEFAULTS.get(k)}
+    extras = dict(node.extras)
+    if kept:
+        extras["style"] = Obj(None, kept)
+    else:
+        extras.pop("style", None)
+    return Node(node.id, node.kind, extras)
+
+
+def _patch_style(node: Node, delta: Value) -> Node:
+    current = node.extras.get("style")
+    merged = dict(current.fields) if isinstance(current, Obj) else {}
+    if isinstance(delta, Obj):
+        merged.update(delta.fields)
+    return _store_style(node, merged)
 
 
 def _set_state_child(node: Node, key: str, child: Node) -> Node:
@@ -909,9 +934,24 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
         return _ok(tree)
 
     if tag == "UpdateStyle":
+        # The whole record replaces the node's style; a record equal to the
+        # default is stored as the ABSENT slot (Phase 2313), as PatchStyle stores it.
         target = _as_str(fields["target"])
         style = fields["style"]
-        tree = _map(target, lambda n: _set_extra(n, "style", style), root)
+        members = dict(style.fields) if isinstance(style, Obj) else {}
+        tree = _map(target, lambda n: _store_style(n, members), root)
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
+    if tag == "PatchStyle":
+        # Phase 2291 — the field-level style edit: patch the delta over the node's
+        # CURRENT style (an absent slot is the default record), carrying every field
+        # the delta does not name. A result equal to the default record is stored as
+        # the ABSENT slot, the form a decoded all-default style takes.
+        target = _as_str(fields["target"])
+        delta = fields["style"]
+        tree = _map(target, lambda n: _patch_style(n, delta), root)
         if tree is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         return _ok(tree)
@@ -1133,9 +1173,9 @@ def _op_can_grow(op: Obj) -> bool:
     a payload whose ids repeat has fewer ids than nodes. ``MoveNode`` carries no node
     and is checked anyway: moving one legal branch under the leaf of another stacks
     two depths that each passed. Everything else - ``UpdateProp``, ``ReplaceBinding``,
-    ``UpdateStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow the tree, is not
-    charged the walk, and still applies to a tree already over a limit it did not put
-    there.
+    ``UpdateStyle``, ``PatchStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow
+    the tree, is not charged the walk, and still applies to a tree already over a limit
+    it did not put there.
     """
     if op.tag == "MoveNode":
         return True

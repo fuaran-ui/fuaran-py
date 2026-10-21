@@ -355,7 +355,7 @@ def test_media_poster_under_a_declared_policy_is_emitted() -> None:
 
 
 def test_custom_renders_inert_labelled_placeholder() -> None:
-    html = _render('{"id":"c","kind":{"$type":"Custom","moduleId":"deal-flow","componentId":"TrendCard"}}')
+    html = _render('{"id":"c","kind":{"$type":"Custom","moduleId":"deal-flow","componentId":"TrendCard","props":{}}}')
     assert "fuaran-kind-custom-placeholder" in html
     assert "fuaran-custom-deal-flow-TrendCard" in html
     assert 'data-fuaran-custom-module="deal-flow"' in html

@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from _corpus import CORPUS_ROOT, corpus_required, fixtures_of
+from fuaran_ui.conformance.harness import path_matches
 from fuaran_ui.elicitation import (
     ANSWER_OUT_OF_SPACE,
     ANSWER_TYPE_MISMATCH,
@@ -58,7 +59,7 @@ def test_elicitation_reject(fx: dict) -> None:
     result = _decode(fx["decoder"], _read(fx["inputFile"]))
     assert not result.ok, f"{fx['id']} should refuse"
     assert result.error.code == fx["expectedErrorCode"], f"{fx['id']}: {result.error.code}"
-    assert result.error.path.startswith(fx["expectedPath"]), f"{fx['id']}: {result.error.path}"
+    assert path_matches(result.error.path, fx["expectedPath"]) is None, f"{fx['id']}: {result.error.path}"
 
 
 @corpus_required
@@ -74,7 +75,7 @@ def test_elicitation_answer_reject(fx: dict) -> None:
     result = decode_answer_doc(_read(fx["inputFile"]))
     assert not result.ok, f"{fx['id']} should refuse"
     assert result.error.code == fx["expectedErrorCode"], f"{fx['id']}: {result.error.code}"
-    assert result.error.path.startswith(fx["expectedPath"]), f"{fx['id']}: {result.error.path}"
+    assert path_matches(result.error.path, fx["expectedPath"]) is None, f"{fx['id']}: {result.error.path}"
 
 
 # ── Unit tests mirroring the Go elicitation_test.go ─────────────────────────

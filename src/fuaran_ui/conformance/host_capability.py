@@ -72,9 +72,10 @@ from pathlib import Path
 from typing import Any, Literal
 
 from .. import __version__
+from ..schema import generated as _generated
 from ..schema import types as _types
-from ..schema.decode import KNOWN_KINDS
 from ..ui import compute as _compute
+from .corpus_root import REPO_MARKER, RepoRootRefused, find_repo_root
 
 __all__ = [
     "MANIFEST_FORMAT",
@@ -99,8 +100,8 @@ GENERATOR = "fuaran_ui.conformance.host_capability"
 #:
 #: This is a NAME correspondence, not a token list: it says which of the host's aliases *is* a given
 #: wire union, and every token is still derived from the alias's members. A wrong entry cannot
-#: survive — ``tests/test_host_capability_manifest.py`` checks each declared union against the
-#: corpus IDL, and a host alias may only ever be a SUBSET of the spec union's cases.
+#: survive — :func:`build` refuses a scoped union, or a declared case, the generated vocabulary does
+#: not carry, and a host alias may only ever be a SUBSET of the spec union's cases.
 SPEC_UNION_ALIASES: Mapping[str, str] = {
     "Action": "Action",
     "Binding": "Binding",
@@ -253,11 +254,23 @@ def build(
     kind_tokens = _kind_tokens(source, frozenset(union_members))
 
     declared_kinds = {token.split(".", 1)[1] for token in kind_tokens}
-    unknown = sorted(declared_kinds - set(KNOWN_KINDS))
+    unknown = sorted(declared_kinds - set(_generated.KINDS))
     if unknown:
-        # A kind this host can author but cannot decode is not a capability, it is a defect: the
-        # round trip a manifest exists to describe is author-then-decode. Refuse to publish it.
+        # A kind this host can author but the vocabulary does not declare is not a capability, it is
+        # a defect: the round trip a manifest exists to describe is author-then-decode, and the
+        # decoder's kind set IS the generated one. Refuse to publish it.
         raise ValueError(f"authoring kinds absent from the host's decode vocabulary: {', '.join(unknown)}")
+    # §27.1's unrecoverable direction, refused at generation rather than caught by a test: a scoped
+    # union the IDL does not have, or a declared case its union does not carry, is an
+    # OVER-declaration. The generated tables are the IDL (Phase 2296), so this needs no corpus.
+    stray = sorted(set(union_scope) - set(_generated.UNION_CASES))
+    if stray:
+        raise ValueError(f"scoped unions the vocabulary does not declare: {', '.join(stray)}")
+    invented = sorted(
+        token for token in union_tokens if token.split(".", 1)[1] not in _generated.UNION_CASES[token.split(".", 1)[0]]
+    )
+    if invented:
+        raise ValueError(f"declared union cases the wire does not have: {', '.join(invented)}")
 
     families: dict[str, Any] = {
         "kinds": {"covered": True},
@@ -279,8 +292,97 @@ def build(
         "corpusAuthority": corpus_authority,
         "generator": GENERATOR,
         "families": families,
+        "corpusFamilies": dict(sorted(CORPUS_FAMILIES.items())),
         "tokens": sorted(set(union_tokens) | set(kind_tokens)),
     }
+
+
+# -- §27.7: the corpus families this host's suite runs (Phase 1938) ------------------------------
+#
+# A host STATEMENT, not a projection: no introspection can see which families a test suite runs. It
+# replaces the hand "skipped family" printer, and unlike that printer it is checked — the gate
+# (``tests/test_corpus_sync.py``) derives the family set from the corpus tree with
+# :func:`corpus_families` and fails on a family named here that the corpus does not have, or one the
+# corpus has that is not named here.
+
+_NO_CARD_CODEC = "this host has no contract-card codec (§25) for the card fixtures to run against yet"
+_TELEPORT_UNRUN = "the teleport module is unit-tested by hand; its suite does not yet run the corpus teleport/ fixtures"
+_NO_DESIGN_SEAM = (
+    "this host ships no design-provider seam: its records are read by a design-tool integration, "
+    "and this host carries none"
+)
+_LAW_UNRUN = "this host's suite does not yet run this law family's vectors"
+
+#: Every corpus family, and this host's answer for it (WIRE_FORMAT §27.7).
+CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
+    "node-round-trip": "covered",
+    "op-round-trip": "covered",
+    "reject": "covered",
+    "lenient-accept": "covered",
+    "envelope-round-trip": "covered",
+    "formatting": {
+        "pending": (
+            "the cell formatter is not yet driven from the formatting vectors, and it diverges "
+            "from them on significant-digit exponent forms, ties and negative zero"
+        )
+    },
+    "envelope-reject": "covered",
+    "elicitation-round-trip": "covered",
+    "elicitation-reject": "covered",
+    "elicitation-answer-accept": "covered",
+    "elicitation-answer-reject": "covered",
+    "style-observer": "covered",
+    "contract-card-round-trip": {"pending": _NO_CARD_CODEC},
+    "contract-card-reject": {"pending": _NO_CARD_CODEC},
+    "teleport-decode": {"pending": _TELEPORT_UNRUN},
+    "teleport-reject": {"pending": _TELEPORT_UNRUN},
+    "apply/duplicateIdsApply": "covered",
+    "apply/limitsApply": "covered",
+    "apply/styleNormaliseApply": "covered",
+    "apply/skeletonApply": {"pending": "the apply engine's suite does not yet run the skeleton-apply vectors"},
+    "chain": "covered",  # tests/test_op_stream.py
+    "dag": "covered",
+    "merge-conformance": "covered",
+    "sanitization": "covered",
+    "diff/treeDiff": "covered",
+    "laws/dataframeParity": "covered",
+    "laws/capabilityLaws": {"pending": _LAW_UNRUN},
+    "laws/decimal": "covered",  # tests/test_decimal_laws.py
+    "laws/fieldLaws": {"pending": _LAW_UNRUN},
+    "laws/propagationLaws": {"pending": _LAW_UNRUN},
+    # tests/test_transform_laws.py — every evalPipeline vector but the `-unit-` ones (fuaran#2208),
+    # which it names; the columnOp and delta case kinds have no surface here and are named too.
+    "laws/transformLaws": "covered",
+    "decode-policy": {"notApplicable": "this host's decoder offers no §23 kind admission policy"},
+    "design-seam-reject": {"notApplicable": _NO_DESIGN_SEAM},
+    "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
+    "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
+    "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
+    "repair": {"pending": "this host has no §28 repair function yet"},
+    "row-encode": "covered",  # tests/test_row_encode.py
+    "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
+}
+
+
+def corpus_families(corpus_root: Path) -> set[str]:
+    """The corpus family set, derived from the corpus tree (WIRE_FORMAT §27.7).
+
+    Each distinct ``kind`` among the root manifest's ``fixtures``; and each top-level directory
+    carrying its own ``manifest.json`` — one family named by the directory, or, where that manifest
+    carries a ``families`` array of objects, one family ``<directory>/<id>`` per entry.
+    """
+    root_manifest = json.loads((corpus_root / "manifest.json").read_text(encoding="utf-8"))
+    found = {fixture["kind"] for fixture in root_manifest["fixtures"]}
+    for directory in sorted(p for p in corpus_root.iterdir() if p.is_dir()):
+        own = directory / "manifest.json"
+        if not own.is_file():
+            continue
+        members = json.loads(own.read_text(encoding="utf-8")).get("families")
+        if isinstance(members, list) and members and all(isinstance(m, dict) for m in members):
+            found.update(f"{directory.name}/{m['id']}" for m in members)
+        else:
+            found.add(directory.name)
+    return found
 
 
 _FIELD_FAMILY_REASON = (
@@ -308,21 +410,17 @@ def render(manifest: Mapping[str, Any]) -> str:
     return json.dumps(manifest, indent=2, sort_keys=False, ensure_ascii=False) + "\n"
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+def _output_path(repo: Path) -> Path:
+    return repo / "conformance" / "host-capability-manifest.json"
 
 
-def _default_output() -> Path:
-    return _repo_root() / "conformance" / "host-capability-manifest.json"
+def _snapshot_authority(repo: Path) -> str | None:
+    """The corpus commit the snapshot in ``repo`` was taken from, when there is one.
 
-
-def _snapshot_authority() -> str | None:
-    """The corpus commit this host's bundled snapshot was taken from, when there is one.
-
-    Provenance, never a dependency: nothing in the generation reads the corpus, so an installed
-    package with no snapshot beside it produces the same tokens with ``corpusAuthority`` null.
+    Provenance, never a dependency: nothing in the generation reads the corpus, so a checkout with
+    no snapshot produces the same tokens with ``corpusAuthority`` null.
     """
-    snapshot = _repo_root() / "conformance" / "corpus" / "snapshot.json"
+    snapshot = repo / "conformance" / "corpus" / "snapshot.json"
     if not snapshot.is_file():
         return None
     try:
@@ -333,14 +431,35 @@ def _snapshot_authority() -> str | None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """``--check`` (default) compares the published artefact; ``--write`` regenerates it."""
+    """``--check`` (default) compares the published artefact; ``--write`` regenerates it.
+
+    The artefact is the one in the checkout the caller names (``--repo``) or is standing in - never
+    the one this module was imported from, which under an editable install is whichever checkout
+    the interpreter was set up in.
+    """
     parser = argparse.ArgumentParser(description="Generate or check this host's capability manifest (WIRE_FORMAT §27).")
     parser.add_argument("--write", action="store_true", help="rewrite the published artefact")
-    parser.add_argument("--out", type=Path, default=None, help="the artefact path (default: conformance/)")
+    parser.add_argument("--out", type=Path, default=None, help="the artefact path (default: conformance/ in the repo)")
+    parser.add_argument(
+        "--repo", type=Path, default=None, help="the checkout to operate on (default: the one cwd is in)"
+    )
     args = parser.parse_args(argv)
 
-    out = _default_output() if args.out is None else args.out
-    text = render(build(corpus_authority=_snapshot_authority()))
+    try:
+        repo = find_repo_root(args.repo)
+    except RepoRootRefused as refused:
+        print(refused, file=sys.stderr)
+        return 2
+    if repo is None:
+        print(
+            f"{Path.cwd()} is not inside a fuaran-py checkout (no {REPO_MARKER.as_posix()} above it). "
+            "Run this from the checkout to operate on, or name it with --repo.",
+            file=sys.stderr,
+        )
+        return 2
+
+    out = _output_path(repo) if args.out is None else args.out
+    text = render(build(corpus_authority=_snapshot_authority(repo)))
 
     if args.write:
         out.parent.mkdir(parents=True, exist_ok=True)

@@ -106,6 +106,75 @@ def test_update_style() -> None:
     _assert_tree(_apply_fixture("op-updatestyle", base), expected)
 
 
+# ── PatchStyle (Phase 2291) — the field-level style edit ────────────────────
+
+_INFO_SPACIOUS = t.SemanticStyle(tone="Info", weight="Spacious")
+
+
+def _styled_dashboard(style: t.SemanticStyle | None) -> t.UiNode:
+    metric = _full_metric() if style is None else _full_metric().replace(style=style)
+    return node.bare(fuaran.dashboard("root", children=[metric]))
+
+
+def _patch(target: str, **members: str) -> Obj:
+    return Obj("PatchStyle", {"style": Obj(None, dict(members)), "target": target})
+
+
+@corpus_required
+def test_patch_style() -> None:
+    # The fixture sets tone + voice; the node's weight is carried through unchanged.
+    expected = _styled_dashboard(t.SemanticStyle(tone="Success", voice="Display", weight="Spacious"))
+    _assert_tree(_apply_fixture("op-patchstyle", _styled_dashboard(_INFO_SPACIOUS)), expected)
+
+
+@corpus_required
+def test_patch_style_default_token_is_an_edit() -> None:
+    # `tone: Default` resets the tone; it is not an omission that leaves `Info` in place.
+    fixture = "op-patchstyle (phase 2291 tone=default is an edit, not an omission)"
+    expected = _styled_dashboard(t.SemanticStyle(weight="Spacious"))
+    _assert_tree(_apply_fixture(fixture, _styled_dashboard(_INFO_SPACIOUS)), expected)
+
+
+def test_patch_style_sets_only_the_named_field() -> None:
+    result = _apply_op(_patch("metric-1", tone="Brand"), _styled_dashboard(_INFO_SPACIOUS))
+    _assert_tree(result, _styled_dashboard(t.SemanticStyle(tone="Brand", weight="Spacious")))
+
+
+def test_patch_style_over_an_absent_style_patches_the_default_record() -> None:
+    result = _apply_op(_patch("metric-1", weight="Compact"), _styled_dashboard(None))
+    _assert_tree(result, _styled_dashboard(t.SemanticStyle(weight="Compact")))
+
+
+def test_patch_style_to_the_default_record_stores_the_absent_slot() -> None:
+    result = _apply_op(_patch("metric-1", tone="Default", weight="Standard"), _styled_dashboard(_INFO_SPACIOUS))
+    _assert_tree(result, _styled_dashboard(None))
+    assert isinstance(result, Ok)
+    children = result.value.kind.fields["children"]
+    assert isinstance(children, Arr)
+    metric = children.items[0]
+    assert isinstance(metric, Node)
+    assert "style" not in metric.extras
+
+
+def test_patch_styles_of_different_fields_commute() -> None:
+    base = _decode_tree(_styled_dashboard(_INFO_SPACIOUS))
+    tone, emphasis = _patch("metric-1", tone="Brand"), _patch("metric-1", emphasis="Loud")
+    first = apply(tone, base)
+    assert isinstance(first, Ok), first
+    tone_then_emphasis = apply(emphasis, first.value)
+    second = apply(emphasis, base)
+    assert isinstance(second, Ok), second
+    emphasis_then_tone = apply(tone, second.value)
+    expected = _styled_dashboard(t.SemanticStyle(emphasis="Loud", tone="Brand", weight="Spacious"))
+    _assert_tree(tone_then_emphasis, expected)
+    _assert_tree(emphasis_then_tone, expected)
+
+
+def test_patch_style_unknown_target_is_node_not_found() -> None:
+    base = fuaran.markdown("a", "x")
+    assert _err(_apply_op(_patch("ghost", tone="Brand"), base)) == "NodeNotFound"
+
+
 @corpus_required
 def test_update_state() -> None:
     base = node.bare(fuaran.dashboard("root", children=[_full_metric()]))

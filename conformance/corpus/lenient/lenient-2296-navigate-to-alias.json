@@ -1,0 +1,1 @@
+{"id":"len-nav-to","kind":{"$type":"Button","label":{"$type":"Literal","text":"Browse"},"onClick":{"$type":"Navigate","target":"Blank","to":"/jobs"},"variant":"Primary"}}

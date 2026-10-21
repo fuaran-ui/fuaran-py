@@ -35,16 +35,60 @@ CORPUS_ROOT_ENV = "FUARAN_WIRE_FIXTURES"
 #: The corpus clone's directory name.
 CORPUS_DIR_NAME = "wire-format-fixtures"
 
+#: The file whose presence marks a directory as a checkout of this repository: the sync script
+#: is the one file every repository tool here is run beside, and no other project spells it.
+REPO_MARKER = Path("conformance") / "sync_corpus.py"
+
 
 class CorpusRootRefused(ValueError):
     """A named corpus root holds no ``manifest.json``."""
 
 
-def sibling_corpus_root() -> Path:
-    """The canonical sibling clone, ``../wire-format-fixtures`` beside this repository."""
+class RepoRootRefused(ValueError):
+    """An explicitly named repository root holds no ``conformance/sync_corpus.py``."""
+
+
+def sibling_corpus_root(repo: Path | None = None) -> Path:
+    """The canonical sibling clone, ``../wire-format-fixtures`` beside a repository.
+
+    ``repo`` names the checkout the corpus sits beside; omitted, it is the checkout this file
+    sits in. A caller that works on a DIFFERENT checkout than the one holding this module (a
+    worktree run with another checkout's install) passes its own.
+    """
+    if repo is not None:
+        return Path(repo).resolve().parent / CORPUS_DIR_NAME
     # parents: [0] conformance, [1] fuaran_ui, [2] src, [3] fuaran-py, [4] the
     # directory the corpus sits beside.
     return Path(__file__).resolve().parents[4] / CORPUS_DIR_NAME
+
+
+def find_repo_root(explicit: str | os.PathLike[str] | None = None, *, cwd: Path | None = None) -> Path | None:
+    """The checkout to operate on: ``explicit``, else the one the invoking directory sits in.
+
+    Never the location of the installed module. An editable install made in one checkout is
+    importable from every other, so a generator that located its target from ``__file__``
+    wrote into whichever checkout the interpreter's install pointed at - from a git worktree
+    that is the shared primary clone, and the run reported success. The checkout is instead
+    what the caller is standing in (the nearest ancestor of ``cwd`` holding
+    :data:`REPO_MARKER`) or what it names.
+
+    Raises :class:`RepoRootRefused` when a named root is not a checkout; returns ``None`` when
+    nothing is named and ``cwd`` is in no checkout - each caller decides what that means.
+    """
+    named = _named(explicit)
+    if named is not None:
+        root = Path(named).expanduser().resolve()
+        if not (root / REPO_MARKER).is_file():
+            raise RepoRootRefused(
+                f"the repository given explicitly ({named!r}) is not a fuaran-py checkout "
+                f"(no {REPO_MARKER.as_posix()} under {root})."
+            )
+        return root
+    here = (Path.cwd() if cwd is None else Path(cwd)).resolve()
+    for candidate in (here, *here.parents):
+        if (candidate / REPO_MARKER).is_file():
+            return candidate
+    return None
 
 
 def _named(value: str | os.PathLike[str] | None) -> str | None:
@@ -63,7 +107,7 @@ def resolve_corpus_root(
     """Explicit argument, then ``FUARAN_WIRE_FIXTURES``, then the sibling clone.
 
     ``sibling`` overrides the fallback for a caller that knows its own checkout
-    (the sync script resolves it from where the script sits). Raises
+    (the sync script passes the sibling of the checkout it operates on). Raises
     :class:`CorpusRootRefused` when a named root holds no ``manifest.json``.
     """
     named = _named(explicit)

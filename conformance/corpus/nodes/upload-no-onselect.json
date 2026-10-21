@@ -1,0 +1,1 @@
+{"id":"upload-no-onselect","kind":{"$type":"FileUpload","accept":[".csv","text/csv"],"label":"Upload CSV"}}

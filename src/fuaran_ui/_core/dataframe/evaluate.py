@@ -43,6 +43,7 @@ from .model import (
     JOIN_ERROR,
     STRING,
     TIMESTAMP,
+    TIMESTAMP_UNIT_DIGITS,
     TYPE_ERROR,
     UNBOUND_PARAM,
     UNKNOWN_COLUMN,
@@ -250,9 +251,30 @@ def _compare_cells(a: Cell, b: Cell) -> int | None:
         return decimal_text.compare(_decimal_of(a), _decimal_of(b))  # type: ignore[arg-type]
     if a.kind == BOOL and b.kind == BOOL:
         return (a.value > b.value) - (a.value < b.value)  # type: ignore[operator]
-    if a.kind == b.kind and a.kind in (STRING, DATE, TIMESTAMP):
+    if a.kind == TIMESTAMP and b.kind == TIMESTAMP:
+        x, y = _instant_key(a.value), _instant_key(b.value)  # type: ignore[arg-type]
+        return (x > y) - (x < y)
+    if a.kind == b.kind and a.kind in (STRING, DATE):
         return (a.value > b.value) - (a.value < b.value)  # type: ignore[operator]
     return None
+
+
+def _instant_key(s: str) -> str:
+    """Canonical instant text keyed so its order is the instants' (WIRE_FORMAT §3.6.25). The text
+    drops an all-zero fraction and every trailing zero, so ``…:00Z`` and ``…:00.5Z`` do not order by
+    their characters (``.`` sorts below ``Z``); the key pads the fraction to nanoseconds. Text that
+    is not canonical keys as itself."""
+    if len(s) < 20 or not s.endswith("Z"):
+        return s
+    if s[19] == ".":
+        fraction = s[20:-1]
+    elif len(s) == 20:
+        fraction = ""
+    else:
+        return s
+    if len(fraction) > 9:
+        return s
+    return s[:19] + fraction.ljust(9, "0")
 
 
 def _cell_eq(a: Cell, b: Cell) -> bool:
@@ -459,12 +481,14 @@ def _cast_cell(ty: str, c: Cell) -> Result[Cell, EvalError]:  # noqa: C901, PLR0
         if c.kind == STRING:
             return Ok(cell_date(str(c.value)))
         return Err(EvalError(TYPE_ERROR, "cannot cast to date"))
-    if ty == TIMESTAMP:
+    if ty in TIMESTAMP_UNIT_DIGITS:
+        # Phase 2206 — a cast to any unit keeps the instant's one canonical text; the
+        # unit is a statement about the column, not the cell.
         if c.kind == TIMESTAMP:
             return Ok(c)
         if c.kind == STRING:
             return Ok(cell_timestamp(str(c.value)))
-        return Err(EvalError(TYPE_ERROR, "cannot cast to timestamp"))
+        return Err(EvalError(TYPE_ERROR, f"cannot cast to {ty}"))
     return Err(EvalError(TYPE_ERROR, f"unknown cast type {ty}"))
 
 

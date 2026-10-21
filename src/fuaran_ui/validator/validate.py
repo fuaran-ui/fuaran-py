@@ -207,10 +207,10 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
 
 _NUMERIC_COLUMN_TYPES = frozenset({"int", "float", "bool"})  # bool coerces 1/0 at lowering
 
-_DATED_COLUMN_TYPES = frozenset({"date", "timestamp"})
-"""The column types a temporal x-axis can read (FUARAN097, Phase 882). Both are
-honoured: a timestamp's time-of-day is DISCARDED by the lowering, which is a
-documented narrowing, not a mismatch."""
+_DATED_COLUMN_TYPES = frozenset({"date", "timestamp", "timestamp_ms", "timestamp_us", "timestamp_ns"})
+"""The column types a temporal x-axis can read (FUARAN097, Phase 882; every timestamp
+unit since Phase 2206). All are honoured: a timestamp's time-of-day is DISCARDED by
+the lowering, which is a documented narrowing, not a mismatch."""
 
 
 def _non_finite_spelling(value: object) -> str | None:

@@ -1508,6 +1508,15 @@
       "description": "0.28.0 — the pre-rename column-member spellings decode unchanged and re-encode to the spelled-out names: a project step's `cols` becomes `columns`, and a sort key's and a window frame-ordering entry's `col` becomes `column`. The `col` expression tag is NOT a member name and does not move"
     },
     {
+      "id": "lenient-transform-epoch-timestamp-units",
+      "kind": "lenient-accept",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-epoch-timestamp-units.json",
+      "expectedFile": "lenient/lenient-transform-epoch-timestamp-units.expected.json",
+      "description": "Phase 2206 — an epoch number is read in its column's unit: a `timestamp` column keeps fuaran-core#94's reading by magnitude (>= 1e11 is milliseconds, TRUNCATED toward zero, so -100000000001 is -100000000 s), and a sub-second column reads the number in its own unit with no guess (floor second, non-negative fraction), written as the minimal canonical text — a whole-second result carries no fraction, and the 0000 boundary is reachable as milliseconds (WIRE_FORMAT §3.6.25)"
+    },
+    {
       "id": "lenient-transform-epoch-timestamps",
       "kind": "lenient-accept",
       "since": "0.3.0",
@@ -2946,6 +2955,51 @@
       "inputFile": "nodes/grid-transform-param.json",
       "expectedFile": "nodes/grid-transform-param.json",
       "description": "Visualisation/Grid (Phase 424 — parameterised Binding.Transform, filter param from a chip)"
+    },
+    {
+      "id": "grid-transform-timestamp-unit-ms",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-timestamp-unit-ms.json",
+      "expectedFile": "nodes/grid-transform-timestamp-unit-ms.json",
+      "description": "Visualisation/Grid (Phase 2206 — a `timestamp_ms` column: the 0000 and 9999 boundary instants at the unit's finest fraction, a whole-second instant whose all-zero fraction is written as no fraction, a fraction with interior zeros in its minimal text, and an absent cell; one instant has one canonical text, WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "grid-transform-timestamp-unit-ns",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-timestamp-unit-ns.json",
+      "expectedFile": "nodes/grid-transform-timestamp-unit-ns.json",
+      "description": "Visualisation/Grid (Phase 2206 — a `timestamp_ns` column: the 0000 and 9999 boundary instants at the unit's finest fraction, a whole-second instant whose all-zero fraction is written as no fraction, a fraction with interior zeros in its minimal text, and an absent cell; one instant has one canonical text, WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "grid-transform-timestamp-unit-s",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-timestamp-unit-s.json",
+      "expectedFile": "nodes/grid-transform-timestamp-unit-s.json",
+      "description": "Visualisation/Grid (Phase 2206 — a `timestamp` column: the 0000 and 9999 boundary instants at the unit's finest fraction, a whole-second instant whose all-zero fraction is written as no fraction, a fraction with interior zeros in its minimal text, and an absent cell; one instant has one canonical text, WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "grid-transform-timestamp-unit-us",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-timestamp-unit-us.json",
+      "expectedFile": "nodes/grid-transform-timestamp-unit-us.json",
+      "description": "Visualisation/Grid (Phase 2206 — a `timestamp_us` column: the 0000 and 9999 boundary instants at the unit's finest fraction, a whole-second instant whose all-zero fraction is written as no fraction, a fraction with interior zeros in its minimal text, and an absent cell; one instant has one canonical text, WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "grid-transform-timestamp-widening",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-timestamp-widening.json",
+      "expectedFile": "nodes/grid-transform-timestamp-widening.json",
+      "description": "Visualisation/Grid (Phase 2206 — a coarser unit widens into a finer one: whole-second and millisecond instants in a `timestamp_us` column, and instants of every coarser precision in a `timestamp_ns` column, each read and re-encoded as the same minimal text, WIRE_FORMAT §3.6.25)"
     },
     {
       "id": "grid-transform-undeclared-param",
@@ -5965,6 +6019,66 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.source.pipeline",
       "description": "a sort key carrying BOTH `column` (canonical since 0.28.0) and `col` (its decode alias) — refused as ambiguous, on the same rule as the project step beside it. The two name different columns here, so accepting either would silently sort by a column the author may not have meant"
+    },
+    {
+      "id": "reject-transform-timestamp-fractional-second",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-fractional-second.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — a `timestamp` (seconds) column holds whole seconds only: a fractional instant is refused, the same rule as every finer unit (WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "reject-transform-timestamp-ms-epoch-before-0000",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-ms-epoch-before-0000.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — an epoch number one millisecond before 0000-01-01T00:00:00Z names an instant the canonical text cannot spell, refused in every unit (WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "reject-transform-timestamp-ms-finer-fraction",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-ms-finer-fraction.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — a `timestamp_ms` value whose fraction needs microseconds: a fraction finer than the column's unit is refused, never rounded (WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "reject-transform-timestamp-ms-padded-fraction",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-ms-padded-fraction.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — `.500` is not the canonical text of half a second (a fraction carries no trailing zero), so it is refused in every unit rather than normalised: one instant has one text (WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "reject-transform-timestamp-unknown-unit",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-unknown-unit.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — a timestamp unit tag no host knows (`timestamp_ps`) is an unknown column type, refused by name rather than read as the nearest unit (WIRE_FORMAT §3.6.25)"
+    },
+    {
+      "id": "reject-transform-timestamp-us-finer-fraction",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-timestamp-us-finer-fraction.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2206 — a `timestamp_us` value whose fraction needs nanoseconds: a fraction finer than the column's unit is refused, never rounded (WIRE_FORMAT §3.6.25)"
     },
     {
       "id": "reject-tree-item-missing-id",

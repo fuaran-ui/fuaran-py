@@ -2008,15 +2008,29 @@ class Renderer:
         """
         field_id = field.fields.get("id")
         field_id = field_id if isinstance(field_id, str) else ""
-        label = element(
-            "span", [("class", "fuaran-form-field-label")], escape_text(self._text(field.fields.get("label")))
-        )
+        # Phase 2391 — the reference host's ruled field shape (its 0.98.0 R4):
+        # `div.fuaran-form-field > label.fuaran-form-label[for] + control[id,
+        # data-fuaran-field] + help`, the label reading "Label *" when required.
+        label_text = self._text(field.fields.get("label"))
+        if field.fields.get("required") is True:
+            label_text += " *"
+        label = text_element("label", [("class", "fuaran-form-label"), ("for", field_id)], label_text)
         control_kind = field.fields.get("kind")
         control_tag = control_kind.tag if isinstance(control_kind, Obj) else None
-        attrs: list[tuple[str, str]] = [("class", "fuaran-form-field-control"), ("data-fuaran-field", field_id)]
+        attrs: list[tuple[str, str]] = [
+            ("class", "fuaran-form-field-control"),
+            ("id", field_id),
+            ("data-fuaran-field", field_id),
+        ]
         attrs.extend(_field_rule_attrs(field.fields.get("rule"), control_tag))
         control = void_element("input", attrs)
-        return element("label", [("class", "fuaran-form-field")], label + control)
+        help_value = field.fields.get("help")
+        help_html = (
+            text_element("div", [("class", "fuaran-form-help")], self._text(help_value))
+            if help_value is not None
+            else ""
+        )
+        return element("div", [("class", "fuaran-form-field")], label + control + help_html)
 
     def _filters(self, node: Node, fields: dict[str, Value]) -> str:
         # The structural decode does not give Filters a typed schema; render the
@@ -2476,15 +2490,33 @@ class Renderer:
         )
 
     def _map(self, node: Node, fields: dict[str, Value]) -> str:
-        count = _seq_len(resolve_source(fields.get("source"), self.sources))
-        return text_element(
+        # Phase 2391 — the reference host's ruled Map (its 0.98.0 R12): the
+        # loading slot while the source is unresolved, else the served
+        # placeholder, carrying one `li` per marker once the markers resolve.
+        resolved = resolve_source(fields.get("source"), self.sources)
+        if resolved is None:
+            loading = self._state_loading(node)
+            if loading is not None:
+                return self.render_node(loading)
+        markers = [m for m in resolved.items if isinstance(m, Obj)] if isinstance(resolved, Arr) else []
+        caption = escape_text(f"[Map: {len(markers)} markers {_EM_DASH} hydrates client-side]")
+        marker_list = (
+            element(
+                "ul",
+                [("class", "fuaran-map-marker-list")],
+                "".join(text_element("li", [("class", "fuaran-map-marker")], _marker_text(m)) for m in markers),
+            )
+            if markers
+            else ""
+        )
+        return element(
             "div",
             [
                 ("class", "fuaran-map fuaran-map-ssr-placeholder"),
                 ("data-fuaran-ssr-placeholder", "Map"),
-                ("data-fuaran-marker-count", str(count)),
+                ("data-fuaran-marker-count", str(len(markers))),
             ],
-            f"[Map: {count} markers {_EM_DASH} hydrates client-side]",
+            caption + marker_list,
         )
 
     # ── structural ───────────────────────────────────────────────────────────
@@ -2615,6 +2647,17 @@ def _float_series(value: object) -> list[float] | None:
         return None
     items = value.items if isinstance(value, Arr) else list(value)
     return [_float_seq_element(item) for item in items]
+
+
+def _marker_text(marker: Obj) -> str:
+    """One Map marker as the reference host serves it: ``label @ (lat, lon)``,
+    each coordinate to four decimal places."""
+    label = marker.fields.get("label")
+    lat = marker.fields.get("latitude")
+    lon = marker.fields.get("longitude")
+    lat_f = float(lat) if isinstance(lat, (int, float)) and not isinstance(lat, bool) else 0.0
+    lon_f = float(lon) if isinstance(lon, (int, float)) and not isinstance(lon, bool) else 0.0
+    return f"{label if isinstance(label, str) else ''} @ ({lat_f:.4f}, {lon_f:.4f})"
 
 
 def _seq_len(value: object) -> int:

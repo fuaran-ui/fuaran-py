@@ -250,7 +250,10 @@ def test_the_corpus_fixture_projects_the_reference_constraint_attributes() -> No
     result = decode_node(src)
     assert result.ok
     html = render_html(result.value)
-    assert '<input class="fuaran-form-field-control" data-fuaran-field="work-email" type="email" />' in html
+    assert (
+        '<input class="fuaran-form-field-control" id="work-email" data-fuaran-field="work-email" type="email" />'
+        in html
+    )
     assert 'data-fuaran-field="postcode" pattern="[A-Z]{1,2}[0-9][A-Z0-9]? ?[0-9][A-Z]{2}" />' in html
     assert 'data-fuaran-field="username" minlength="3" maxlength="24" />' in html
 
@@ -276,7 +279,7 @@ def test_a_ruleless_field_renders_byte_unchanged() -> None:
     result = decode_node(wire)
     assert result.ok
     html = render_html(result.value)
-    assert '<input class="fuaran-form-field-control" data-fuaran-field="x" />' in html
+    assert '<input class="fuaran-form-field-control" id="x" data-fuaran-field="x" />' in html
     # Scoped to the INPUT: the submit button legitimately carries `type="submit"`.
     assert not re.search(r"<input[^>]*type=", html)
 

@@ -1510,6 +1510,7 @@
     {
       "id": "lenient-transform-epoch-timestamp-units",
       "kind": "lenient-accept",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "lenient/lenient-transform-epoch-timestamp-units.json",
       "expectedFile": "lenient/lenient-transform-epoch-timestamp-units.expected.json",
@@ -2958,6 +2959,7 @@
     {
       "id": "grid-transform-timestamp-unit-ms",
       "kind": "node-round-trip",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-timestamp-unit-ms.json",
       "expectedFile": "nodes/grid-transform-timestamp-unit-ms.json",
@@ -2966,6 +2968,7 @@
     {
       "id": "grid-transform-timestamp-unit-ns",
       "kind": "node-round-trip",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-timestamp-unit-ns.json",
       "expectedFile": "nodes/grid-transform-timestamp-unit-ns.json",
@@ -2974,6 +2977,7 @@
     {
       "id": "grid-transform-timestamp-unit-s",
       "kind": "node-round-trip",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-timestamp-unit-s.json",
       "expectedFile": "nodes/grid-transform-timestamp-unit-s.json",
@@ -2982,6 +2986,7 @@
     {
       "id": "grid-transform-timestamp-unit-us",
       "kind": "node-round-trip",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-timestamp-unit-us.json",
       "expectedFile": "nodes/grid-transform-timestamp-unit-us.json",
@@ -2990,6 +2995,7 @@
     {
       "id": "grid-transform-timestamp-widening",
       "kind": "node-round-trip",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "nodes/grid-transform-timestamp-widening.json",
       "expectedFile": "nodes/grid-transform-timestamp-widening.json",
@@ -6017,6 +6023,7 @@
     {
       "id": "reject-transform-timestamp-fractional-second",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-fractional-second.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -6026,6 +6033,7 @@
     {
       "id": "reject-transform-timestamp-ms-epoch-before-0000",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-ms-epoch-before-0000.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -6035,6 +6043,7 @@
     {
       "id": "reject-transform-timestamp-ms-finer-fraction",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-ms-finer-fraction.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -6044,6 +6053,7 @@
     {
       "id": "reject-transform-timestamp-ms-padded-fraction",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-ms-padded-fraction.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -6053,6 +6063,7 @@
     {
       "id": "reject-transform-timestamp-unknown-unit",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-unknown-unit.json",
       "expectedErrorCode": "WRONG_TYPE",
@@ -6062,6 +6073,7 @@
     {
       "id": "reject-transform-timestamp-us-finer-fraction",
       "kind": "reject",
+      "since": "0.98.0",
       "decoder": "node",
       "inputFile": "reject/reject-transform-timestamp-us-finer-fraction.json",
       "expectedErrorCode": "WRONG_TYPE",

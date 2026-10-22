@@ -15,6 +15,19 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### breaking — two number tokens are refused at decode (Phase 2286)
+
+- Every wire reader (`load_bounded`, so `decode_node`, `decode_op` and the secondary readers) refuses
+  two number tokens it used to read, both as `INVALID_JSON`: an overflowing exponent (`1e999`),
+  which read as an infinity (WIRE_FORMAT.md §20.2 row 7, amended), and an integer token past 2^53
+  that is not the canonical float layout of the double it reads as (`9007199254740993`, a 19-digit
+  identifier), which read as the nearest double (§2 rule 5, amended). `1e-999` still reads as zero
+  and `10000000000000000`, a canonical layout, still reads. Neither refused token can be written by
+  a conformant encoder; the corpus moves with the amendment (`reject-json-number-overflow-exponent`,
+  `reject-json-integer-beyond-int53`; `lenient-1521-payload-integer-beyond-int53` leaves), and the
+  bundled snapshot is re-synced. A consumer carrying an integer that can leave ±2^53 carries it as a
+  string. The authoring surface is unchanged.
+
 ### behavioural — a field at its declared default is omitted from the wire (Phase 2300, rule 1)
 
 - Fifteen members the vocabulary moved to omit-at-default now write nothing when they hold their

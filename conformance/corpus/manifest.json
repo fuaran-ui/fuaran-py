@@ -869,15 +869,6 @@
       "description": "§7.1 — an integer-VALUED number written with a fractional part decodes at an integer slot and canonicalises to the integer spelling. Two hosts refused `3.0` outright, which refuses a document whose intent is unambiguous for its spelling; `2.5` at the same slot stays a WRONG_TYPE, so the accept set widens by exactly the values an integer slot can hold"
     },
     {
-      "id": "lenient-1521-payload-integer-beyond-int53",
-      "kind": "lenient-accept",
-      "since": "0.77.0",
-      "decoder": "node",
-      "inputFile": "lenient/lenient-1521-payload-integer-beyond-int53.json",
-      "expectedFile": "lenient/lenient-1521-payload-integer-beyond-int53.expected.json",
-      "description": "§2 rule 5 — integer identity in a rule-12 payload stops at ±(2⁵³−1). `boundary` is at the limit and survives verbatim; `beyond` is one past it, has no representation every host holds exactly, and decodes to the nearest double. Pinned as a lenient NORMALISATION rather than left implicit, because three hosts silently rounded it, one kept an int64 and one an arbitrary-precision integer — the same document, five canonical byte sequences, five hash-chain digests"
-    },
-    {
       "id": "lenient-1656-state-default-null",
       "kind": "lenient-accept",
       "since": "0.81.0",
@@ -4927,6 +4918,16 @@
       "description": "§20.2 row 1 — a repeated object member. THE row that changes what a document MEANS rather than whether it is accepted: this host kept the first occurrence and every other host the last, so a vetting host and a rendering host saw different trees from identical bytes with no error anywhere. Twin: the `markdown-1` node fixture (drop the second `id`)"
     },
     {
+      "id": "reject-json-integer-beyond-int53",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-integer-beyond-int53.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§2 rule 5 — an integer token past 2^53 that is not the canonical float layout of the double it reads as. Phase 2286 amended this from a lenient normalisation (decode to the nearest double) to a refusal: the token has no representation every host holds exactly, and admitting it rounded one document to different bytes on different hosts. A token past 2^53 that IS a canonical float layout (`10000000000000000`) is still read. Twin: the `custom-1` node fixture (drop the member)"
+    },
+    {
       "id": "reject-json-lone-high-surrogate",
       "kind": "reject",
       "since": "0.77.0",
@@ -4985,6 +4986,16 @@
       "expectedErrorCode": "INVALID_JSON",
       "expectedPath": "$",
       "description": "§20.2 row 3 — a number with no integer part. Refused as a GRAMMAR violation before the slot's type is ever consulted, which is why the vector sits at a slot that would refuse a number anyway: the point is that `.5` is not a number at all. Twin: the `markdown-1` node fixture (drop the trailing member)"
+    },
+    {
+      "id": "reject-json-number-overflow-exponent",
+      "kind": "reject",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-json-number-overflow-exponent.json",
+      "expectedErrorCode": "INVALID_JSON",
+      "expectedPath": "$",
+      "description": "§20.2 row 7 — an overflowing exponent. Amended by Phase 2286 from an accept to a refusal: the value is outside the finite double range, the wire's value model has no non-finite float, and §7's quoted sentinels are the only spelling a conformant encoder writes for an infinity, so no encoder can produce this token. Twin: the `metric-1` node fixture (the value written as `1234.5`)"
     },
     {
       "id": "reject-json-number-trailing-point",

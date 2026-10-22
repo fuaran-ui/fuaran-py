@@ -755,11 +755,11 @@ def _from_json_strict(value: object, path: str) -> Value:
         return value
     if isinstance(value, int):
         # §2 rule 5 — integer identity in a rule-12 payload position stops at
-        # +/-(2^53-1), the range every host holds exactly. Beyond it a decoder
-        # MUST take the token as a double and accept the rounding: keeping
-        # Python's arbitrary-precision int would give this host a tree, and
-        # canonical bytes, that no other host can produce from the same
-        # document.
+        # +/-(2^53-1), the range every host holds exactly. A token past 2^53
+        # reaches here only when it is the canonical float layout of its double
+        # (the parse refuses every other one, Phase 2286), so it is that double:
+        # keeping Python's arbitrary-precision int would give this host a tree,
+        # and canonical bytes, that no other host can produce.
         return value if -PAYLOAD_INT_MAX <= value <= PAYLOAD_INT_MAX else float(value)
     if isinstance(value, list):
         return Arr([_from_json_strict(item, f"{path}[{i}]") for i, item in enumerate(value)])
@@ -2055,10 +2055,9 @@ def _decode_number(value: object, path: str) -> Value:
     # §7 widens float slots and nothing else.
     #
     # The float is returned rather than the sentinel string so decode is idempotent
-    # at the TREE level and not merely at the byte level: ``json.loads`` already
-    # turns the bare overflowing literal ``-1e999`` into ``-inf``, so answering a
-    # re-decode of its own canonical form with a ``str`` would hand a consumer a
-    # float the first time and a string the second.
+    # at the TREE level and not merely at the byte level: answering a re-decode
+    # of its own canonical form with a ``str`` would hand a consumer a float the
+    # first time and a string the second.
     value = _unwrap_static_envelope(value)
     if isinstance(value, str):
         sentinel = _NON_FINITE_SENTINELS.get(value)

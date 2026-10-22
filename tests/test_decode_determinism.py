@@ -76,15 +76,35 @@ def test_row_is_refused_and_its_twin_is_accepted(label: str, bad: str, good: str
     assert check_shape(value) is None
 
 
-def test_row_7_overflowing_exponent_still_decodes_to_infinity() -> None:
-    """The one row that ratifies an ACCEPT, and it sits beside row 4 refusing
-    the same three values written as bare literals. ``1e999`` is a well-formed
-    JSON number whose value is not representable; ``NaN`` is not a token at all.
-    """
-    value, error = load_bounded('{"a":1e999,"b":-1e999}')
+@pytest.mark.parametrize("token", ["1e999", "-1e999", "1E+400"])
+def test_row_7_overflowing_exponent_is_refused(token: str) -> None:
+    """Amended by Phase 2286: the value is outside the finite double range and
+    the wire has no non-finite float, so the token is refused. Row 4 refuses the
+    bare literals and row 8 still reads the quoted sentinels."""
+    _, error = load_bounded(f'{{"a":{token}}}')
+    assert error is not None and error.code == INVALID_JSON
+
+
+def test_row_7_underflow_is_a_finite_zero() -> None:
+    value, error = load_bounded('{"a":1e-999}')
     assert error is None
-    assert value["a"] == float("inf")
-    assert value["b"] == float("-inf")
+    assert value["a"] == 0.0
+
+
+@pytest.mark.parametrize(
+    "token", ["9007199254740993", "-9007199254740993", "12345678901234567890", "100000000000000000"]
+)
+def test_rule_5_non_canonical_integer_past_int53_is_refused(token: str) -> None:
+    """§2 rule 5, amended by Phase 2286: an integer token past 2^53 that is not
+    the canonical float layout of its double is refused, not rounded."""
+    _, error = load_bounded(f'{{"a":{token}}}')
+    assert error is not None and error.code == INVALID_JSON
+
+
+@pytest.mark.parametrize("token", ["9007199254740991", "9007199254740992", "9007199254740994", "10000000000000000"])
+def test_rule_5_canonical_integer_layout_is_read(token: str) -> None:
+    _, error = load_bounded(f'{{"a":{token}}}')
+    assert error is None
 
 
 def test_row_8_quoted_sentinels_are_untouched() -> None:

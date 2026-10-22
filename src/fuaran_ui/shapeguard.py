@@ -27,9 +27,11 @@ enforced on the way down actually are:
 **The parse pass.** ``json.loads`` is given two hooks that close the remaining
 §20 rows CPython's parser leaves open: ``parse_constant`` refuses the bare
 ``NaN`` / ``Infinity`` / ``-Infinity`` tokens (row 4 — §7's *quoted* sentinels
-are strings and are unaffected, and row 7's ``1e999`` is a well-formed number
-token that never reaches this hook), and ``object_pairs_hook`` refuses a
-repeated member (row 1). CPython already answers rows 2, 3 and 5 — trailing
+are strings and are unaffected), ``object_pairs_hook`` refuses a repeated member
+(row 1), and ``parse_float`` / ``parse_int`` hold the number VALUE rules Phase
+2286 amended: an overflowing exponent (row 7, ``1e999``) is refused, and so is
+an integer token past 2^53 that is not the canonical float layout of the double
+it reads as (§2 rule 5). CPython already answers rows 2, 3 and 5 — trailing
 content, the RFC 8259 number grammar, and raw C0 control characters inside a
 string — so those need no hook, and the host's suite pins each of them.
 
@@ -48,8 +50,10 @@ it is one character, and §20.2 row 6 has already refused the unpaired halves.
 from __future__ import annotations
 
 import json
+import math
 from typing import Any
 
+from .canonical import format_finite_double
 from .limits import (
     MAX_ARRAY_LENGTH,
     MAX_DOCUMENT_BYTES,
@@ -75,6 +79,31 @@ def _refuse_constant(token: str) -> Any:
         f"the bare `{token}` literal is not a JSON number (§20.2 row 4); "
         'the wire spelling of a non-finite value is the quoted sentinel "NaN" / "Infinity" / "-Infinity"'
     )
+
+
+def _read_float(token: str) -> float:
+    # §20.2 row 7 (amended by Phase 2286): a value outside the finite double
+    # range is refused; the wire has no non-finite float.
+    value = float(token)
+    if not math.isfinite(value):
+        raise _WireRefusal(f"number outside the finite double range; it cannot round-trip on the wire: {token}")
+    return value
+
+
+def _read_int(token: str) -> int:
+    # §2 rule 5 (amended by Phase 2286): an integer token past 2^53 is read only
+    # when it is the canonical float layout of the double it reads as. Judged on
+    # the TOKEN: 2^53 + 1 reads as 2^53, so a range check on the value admits it.
+    digits = token[1:] if token.startswith("-") else token
+    int53_safe = len(digits) < 16 or (len(digits) == 16 and digits <= "9007199254740992")
+    if not int53_safe:
+        as_float = float(token)
+        if not math.isfinite(as_float) or format_finite_double(as_float) != token:
+            raise _WireRefusal(
+                "integer literal outside the int53 safe range (|n| > 2^53); "
+                f"it cannot round-trip without precision loss: {token}"
+            )
+    return int(token)
 
 
 def _refuse_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -237,6 +266,8 @@ def load_bounded(text: str) -> tuple[Any, DecodeError | None]:
         parsed = json.loads(
             text,
             parse_constant=_refuse_constant,
+            parse_float=_read_float,
+            parse_int=_read_int,
             object_pairs_hook=_refuse_duplicate_keys,
         )
     except _WireRefusal as refusal:

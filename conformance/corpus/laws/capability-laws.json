@@ -1,6 +1,6 @@
 {
   "family": "capabilityLaws",
-  "kitVersion": "0.40.3",
+  "kitVersion": "0.41.0",
   "seed": 20260904,
   "iterations": 12,
   "description": "The (input, expected) pairs Fuaran.Core.Conformance.capabilityLaws draws from `seed` over `iterations` iterations, computed by calling the pinned kit. A host reproduces the sample with its own ConfRng: per iteration draw intBelow(50) = lo, intBelow(50) = span (hi = lo + span + 1), intBelow(1000) = the captured value, and build one capability per iteration over a single required value hole `h0` in IntRange(lo, hi) with effect readsHost and the determinism set of the (i mod 7)th non-empty subset of {clock, random, network} in mask order (mask 1..7, bit 0 clock, bit 1 random, bit 2 network; the label names the members in that order joined by `+`). `capability` and `declaration` members carry a canonical capability declaration as a JSON STRING — decode it with the host's capability codec. `validateArgs` vectors expect accept, or reject with a named error class and the offending address. `invocationKey` vectors expect the effect-identity key a non-deterministic invocation is journalled under, its determinism tag, and the value the replay must return byte-identically. `declarationRoundTrip` expects decode-then-encode to return the input bytes. `registryEnumerate` expects id-sorted enumeration regardless of insertion order (the declarations are given in insertion order).",

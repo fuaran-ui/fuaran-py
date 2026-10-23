@@ -24,12 +24,13 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
 from _corpus import AUTHORITY_ROOT, SNAPSHOT_ROOT
-from fuaran_ui.conformance.host_capability import CORPUS_FAMILIES, corpus_families
+from fuaran_ui.conformance.host_capability import CORPUS_FAMILIES, build, corpus_families, render
 
 _SYNC = Path(__file__).resolve().parents[1] / "conformance" / "sync_corpus.py"
 _MANIFEST = Path(__file__).resolve().parents[1] / "conformance" / "host-capability-manifest.json"
@@ -118,14 +119,35 @@ def test_the_family_derivation_sees_a_self_enumerated_family(tmp_path: Path) -> 
     assert corpus_families(tmp_path) == {"node-round-trip", "newfamily", "split/a", "split/b"}
 
 
-def test_a_resync_restamps_only_the_manifest_authority(tmp_path: Path) -> None:
-    """Phase 2301: the re-sync carries the new authority commit into the capability manifest."""
-    (tmp_path / "conformance").mkdir()
-    manifest = tmp_path / "conformance" / "host-capability-manifest.json"
-    before = '{\n  "host": "x",\n  "corpusAuthority": "' + "a" * 40 + '",\n  "tokens": []\n}\n'
-    manifest.write_text(before, encoding="utf-8")
-    assert _sync.restamp_manifest_authority(tmp_path, "b" * 40) == manifest
-    assert manifest.read_text(encoding="utf-8") == before.replace("a" * 40, "b" * 40)
-    _sync.restamp_manifest_authority(tmp_path, None)
-    assert '"corpusAuthority": null,' in manifest.read_text(encoding="utf-8")
-    assert _sync.restamp_manifest_authority(tmp_path / "absent", "c" * 40) is None
+@authority_present
+def test_a_resync_regenerates_the_capability_manifest(tmp_path: Path) -> None:
+    """Phase 2418: the re-sync REGENERATES the capability manifest, not just its authority member.
+
+    Restamping ``corpusAuthority`` alone left every other byte as it was, so a re-sync that moved
+    anything else the generator reads (Phase 1843's did) left a stale manifest and a red gate until
+    ``python -m fuaran_ui.conformance.host_capability --write`` was run by hand. The falsifier: a
+    checkout whose manifest is wrong in a member the generator owns must come out of the sync
+    holding exactly the generator's bytes.
+    """
+    repo = tmp_path / "checkout"
+    (repo / "conformance").mkdir(parents=True)
+    shutil.copy2(_SYNC, repo / "conformance" / "sync_corpus.py")
+    shutil.copytree(
+        _SYNC.parents[1] / "src" / "fuaran_ui",
+        repo / "src" / "fuaran_ui",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    manifest = repo / "conformance" / "host-capability-manifest.json"
+    stale = json.loads(_MANIFEST.read_text(encoding="utf-8"))
+    stale["tokens"] = ["kind.Stale"]
+    stale["corpusAuthority"] = "a" * 40
+    manifest.write_text(json.dumps(stale, indent=2) + "\n", encoding="utf-8", newline="\n")
+
+    assert _sync.main(["--repo", str(repo), str(AUTHORITY_ROOT)]) == 0
+
+    recorded = json.loads((repo / "conformance" / "corpus" / "snapshot.json").read_text(encoding="utf-8"))
+    expected = render(build(corpus_authority=recorded["authorityCommit"]))
+    assert manifest.read_text(encoding="utf-8") == expected, (
+        "the sync left the capability manifest stale; it must regenerate it "
+        "(python -m fuaran_ui.conformance.host_capability --write)"
+    )

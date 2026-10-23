@@ -120,6 +120,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -256,29 +257,36 @@ def regenerate(repo: Path) -> Path | None:
     return written
 
 
-_AUTHORITY_MEMBER = re.compile(r'("corpusAuthority": )(null|"[0-9a-f]{40}")')
+def regenerate_manifest(repo: Path) -> Path | None:
+    """Regenerate ``repo``'s published capability manifest after a re-sync (Phase 2418).
 
+    The manifest is generated output (``fuaran_ui.conformance.host_capability``) whose
+    ``corpusAuthority`` is provenance read from ``corpus/snapshot.json``. Restamping that one member
+    (Phase 2301) left every other byte as it was, so a re-sync that moved anything else the generator
+    reads left the manifest stale and ``tests/test_host_capability_manifest.py`` red until someone ran
+    ``python -m fuaran_ui.conformance.host_capability --write`` by hand. The sync now runs that step.
 
-def restamp_manifest_authority(repo: Path, commit: str | None) -> Path | None:
-    """Carry the snapshot's authority commit into the published capability manifest (Phase 2301).
-
-    The manifest's ``corpusAuthority`` is provenance copied from ``corpus/snapshot.json``, so a
-    re-sync that moves the sentinel moves it too — or the manifest's own currency test reads the
-    re-sync as staleness. Only that one member is rewritten, in place; every other byte is the
-    generator's, and ``tests/test_host_capability_manifest.py`` still holds the whole file to it.
-    Returns the path written, or ``None`` when the checkout publishes no manifest.
+    It runs in a fresh interpreter with ``repo``'s own ``src`` first on the path, so the generator and
+    the structural layer it reads are the ones ``regenerate`` has just written in THIS checkout, never
+    an editable install made from another tree. Returns the path written, or ``None`` for a checkout
+    that carries no generator.
     """
-    manifest = repo / "conformance" / "host-capability-manifest.json"
-    if not manifest.is_file():
+    src = repo / "src"
+    if not (src / "fuaran_ui" / "conformance" / "host_capability.py").is_file():
         return None
-    text = manifest.read_text(encoding="utf-8")
-    value = "null" if commit is None else f'"{commit}"'
-    updated, count = _AUTHORITY_MEMBER.subn(lambda m: m.group(1) + value, text, count=1)
-    if count != 1:
-        raise SystemExit(f"{manifest} carries no corpusAuthority member to restamp")
-    if updated != text:
-        manifest.write_text(updated, encoding="utf-8", newline="\n")
-    return manifest
+    env = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(p for p in (str(src), env.get("PYTHONPATH", "")) if p)
+    done = subprocess.run(
+        [sys.executable, "-m", "fuaran_ui.conformance.host_capability", "--write", "--repo", str(repo)],
+        cwd=repo,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise SystemExit(f"capability manifest regeneration failed (exit {done.returncode}):\n{done.stderr.strip()}")
+    return repo / "conformance" / "host-capability-manifest.json"
 
 
 def _git(repo: Path, *args: str) -> str | None:
@@ -709,9 +717,9 @@ def main(argv: list[str]) -> int:
     written = regenerate(repo)
     if written is not None:
         print(f"Structural layer regenerated: {written}", file=sys.stderr)
-    restamped = restamp_manifest_authority(repo, recorded)
-    if restamped is not None:
-        print(f"Capability manifest corpusAuthority restamped: {restamped}", file=sys.stderr)
+    manifest = regenerate_manifest(repo)
+    if manifest is not None:
+        print(f"Capability manifest regenerated: {manifest}", file=sys.stderr)
     return 0
 
 

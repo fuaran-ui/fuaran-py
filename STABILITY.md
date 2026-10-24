@@ -15,6 +15,20 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### additive and behavioural — the dataframe evaluator learns `pow`, `exp`, `ln` and `log10`, and refuses an output named twice (Phase 2400)
+
+- `fuaran_ui.dataframe` decodes, encodes and evaluates the four scalar functions the reference added (its
+  D43). An integer exponent runs one pinned routine, binary exponentiation over IEEE-754 multiplication
+  with one reciprocal for a negative exponent (null where that power is zero), so it is byte-identical on
+  every host; an int base under a non-negative int exponent answers an int, refused outside the int32 band.
+  A float exponent, `exp`, `ln` and `log10` answer a special-value table first, then `math` (where
+  `math.pow` raises `OverflowError`, the answer is the infinity IEEE-754 gives), and agree with the other
+  hosts within 2 ulp. A pipeline naming any of the four used to be refused at decode.
+- **behavioural:** `project`, `groupBy`, `unpivot` and `pivot` refuse an output that names a column twice
+  (the reference's D35), where they used to answer a table with two columns of one name.
+- Certified by the corpus's `transformLaws` family at kit version 0.41.0, whose runner now reads
+  `expected.tolerance`; the bundled snapshot is re-synced. The authoring surface is unchanged.
+
 ### breaking — two number tokens are refused at decode (Phase 2286)
 
 - Every wire reader (`load_bounded`, so `decode_node`, `decode_op` and the secondary readers) refuses

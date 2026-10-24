@@ -333,6 +333,11 @@ SCALAR_FNS: frozenset[str] = frozenset(
         "trim",
         "replace",
         "dateDiffDays",
+        # Phase 2400 — the power functions (the reference's D43).
+        "pow",
+        "exp",
+        "ln",
+        "log10",
     }
 )
 AGG_FNS: frozenset[str] = frozenset(

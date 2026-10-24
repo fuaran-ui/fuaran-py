@@ -21,18 +21,31 @@ counted, never silent:
   renamed one, is noticed;
 * the ``columnOp`` and ``delta`` case kinds, which this host has no surface for. The set of case
   kinds is pinned exactly, so a new kind fails loudly.
+
+A vector carrying ``expected.tolerance`` (Phase 2400) names the columns the reference marks
+host-rounded, each with a bound in ulps. Those columns are compared cell by cell — one type, one
+length, null in the same rows, two present nonzero finite floats of one sign within the bound (the
+distance being the difference of their IEEE-754 binary64 bit patterns), every other cell (a zero of
+either sign, a non-finite float, a non-float) exactly — and the rest of the table byte for byte: this
+host's answer with every named column replaced by the recorded one must encode to ``expected.table``
+exactly. The bound is the vector's own, never a constant here; the worst distance per named column is
+reported, so a host drifting toward the bound is visible.
 """
 
 from __future__ import annotations
 
 import json
+import math
+import struct
 import warnings
 
 import pytest
 
 from _corpus import CORPUS_ROOT
 from fuaran_ui.dataframe import (
+    Column,
     Embedded,
+    Table,
     decode_pipeline,
     decode_source,
     encode_pipeline,
@@ -150,10 +163,99 @@ def test_eval_pipeline_vector(vector: dict) -> None:
 
     result = eval_pipeline(pipe.value, src.value.table)
     assert result.ok, f"{vector['id']}: this host refused, the reference succeeded: {getattr(result, 'error', None)}"
-    assert encode_source(Embedded(result.value)) == expected["table"], f"{vector['id']}: this host ≠ the reference"
+    tolerance: dict[str, int] = expected.get("tolerance", {})
+    if not tolerance:
+        assert encode_source(Embedded(result.value)) == expected["table"], f"{vector['id']}: this host ≠ the reference"
+        return
+    _compare_within_tolerance(vector["id"], tolerance, result.value, expected["table"])
+
+
+def _ulp_distance(a: float, b: float) -> int:
+    """The distance between two doubles of one sign: their binary64 bit patterns' difference."""
+    (ia,) = struct.unpack("<q", struct.pack("<d", a))
+    (ib,) = struct.unpack("<q", struct.pack("<d", b))
+    return abs(ia - ib)
+
+
+def _bits(f: float) -> bytes:
+    return struct.pack("<d", f)
+
+
+def _compare_within_tolerance(vid: str, tolerance: dict[str, int], answer: Table, expected_text: str) -> None:
+    decoded = decode_source(expected_text)
+    assert decoded.ok and isinstance(decoded.value, Embedded), f"{vid}: expected.table does not decode"
+    want = decoded.value.table
+    by_name = {c.name: c for c in want.columns}
+    columns = list(answer.columns)
+    worst: dict[str, int] = {}
+    for name, bound in sorted(tolerance.items()):
+        wc = by_name.get(name)
+        at = next((i for i, c in enumerate(columns) if c.name == name), None)
+        assert wc is not None and at is not None, f"{vid}: tolerance column {name!r} is absent"
+        gc = columns[at]
+        assert gc.type == wc.type and len(gc.cells) == len(wc.cells), (
+            f"{vid}: tolerance column {name!r} differs in shape"
+        )
+        worst[name] = 0
+        for r, (w, g) in enumerate(zip(wc.cells, gc.cells, strict=True)):
+            assert (w.kind == "null") == (g.kind == "null"), f"{vid}: {name!r} row {r} is null in one table only"
+            if w.kind == "null":
+                continue
+            both = w.kind == g.kind == "float"
+            if (
+                both
+                and all(x != 0.0 and math.isfinite(x) for x in (w.value, g.value))
+                and math.copysign(1.0, w.value) == math.copysign(1.0, g.value)
+            ):
+                d = _ulp_distance(w.value, g.value)
+                worst[name] = max(worst[name], d)
+                assert d <= bound, (
+                    f"{vid}: {name!r} row {r}: {g.value!r} is {d} ulp from {w.value!r}; the bound is {bound}"
+                )
+                continue
+            if both:
+                same = _bits(w.value) == _bits(g.value) or (math.isnan(w.value) and math.isnan(g.value))
+            else:
+                same = w.kind == g.kind and w.value == g.value
+            assert same, f"{vid}: {name!r} row {r}: {g.value!r} differs from {w.value!r} (compared exactly)"
+        columns[at] = Column(gc.name, gc.type, list(wc.cells))
+    warnings.warn(
+        f"transformLaws tolerance: {vid} worst ulp per column {worst} (bounds {tolerance})",
+        stacklevel=1,
+    )
+    replaced = Table(answer.schema, columns)
+    assert encode_source(Embedded(replaced)) == expected_text, (
+        f"{vid}: this host ≠ the reference outside the tolerance columns"
+    )
 
 
 @pytest.mark.parametrize("kind", sorted(NOT_RUN))
 def test_case_kinds_this_host_has_no_surface_for(kind: str) -> None:
     ids = [v["id"] for v in VECTORS if v["case"] == kind]
     pytest.skip(f"{len(ids)} {kind} vector(s) not run — {NOT_RUN[kind]}: {', '.join(ids)}")
+
+
+def test_power_rows_the_wire_cannot_carry() -> None:
+    """The special-value rows over a NaN or an infinity (the wire carries neither, so the law file
+    cannot), the pinned product tree past the cube, and the int32 band an int power stays inside."""
+    from fuaran_ui._core.dataframe.evaluate import _apply_scalar, _exp_host, _log_host, _pow_float, _pow_go
+
+    nan, inf = math.nan, math.inf
+    assert math.isnan(_pow_float(1.0, nan).value)  # type: ignore[arg-type]
+    assert math.isnan(_pow_float(nan, 0.0).value)  # type: ignore[arg-type]
+    assert _pow_float(-1.0, inf).value == 1.0
+    assert _pow_float(-1.0, -inf).value == 1.0
+    assert _pow_float(1e200, 2.5).value == inf  # math.pow raises here; IEEE-754 answers +Inf
+    assert _pow_float(-1e200, 3.0).value == -inf
+    assert math.isnan(_exp_host(nan))
+    assert _exp_host(709.8) == inf
+    assert _log_host(math.log, inf).value == inf
+    assert math.isnan(_log_host(math.log10, nan).value)  # type: ignore[arg-type]
+    from fuaran_ui.dataframe import Cell
+
+    assert _apply_scalar("pow", [Cell("float", 1e-300), Cell("int", -2)]).value.kind == "null"  # type: ignore[union-attr]
+    x = 1.1
+    assert _pow_go(x, 4) == (x * x) * (x * x)
+    assert _pow_go(x, 5) == x * ((x * x) * (x * x))
+    assert not _apply_scalar("pow", [Cell("int", 46341), Cell("int", 2)]).ok
+    assert _apply_scalar("pow", [Cell("int", -2), Cell("int", 31)]).value == Cell("int", -(2**31))  # type: ignore[union-attr]

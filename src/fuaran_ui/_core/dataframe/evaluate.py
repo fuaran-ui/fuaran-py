@@ -548,11 +548,172 @@ def _scale_of(r: Rounding) -> Result[int, EvalError]:
 _SCALE0_MODES = {"round": decimal_text.HALF_UP, "floor": decimal_text.FLOOR, "ceil": decimal_text.CEILING}
 
 
+# ── Phase 2400: the power functions (the reference's D43) ───────────────────
+#
+# Two guarantees, stated per function. An INTEGER exponent is EXACT on every host: one pinned product
+# tree over IEEE-754 multiplication, which every host rounds the same way, so the tree and not the
+# host decides the bits. A float exponent, `exp`, `ln` and `log10` are HOST-ROUNDED: the special-value
+# table below answers every input the hosts' libraries disagree on BEFORE the host is called, and what
+# remains is this host's `math` module — within the bound the transform laws compare in
+# (`expected.tolerance`, in ulps).
+
+_INT32_MIN = -(2**31)
+_INT32_MAX = 2**31 - 1
+
+
+def _pow_go(b: float, k: int) -> float:
+    """Binary exponentiation, the accumulator empty until the first set bit, so a power takes exactly
+    the multiplies its bits name: ``x^1`` is ``x``, ``x^2`` is ``x*x``, ``x^3`` is ``x*(x*x)``, ``x^4``
+    is ``(x*x)*(x*x)``. ``k`` is the exponent's magnitude, ``k > 0``."""
+    acc: float | None = None
+    while True:
+        if k % 2 == 1:
+            acc = b if acc is None else acc * b
+        k //= 2
+        if k == 0:
+            return 1.0 if acc is None else acc
+        b = b * b
+
+
+def _pow_int_float(x: float, n: int) -> Cell:
+    """A float base under an integer exponent: ``x^0`` is 1 with no multiply; a negative exponent is
+    one reciprocal of the positive power, null where that power is zero (a zero base, or a power that
+    underflowed), exactly as a division by zero is null. The caller has answered a NaN base."""
+    if n == 0:
+        return cell_float(1.0)
+    if n > 0:
+        return cell_float(_pow_go(x, n))
+    p = _pow_go(x, -n)
+    return NULL if p == 0.0 else cell_float(1.0 / p)
+
+
+def _pow_int_exact(x: int, n: int) -> Result[Cell, EvalError]:
+    """An int base under a non-negative int exponent: the same product tree, every product that leaves
+    the int32 band refused by name — a base square that leaves it with exponent bits still to take
+    included, since every value it would still multiply into is at least as large."""
+    if n == 0:
+        return Ok(cell_int(1))
+
+    def overflow(v: int) -> Err[EvalError]:
+        return Err(EvalError(TYPE_ERROR, f"pow overflowed int32: {v}"))
+
+    acc: int | None = None
+    b, k = x, n
+    while True:
+        if k % 2 == 1:
+            acc = b if acc is None else acc * b
+            if not _INT32_MIN <= acc <= _INT32_MAX:
+                return overflow(acc)
+        k //= 2
+        if k == 0:
+            return Ok(cell_int(1 if acc is None else acc))
+        b = b * b
+        if not _INT32_MIN <= b <= _INT32_MAX:
+            return overflow(b)
+
+
+def _pow_float(x: float, y: float) -> Cell:  # noqa: PLR0911
+    """A float exponent: the special-value table, then the host. A NaN operand propagates
+    (``pow(1, NaN)`` and ``pow(NaN, 0)`` included); a zero exponent and a base of one answer 1, and so
+    does a base of minus one under an infinite exponent; a zero base under a negative exponent and a
+    finite negative base under a finite non-integer exponent are outside the reals and answer null."""
+    if math.isnan(x) or math.isnan(y):
+        return cell_float(math.nan)
+    if y == 0.0 or x == 1.0:
+        return cell_float(1.0)
+    if x == 0.0 and y < 0.0:
+        return NULL
+    if x == -1.0 and math.isinf(y):
+        return cell_float(1.0)
+    if x < 0.0 and not math.isinf(x) and not math.isinf(y) and y != math.floor(y):
+        return NULL
+    try:
+        return cell_float(math.pow(x, y))
+    except OverflowError:
+        # `math.pow` raises where IEEE-754 answers an infinity: a negative base under an odd integer
+        # exponent overflows to minus infinity, every other overflow to plus infinity.
+        odd = not math.isinf(y) and y == math.floor(y) and math.fmod(y, 2.0) != 0.0
+        return cell_float(-math.inf if x < 0.0 and odd else math.inf)
+
+
+def _exp_host(x: float) -> float:
+    """`exp`'s table: a NaN propagates; above the natural log of the largest double the answer is
+    +Inf and below the natural log of half the smallest subnormal it is 0 — the two edges where a
+    host's last-ulp rounding decides between a finite value and the limit."""
+    if math.isnan(x):
+        return x
+    if x > 709.782712893384:
+        return math.inf
+    if x < -745.1332191019412:
+        return 0.0
+    return math.exp(x)
+
+
+def _log_host(log: Callable[[float], float], x: float) -> Cell:
+    """`ln`'s and `log10`'s table over a host logarithm: a NaN propagates, zero and below is null, one
+    is exactly 0 and +Inf is +Inf; in between the host answers."""
+    if math.isnan(x):
+        return cell_float(x)
+    if x <= 0.0:
+        return NULL
+    if x == 1.0:
+        return cell_float(0.0)
+    if math.isinf(x):
+        return cell_float(x)
+    return cell_float(log(x))
+
+
+_SPELLED = {"exp": "Exp", "ln": "Ln", "log10": "Log10"}
+
+
+def _apply_power(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa: PLR0911
+    if fn == "pow":
+        if len(args) != 2:
+            return Err(EvalError("ARITY_ERROR", f"function 'pow' expects 2 args, got {len(args)}"))
+        x, y = args
+        if is_null(x) or is_null(y):
+            return Ok(NULL)
+        if DECIMAL in (x.kind, y.kind):
+            return Err(EvalError(TYPE_ERROR, "pow of a decimal is not exact: write Pow(Cast(float, x), n)"))
+        if x.kind == INT and y.kind == INT:
+            n = int(y.value)  # type: ignore[arg-type]
+            if n >= 0:
+                return _pow_int_exact(int(x.value), n)  # type: ignore[arg-type]
+            return Ok(_pow_int_float(float(x.value), n))  # type: ignore[arg-type]
+        if y.kind == INT:
+            f = _as_num(x)
+            if f is None:
+                return Err(EvalError(TYPE_ERROR, "pow of a non-numeric"))
+            if math.isnan(f):
+                return Ok(cell_float(f))
+            return Ok(_pow_int_float(f, int(y.value)))  # type: ignore[arg-type]
+        f, g = _as_num(x), _as_num(y)
+        if f is None or g is None:
+            return Err(EvalError(TYPE_ERROR, "pow of a non-numeric"))
+        return Ok(_pow_float(f, g))
+    if len(args) != 1:
+        return Err(EvalError("ARITY_ERROR", f"function '{fn}' expects 1 args, got {len(args)}"))
+    c = args[0]
+    if is_null(c):
+        return Ok(NULL)
+    if c.kind == DECIMAL:
+        return Err(EvalError(TYPE_ERROR, f"{fn} of a decimal is not exact: write {_SPELLED[fn]}(Cast(float, x))"))
+    f = _as_num(c)
+    if f is None:
+        return Err(EvalError(TYPE_ERROR, f"{fn} of a non-numeric"))
+    if fn == "exp":
+        return Ok(cell_float(_exp_host(f)))
+    return Ok(_log_host(math.log if fn == "ln" else math.log10, f))
+
+
 def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa: C901, PLR0911, PLR0912
     def arity(n: int) -> Err[EvalError] | None:
         if len(args) != n:
             return Err(EvalError("ARITY_ERROR", f"function '{fn}' expects {n} args, got {len(args)}"))
         return None
+
+    if fn in ("pow", "exp", "ln", "log10"):
+        return _apply_power(fn, args)
 
     if fn in ("abs", "round", "floor", "ceil", "length", "lower", "upper"):
         a = arity(1)
@@ -844,7 +1005,29 @@ def _typing_apply(fn: str, args: list[str]) -> str:  # noqa: PLR0911
         return ABSENT if len(args) != 3 or any_absent else STRING
     if fn == "dateDiffDays":
         return ABSENT if len(args) != 2 or any_absent else INT
+    # Phase 2400 (the reference's D43): the transcendentals answer a float, as a root does. A power over
+    # an int base and an int exponent is decided by the exponent's SIGN, which a typing does not carry —
+    # `_typing_pow_lit` reads a literal exponent, and otherwise the cells decide; an undecided operand may
+    # be that pair, so it is undecided too; every other pair is a float.
+    if fn in ("exp", "ln", "log10"):
+        return unary(lambda _: FLOAT)
+    if fn == "pow":
+        if len(args) != 2 or any_absent:
+            return ABSENT
+        if args[0] == INT and args[1] == INT:
+            return UNKNOWN
+        return UNKNOWN if UNKNOWN in args else FLOAT
     return UNKNOWN
+
+
+def _typing_pow_lit(n: int, b: str) -> str:
+    """A power under a LITERAL integer exponent: an int base answers an int at or above zero and a
+    float below; any other typed base a float."""
+    if b in (ABSENT, UNKNOWN):
+        return b
+    if b == INT:
+        return INT if n >= 0 else FLOAT
+    return FLOAT
 
 
 def _typing(cols: Schema, e: ColExpr) -> str:  # noqa: C901, PLR0911
@@ -869,6 +1052,10 @@ def _typing(cols: Schema, e: ColExpr) -> str:  # noqa: C901, PLR0911
         # error, not a cell of another type.
         return ABSENT if _typing(cols, e.expr) == ABSENT else e.type
     if isinstance(e, ApplyFn):
+        if e.fn == "pow" and len(e.args) == 2:
+            lit = e.args[1]
+            if isinstance(lit, Lit) and lit.cell.kind == INT:
+                return _typing_pow_lit(int(lit.cell.value), _typing(cols, e.args[0]))  # type: ignore[arg-type]
         return _typing_apply(e.fn, [_typing(cols, x) for x in e.args])
     if isinstance(e, InList | InParam):
         return ABSENT if _typing(cols, e.expr) == ABSENT else BOOL
@@ -1205,6 +1392,25 @@ def _eval_filter(f: Frame, pred: ColExpr) -> Result[Frame, EvalError]:
     return Ok(Frame(f.cols, kept))
 
 
+def _repeated_output(verb: str, outs: list[tuple[str, str]]) -> Err[EvalError] | None:
+    """Each output column's name beside what produced it, in output order: the first name an earlier
+    output already took is refused — a table cannot hold two columns of one name (the reference's D35,
+    Phase 468: project, groupBy, unpivot and pivot ask this one check, after every name the verb
+    resolves and before any row is read)."""
+    seen: dict[str, str] = {}
+    for name, by in outs:
+        if name in seen:
+            return Err(
+                EvalError(
+                    TYPE_ERROR,
+                    f"{verb} output '{name}' is named twice, by {seen[name]} and by {by}; "
+                    "give each output a name of its own",
+                )
+            )
+        seen[name] = by
+    return None
+
+
 def _eval_project(f: Frame, pairs: list[tuple[str, str]]) -> Result[Frame, EvalError]:
     resolved: list[tuple[str, str, int]] = []
     for src, out in pairs:
@@ -1212,6 +1418,9 @@ def _eval_project(f: Frame, pairs: list[tuple[str, str]]) -> Result[Frame, EvalE
         if i is None:
             return _unknown(src, f.cols)
         resolved.append((out, f.cols[i][1], i))
+    refused = _repeated_output("project", [(out, f"the projection of '{src}'") for src, out in pairs])
+    if refused is not None:
+        return refused
     cols: Schema = [(o, ty) for o, ty, _ in resolved]
     rows = [[row[i] for _, _, i in resolved] for row in f.rows]
     return Ok(Frame(cols, rows))
@@ -1273,6 +1482,12 @@ def _eval_group_by(f: Frame, keys: list[str], aggs: list[Agg]) -> Result[Frame, 
         i = _col_index(f.cols, a.of)
         assert i is not None
         resolved.append((a, ty, i))
+    refused = _repeated_output(
+        "groupBy",
+        [(k, f"the key '{k}'") for k in keys] + [(a.name, f"the aggregate over '{a.of}'") for a in aggs],
+    )
+    if refused is not None:
+        return refused  # type: ignore[return-value]
 
     key_cols: Schema = [(k, _col_type(f.cols, k) or STRING) for k in keys]
     agg_cols: Schema = [(a.name, _agg_type(a.fn, ty)) for a, ty, _ in resolved]
@@ -1486,7 +1701,19 @@ def _eval_pivot(f: Frame, spec: Pivot) -> Result[Frame, EvalError]:
         c = row[on_idx]
         if not is_null(c) and c not in seen_on:
             seen_on.append(c)
-    on_values = sorted(seen_on, key=cell_string)
+    # Two on values of one text are the one column they name when the cells are equal (two NaNs);
+    # a text shared by cells the comparison keeps apart is refused below, with the index columns.
+    on_values: list[Cell] = []
+    for c in sorted(seen_on, key=cell_string):
+        if not any(cell_string(o) == cell_string(c) and _cell_eq(o, c) for o in on_values):
+            on_values.append(c)
+    refused = _repeated_output(
+        "pivot",
+        [(n, f"the index column '{n}'") for n in s.index]
+        + [(cell_string(ov), f"the column for the on value '{cell_string(ov)}'") for ov in on_values],
+    )
+    if refused is not None:
+        return refused  # type: ignore[return-value]
 
     order: list[tuple[Cell, ...]] = []
     seen_keys: set[tuple[Cell, ...]] = set()
@@ -1524,6 +1751,13 @@ def _eval_unpivot(f: Frame, id_vars: list[str], value_vars: list[str]) -> Result
         if i is None:
             return _unknown(n, f.cols)
         val_idx.append(i)
+    refused = _repeated_output(
+        "unpivot",
+        [(n, f"the id column '{n}'") for n in id_vars]
+        + [("variable", "the unpivot's variable column"), ("value", "the unpivot's value column")],
+    )
+    if refused is not None:
+        return refused  # type: ignore[return-value]
 
     # The value column is typed by the one derived-column rule, the value columns being its arms:
     # their declared types' join where the schema decides it — over an empty frame too — and the

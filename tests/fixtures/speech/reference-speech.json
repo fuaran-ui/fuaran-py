@@ -1931,6 +1931,19 @@
         }
       ]
     },
+    "frag-stdlib-filter-bar-ref-choices": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-filter-bar-ref-choices",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-filter-bar-ref-choices"
+        }
+      ]
+    },
     "frag-stdlib-filter-bar-ref": {
       "text": "",
       "ssml": "<speak>\n</speak>\n",
@@ -1960,6 +1973,19 @@
           "kind": "Filters",
           "reason": "nothing-sayable",
           "decidedAt": "frag-stdlib-filter-bar"
+        }
+      ]
+    },
+    "frag-stdlib-kpi-strip-ref-figures": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-kpi-strip-ref-figures",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-kpi-strip-ref-figures"
         }
       ]
     },

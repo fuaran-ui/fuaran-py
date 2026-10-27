@@ -2639,7 +2639,7 @@
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-filter-bar.json",
       "expectedFile": "nodes/frag-stdlib-filter-bar.json",
-      "description": "FragmentDecl (stdlib 'filter-bar' — A free-text chip and a status chip, both bound to their own host filter keys.)"
+      "description": "FragmentDecl (stdlib 'filter-bar' — A row of filter chips, each bound to its own host filter key: a free-text chip and a status chip by default, or up to four choice filters.)"
     },
     {
       "id": "frag-stdlib-filter-bar-ref",
@@ -2649,6 +2649,15 @@
       "inputFile": "nodes/frag-stdlib-filter-bar-ref.json",
       "expectedFile": "nodes/frag-stdlib-filter-bar-ref.json",
       "description": "FragmentRef (stdlib 'filter-bar' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-filter-bar-ref-choices",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-filter-bar-ref-choices.json",
+      "expectedFile": "nodes/frag-stdlib-filter-bar-ref-choices.json",
+      "description": "FragmentRef (stdlib 'filter-bar' — two choice filters, search chip hidden)"
     },
     {
       "id": "frag-stdlib-kpi-strip",
@@ -2667,6 +2676,15 @@
       "inputFile": "nodes/frag-stdlib-kpi-strip-ref.json",
       "expectedFile": "nodes/frag-stdlib-kpi-strip-ref.json",
       "description": "FragmentRef (stdlib 'kpi-strip' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-kpi-strip-ref-figures",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-kpi-strip-ref-figures.json",
+      "expectedFile": "nodes/frag-stdlib-kpi-strip-ref-figures.json",
+      "description": "FragmentRef (stdlib 'kpi-strip' — per-figure format, trend and polarity bound)"
     },
     {
       "id": "frag-stdlib-labelled-metric-row",

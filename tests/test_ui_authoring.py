@@ -1073,6 +1073,18 @@ def _authored() -> dict[str, t.UiNode]:
             holes=[
                 t.ValueHole("searchLabel", t.StringLen(1, 32), t.ScalarStr("Search")),
                 t.ValueHole("statusLabel", t.StringLen(1, 32), t.ScalarStr("Status")),
+                # Phase 2471 — the choice filters, each defaulted to the original bar.
+                t.ValueHole("search", t.EnumSpace(("shown", "hidden")), t.ScalarStr("shown")),
+                t.ValueHole("choices", t.IntRange(0, 4), t.ScalarInt(0)),
+                *[
+                    hole
+                    for k in range(1, 5)
+                    for hole in (
+                        t.ValueHole(f"choice-{k}-label", t.StringLen(1, 32), t.ScalarStr(f"Filter {k}")),
+                        t.ValueHole(f"choice-{k}-key", t.StringLen(1, 32), t.ScalarStr(f"filter-{k}")),
+                        t.ValueHole(f"choice-{k}-options", t.StringLen(1, 240), t.ScalarStr("=All")),
+                    )
+                ],
             ],
         ),
         # The declarative / closure PAIR, and reading them together is the point:

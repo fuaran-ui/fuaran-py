@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "e9ff0a22d727111d3d847a689655149081bdd1203f66ea2417905e13cd1791c7"
+IDL_SHA256 = "c78f383ca50dc36dc5d158d63052aa202e70d2a1bdee77a30c629354247f76d4"
 IDL_VERSION = 1
 
 
@@ -126,6 +126,8 @@ T_list_record_TrackEntry = T("list", of=T_record_TrackEntry)
 T_enum_StyleWeight = T("enum", "StyleWeight")
 T_enum_Emphasis = T("enum", "Emphasis")
 T_enum_TrendPolarity = T("enum", "TrendPolarity")
+T_record_MetricComparison = T("record", "MetricComparison")
+T_list_record_MetricComparison = T("list", of=T_record_MetricComparison)
 T_enum_ModalityKind = T("enum", "ModalityKind")
 T_record_GuestChannel = T("record", "GuestChannel")
 T_enum_ScrollOrientation = T("enum", "ScrollOrientation")
@@ -706,6 +708,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("trend", "optional", T_union_Binding_float),
         F("trendFormat", "optional", T_union_CellFormat),
         F("trendPolarity", "omitDefault", T_enum_TrendPolarity, default="HigherIsBetter"),
+        F("comparisons", "omitDefault", T_list_record_MetricComparison, default=[]),
         F("icon", "optional", T_str),
         F("subtext", "optional", T_union_TextSource),
     ),
@@ -907,6 +910,12 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_str),
         F("latitude", "required", T_float),
         F("longitude", "required", T_float),
+    ),
+    "MetricComparison": (
+        F("label", "required", T_union_TextSource),
+        F("value", "required", T_union_Binding_float),
+        F("format", "omitDefault", T_union_CellFormat, default={"$type": "None"}),
+        F("polarity", "omitDefault", T_enum_TrendPolarity, default="HigherIsBetter"),
     ),
     "RangePair": (
         F("max", "required", T_float),

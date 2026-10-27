@@ -835,7 +835,11 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         trend: t.NumberInput | None = None,
         trend_format: CellFormat | None = None,
         trend_polarity: t.TrendPolarity = "HigherIsBetter",
+        comparisons: Sequence[t.MetricComparison] = (),
     ) -> UiNode:
+        # fuaran#2472 — `comparisons` carries each FURTHER comparison (against
+        # last week AND last year), each one more trend line with its own label,
+        # glyph and polarity; `trend` stays the primary one.
         # fuaran#867 — `trend_polarity` says which way the quantity IMPROVES;
         # `tone` says how the reading STANDS. Never derive one from the other:
         # a falling wait time on a tile the author deliberately toned `Warning`
@@ -852,6 +856,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             trend=_num_binding(trend) if trend is not None else None,
             trend_format=trend_format,
             trend_polarity=trend_polarity,
+            comparisons=tuple(comparisons),
         )
         return _node(id, kind, accessibility.metric)
 

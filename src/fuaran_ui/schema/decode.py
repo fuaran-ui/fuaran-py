@@ -1074,6 +1074,37 @@ def _decode_tracks(value: object, path: str) -> object:
     return Arr([_decode_track_entry(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
 
 
+def _decode_metric_comparison(value: object, path: str) -> Value:
+    """One ``MetricComparison`` (fuaran#2472) — a further comparison on a Metric.
+
+    ``label`` and ``value`` are required; ``format`` is omitted at ``None`` and
+    ``polarity`` at ``HigherIsBetter``, exactly as the tile's own ``format`` and
+    ``trendPolarity`` are, so an explicit default decodes to the bytes that omit it.
+    """
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "format" in obj:
+        fmt = _decode_cell_format(obj["format"], f"{path}.format")
+        if not (isinstance(fmt, Obj) and fmt.tag == "None"):
+            fields["format"] = fmt
+    fields["label"] = _decode_text_source(_require(obj, "label", path), f"{path}.label")
+    if "polarity" in obj:
+        polarity = _enum(obj["polarity"], f"{path}.polarity", TREND_POLARITY, "TrendPolarity")
+        if polarity != "HigherIsBetter":
+            fields["polarity"] = polarity
+    fields["value"] = _decode_binding_float(_require(obj, "value", path), f"{path}.value")
+    return Obj(None, fields)
+
+
+def _decode_metric_comparisons(value: object, path: str) -> object:
+    """``MetricSpec.comparisons`` (fuaran#2472) — omitted when EMPTY, on the
+    ``tracks`` rule; authored order is the order the trend lines render in."""
+    items = _expect_array(value, path)
+    if not items:
+        return _DROP
+    return Arr([_decode_metric_comparison(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
 def _decode_permissions(value: object, path: str) -> object:
     """``EmbedSpec.permissions`` — the MISSING-LIST-FIELD class once more, and
     here the empty list carries a second meaning worth naming: it is TOTAL
@@ -2364,6 +2395,7 @@ _LIST_DECODERS: dict[str, FieldDecoder] = {
     "record:TreeItem": _decode_tree_items,
     "record:TabHeader": _decode_tab_headers,
     "record:TrackEntry": _decode_tracks,
+    "record:MetricComparison": _decode_metric_comparisons,
     "record:SrcSetEntry": _decode_srcset,
     "enum:EmbedPermission": _decode_permissions,
 }

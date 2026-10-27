@@ -263,6 +263,7 @@ def metric(
     trend: float | Binding | None = None,
     trend_format: CellFormat | None = None,
     trend_polarity: t.TrendPolarity = "HigherIsBetter",
+    comparisons: Sequence[t.MetricComparison] = (),
     occurrence: int = 0,
 ) -> UiNode:
     """A KPI tile. ``occurrence`` disambiguates a second tile with the same label."""
@@ -276,6 +277,7 @@ def metric(
         trend=trend,
         trend_format=trend_format,
         trend_polarity=trend_polarity,
+        comparisons=comparisons,
     )
 
 

@@ -2588,6 +2588,23 @@
           }
         },
         {
+          "name": "comparisons",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "record",
+              "name": "MetricComparison"
+            }
+          }
+        },
+        {
           "name": "icon",
           "optionality": {
             "$type": "optional"
@@ -4626,6 +4643,67 @@
         }
       ],
       "name": "MapMarker"
+    },
+    {
+      "fields": [
+        {
+          "name": "label",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
+          }
+        },
+        {
+          "name": "value",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "union",
+            "args": [
+              {
+                "$type": "float"
+              }
+            ],
+            "name": "Binding"
+          }
+        },
+        {
+          "name": "format",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "union",
+              "fields": [],
+              "tag": "None"
+            }
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "CellFormat"
+          }
+        },
+        {
+          "name": "polarity",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "enum",
+              "case": "HigherIsBetter"
+            }
+          },
+          "type": {
+            "$type": "enum",
+            "name": "TrendPolarity"
+          }
+        }
+      ],
+      "name": "MetricComparison"
     },
     {
       "fields": [

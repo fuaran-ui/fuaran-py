@@ -15,6 +15,20 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### additive — a Metric can carry a second comparison (Phase 2472)
+
+- `Metric` gains `comparisons`, a tuple of `MetricComparison(label, value, format=FormatNone(),
+  polarity="HigherIsBetter")`, omitted on the wire when empty and, inside an entry, at each default — so
+  every existing document keeps its bytes. The decoder restores the empty tuple and drops an explicit
+  default; an entry missing `label` or `value` is refused.
+- The server renderer draws each comparison as one more `fuaran-metric-trend` line after the primary trend:
+  its own glyph and sentiment under its OWN polarity, then the figure in its format, then its label. The
+  speech projection speaks each after the trend. Both are byte-identical to the reference host on the
+  corpus's `metric-two-comparisons` and `metric-comparison-inverted` fixtures.
+- `fuaran.metric(..., comparisons=...)` and `quick.metric(..., comparisons=...)` author it. The bundled
+  snapshot, the generated structural layer, the capability manifest and the speech golden (regenerated
+  from the reference's 0.98.0 build; only the two new fixtures' entries move) are re-synced.
+
 ### additive and behavioural — the dataframe evaluator learns `pow`, `exp`, `ln` and `log10`, and refuses an output named twice (Phase 2400)
 
 - `fuaran_ui.dataframe` decodes, encodes and evaluates the four scalar functions the reference added (its

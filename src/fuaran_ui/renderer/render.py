@@ -897,6 +897,35 @@ class Renderer:
                         + escape_text(format_number(fields.get("trendFormat"), trend)),
                     )
                 )
+        # fuaran#2472 — each further comparison is one more trend line, under its
+        # OWN polarity, with its label after the figure. Mirrors the reference
+        # server renderer byte-for-byte, including the bare div an unresolved
+        # value leaves.
+        comparisons = fields.get("comparisons")
+        for entry in comparisons.items if isinstance(comparisons, Arr) else ():
+            cfields = entry.fields if isinstance(entry, Obj) else {}
+            figure = resolve_scalar_number(cfields.get("value"), self.sources)
+            if figure is None:
+                parts.append(text_element("div", [("class", "fuaran-metric-trend")], ""))
+                continue
+            sentiment, glyph = trend_sentiment(cfields.get("polarity"), figure)
+            line = f"{format_number(cfields.get('format'), figure)} {self._text(cfields.get('label'))}"
+            parts.append(
+                element(
+                    "div",
+                    [("class", f"fuaran-metric-trend fuaran-metric-trend-{sentiment}")],
+                    text_element(
+                        "span",
+                        [
+                            ("class", "fuaran-metric-trend-glyph"),
+                            ("role", "img"),
+                            ("aria-label", sentiment),
+                        ],
+                        glyph,
+                    )
+                    + escape_text(line),
+                )
+            )
         subtext = fields.get("subtext")
         if subtext is not None:
             parts.append(text_element("div", [("class", "fuaran-metric-subtext")], self._text(subtext)))

@@ -620,6 +620,14 @@ class _NodeWalk:
             t = resolve_scalar_number(trend_binding, self.p.sources)
             if t is not None:
                 trend = ", trend " + format_number(f.get("trendFormat"), t)
+        # fuaran#2472 — each further comparison is spoken after the trend, its
+        # figure then its label; an unresolved one is left unsaid (the reference).
+        comparisons = f.get("comparisons")
+        for entry in comparisons.items if isinstance(comparisons, Arr) else ():
+            cf = entry.fields if isinstance(entry, Obj) else {}
+            c = resolve_scalar_number(cf.get("value"), self.p.sources)
+            if c is not None:
+                trend += ", " + format_number(cf.get("format"), c) + " " + self.p.text(cf.get("label"))
         lines = [_sentence(self.p.text(f.get("label")) + ": " + value + trend)]
         subtext = f.get("subtext")
         if subtext is not None:

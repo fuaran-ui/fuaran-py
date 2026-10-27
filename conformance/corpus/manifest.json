@@ -3353,6 +3353,15 @@
       "description": "Display/Metric"
     },
     {
+      "id": "metric-comparison-inverted",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/metric-comparison-inverted.json",
+      "expectedFile": "nodes/metric-comparison-inverted.json",
+      "description": "Display/Metric (Phase 2472 — a trend plus an inverted-polarity comparison)"
+    },
+    {
       "id": "metric-duration-1",
       "kind": "node-round-trip",
       "since": "0.26.0",
@@ -3432,6 +3441,15 @@
       "inputFile": "nodes/metric-nonfinite-sentinel.json",
       "expectedFile": "nodes/metric-nonfinite-sentinel.json",
       "description": "Display/Metric (Phase 1063 — §5/§7 non-finite sentinels behind a Binding.Static envelope)"
+    },
+    {
+      "id": "metric-two-comparisons",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/metric-two-comparisons.json",
+      "expectedFile": "nodes/metric-two-comparisons.json",
+      "description": "Display/Metric (Phase 2472 — two comparisons, each its own trend line)"
     },
     {
       "id": "modal-1",

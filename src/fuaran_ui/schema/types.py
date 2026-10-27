@@ -1617,6 +1617,33 @@ class Markdown:
 
 
 @dataclass(frozen=True)
+class MetricComparison:
+    """fuaran#2472 — one further comparison on a :class:`Metric`: a figure measured
+    against a second (or third) period at once, rendered as one more trend line
+    under ``trend`` with its own glyph, sentiment and label.
+
+    ``label`` and ``value`` are required; ``format`` is omitted at ``None`` and
+    ``polarity`` at ``HigherIsBetter``, exactly as the tile's own are.
+    """
+
+    label: TextSource
+    value: Binding
+    format: CellFormat = field(default_factory=FormatNone)
+    polarity: TrendPolarity = "HigherIsBetter"
+
+    def to_wire(self) -> Obj:
+        return _obj(
+            None,
+            {
+                "format": None if isinstance(self.format, FormatNone) else self.format,
+                "label": self.label,
+                "polarity": None if self.polarity == "HigherIsBetter" else self.polarity,
+                "value": self.value,
+            },
+        )
+
+
+@dataclass(frozen=True)
 class Metric:
     label: TextSource
     value: Binding
@@ -1629,12 +1656,17 @@ class Metric:
     trend: Binding | None = None
     trend_format: CellFormat | None = None
     trend_polarity: TrendPolarity = "HigherIsBetter"
+    # fuaran#2472 — further comparisons, each one more trend line. The EMPTY
+    # tuple is the identity and emits no key, so every Metric authored before
+    # the slot existed encodes byte-identically.
+    comparisons: tuple[MetricComparison, ...] = ()
 
     def to_wire(self) -> Obj:
         # Phase 460 — the stylistic fields are omitted-when-default (WIRE_FORMAT §3.6).
         return _obj(
             "Metric",
             {
+                "comparisons": list(self.comparisons) if self.comparisons else None,
                 "emphasis": None if self.emphasis == "Normal" else self.emphasis,
                 "format": None if isinstance(self.format, FormatNone) else self.format,
                 "icon": self.icon,

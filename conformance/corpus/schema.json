@@ -5761,11 +5761,38 @@
         "trendPolarity": {
           "$ref": "#/$defs/TrendPolarity"
         },
+        "comparisons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/MetricComparison"
+          }
+        },
         "icon": {
           "type": "string"
         },
         "subtext": {
           "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "label",
+        "value"
+      ]
+    },
+    "MetricComparison": {
+      "type": "object",
+      "properties": {
+        "format": {
+          "$ref": "#/$defs/CellFormat"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "polarity": {
+          "$ref": "#/$defs/TrendPolarity"
+        },
+        "value": {
+          "$ref": "#/$defs/Binding_float"
         }
       },
       "required": [

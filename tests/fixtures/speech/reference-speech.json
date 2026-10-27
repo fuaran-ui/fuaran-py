@@ -1,5 +1,5 @@
 {
-  "generator": "Fuaran.UI.Renderer.Server 0.97.0 Speech.projectStatic",
+  "generator": "Fuaran.UI.Renderer.Server 0.98.0 Speech.projectStatic",
   "fixtures": {
     "a11y-alert-assertive": {
       "text": "Upload failed\nThe file exceeded the size limit.\n",
@@ -3591,6 +3591,25 @@
       ],
       "omissions": []
     },
+    "metric-comparison-inverted": {
+      "text": "Avg wait: 80, trend -7.34%, 12 minutes vs last year\ntrend is vs last week\n",
+      "ssml": "<speak>\n<s>Avg wait: 80, trend -7.34%, 12 minutes vs last year</s><break strength=\"medium\"/>\n<s>trend is vs last week</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-comparison-inverted",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "metric-comparison-inverted",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "metric-duration-1": {
       "text": "Avg wait: 1h 20m, trend 3 minutes ago\n",
       "ssml": "<speak>\n<s>Avg wait: 1h 20m, trend 3 minutes ago</s><break strength=\"medium\"/>\n</speak>\n",
@@ -3749,6 +3768,19 @@
         },
         {
           "nodeId": "metric-nonfinite-sentinel",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "metric-two-comparisons": {
+      "text": "Orders yesterday: 1284, 4.2% vs same day last week, -3.1% vs same day last year\n",
+      "ssml": "<speak>\n<s>Orders yesterday: 1284, 4.2% vs same day last week, -3.1% vs same day last year</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "metric-two-comparisons",
           "source": "derived",
           "emphasis": false,
           "pause": "short"

@@ -14,8 +14,8 @@
 // snapshot gains or loses a node fixture the golden does not cover.
 
 #i "nuget: ../../../../../../local-nuget-feed"
-#r "nuget: Fuaran.UI.Renderer.Server, 0.97.0"
-#r "nuget: Fuaran.UI.Ops, 0.97.0"
+#r "nuget: Fuaran.UI.Renderer.Server, 0.98.0"
+#r "nuget: Fuaran.UI.Ops, 0.98.0"
 
 open System
 open System.IO
@@ -94,7 +94,7 @@ for path in
         fixtures[Path.GetFileNameWithoutExtension path] <- entry
 
 let doc = JsonObject()
-doc["generator"] <- JsonValue.Create "Fuaran.UI.Renderer.Server 0.97.0 Speech.projectStatic"
+doc["generator"] <- JsonValue.Create "Fuaran.UI.Renderer.Server 0.98.0 Speech.projectStatic"
 doc["fixtures"] <- fixtures
 
 let opts = JsonSerializerOptions(WriteIndented = true)

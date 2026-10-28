@@ -1406,16 +1406,25 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         rows: list[list[t.TextInput]],
         sortable: bool | None = None,
         default_sort: t.DefaultSort | None = None,
+        columns: list[t.Column] | None = None,
+        row_key_field: str | None = None,
     ) -> UiNode:
         """``sortable`` is TRI-STATE: absent is the pre-801 wire byte-for-byte,
         and an explicit ``False`` is an author declining the affordance rather
         than one who was never asked. ``default_sort`` names the header ORDINAL
-        the table arrives sorted by, and is meaningful on its own."""
+        the table arrives sorted by, and is meaningful on its own.
+
+        ``columns`` (Phase 2473) say how the cells render, read by position;
+        ``row_key_field`` (Phase 2474) names the column whose cell identifies a
+        row, which makes the table selectable: a ``Selection`` on its id with a
+        ``field`` reads that cell of the selected row."""
         spec = t.Table(
             tuple(_text(h) for h in headers),
             tuple(tuple(_text(c) for c in row) for row in rows),
             sortable=sortable,
             default_sort=default_sort,
+            columns=tuple(columns or ()),
+            row_key_field=row_key_field,
         )
         return _node(id, spec, accessibility.table)
 

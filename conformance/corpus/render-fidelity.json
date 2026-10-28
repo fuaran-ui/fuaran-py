@@ -291,7 +291,7 @@
       "kind": "DataGrid",
       "sensitive": true,
       "source": "the column declarations, the row-source binding, the declared sort / page / edit intent, and the two Phase 1473 print-break declarations",
-      "fallback": "in static read-only mode the full semantic `<table class=\"fuaran-table\">` (byte-identical to the retired `Table`, with the declared sort surfaced as `data-fuaran-sort-*`); a static table's declared `columns` are read by position (`columns[j]` describes every row's cell `j`), and a `TonedPill` column draws its cell as `<span class=\"fuaran-grid-cell-pill fuaran-pill-<tone>\">` holding the cell's own text, toned by the map entry for the row's value at the pill's `field` (a static row reads as each declared column's `field` mapped to its cell's text) - a class plus text, never colour alone, and every other cell plain text; for a client-library grid a deterministic `fuaran-grid-ssr-placeholder` carrying `data-fuaran-row-count` - never a blank. A declared `keepRowsTogether` / `repeatHeader` is carried as the `fuaran-grid-rows-together` / `fuaran-grid-repeat-header` class on BOTH legs - on the static table the reference stylesheet's `@media print` rules then reach its rows and its header row group with no script at all, and on the placeholder the class records that the declaration was read and survives to the hydrated grid. A declared `exportable` (Phase 1125) reaches NEITHER leg: the export control is drawn only where it can act, so a server-rendered grid emits the markup it emitted before the affordance existed and the declaration rides the wire to the client tier",
+      "fallback": "in static read-only mode the full semantic `<table class=\"fuaran-table\">` (byte-identical to the retired `Table`, with the declared sort surfaced as `data-fuaran-sort-*`); a static table's declared `columns` are read by position (`columns[j]` describes every row's cell `j`), and a `TonedPill` column draws its cell as `<span class=\"fuaran-grid-cell-pill fuaran-pill-<tone>\">` holding the cell's own text, toned by the map entry for the row's value at the pill's `field` (a static row reads as each declared column's `field` mapped to its cell's text) - a class plus text, never colour alone, and every other cell plain text; a static table whose `rowKeyField` names a declared column's `field` is selectable - a row click publishes the row's record under the table's id, and the row whose key is the selection's (a designed selection is a `Selection` on the table projecting that field with a `defaultValue`, laid under the host's selections before the first render) carries `fuaran-grid-row-selected` and `aria-selected=\"true\"`; for a client-library grid a deterministic `fuaran-grid-ssr-placeholder` carrying `data-fuaran-row-count` - never a blank. A declared `keepRowsTogether` / `repeatHeader` is carried as the `fuaran-grid-rows-together` / `fuaran-grid-repeat-header` class on BOTH legs - on the static table the reference stylesheet's `@media print` rules then reach its rows and its header row group with no script at all, and on the placeholder the class records that the declaration was read and survives to the hydrated grid. A declared `exportable` (Phase 1125) reaches NEITHER leg: the export control is drawn only where it can act, so a server-rendered grid emits the markup it emitted before the affordance existed and the declaration rides the wire to the client tier",
       "rich": {
         "class": "clientOnly",
         "technique": "the client grid library draws into the placeholder",
@@ -300,7 +300,8 @@
       },
       "fixtures": [
         "nodes/grid-1.json",
-        "nodes/table-toned-column.json"
+        "nodes/table-toned-column.json",
+        "nodes/table-selectable-detail.json"
       ],
       "obligations": [
         {
@@ -330,7 +331,7 @@
         "class": "announced-only",
         "note": "'Table[: <name>], <n> rows, <m> columns' for the static-rows form, else 'Table[: <name>]'; the cells are not read out"
       },
-      "contract": "Phase 393; Phase 1701; Phase 2473; docs/SSR.md (Visualisation, sortable rendered tables); WIRE_FORMAT.md 3.6.24"
+      "contract": "Phase 393; Phase 1701; Phase 2473; Phase 2474; docs/SSR.md (Visualisation, sortable rendered tables); WIRE_FORMAT.md 3.6.24"
     },
     {
       "kind": "Disclosure",

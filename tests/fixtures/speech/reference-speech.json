@@ -4571,6 +4571,43 @@
       ],
       "omissions": []
     },
+    "table-selectable-detail": {
+      "text": "Table, 3 rows, 3 columns\nCountry detail\nCountry: France\nGDP: 3.1T\nGrowth: +1.1%\n",
+      "ssml": "<speak>\n<s>Table, 3 rows, 3 columns</s><break strength=\"medium\"/>\n<s><emphasis level=\"moderate\">Country detail</emphasis></s><break strength=\"strong\"/>\n<s>Country: France</s><break strength=\"medium\"/>\n<s>GDP: 3.1T</s><break strength=\"medium\"/>\n<s>Growth: +1.1%</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "countries",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "country-detail",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "detail-country",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-gdp",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "detail-growth",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "table-sortable-1": {
       "text": "Table, 2 rows, 2 columns\n",
       "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",

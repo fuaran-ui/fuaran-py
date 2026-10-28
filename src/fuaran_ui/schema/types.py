@@ -2987,12 +2987,19 @@ class Table:
     #: The sort in force before any click. Meaningful with ``sortable`` absent —
     #: an author can order a table the reader cannot re-order.
     default_sort: DefaultSort | None = None
+    #: Phase 2473 / 2474 — the declared columns, read by POSITION (``columns[j]``
+    #: describes every row's cell ``j``). Empty is the pre-2473 wire byte-for-byte.
+    columns: tuple[Column, ...] = ()
+    #: Phase 2474 — the declared column whose cell identifies each row. Naming one
+    #: of ``columns`` makes the table SELECTABLE. Absent is omitted on the wire.
+    row_key_field: str | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
             "DataGrid",
             {
-                "columns": [],
+                "columns": list(self.columns),
+                "rowKeyField": self.row_key_field,
                 "source": Static(Arr([])),
                 # `_obj`, not a bare dict: `_lower` keeps every key a dict carries,
                 # so the two optional slots would encode as JSON null rather than

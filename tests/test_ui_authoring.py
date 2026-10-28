@@ -1784,6 +1784,53 @@ def _authored() -> dict[str, t.UiNode]:
                 ],
             )
         ),
+        # Phase 2474 — the drill over a static table: a selectable table (its
+        # `rowKeyField` is a declared column) beside a detail pane bound to its
+        # selection, France selected by design.
+        "table-selectable-detail": node.bare(
+            fuaran.split_panel(
+                "table-selectable-detail",
+                weight=0.6,
+                children=[
+                    node.bare(
+                        fuaran.table(
+                            "countries",
+                            headers=["Country", "GDP", "Growth"],
+                            rows=[
+                                ["Germany", "4.5T", "+0.2%"],
+                                ["France", "3.1T", "+1.1%"],
+                                ["Italy", "2.3T", "+0.7%"],
+                            ],
+                            columns=[t.Column(label=n, field_name=n) for n in ("country", "gdp", "growth")],
+                            row_key_field="country",
+                        )
+                    ),
+                    node.bare(
+                        fuaran.card(
+                            "country-detail",
+                            heading="Country detail",
+                            children=[
+                                fuaran.fact(
+                                    "detail-country",
+                                    label="Country",
+                                    value=t.Bound(t.Selection("countries", "France", "country")),
+                                ),
+                                fuaran.fact(
+                                    "detail-gdp",
+                                    label="GDP",
+                                    value=t.Bound(t.Selection("countries", "3.1T", "gdp")),
+                                ),
+                                fuaran.fact(
+                                    "detail-growth",
+                                    label="Growth",
+                                    value=t.Bound(t.Selection("countries", "+1.1%", "growth")),
+                                ),
+                            ],
+                        )
+                    ),
+                ],
+            )
+        ),
         "master-detail-multi-field": node.bare(
             fuaran.dashboard(
                 "master-detail-multi-field",

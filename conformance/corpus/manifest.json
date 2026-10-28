@@ -3794,6 +3794,15 @@
       "description": "Visualisation/Grid (static-table mode — staticRows; absorbed the retired Table kind)"
     },
     {
+      "id": "table-selectable-detail",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/table-selectable-detail.json",
+      "expectedFile": "nodes/table-selectable-detail.json",
+      "description": "Visualisation/Grid (Phase 2474 — selectable static table with a SplitPanel detail pane bound to its selection)"
+    },
+    {
       "id": "table-sortable-1",
       "kind": "node-round-trip",
       "since": "0.26.0",

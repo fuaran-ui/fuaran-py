@@ -4584,6 +4584,19 @@
       ],
       "omissions": []
     },
+    "table-toned-column": {
+      "text": "Table, 2 rows, 2 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-toned-column",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "tabs-1": {
       "text": "Tabbed section, 1 tab\n",
       "ssml": "<speak>\n<s>Tabbed section, 1 tab</s><break strength=\"medium\"/>\n</speak>\n",

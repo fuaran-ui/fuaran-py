@@ -3803,6 +3803,15 @@
       "description": "Visualisation/Grid (Phase 801 — static-table mode declaring sort intent: sortable + defaultSort)"
     },
     {
+      "id": "table-toned-column",
+      "kind": "node-round-trip",
+      "since": "0.98.0",
+      "decoder": "node",
+      "inputFile": "nodes/table-toned-column.json",
+      "expectedFile": "nodes/table-toned-column.json",
+      "description": "Visualisation/Grid (Phase 2473 — static-table mode with a toned column: columns read positionally beside staticRows)"
+    },
+    {
       "id": "tabs-1",
       "kind": "node-round-trip",
       "since": "0.3.0",

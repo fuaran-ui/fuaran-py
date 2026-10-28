@@ -1209,6 +1209,25 @@
       ],
       "omissions": []
     },
+    "figure-locale-en-gb": {
+      "text": "Revenue: £412,380.00, trend 4.2%\nTable\n",
+      "ssml": "<speak>\n<s>Revenue: £412,380.00, trend 4.2%</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "figure-locale-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "figure-locale-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "filterable-static-dashboard": {
       "text": "Filters, 2 fields\nChart: Retention\nTable\n",
       "ssml": "<speak>\n<s>Filters, 2 fields</s><break strength=\"medium\"/>\n<s>Chart: Retention</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",

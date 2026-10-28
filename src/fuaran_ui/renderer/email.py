@@ -798,7 +798,7 @@ class _EmailRenderer:
     def _metric(self, node: Node, fields: dict[str, Value], depth: int) -> str:
         colour = _tone_colour(fields.get("tone"))
         value = resolve_scalar_number(fields.get("value"), self.sources)
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
         parts = [
             text_element(
                 "p",
@@ -827,7 +827,7 @@ class _EmailRenderer:
                     text_element(
                         "p",
                         [("style", self._text_in(colour, "font-size:13px;line-height:18px;"))],
-                        format_number(fields.get("trendFormat"), trend),
+                        format_number(fields.get("trendFormat"), trend, self.sources),
                     )
                 )
         subtext = fields.get("subtext")
@@ -878,7 +878,7 @@ class _EmailRenderer:
 
     def _label_value_row(self, node: Node, fields: dict[str, Value], depth: int) -> str:
         value = resolve_scalar_number(fields.get("value"), self.sources)
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
         weight = "700" if fields.get("emphasis") is True else "400"
         label_cell = text_element(
             "td",

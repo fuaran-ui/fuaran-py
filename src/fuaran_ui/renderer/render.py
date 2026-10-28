@@ -90,7 +90,7 @@ from .theme import (
 _EM_DASH = "—"
 
 
-def metric_value_text(fields: dict[str, Value], value: object) -> str:
+def metric_value_text(fields: dict[str, Value], value: object, sources: BindingSourcesLike | None = None) -> str:
     """The TEXT a ``Metric``'s numeric value slot reads.
 
     The resolved number in the slot's declared format, or the em-dash when the
@@ -104,7 +104,7 @@ def metric_value_text(fields: dict[str, Value], value: object) -> str:
     ALREADY-RESOLVED value, so the one call site that also needs the resolution
     for its loading branch does not resolve twice.
     """
-    return format_number(fields.get("format"), value) if value is not None else _EM_DASH
+    return format_number(fields.get("format"), value, sources) if value is not None else _EM_DASH
 
 
 # ── FormField.rule → the platform's own constraint attributes (fuaran#864) ───
@@ -860,7 +860,7 @@ class Renderer:
             if loading is not None:
                 return self.render_node(loading)
         tone = str(fields.get("tone", "Default")).lower()
-        value_text = metric_value_text(fields, value)
+        value_text = metric_value_text(fields, value, self.sources)
         parts = [
             text_element("div", [("class", "fuaran-metric-label")], self._text(fields.get("label"))),
             text_element("div", [("class", "fuaran-metric-value")], value_text),
@@ -894,7 +894,7 @@ class Renderer:
                             ],
                             glyph,
                         )
-                        + escape_text(format_number(fields.get("trendFormat"), trend)),
+                        + escape_text(format_number(fields.get("trendFormat"), trend, self.sources)),
                     )
                 )
         # fuaran#2472 — each further comparison is one more trend line, under its
@@ -909,7 +909,7 @@ class Renderer:
                 parts.append(text_element("div", [("class", "fuaran-metric-trend")], ""))
                 continue
             sentiment, glyph = trend_sentiment(cfields.get("polarity"), figure)
-            line = f"{format_number(cfields.get('format'), figure)} {self._text(cfields.get('label'))}"
+            line = f"{format_number(cfields.get('format'), figure, self.sources)} {self._text(cfields.get('label'))}"
             parts.append(
                 element(
                     "div",
@@ -1028,7 +1028,7 @@ class Renderer:
                 return self.render_node(loading)
         emphasis = " fuaran-label-value-row-emphasis" if fields.get("emphasis") is True else ""
         # 0.2.0 rename law — the scalar displayed value is `value`.
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
         label = text_element("span", [("class", "fuaran-label-value-row-label")], self._text(fields.get("label")))
         val = text_element("span", [("class", "fuaran-label-value-row-value")], value_text)
         return element("div", [("class", f"fuaran-label-value-row{emphasis}")], label + val)
@@ -2188,8 +2188,7 @@ class Renderer:
             return []
         return [c.fields for c in columns.items if isinstance(c, Obj)]
 
-    @staticmethod
-    def _grid_cell_text(column: dict[str, Value], row: Obj) -> str:
+    def _grid_cell_text(self, column: dict[str, Value], row: Obj) -> str:
         """One bound-grid cell's text, mirroring the reference ``renderCellValue``.
 
         A column projects its cell either declaratively (``field`` — a row
@@ -2207,7 +2206,7 @@ class Renderer:
         if isinstance(value, bool):
             return "true" if value else "false"
         if isinstance(value, (int, float)):
-            return format_number(column.get("format"), value)
+            return format_number(column.get("format"), value, self.sources)
         return str(value)
 
     def _bound_grid(

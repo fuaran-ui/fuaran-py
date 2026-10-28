@@ -422,7 +422,7 @@ class _Projector:
             if outcome == "error":
                 return "unavailable"
         value = resolve_scalar_number(binding, self.sources)
-        return "no value" if value is None else format_number(fmt, value)
+        return "no value" if value is None else format_number(fmt, value, self.sources)
 
     # ── the two accumulators ────────────────────────────────────────────────
 
@@ -619,7 +619,7 @@ class _NodeWalk:
         if trend_binding is not None:
             t = resolve_scalar_number(trend_binding, self.p.sources)
             if t is not None:
-                trend = ", trend " + format_number(f.get("trendFormat"), t)
+                trend = ", trend " + format_number(f.get("trendFormat"), t, self.p.sources)
         # fuaran#2472 — each further comparison is spoken after the trend, its
         # figure then its label; an unresolved one is left unsaid (the reference).
         comparisons = f.get("comparisons")
@@ -627,7 +627,7 @@ class _NodeWalk:
             cf = entry.fields if isinstance(entry, Obj) else {}
             c = resolve_scalar_number(cf.get("value"), self.p.sources)
             if c is not None:
-                trend += ", " + format_number(cf.get("format"), c) + " " + self.p.text(cf.get("label"))
+                trend += ", " + format_number(cf.get("format"), c, self.p.sources) + " " + self.p.text(cf.get("label"))
         lines = [_sentence(self.p.text(f.get("label")) + ": " + value + trend)]
         subtext = f.get("subtext")
         if subtext is not None:

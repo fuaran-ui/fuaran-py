@@ -1010,26 +1010,32 @@ class FormatNone:
 
 @dataclass(frozen=True)
 class Currency:
+    """Phase 2490 — ``locale`` renders the figure grouped and symbol-led through the
+    locale formatter ``Binding.Format`` uses; absent, it is the locale-free form."""
+
     code: str
+    locale: LocaleSource | None = None
 
     def to_wire(self) -> Value:
-        return Obj("Currency", {"code": self.code})
+        return _obj("Currency", {"code": self.code, "locale": self.locale})
 
 
 @dataclass(frozen=True)
 class NumberFormat:
     decimals: int | None = None
+    locale: LocaleSource | None = None
 
     def to_wire(self) -> Value:
-        return _obj("Number", {"decimals": self.decimals})
+        return _obj("Number", {"decimals": self.decimals, "locale": self.locale})
 
 
 @dataclass(frozen=True)
 class PercentFormat:
     decimals: int | None = None
+    locale: LocaleSource | None = None
 
     def to_wire(self) -> Value:
-        return _obj("Percent", {"decimals": self.decimals})
+        return _obj("Percent", {"decimals": self.decimals, "locale": self.locale})
 
 
 @dataclass(frozen=True)

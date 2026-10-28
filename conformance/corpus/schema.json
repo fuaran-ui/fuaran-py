@@ -4783,6 +4783,9 @@
             },
             "decimals": {
               "type": "integer"
+            },
+            "locale": {
+              "$ref": "#/$defs/LocaleSource"
             }
           },
           "required": [
@@ -4797,6 +4800,9 @@
             },
             "code": {
               "type": "string"
+            },
+            "locale": {
+              "$ref": "#/$defs/LocaleSource"
             }
           },
           "required": [
@@ -4812,6 +4818,9 @@
             },
             "decimals": {
               "type": "integer"
+            },
+            "locale": {
+              "$ref": "#/$defs/LocaleSource"
             }
           },
           "required": [

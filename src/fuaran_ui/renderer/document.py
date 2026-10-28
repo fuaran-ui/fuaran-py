@@ -548,13 +548,13 @@ class _MarkdownRenderer:
 
     def _metric(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
         value = resolve_scalar_number(fields.get("value"), self.sources)
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
         lines = [f"**{self._inline(fields.get('label'))}** — {escape_inline(value_text)}"]
         trend_binding = fields.get("trend")
         if trend_binding is not None:
             trend = resolve_scalar_number(trend_binding, self.sources)
             if trend is not None:
-                lines.append(escape_inline(format_number(fields.get("trendFormat"), trend)))
+                lines.append(escape_inline(format_number(fields.get("trendFormat"), trend, self.sources)))
         subtext = fields.get("subtext")
         if subtext is not None:
             lines.append(f"*{self._inline(subtext)}*")
@@ -569,7 +569,7 @@ class _MarkdownRenderer:
 
     def _label_value_row(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
         value = resolve_scalar_number(fields.get("value"), self.sources)
-        value_text = format_number(fields.get("format"), value) if value is not None else _EM_DASH
+        value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
         return [f"**{self._inline(fields.get('label'))}** — {escape_inline(value_text)}"]
 
     def _badge(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:

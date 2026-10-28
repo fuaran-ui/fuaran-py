@@ -381,16 +381,17 @@ class format:  # noqa: N801, A001 — namespace object, mirrors the cross-tier `
         return t.FormatNone()
 
     @staticmethod
-    def currency(code: str) -> CellFormat:
-        return t.Currency(code)
+    def currency(code: str, locale: t.LocaleSource | None = None) -> CellFormat:
+        """Phase 2490 — a ``locale`` renders the figure grouped and symbol-led there."""
+        return t.Currency(code, locale)
 
     @staticmethod
-    def number(decimals: int | None = None) -> CellFormat:
-        return t.NumberFormat(decimals)
+    def number(decimals: int | None = None, locale: t.LocaleSource | None = None) -> CellFormat:
+        return t.NumberFormat(decimals, locale)
 
     @staticmethod
-    def percent(decimals: int | None = None) -> CellFormat:
-        return t.PercentFormat(decimals)
+    def percent(decimals: int | None = None, locale: t.LocaleSource | None = None) -> CellFormat:
+        return t.PercentFormat(decimals, locale)
 
     @staticmethod
     def significant_digits(digits: int) -> CellFormat:

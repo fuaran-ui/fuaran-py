@@ -6304,6 +6304,17 @@
               "type": {
                 "$type": "int"
               }
+            },
+            {
+              "name": "locale",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "LocaleSource"
+              }
             }
           ],
           "tag": "Number"
@@ -6318,6 +6329,17 @@
               "type": {
                 "$type": "str"
               }
+            },
+            {
+              "name": "locale",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "LocaleSource"
+              }
             }
           ],
           "tag": "Currency"
@@ -6331,6 +6353,17 @@
               },
               "type": {
                 "$type": "int"
+              }
+            },
+            {
+              "name": "locale",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "LocaleSource"
               }
             }
           ],

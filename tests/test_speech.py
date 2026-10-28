@@ -177,6 +177,10 @@ KNOWN_HOST_DIVERGENCES: dict[str, str] = {
     "deliberately pins neither",
     "format-date-time": "Binding.Format DateTime renders this host's locale-free ISO 8601 form, where the "
     "reference renders its locale database's date and time patterns — the corpus deliberately pins neither",
+    "figure-locale-en-gb": "a Currency figure carrying a locale (Phase 2490) renders through this host's "
+    "LocaleFormatter, whose default is the locale-free form ('GBP 412380.00'), where the reference renders "
+    "its locale database's ('£412,380.00') - the same route and caveat as a Binding.Format Currency; the "
+    "golden entry was generated from the phase-2490 reference build, the only one that carries the member",
     "metric-float-exp-pos": "a Currency metric whose value is 1e21 renders this host's expanded decimal "
     "('GBP 1000000000000000000000.00'), where the reference (0.97.0, after its number-formatting family) "
     "renders the exponent form ('GBP 1e+21') — surfaced when the golden was regenerated from 0.87.0 to "

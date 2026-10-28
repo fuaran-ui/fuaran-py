@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "c78f383ca50dc36dc5d158d63052aa202e70d2a1bdee77a30c629354247f76d4"
+IDL_SHA256 = "b8d8755fcf412df90d10c812c9ce99634d616486d007aeb7b5ca42c1c1ced409"
 IDL_VERSION = 1
 
 
@@ -1221,9 +1221,18 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
     },
     "CellFormat": {
         "None": (),
-        "Number": (F("decimals", "optional", T_int),),
-        "Currency": (F("code", "required", T_str),),
-        "Percent": (F("decimals", "optional", T_int),),
+        "Number": (
+            F("decimals", "optional", T_int),
+            F("locale", "optional", T_union_LocaleSource),
+        ),
+        "Currency": (
+            F("code", "required", T_str),
+            F("locale", "optional", T_union_LocaleSource),
+        ),
+        "Percent": (
+            F("decimals", "optional", T_int),
+            F("locale", "optional", T_union_LocaleSource),
+        ),
         "SignificantDigits": (F("digits", "required", T_int),),
         "DateTime": (F("format", "required", T_str),),
         "Duration": (

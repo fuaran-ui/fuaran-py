@@ -1009,16 +1009,37 @@ def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str 
     return format_relative_english(unit, count)
 
 
-def format_number(fmt: Value, value: object) -> str:
+def _figure_locale(fmt: Obj, sources: BindingSourcesLike | None) -> str | None:
+    """The tag a figure case's ``locale`` resolves to (Phase 2490), or ``None``.
+
+    ``Explicit`` pins its own tag; ``Ambient`` reads the host's
+    :attr:`BindingSources.locale` — :func:`resolve_locale_tag`'s rule for a
+    ``Binding.Format``. ``None`` for a figure that declares no ``locale``.
+    """
+    locale = fmt.fields.get("locale")
+    if not isinstance(locale, Obj):
+        return None
+    if locale.tag == "Explicit":
+        tag = locale.fields.get("tag")
+        return tag if isinstance(tag, str) else None
+    if locale.tag == "Ambient":
+        return as_sources(sources).locale
+    return None
+
+
+def format_number(fmt: Value, value: object, sources: BindingSourcesLike | None = None) -> str:
     """Format a numeric value through a decoded ``CellFormat`` (mirrors F# ``formatNumber``).
 
-    The ``Number`` / ``Currency`` / ``Percent`` cases render through
-    :data:`LOCALE_FREE_FORMATTER` — the SAME implementation a ``Binding.Format``
-    slot defaults to (Phase 1920), so the two paths cannot drift. A cell carries
-    no locale source, so the cell path takes the locale-free form whatever
-    formatter a render pass or a companion selected for ``Binding.Format`` slots.
-    Non-finite values are spelled ``Infinity`` / ``-Infinity`` / ``NaN`` on every
-    arm, as the reference host writes them.
+    The ``Number`` / ``Currency`` / ``Percent`` cases render through a
+    :class:`LocaleFormatter` — the SAME seam a ``Binding.Format`` slot renders
+    through (Phase 1920), so the two paths cannot drift. A figure with no
+    ``locale`` takes :data:`LOCALE_FREE_FORMATTER`, the locale-free form, whatever
+    formatter a render pass selected. A figure carrying a ``locale`` (Phase 2490)
+    takes the pass's own formatter (:func:`active_locale_formatter`) under the
+    resolved tag, exactly as the matching ``Binding.Format`` case does — so with
+    no locale-aware formatter installed it is still the locale-free form, this
+    host's declared fallback. Non-finite values are spelled ``Infinity`` /
+    ``-Infinity`` / ``NaN`` on every arm, as the reference host writes them.
     """
     try:
         num = float(value)  # type: ignore[arg-type]
@@ -1032,6 +1053,14 @@ def format_number(fmt: Value, value: object) -> str:
 
     if tag == "None" or tag is None:
         return _plain_number(num)
+    if tag in ("Number", "Currency", "Percent") and "locale" in fields:
+        formatter = active_locale_formatter(sources)
+        locale_tag = _figure_locale(fmt, sources)
+        if tag == "Number":
+            return formatter.number(num, _declared_int(fields, "decimals"), locale_tag)
+        if tag == "Currency":
+            return formatter.currency(num, _declared_str(fields, "code") or "", locale_tag)
+        return formatter.percent(num, _declared_int(fields, "decimals"), locale_tag)
     if tag == "Number":
         return LOCALE_FREE_FORMATTER.number(num, _declared_int(fields, "decimals"), None)
     if tag == "Currency":

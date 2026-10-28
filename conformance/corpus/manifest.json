@@ -2237,6 +2237,15 @@
       "description": "Display/Fact"
     },
     {
+      "id": "figure-locale-en-gb",
+      "kind": "node-round-trip",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "nodes/figure-locale-en-gb.json",
+      "expectedFile": "nodes/figure-locale-en-gb.json",
+      "description": "Display/Metric + Visualisation/Grid (Phase 2490 — a figure carrying a locale: Currency GBP in en-GB on a Metric and a grid column)"
+    },
+    {
       "id": "filterable-static-dashboard",
       "kind": "node-round-trip",
       "since": "0.3.0",

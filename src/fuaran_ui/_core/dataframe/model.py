@@ -16,13 +16,16 @@ closed scalar set with a first-class null case.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Literal
 
 # The rounding vocabulary is the decimal module's; re-exported so the algebra's closed sets read
 # from one place.
 from .decimal_text import MAX_SCALE as MAX_SCALE
 from .decimal_text import ROUNDING_MODES as ROUNDING_MODES
+
+if TYPE_CHECKING:
+    from .unit import UnitOfMeasure
 
 # ── Column scalar types (the closed, Arrow-compatible set) — wire tags ───────
 
@@ -153,9 +156,59 @@ class Column:
 
 
 @dataclass(frozen=True)
+class FieldMeta:
+    """What a column MEANS, beside what it is (WIRE_FORMAT §3.6.26, Phase 2207): an optional
+    ``unit`` (a parsed :class:`~fuaran_ui.dataframe.unit.UnitOfMeasure`), ``label`` and
+    ``description``, and ``ext``, namespaced extension members preserved verbatim. ``None`` is
+    "not stated" and differs from a stated empty string; an empty ``ext`` states nothing."""
+
+    unit: UnitOfMeasure | None = None
+    label: str | None = None
+    description: str | None = None
+    ext: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def is_empty(self) -> bool:
+        """Whether the metadata states nothing — the entry is exactly ``{name, type}``."""
+        return self.unit is None and self.label is None and self.description is None and not self.ext
+
+
+#: The metadata that states nothing.
+NO_METADATA = FieldMeta()
+
+
+@dataclass(frozen=True)
+class Field:
+    """One schema entry: a column's ``name`` and ``type``, and its metadata (Phase 2207) — the
+    reference's ``Field``. A :class:`Table` keeps the ``(name, type)`` pairs in ``schema`` and the
+    metadata by column name in ``metadata``; :func:`table_fields` reads the two together."""
+
+    name: str
+    type: str
+    meta: FieldMeta = NO_METADATA
+
+
+@dataclass(frozen=True)
 class Table:
     schema: Schema
     columns: list[Column]
+    #: The metadata of the columns that state any (Phase 2207), by column name. A column absent
+    #: here states none, so every table built before this member keeps its bytes.
+    metadata: dict[str, FieldMeta] = field(default_factory=dict)
+
+
+def table_fields(t: Table) -> list[Field]:
+    """The table's schema as :class:`Field` entries, each with the metadata its column states."""
+    return [Field(name, ty, t.metadata.get(name, NO_METADATA)) for name, ty in t.schema]
+
+
+def table_of_fields(fields: list[Field], columns: list[Column]) -> Table:
+    """A table whose schema is ``fields`` — the metadata of each field that states any kept."""
+    return Table(
+        [(f.name, f.type) for f in fields],
+        columns,
+        {f.name: f.meta for f in fields if not f.meta.is_empty},
+    )
 
 
 @dataclass(frozen=True)

@@ -13,6 +13,10 @@ and its reference evaluator:
   reference over the F#-generated parity fixtures.
 * :mod:`~fuaran_ui.dataframe.decimal_text` — the exact decimal a ``decimal`` cell carries
   as canonical text: its grammar, order, arithmetic and the one rounding kernel.
+* :mod:`~fuaran_ui.dataframe.unit` — a column's unit: the unit algebra's parse and its one
+  canonical text (WIRE_FORMAT §3.6.26).
+* :mod:`~fuaran_ui.dataframe.schema` — schema operations that read a field's metadata: diff,
+  patch, the delta's wire, the compatibility verdict and the fingerprint.
 
 The ergonomic, polars-shaped *authoring* surface that emits a ``Transform`` lives in
 :mod:`fuaran_ui.ui` (``frame`` / ``col``); this package is the data + engine.
@@ -20,12 +24,15 @@ The ergonomic, polars-shaped *authoring* surface that emits a ``Transform`` live
 
 from __future__ import annotations
 
-from . import codec, decimal_text, evaluate, model
+from . import codec, decimal_text, evaluate, model, schema, unit
 from .codec import (
+    decode_field,
     decode_pipeline,
     decode_pipeline_json,
+    decode_schema,
     decode_source,
     decode_source_json,
+    encode_field,
     encode_pipeline,
     encode_source,
     try_encode_source,
@@ -52,6 +59,8 @@ from .model import (
     Err,
     EvalError,
     Except,
+    Field,
+    FieldMeta,
     Filter,
     GroupBy,
     InList,
@@ -87,7 +96,11 @@ from .model import (
     cell_int,
     cell_str,
     cell_timestamp,
+    table_fields,
+    table_of_fields,
 )
+from .schema import SchemaCompat, SchemaDelta, classify, diff, encode_delta, fingerprint, patch
+from .unit import UnitOfMeasure, UnitRefusal, parse_unit, render_unit
 
 __all__ = [
     # submodules
@@ -95,6 +108,8 @@ __all__ = [
     "codec",
     "decimal_text",
     "evaluate",
+    "schema",
+    "unit",
     # codec
     "encode_source",
     "try_encode_source",
@@ -103,6 +118,9 @@ __all__ = [
     "encode_pipeline",
     "decode_pipeline",
     "decode_pipeline_json",
+    "encode_field",
+    "decode_field",
+    "decode_schema",
     # evaluator
     "eval_pipeline",
     "eval_pipeline_with",
@@ -125,6 +143,23 @@ __all__ = [
     "cell_date",
     "cell_timestamp",
     "cell_decimal",
+    # model — field metadata (Phase 2207)
+    "Field",
+    "FieldMeta",
+    "table_fields",
+    "table_of_fields",
+    "UnitOfMeasure",
+    "UnitRefusal",
+    "parse_unit",
+    "render_unit",
+    # schema operations (Phase 2207)
+    "SchemaDelta",
+    "SchemaCompat",
+    "diff",
+    "patch",
+    "encode_delta",
+    "classify",
+    "fingerprint",
     # model — algebra
     "ColExpr",
     "Col",

@@ -348,7 +348,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "laws/dataframeParity": "covered",
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
     "laws/decimal": "covered",  # tests/test_decimal_laws.py
-    "laws/fieldLaws": {"pending": _LAW_UNRUN},
+    "laws/fieldLaws": "covered",  # tests/test_field_laws.py
     "laws/propagationLaws": {"pending": _LAW_UNRUN},
     # tests/test_transform_laws.py — every evalPipeline vector but the `-unit-` ones (fuaran#2208),
     # which it names; the columnOp and delta case kinds have no surface here and are named too.

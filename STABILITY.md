@@ -15,6 +15,26 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### additive — a column's schema entry carries field metadata: unit, label, description, ext (Phase 2207)
+
+- `fuaran_ui.dataframe` gains `Field(name, type, meta=FieldMeta())` and `FieldMeta(unit=None, label=None,
+  description=None, ext={})`, and `Table` gains `metadata`, the `FieldMeta` of each column that states any,
+  by name (default empty, so every existing table keeps its bytes). `table_fields` / `table_of_fields` read
+  and build a table's schema as fields.
+- The embedded-source codec reads and writes the four members (WIRE_FORMAT §3.6.26): only the members a
+  field states are written, an empty `ext` is none, a member the entry does not define is read past, and a
+  `unit` is parsed by the unit algebra and re-encoded as its canonical text (`s-1.m` reads `m/s`, `l` reads
+  `L`). A unit that does not parse, a non-string `unit` / `label` / `description`, an `ext` that is not an
+  object and a non-string `ext` member are refused as `MALFORMED_SHAPE` naming the column. `encode_field`,
+  `decode_field` and `decode_schema` expose one entry and one schema array.
+- `fuaran_ui.dataframe.unit` is the unit algebra's text (`parse_unit`, `render_unit`, `UnitOfMeasure`,
+  `UnitRefusal` with the reference's refusal classes); `fuaran_ui.dataframe.schema` carries the schema
+  operations that read the metadata — `diff`, `patch`, `encode_delta` (with `amended` only when a member
+  moved), `classify` (a depended-on unit replaced or withdrawn is breaking, a moved `ext` member unknown) and
+  `fingerprint` (FNV-1a over UTF-16 code units; a schema without metadata keeps its fingerprint).
+- Certified by the corpus's `laws/fieldLaws` family (43 vectors, kit version 0.41.0) in
+  `tests/test_field_laws.py`; the capability manifest declares it covered.
+
 ### additive — a Metric can carry a second comparison (Phase 2472)
 
 - `Metric` gains `comparisons`, a tuple of `MetricComparison(label, value, format=FormatNone(),

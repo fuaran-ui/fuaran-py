@@ -32,6 +32,7 @@ from .model import (
     LIMIT_EXCEEDED,
     MALFORMED_SHAPE,
     MISSING_FIELD,
+    NO_METADATA,
     NOT_JSON,
     NULL,
     ROUNDING_MODES,
@@ -57,6 +58,8 @@ from .model import (
     Embedded,
     Err,
     Except,
+    Field,
+    FieldMeta,
     Filter,
     GroupBy,
     InList,
@@ -77,9 +80,7 @@ from .model import (
     Result,
     Rounded,
     Rounding,
-    Schema,
     Sort,
-    Table,
     Transform,
     Union,
     Unpivot,
@@ -94,7 +95,10 @@ from .model import (
     cell_timestamp,
     default_for,
     is_null,
+    table_fields,
+    table_of_fields,
 )
+from .unit import UnitRefusal, parse_unit, refusal_text, render_unit
 
 # ════════════════════════════════════════════════════════════════════════════
 #  Encode — lower to the structural model, then the canonical encoder
@@ -126,8 +130,27 @@ def _column_obj(col: Column) -> Obj:
     return Obj(None, {"values": Arr(values), "validity": Arr(validity)})
 
 
-def _schema_arr(schema: Schema) -> Arr:
-    return Arr([Obj(None, {"name": name, "type": ty}) for name, ty in schema])
+def field_value(f: Field) -> Obj:
+    """One schema entry as the wire carries it (WIRE_FORMAT §3.6.26): ``name`` and ``type``
+    always, then the metadata members the field states and no other — ``unit`` (its canonical
+    text), ``label``, ``description``, and ``ext`` when it holds a member — so a field without
+    metadata writes exactly the ``{name, type}`` entry it always did."""
+    members: dict[str, Value] = {"name": f.name, "type": f.type}
+    m = f.meta
+    if m.unit is not None:
+        members["unit"] = render_unit(m.unit)
+    if m.label is not None:
+        members["label"] = m.label
+    if m.description is not None:
+        members["description"] = m.description
+    if m.ext:
+        members["ext"] = Obj(None, dict(m.ext))
+    return Obj(None, members)
+
+
+def encode_field(f: Field) -> str:
+    """The canonical bytes of one schema entry."""
+    return encode_value(field_value(f))
 
 
 def encode_source_value(src: DataSource) -> Value:
@@ -138,7 +161,8 @@ def encode_source_value(src: DataSource) -> Value:
         for name, _ in t.schema:
             col = next((c for c in t.columns if c.name == name), Column(name, "string", []))
             columns[name] = _column_obj(col)
-        return Obj(None, {"schema": _schema_arr(t.schema), "columns": Obj(None, columns)})
+        schema = Arr([field_value(f) for f in table_fields(t)])
+        return Obj(None, {"schema": schema, "columns": Obj(None, columns)})
     return Obj(None, {"schema": Arr([]), "ref": src.name})
 
 
@@ -564,23 +588,87 @@ def _decode_decimal_value(col: str, v: object) -> Result[Cell, ColumnError]:
     return _err(TYPE_MISMATCH, f"column '{col}': expected decimal value, got {_kind_name(v)}")
 
 
-def _decode_schema(el: object) -> Result[Schema, ColumnError]:
+def _optional_text(column: str, member: str, entry: dict) -> Result[str | None, ColumnError]:
+    """An optional string member of a schema entry: absent is ``None``; present and not a string
+    is refused naming the column and the member."""
+    if member not in entry:
+        return Ok(None)
+    v = entry[member]
+    if not isinstance(v, str):
+        return _err(MALFORMED_SHAPE, f"{column}: schema entry member '{member}' must be a string, got {_kind_name(v)}")
+    return Ok(v)
+
+
+def _decode_meta(name: str, entry: dict) -> Result[FieldMeta, ColumnError]:
+    """A schema entry's metadata members (WIRE_FORMAT §3.6.26): ``unit`` parsed by the unit
+    algebra and refused, naming the column and the reason, when it does not parse; ``label`` and
+    ``description`` strings; ``ext`` an object of strings. Absent members state nothing."""
+    ru = _optional_text(name, "unit", entry)
+    if not ru.ok:
+        return ru  # type: ignore[return-value]
+    unit = None
+    if ru.value is not None:
+        parsed = parse_unit(ru.value)
+        if isinstance(parsed, UnitRefusal):
+            return _err(
+                MALFORMED_SHAPE,
+                f"{name}: unit '{ru.value}' is not a unit the kit parses: {refusal_text(parsed)}",
+            )
+        unit = parsed
+    rl = _optional_text(name, "label", entry)
+    if not rl.ok:
+        return rl  # type: ignore[return-value]
+    rd = _optional_text(name, "description", entry)
+    if not rd.ok:
+        return rd  # type: ignore[return-value]
+    ext: dict[str, str] = {}
+    if "ext" in entry:
+        raw = entry["ext"]
+        if not isinstance(raw, dict):
+            return _err(MALFORMED_SHAPE, f"{name}: schema entry member 'ext' must be an object, got {_kind_name(raw)}")
+        for k, v in raw.items():
+            if not isinstance(v, str):
+                return _err(
+                    MALFORMED_SHAPE,
+                    f"{name}: schema entry extension member '{k}' must be a string, got {_kind_name(v)}",
+                )
+            ext[k] = v
+    meta = FieldMeta(unit, rl.value, rd.value, ext)
+    return Ok(NO_METADATA if meta.is_empty else meta)
+
+
+def decode_field(el: object) -> Result[Field, ColumnError]:
+    """One schema entry from parsed JSON: ``name`` and ``type``, then its metadata
+    (WIRE_FORMAT §3.6.26). A member the entry does not define is read past."""
+    if not isinstance(el, dict):
+        return _err(MALFORMED_SHAPE, f"expected object, got {_kind_name(el)}")
+    rn = _field(el, "name")
+    if not rn.ok:
+        return rn  # type: ignore[return-value]
+    rt = _field(el, "type")
+    if not rt.ok:
+        return rt  # type: ignore[return-value]
+    name, ty = rn.value, rt.value
+    if not isinstance(name, str):
+        return _err(MALFORMED_SHAPE, "schema.name: expected string")
+    if not isinstance(ty, str) or ty not in COLUMN_TYPES:
+        return _err(UNKNOWN_TYPE, f"unknown column type '{ty}'; expected one of: {', '.join(COLUMN_TYPES)}")
+    rm = _decode_meta(name, el)
+    if not rm.ok:
+        return rm  # type: ignore[return-value]
+    return Ok(Field(name, ty, rm.value))
+
+
+def decode_schema(el: object) -> Result[list[Field], ColumnError]:
+    """A schema array from parsed JSON, each entry through :func:`decode_field`."""
     if not isinstance(el, list):
         return _err(MALFORMED_SHAPE, f"schema: expected array, got {_kind_name(el)}")
-    out: Schema = []
+    out: list[Field] = []
     for entry in el:
-        rn = _field(entry, "name")
-        if not rn.ok:
-            return rn  # type: ignore[return-value]
-        rt = _field(entry, "type")
-        if not rt.ok:
-            return rt  # type: ignore[return-value]
-        name, ty = rn.value, rt.value
-        if not isinstance(name, str):
-            return _err(MALFORMED_SHAPE, "schema.name: expected string")
-        if not isinstance(ty, str) or ty not in COLUMN_TYPES:
-            return _err(UNKNOWN_TYPE, f"unknown column type '{ty}'; expected one of: {', '.join(COLUMN_TYPES)}")
-        out.append((name, ty))
+        rf = decode_field(entry)
+        if not rf.ok:
+            return rf  # type: ignore[return-value]
+        out.append(rf.value)
     return Ok(out)
 
 
@@ -673,14 +761,14 @@ def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
     # per `_infer_column_type`, columns in Ordinal key order); a `ref` source
     # still requires it (no cells to infer from). The canonical encoder always
     # emits the explicit schema, so the shorthand normalises on re-encode.
-    schema: Schema | None = None
+    fields: list[Field] | None = None
     if isinstance(el, dict) and "schema" in el:
-        rschema = _decode_schema(el["schema"])
+        rschema = decode_schema(el["schema"])
         if not rschema.ok:
             return rschema  # type: ignore[return-value]
-        schema = rschema.value
+        fields = rschema.value
     if isinstance(el, dict) and "ref" in el:
-        if schema is None:
+        if fields is None:
             return _err(
                 MALFORMED_SHAPE,
                 'a ref source requires an explicit "schema" array — there are no cells to infer column types from',
@@ -693,10 +781,10 @@ def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
     if not rc.ok:
         return rc  # type: ignore[return-value]
     columns_obj = rc.value
-    if schema is None:
+    if fields is None:
         if not isinstance(columns_obj, dict):
             return _err(MALFORMED_SHAPE, "columns: expected object")
-        schema = []
+        fields = []
         for name in sorted(columns_obj):
             rparts = _column_parts(name, columns_obj[name])
             if not rparts.ok:
@@ -704,14 +792,14 @@ def decode_source_json(el: object) -> Result[DataSource, ColumnError]:
             rty = _infer_column_type(name, rparts.value[0])
             if not rty.ok:
                 return rty  # type: ignore[return-value]
-            schema.append((name, rty.value))
+            fields.append(Field(name, rty.value))
     cols: list[Column] = []
-    for name, ty in schema:
-        rcol = _decode_column(columns_obj, name, ty)
+    for f in fields:
+        rcol = _decode_column(columns_obj, f.name, f.type)
         if not rcol.ok:
             return rcol  # type: ignore[return-value]
         cols.append(rcol.value)
-    return Ok(Embedded(Table(schema, cols)))
+    return Ok(Embedded(table_of_fields(fields, cols)))
 
 
 def decode_source(text: str) -> Result[DataSource, ColumnError]:

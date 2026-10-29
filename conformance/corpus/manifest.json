@@ -1562,6 +1562,24 @@
       "description": "fuaran-core#94 — flat scalar-fn spellings: `fn` aliases `apply` (same fn/args), and a bare fn-name node ({\"$type\":\"lower\",\"expr\":…}) denotes ApplyFn directly; canonical stays `apply`"
     },
     {
+      "id": "lenient-transform-int-inferred-past-int32",
+      "kind": "lenient-accept",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-int-inferred-past-int32.json",
+      "expectedFile": "lenient/lenient-transform-int-inferred-past-int32.expected.json",
+      "description": "Phase 2484 — inference classifies a number by its value: a column of whole values with one past the signed 32-bit range infers `float` (never `int`, and never a refusal), while whole values inside the range, `2.0` and the minimum included, infer `int` (WIRE_FORMAT §3.6.28)"
+    },
+    {
+      "id": "lenient-transform-int-whole-float-token",
+      "kind": "lenient-accept",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-transform-int-whole-float-token.json",
+      "expectedFile": "lenient/lenient-transform-int-whole-float-token.expected.json",
+      "description": "Phase 2484 — a whole-valued number written with a point in an `int` column (`2.0`, `-3.0`) is the integer it denotes, and re-encodes without the point: §7.1's integer-slot rule applied to a column value (WIRE_FORMAT §3.6.28)"
+    },
+    {
       "id": "lenient-transform-schemaless",
       "kind": "lenient-accept",
       "since": "0.3.0",
@@ -2964,6 +2982,15 @@
       "inputFile": "nodes/grid-transform.json",
       "expectedFile": "nodes/grid-transform.json",
       "description": "Visualisation/Grid (Phase 282 — Binding.Transform compute source)"
+    },
+    {
+      "id": "grid-transform-int-bounds",
+      "kind": "node-round-trip",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "nodes/grid-transform-int-bounds.json",
+      "expectedFile": "nodes/grid-transform-int-bounds.json",
+      "description": "Visualisation/Grid (Phase 2484 — an `int` column holds signed 32-bit integers: the boundary values 2147483647 and -2147483648 round-trip beside zero, a small negative and an absent cell, WIRE_FORMAT §3.6.28)"
     },
     {
       "id": "grid-transform-param",
@@ -6073,6 +6100,36 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.tooltip",
       "description": "a node `tooltip` of `42` — refused rather than stringified. A bare STRING at this slot is the canonical encoding of a literal hint (TextSource's transparent case), so a number is one lenient `toString` away from minting hint text out of a JSON type — which no downstream check could ever catch"
+    },
+    {
+      "id": "reject-transform-int-above-int32",
+      "kind": "reject",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-int-above-int32.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2484 — `2147483648`, one past the signed 32-bit maximum, in a declared `int` column: refused, never widened to a 64-bit cell; a wider integer travels in a `decimal` or `string` column (WIRE_FORMAT §3.6.28)"
+    },
+    {
+      "id": "reject-transform-int-below-int32",
+      "kind": "reject",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-int-below-int32.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2484 — `-2147483649`, one past the signed 32-bit minimum, in a declared `int` column: refused, never widened to a 64-bit cell (WIRE_FORMAT §3.6.28)"
+    },
+    {
+      "id": "reject-transform-int-fractional",
+      "kind": "reject",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-int-fractional.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.source.source",
+      "description": "Phase 2484 — `2.5` in a declared `int` column: refused, never truncated to `2`; §7.1's integer-slot rule, applied to a column value (WIRE_FORMAT §3.6.28)"
     },
     {
       "id": "reject-transform-project-columns-and-cols",

@@ -1,0 +1,1 @@
+{"id":"lenient-transform-int-whole-float-token","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"declared":{"validity":[true,true],"values":[2.0,-3.0]}},"schema":[{"name":"declared","type":"int"}]}}}}

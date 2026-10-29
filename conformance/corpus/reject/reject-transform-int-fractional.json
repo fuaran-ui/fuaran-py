@@ -1,0 +1,1 @@
+{"id":"reject-transform-int-fractional","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"n":{"validity":[true],"values":[2.5]}},"schema":[{"name":"n","type":"int"}]}}}}

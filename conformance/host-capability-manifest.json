@@ -91,6 +91,10 @@
     "formatting": {
       "pending": "the cell formatter is not yet driven from the formatting vectors, and it diverges from them on significant-digit exponent forms, ties and negative zero"
     },
+    "grid-edit": "covered",
+    "grid-window-writer": {
+      "notApplicable": "this host renders a grid as static HTML and has no grid viewport, so nothing it runs measures a viewport or writes a window descriptor"
+    },
     "laws/capabilityLaws": {
       "pending": "this host's suite does not yet run this law family's vectors"
     },

@@ -24,7 +24,7 @@ The ergonomic, polars-shaped *authoring* surface that emits a ``Transform`` live
 
 from __future__ import annotations
 
-from . import codec, decimal_text, evaluate, model, schema, unit
+from . import codec, decimal_text, evaluate, grid_edit, model, schema, unit
 from .codec import (
     decode_field,
     decode_pipeline,
@@ -109,6 +109,7 @@ __all__ = [
     "codec",
     "decimal_text",
     "evaluate",
+    "grid_edit",
     "schema",
     "unit",
     # codec

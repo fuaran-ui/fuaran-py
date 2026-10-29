@@ -360,6 +360,13 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     # which it names; the columnOp and delta case kinds have no surface here and are named too.
     "laws/transformLaws": "covered",
     "decode-policy": {"notApplicable": "this host's decoder offers no §23 kind admission policy"},
+    "grid-edit": "covered",  # tests/test_grid_edit.py
+    "grid-window-writer": {
+        "notApplicable": (
+            "this host renders a grid as static HTML and has no grid viewport, so nothing it runs measures "
+            "a viewport or writes a window descriptor"
+        )
+    },
     "design-seam-reject": {"notApplicable": _NO_DESIGN_SEAM},
     "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},

@@ -2255,6 +2255,15 @@
       "description": "Display/Fact"
     },
     {
+      "id": "figure-decimals-en-gb",
+      "kind": "node-round-trip",
+      "since": "0.99.0",
+      "decoder": "node",
+      "inputFile": "nodes/figure-decimals-en-gb.json",
+      "expectedFile": "nodes/figure-decimals-en-gb.json",
+      "description": "Display/Metric + Visualisation/Grid + Display/LabelValueRow + Display/Fact (Phase 2499 — a figure setting its fraction digits: Currency GBP at 0 decimals, a Percent at 1 and a Number at 0, each in en-GB)"
+    },
+    {
       "id": "figure-locale-en-gb",
       "kind": "node-round-trip",
       "since": "0.99.0",

@@ -4801,6 +4801,9 @@
             "code": {
               "type": "string"
             },
+            "decimals": {
+              "type": "integer"
+            },
             "locale": {
               "$ref": "#/$defs/LocaleSource"
             }
@@ -4988,6 +4991,9 @@
             },
             "isoCode": {
               "type": "string"
+            },
+            "decimals": {
+              "type": "integer"
             }
           },
           "required": [

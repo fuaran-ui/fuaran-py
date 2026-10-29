@@ -181,6 +181,10 @@ KNOWN_HOST_DIVERGENCES: dict[str, str] = {
     "LocaleFormatter, whose default is the locale-free form ('GBP 412380.00'), where the reference renders "
     "its locale database's ('£412,380.00') - the same route and caveat as a Binding.Format Currency; the "
     "golden entry was generated from the phase-2490 reference build, the only one that carries the member",
+    "figure-decimals-en-gb": "figures carrying a locale and decimals (Phase 2499) render through this host's "
+    "LocaleFormatter, whose default is the locale-free form ('GBP 412380', '1234568'), where the reference "
+    "renders its locale database's ('£412,380', '1,234,568') - the 2490 route and caveat; the golden entry "
+    "was generated from the phase-2499 reference build, the only one that carries the member",
     "metric-float-exp-pos": "a Currency metric whose value is 1e21 renders this host's expanded decimal "
     "('GBP 1000000000000000000000.00'), where the reference (0.97.0, after its number-formatting family) "
     "renders the exponent form ('GBP 1e+21') — surfaced when the golden was regenerated from 0.87.0 to "

@@ -6331,6 +6331,15 @@
               }
             },
             {
+              "name": "decimals",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "int"
+              }
+            },
+            {
               "name": "locale",
               "optionality": {
                 "$type": "optional"
@@ -8000,6 +8009,15 @@
               },
               "type": {
                 "$type": "str"
+              }
+            },
+            {
+              "name": "decimals",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "int"
               }
             }
           ],

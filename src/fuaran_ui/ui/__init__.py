@@ -381,9 +381,10 @@ class format:  # noqa: N801, A001 — namespace object, mirrors the cross-tier `
         return t.FormatNone()
 
     @staticmethod
-    def currency(code: str, locale: t.LocaleSource | None = None) -> CellFormat:
-        """Phase 2490 — a ``locale`` renders the figure grouped and symbol-led there."""
-        return t.Currency(code, locale)
+    def currency(code: str, locale: t.LocaleSource | None = None, decimals: int | None = None) -> CellFormat:
+        """Phase 2490 — a ``locale`` renders the figure grouped and symbol-led there.
+        Phase 2499 — ``decimals`` sets its fraction digits (``0`` reads whole units)."""
+        return t.Currency(code, locale, decimals)
 
     @staticmethod
     def number(decimals: int | None = None, locale: t.LocaleSource | None = None) -> CellFormat:

@@ -41,7 +41,7 @@ from test_ui_authoring import _authored
 #: is expected to carry. The counts are ASSERTED against the corpus below rather
 #: than trusted — a number in a docstring is wrong out loud the first time the
 #: corpus moves and nobody re-reads the paragraph.
-PHASE_KINDS = {"Drawing": 5, "Fact": 7, "Mount": 3}
+PHASE_KINDS = {"Drawing": 5, "Fact": 8, "Mount": 3}
 
 
 def _fixtures_carrying(kind: str) -> list[str]:

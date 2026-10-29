@@ -1209,6 +1209,37 @@
       ],
       "omissions": []
     },
+    "figure-decimals-en-gb": {
+      "text": "Revenue: £412,380\nTable\nOrders: 1,234,568\nRevenue, year to date: £412,380\n",
+      "ssml": "<speak>\n<s>Revenue: £412,380</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n<s>Orders: 1,234,568</s><break strength=\"medium\"/>\n<s>Revenue, year to date: £412,380</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "figure-decimals-metric",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "figure-decimals-grid",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "figure-decimals-orders",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "figure-decimals-fact",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "figure-locale-en-gb": {
       "text": "Revenue: £412,380.00, trend 4.2%\nTable\n",
       "ssml": "<speak>\n<s>Revenue: £412,380.00, trend 4.2%</s><break strength=\"medium\"/>\n<s>Table</s><break strength=\"medium\"/>\n</speak>\n",

@@ -1738,6 +1738,49 @@ def _authored() -> dict[str, t.UiNode]:
                 t.Line(0, 0, 200, 0),
             ],
         ),
+        # ── Phase 2499 — every figure case carries `decimals`: a currency at 0
+        # places, a located Percent at 1 and a Number at 0 in en-GB, and the text
+        # route's twin, a Binding.Format Currency at 0 places.
+        "figure-decimals-en-gb": fuaran.stack(
+            "figure-decimals-en-gb",
+            children=[
+                node.bare(
+                    fuaran.metric(
+                        "figure-decimals-metric",
+                        label="Revenue",
+                        value=412380,
+                        format=format.currency("GBP", t.Explicit("en-GB"), 0),
+                    )
+                ),
+                node.bare(
+                    fuaran.grid(
+                        "figure-decimals-grid",
+                        source=t.Static([{"region": "North", "share": 0.4125}, {"region": "South", "share": 0.5875}]),
+                        columns=[
+                            t.Column(label="Region", field_name="region"),
+                            t.Column(
+                                label="Share",
+                                field_name="share",
+                                kind=t.ColumnKind("Numeric"),
+                                format=format.percent(1, t.Explicit("en-GB")),
+                            ),
+                        ],
+                        row_key_field="region",
+                    )
+                ),
+                fuaran.label_value_row(
+                    "figure-decimals-orders",
+                    label="Orders",
+                    value=1234567.6,
+                    format=format.number(0, t.Explicit("en-GB")),
+                ),
+                fuaran.fact(
+                    "figure-decimals-fact",
+                    label="Revenue, year to date",
+                    value=t.Bound(binding.format(t.Static(412380), t.FmtCurrency("GBP", 0), t.Explicit("en-GB"))),
+                ),
+            ],
+        ),
         # ── Phase 1579 — Fact (6) ────────────────────────────────────────────
         "fact-1": fuaran.fact(
             "fact-1",

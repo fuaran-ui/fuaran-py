@@ -827,8 +827,14 @@ class LocaleFormatter(Protocol):
         """``Format.Number`` — ``decimals`` is ``None`` when the document declared none."""
         ...
 
-    def currency(self, value: float, code: str, locale: str | None) -> str:
-        """``Format.Currency`` — ``code`` is the ISO-4217 code the document declared."""
+    def currency(self, value: float, code: str, locale: str | None, decimals: int | None = None) -> str:
+        """``Format.Currency`` — ``code`` is the ISO-4217 code the document declared.
+
+        Phase 2499 — ``decimals`` is the fraction-digit count the document declared,
+        overriding the currency's own, or ``None`` when it declared none. The host
+        passes it only when declared, so an implementation written before the
+        member existed still renders every document that does not use it.
+        """
         ...
 
     def percent(self, value: float, decimals: int | None, locale: str | None) -> str:
@@ -856,7 +862,7 @@ class LocaleFreeFormatter:
 
     * ``Number`` — fixed-point with the declared decimals; undeclared, the plain
       canonical number.
-    * ``Currency`` — ``CODE 0.00``.
+    * ``Currency`` — ``CODE 0.00``; a declared ``decimals`` is its digit count (Phase 2499).
     * ``Percent`` — the ratio ×100 with the declared decimals (one when
       undeclared) and a ``%``.
     * ``DateTime`` — ISO 8601, in UTC, for the declared style pair: the date half
@@ -877,8 +883,8 @@ class LocaleFreeFormatter:
     def number(self, value: float, decimals: int | None, locale: str | None) -> str:
         return _fixed(value, decimals) if decimals is not None else _plain_number(value)
 
-    def currency(self, value: float, code: str, locale: str | None) -> str:
-        return f"{code} {_fixed(value, 2)}"
+    def currency(self, value: float, code: str, locale: str | None, decimals: int | None = None) -> str:
+        return f"{code} {_fixed(value, 2 if decimals is None else decimals)}"
 
     def percent(self, value: float, decimals: int | None, locale: str | None) -> str:
         return f"{_fixed(value * 100, 1 if decimals is None else decimals)}%"
@@ -924,6 +930,15 @@ def active_locale_formatter(sources: BindingSourcesLike | None = None) -> Locale
     """The :class:`LocaleFormatter` a render pass uses: its own, else the installed one."""
     chosen = as_sources(sources).formatter
     return chosen if chosen is not None else _installed_formatter
+
+
+def _format_currency(
+    formatter: LocaleFormatter, value: float, code: str, locale: str | None, decimals: int | None
+) -> str:
+    """``formatter.currency`` with ``decimals`` passed only when declared (Phase 2499)."""
+    if decimals is None:
+        return formatter.currency(value, code, locale)
+    return formatter.currency(value, code, locale, decimals=decimals)
 
 
 def _declared_int(fields: Mapping[str, Value], name: str) -> int | None:
@@ -985,7 +1000,13 @@ def _format_projection(binding: Obj, sources: BindingSourcesLike | None) -> str 
         if fmt.tag == "Number":
             return formatter.number(value, _declared_int(fmt.fields, "decimals"), locale)
         if fmt.tag == "Currency":
-            return formatter.currency(value, _declared_str(fmt.fields, "isoCode") or "", locale)
+            return _format_currency(
+                formatter,
+                value,
+                _declared_str(fmt.fields, "isoCode") or "",
+                locale,
+                _declared_int(fmt.fields, "decimals"),
+            )
         if fmt.tag == "Percent":
             return formatter.percent(value, _declared_int(fmt.fields, "decimals"), locale)
         return formatter.date_time(
@@ -1059,13 +1080,21 @@ def format_number(fmt: Value, value: object, sources: BindingSourcesLike | None 
         if tag == "Number":
             return formatter.number(num, _declared_int(fields, "decimals"), locale_tag)
         if tag == "Currency":
-            return formatter.currency(num, _declared_str(fields, "code") or "", locale_tag)
+            return _format_currency(
+                formatter, num, _declared_str(fields, "code") or "", locale_tag, _declared_int(fields, "decimals")
+            )
         return formatter.percent(num, _declared_int(fields, "decimals"), locale_tag)
     if tag == "Number":
         return LOCALE_FREE_FORMATTER.number(num, _declared_int(fields, "decimals"), None)
     if tag == "Currency":
         code = fields.get("code", "")
-        return LOCALE_FREE_FORMATTER.currency(num, code if isinstance(code, str) else str(code), None)
+        return _format_currency(
+            LOCALE_FREE_FORMATTER,
+            num,
+            code if isinstance(code, str) else str(code),
+            None,
+            _declared_int(fields, "decimals"),
+        )
     if tag == "Percent":
         return LOCALE_FREE_FORMATTER.percent(num, _declared_int(fields, "decimals"), None)
     if tag == "SignificantDigits":

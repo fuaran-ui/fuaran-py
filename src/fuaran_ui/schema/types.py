@@ -283,10 +283,13 @@ class FmtNumber:
 
 @dataclass(frozen=True)
 class FmtCurrency:
+    """Phase 2499 — ``decimals`` pins the fraction digits, overriding the currency's own."""
+
     iso_code: str
+    decimals: int | None = None
 
     def to_wire(self) -> Value:
-        return Obj("Currency", {"isoCode": self.iso_code})
+        return _obj("Currency", {"isoCode": self.iso_code, "decimals": self.decimals})
 
 
 @dataclass(frozen=True)
@@ -1011,13 +1014,16 @@ class FormatNone:
 @dataclass(frozen=True)
 class Currency:
     """Phase 2490 — ``locale`` renders the figure grouped and symbol-led through the
-    locale formatter ``Binding.Format`` uses; absent, it is the locale-free form."""
+    locale formatter ``Binding.Format`` uses; absent, it is the locale-free form.
+    Phase 2499 — ``decimals`` sets its fraction digits on either path; absent, the
+    locale-free form keeps two places and a locale formatter the currency's own."""
 
     code: str
     locale: LocaleSource | None = None
+    decimals: int | None = None
 
     def to_wire(self) -> Value:
-        return _obj("Currency", {"code": self.code, "locale": self.locale})
+        return _obj("Currency", {"code": self.code, "decimals": self.decimals, "locale": self.locale})
 
 
 @dataclass(frozen=True)

@@ -302,7 +302,8 @@
         "nodes/grid-1.json",
         "nodes/table-toned-column.json",
         "nodes/table-selectable-detail.json",
-        "nodes/figure-locale-en-gb.json"
+        "nodes/figure-locale-en-gb.json",
+        "nodes/figure-decimals-en-gb.json"
       ],
       "obligations": [
         {
@@ -658,14 +659,16 @@
         "class": "none",
         "meaning": "no client-only tier - the parity-checked fallback is the whole render"
       },
-      "fixtures": [],
+      "fixtures": [
+        "nodes/figure-decimals-en-gb.json"
+      ],
       "obligations": [],
       "intrinsic": [],
       "speech": {
         "class": "derived",
         "note": "'<label>: <value>', the value formatted through the declared format"
       },
-      "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
+      "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour); Phase 2499"
     },
     {
       "kind": "Link",
@@ -881,7 +884,8 @@
         "meaning": "no client-only tier - the parity-checked fallback is the whole render"
       },
       "fixtures": [
-        "nodes/figure-locale-en-gb.json"
+        "nodes/figure-locale-en-gb.json",
+        "nodes/figure-decimals-en-gb.json"
       ],
       "obligations": [],
       "intrinsic": [
@@ -896,7 +900,7 @@
         "class": "derived",
         "note": "'<label>: <value>' with the value through its format, then 'trend <trend>' through the trend format, then the subtext"
       },
-      "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour); Phase 2490"
+      "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour); Phase 2490; Phase 2499"
     },
     {
       "kind": "Modal",

@@ -52,6 +52,7 @@ from .model import (
     ColExpr,
     Column,
     ColumnError,
+    Convert,
     DataSource,
     Derive,
     Distinct,
@@ -266,6 +267,8 @@ def encode_expr_value(e: ColExpr) -> Value:
         )
     if isinstance(e, Rounded):
         return _typed("rounded", {"expr": encode_expr_value(e.expr), "rounding": _rounding_obj(e.rounding)})
+    if isinstance(e, Convert):
+        return _typed("convert", {"expr": encode_expr_value(e.expr), "unit": render_unit(e.unit)})
     raise TypeError(f"cannot encode ColExpr {type(e)!r}")
 
 
@@ -1017,6 +1020,22 @@ def decode_expr(el: object) -> Result[ColExpr, ColumnError]:
         if not rounding.ok:
             return rounding  # type: ignore[return-value]
         return Ok(Rounded(inner.value, rounding.value))
+    if k == "convert":
+        ru = _field(el, "unit")
+        if not ru.ok:
+            return ru  # type: ignore[return-value]
+        if not isinstance(ru.value, str):
+            return _err(MALFORMED_SHAPE, "convert: unit must be a string")
+        unit = parse_unit(ru.value)
+        if isinstance(unit, UnitRefusal):
+            return _err(MALFORMED_SHAPE, f"convert: '{ru.value}' is not a unit")
+        r = _field(el, "expr")
+        if not r.ok:
+            return r  # type: ignore[return-value]
+        inner = decode_expr(r.value)
+        if not inner.ok:
+            return inner
+        return Ok(Convert(inner.value, unit))
     if k in ("contains", "startsWith", "endsWith"):
         # fuaran-core#93 — expression-level string-predicate spellings:
         # {"$type":"contains","expr":X,"other":Y} (also left/right) denotes

@@ -344,8 +344,35 @@ class Rounded:
     rounding: Rounding
 
 
+@dataclass(frozen=True)
+class Convert:
+    """The operand brought to ``unit`` (Phase 2208, the reference's Phase 429): the one explicit
+    conversion between two units of one dimension, and the one way to give a literal or a unitless
+    column a unit. Resolved against the step's schema before evaluation: over an operand stating
+    no unit it is a tag (the operand cast to float), over a compatible unit the float times the
+    exact factor, across dimensions a ``UNIT_MISMATCH``.
+    Wire: ``{"$type":"convert","expr":…,"unit":"<canonical unit text>"}``."""
+
+    expr: ColExpr
+    unit: UnitOfMeasure
+
+
 ColExpr = (
-    Col | Lit | Binary | Not | Coalesce | Case | Cast | ApplyFn | Param | InList | InParam | IsNull | Quotient | Rounded
+    Col
+    | Lit
+    | Binary
+    | Not
+    | Coalesce
+    | Case
+    | Cast
+    | ApplyFn
+    | Param
+    | InList
+    | InParam
+    | IsNull
+    | Quotient
+    | Rounded
+    | Convert
 )
 
 # Closed vocabularies (wire tags) — additive only.
@@ -391,6 +418,9 @@ SCALAR_FNS: frozenset[str] = frozenset(
         "exp",
         "ln",
         "log10",
+        # Phase 2208 — SQL LEAST / GREATEST (the reference's fuaran-core#101).
+        "least",
+        "greatest",
     }
 )
 AGG_FNS: frozenset[str] = frozenset(
@@ -566,6 +596,8 @@ JOIN_ERROR = "JOIN_ERROR"
 ARITY_ERROR = "ARITY_ERROR"
 UNRESOLVED_SOURCE = "UNRESOLVED_SOURCE"
 UNBOUND_PARAM = "UNBOUND_PARAM"
+#: Two units met where the rule requires one (Phase 2208).
+UNIT_MISMATCH = "UNIT_MISMATCH"
 
 
 @dataclass(frozen=True)

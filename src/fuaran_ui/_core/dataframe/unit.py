@@ -6,9 +6,11 @@ case-sensitive syntax over the admitted subset, the canonical RENDER, and equali
 product of atoms, each under an optional SI prefix, with non-zero integer exponents, held in one
 canonical form — factors ordered by symbol then prefix, ordinally; equal factors merged; zero
 exponents dropped — so two units are equal exactly when they are one product (``km/h`` and ``m/s``
-are different units). Conversion factors and dimensions are the reference's and are not carried
-here; the atom table keeps each atom's ``metric`` flag (whether an SI prefix applies), and the
-non-ratio and arbitrary sets are complete, so every token is refused in the reference's class.
+are different units). The atom table is the reference's in full — each atom's ``metric`` flag
+(whether an SI prefix applies), scale and dimensions — and the non-ratio and arbitrary sets are
+complete, so every token is refused in the reference's class. Since Phase 2208 the algebra the
+dataframe evaluator's unit check reads is here too: :func:`mul_unit`, :func:`div_unit`,
+:func:`pow_unit`, :func:`compatible_units` and the exact :func:`conversion_factor`.
 
 Every refusal is a :class:`UnitRefusal` naming its class, the offending token as written and its
 position (the zero-based index of the token's first character).
@@ -16,6 +18,7 @@ position (the zero-based index of the token's first character).
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import Final
 
@@ -31,92 +34,113 @@ __all__ = [
     "UNKNOWN_ATOM",
     "UnitOfMeasure",
     "UnitRefusal",
+    "compatible_units",
+    "conversion_factor",
+    "div_unit",
+    "mul_unit",
     "parse_unit",
+    "pow_unit",
+    "ratio_to_float",
     "refusal_text",
     "render_unit",
 ]
 
 # ── The admitted vocabulary ──────────────────────────────────────────────────
 
-#: Every admitted atom by its canonical symbol, and whether SI prefixes apply to it.
-_ATOMS: Final[dict[str, bool]] = {
+
+@dataclass(frozen=True)
+class _AtomDef:
+    """An admitted atom: whether SI prefixes apply, its scale relative to the coherent base (metre,
+    GRAM, second, ampere, kelvin, mole, candela) as ``num/den``, and its exponents over
+    ``(length, mass, time, current, temperature, amount, luminous intensity)`` — the reference's
+    ``AtomDef``."""
+
+    metric: bool
+    num: int
+    den: int
+    dims: tuple[int, int, int, int, int, int, int]
+
+
+#: Every admitted atom by its canonical symbol.
+_ATOMS: Final[dict[str, _AtomDef]] = {
     # The seven SI base dimensions; mass at the gram, UCUM's base.
-    "m": True,
-    "g": True,
-    "s": True,
-    "A": True,
-    "K": True,
-    "mol": True,
-    "cd": True,
+    "m": _AtomDef(True, 1, 1, (1, 0, 0, 0, 0, 0, 0)),
+    "g": _AtomDef(True, 1, 1, (0, 1, 0, 0, 0, 0, 0)),
+    "s": _AtomDef(True, 1, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "A": _AtomDef(True, 1, 1, (0, 0, 0, 1, 0, 0, 0)),
+    "K": _AtomDef(True, 1, 1, (0, 0, 0, 0, 1, 0, 0)),
+    "mol": _AtomDef(True, 1, 1, (0, 0, 0, 0, 0, 1, 0)),
+    "cd": _AtomDef(True, 1, 1, (0, 0, 0, 0, 0, 0, 1)),
     # The SI coherent derived units (degree Celsius excepted: it is affine).
-    "rad": True,
-    "sr": True,
-    "Hz": True,
-    "N": True,
-    "Pa": True,
-    "J": True,
-    "W": True,
-    "C": True,
-    "V": True,
-    "F": True,
-    "Ohm": True,
-    "S": True,
-    "Wb": True,
-    "T": True,
-    "H": True,
-    "lm": True,
-    "lx": True,
-    "Bq": True,
-    "Gy": True,
-    "Sv": True,
-    "kat": True,
+    "rad": _AtomDef(True, 1, 1, (0, 0, 0, 0, 0, 0, 0)),
+    "sr": _AtomDef(True, 1, 1, (0, 0, 0, 0, 0, 0, 0)),
+    "Hz": _AtomDef(True, 1, 1, (0, 0, -1, 0, 0, 0, 0)),
+    "N": _AtomDef(True, 1000, 1, (1, 1, -2, 0, 0, 0, 0)),
+    "Pa": _AtomDef(True, 1000, 1, (-1, 1, -2, 0, 0, 0, 0)),
+    "J": _AtomDef(True, 1000, 1, (2, 1, -2, 0, 0, 0, 0)),
+    "W": _AtomDef(True, 1000, 1, (2, 1, -3, 0, 0, 0, 0)),
+    "C": _AtomDef(True, 1, 1, (0, 0, 1, 1, 0, 0, 0)),
+    "V": _AtomDef(True, 1000, 1, (2, 1, -3, -1, 0, 0, 0)),
+    "F": _AtomDef(True, 1, 1000, (-2, -1, 4, 2, 0, 0, 0)),
+    "Ohm": _AtomDef(True, 1000, 1, (2, 1, -3, -2, 0, 0, 0)),
+    "S": _AtomDef(True, 1, 1000, (-2, -1, 3, 2, 0, 0, 0)),
+    "Wb": _AtomDef(True, 1000, 1, (2, 1, -2, -1, 0, 0, 0)),
+    "T": _AtomDef(True, 1000, 1, (0, 1, -2, -1, 0, 0, 0)),
+    "H": _AtomDef(True, 1000, 1, (2, 1, -2, -2, 0, 0, 0)),
+    "lm": _AtomDef(True, 1, 1, (0, 0, 0, 0, 0, 0, 1)),
+    "lx": _AtomDef(True, 1, 1, (-2, 0, 0, 0, 0, 0, 1)),
+    "Bq": _AtomDef(True, 1, 1, (0, 0, -1, 0, 0, 0, 0)),
+    "Gy": _AtomDef(True, 1, 1, (2, 0, -2, 0, 0, 0, 0)),
+    "Sv": _AtomDef(True, 1, 1, (2, 0, -2, 0, 0, 0, 0)),
+    "kat": _AtomDef(True, 1, 1, (0, 0, -1, 0, 0, 1, 0)),
     # Metric non-SI units.
-    "L": True,
-    "t": True,
-    "bar": True,
+    "L": _AtomDef(True, 1, 1000, (3, 0, 0, 0, 0, 0, 0)),
+    "t": _AtomDef(True, 1000000, 1, (0, 1, 0, 0, 0, 0, 0)),
+    "bar": _AtomDef(True, 100000000, 1, (-1, 1, -2, 0, 0, 0, 0)),
     # Non-metric units: time, ratios, and the international customary set.
-    "min": False,
-    "h": False,
-    "d": False,
-    "wk": False,
-    "a": False,
-    "%": False,
-    "[ppm]": False,
-    "[ppb]": False,
-    "[in_i]": False,
-    "[ft_i]": False,
-    "[yd_i]": False,
-    "[mi_i]": False,
-    "[lb_av]": False,
-    "[oz_av]": False,
+    "min": _AtomDef(False, 60, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "h": _AtomDef(False, 3600, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "d": _AtomDef(False, 86400, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "wk": _AtomDef(False, 604800, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "a": _AtomDef(False, 31557600, 1, (0, 0, 1, 0, 0, 0, 0)),
+    "%": _AtomDef(False, 1, 100, (0, 0, 0, 0, 0, 0, 0)),
+    "[ppm]": _AtomDef(False, 1, 1000000, (0, 0, 0, 0, 0, 0, 0)),
+    "[ppb]": _AtomDef(False, 1, 1000000000, (0, 0, 0, 0, 0, 0, 0)),
+    "[in_i]": _AtomDef(False, 127, 5000, (1, 0, 0, 0, 0, 0, 0)),
+    "[ft_i]": _AtomDef(False, 381, 1250, (1, 0, 0, 0, 0, 0, 0)),
+    "[yd_i]": _AtomDef(False, 1143, 1250, (1, 0, 0, 0, 0, 0, 0)),
+    "[mi_i]": _AtomDef(False, 201168, 125, (1, 0, 0, 0, 0, 0, 0)),
+    "[lb_av]": _AtomDef(False, 45359237, 100000, (0, 1, 0, 0, 0, 0, 0)),
+    "[oz_av]": _AtomDef(False, 45359237, 1600000, (0, 1, 0, 0, 0, 0, 0)),
 }
 
 #: Spellings read as another atom: UCUM's lower-case litre. Rendered as the canonical symbol.
 _ALIASES: Final[dict[str, str]] = {"l": "L"}
 
-#: UCUM's twenty prefixes in their TRY order — ``da`` first, so that ``dam`` reads as decametre.
-_PREFIXES: Final[tuple[str, ...]] = (
-    "da",
-    "Y",
-    "Z",
-    "E",
-    "P",
-    "T",
-    "G",
-    "M",
-    "k",
-    "h",
-    "d",
-    "c",
-    "m",
-    "u",
-    "n",
-    "p",
-    "f",
-    "a",
-    "z",
-    "y",
-)
+#: UCUM's twenty prefixes and their powers of ten, in their TRY order — ``da`` first, so that
+#: ``dam`` reads as decametre (a dict keeps insertion order).
+_PREFIX_POWERS: Final[dict[str, int]] = {
+    "da": 1,
+    "Y": 24,
+    "Z": 21,
+    "E": 18,
+    "P": 15,
+    "T": 12,
+    "G": 9,
+    "M": 6,
+    "k": 3,
+    "h": 2,
+    "d": -1,
+    "c": -2,
+    "m": -3,
+    "u": -6,
+    "n": -9,
+    "p": -12,
+    "f": -15,
+    "a": -18,
+    "z": -21,
+    "y": -24,
+}
 
 #: UCUM special units whose conversion is not a ratio: affine temperatures and logarithms.
 _NON_RATIO: Final[frozenset[str]] = frozenset(
@@ -310,12 +334,12 @@ def _resolve(tok: str, pos: int) -> _Atom | UnitRefusal:
         return UnitRefusal(ARBITRARY_UNIT, tok, pos)
     if _is_currency(tok):
         return (tok, "")
-    for p in _PREFIXES:
+    for p in _PREFIX_POWERS:
         if len(tok) > len(p) and tok.startswith(p):
             rest = tok[len(p) :]
             sym = _try_atom(rest)
             if sym is not None:
-                return (sym, p) if _ATOMS[sym] else UnitRefusal(PREFIX_NOT_ALLOWED, tok, pos)
+                return (sym, p) if _ATOMS[sym].metric else UnitRefusal(PREFIX_NOT_ALLOWED, tok, pos)
             if rest in _NON_RATIO:
                 return UnitRefusal(NON_RATIO_UNIT, tok, pos)
             if rest in _ARBITRARY:
@@ -482,3 +506,91 @@ def parse_unit(text: str) -> UnitOfMeasure | UnitRefusal:  # noqa: C901 — the 
             else:
                 expected = "'.', '/' or ')'" if len(stack) > 1 else "'.', '/' or the end"
                 return UnitRefusal(MALFORMED, c, pos, expected)
+
+
+# ── The algebra (Phase 2208) ─────────────────────────────────────────────────
+#
+# What the evaluator's unit check reads (the reference's ``Unit.mul`` / ``div`` / ``pow`` /
+# ``compatible`` / ``conversionFactor``). Where the reference raises because an exponent would
+# leave ±2147483647, these answer ``None`` and the caller names the refusal.
+
+
+def _factors_of(u: UnitOfMeasure) -> _Factors:
+    return {(sym, prefix): e for sym, prefix, e in u.factors}
+
+
+def mul_unit(a: UnitOfMeasure, b: UnitOfMeasure) -> UnitOfMeasure | None:
+    """The product of two units, or ``None`` where an exponent would leave ±2147483647."""
+    f = _try_combine(_factors_of(a), 1, _factors_of(b))
+    return None if f is None else _of_factors(f)
+
+
+def div_unit(a: UnitOfMeasure, b: UnitOfMeasure) -> UnitOfMeasure | None:
+    """The quotient ``a / b``, or ``None`` where an exponent would leave ±2147483647."""
+    f = _try_combine(_factors_of(a), -1, _factors_of(b))
+    return None if f is None else _of_factors(f)
+
+
+def pow_unit(u: UnitOfMeasure, n: int) -> UnitOfMeasure | None:
+    """``u`` to the integer power ``n`` (``1`` at ``n = 0``), or ``None`` where an exponent leaves
+    the range."""
+    if n == 0:
+        return DIMENSIONLESS
+    factors = tuple((sym, prefix, e * n) for sym, prefix, e in u.factors)
+    if any(abs(e) > _MAX_EXP for _, _, e in factors):
+        return None
+    return UnitOfMeasure(factors)
+
+
+def _dimension(u: UnitOfMeasure) -> dict[str, int]:
+    """What a unit measures: non-zero exponents by base dimension, and one per currency."""
+    m: dict[str, int] = {}
+    for sym, _, e in u.factors:
+        if _is_currency(sym):
+            m["[" + sym] = m.get("[" + sym, 0) + e
+        else:
+            for i, x in enumerate(_ATOMS[sym].dims):
+                m[str(i)] = m.get(str(i), 0) + x * e
+    return {k: x for k, x in m.items() if x != 0}
+
+
+def compatible_units(a: UnitOfMeasure, b: UnitOfMeasure) -> bool:
+    """Whether two units measure one dimension. Every currency is a dimension of its own."""
+    return _dimension(a) == _dimension(b)
+
+
+def _scale(u: UnitOfMeasure) -> tuple[int, int]:
+    """The unit's scale relative to the coherent base, ``(num, den)`` in lowest terms."""
+    num, den, ten = 1, 1, 0
+    for sym, prefix, e in u.factors:
+        ten += (_PREFIX_POWERS[prefix] if prefix else 0) * e
+        if _is_currency(sym):
+            continue
+        atom = _ATOMS[sym]
+        if e > 0:
+            num *= atom.num**e
+            den *= atom.den**e
+        else:
+            num *= atom.den**-e
+            den *= atom.num**-e
+    if ten > 0:
+        num *= 10**ten
+    elif ten < 0:
+        den *= 10**-ten
+    g = math.gcd(num, den)
+    return num // g, den // g
+
+
+def conversion_factor(source: UnitOfMeasure, target: UnitOfMeasure) -> tuple[int, int] | None:
+    """The exact factor ``(num, den)`` that turns a value in ``source`` into the same quantity in
+    ``target`` (``km/h`` to ``m/s`` is ``(5, 18)``), or ``None`` where they are not compatible."""
+    if not compatible_units(source, target):
+        return None
+    q = div_unit(source, target)
+    return None if q is None else _scale(q)
+
+
+def ratio_to_float(num: int, den: int) -> float:
+    """A ratio read into a float literal as the reference reads it: each side to its nearest double,
+    then divided (never the correctly-rounded quotient, which can differ in the last place)."""
+    return float(num) / float(den)

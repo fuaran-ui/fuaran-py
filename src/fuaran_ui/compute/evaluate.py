@@ -73,6 +73,7 @@ from ..dataframe import (
     Cell,
     Coalesce,
     ColExpr,
+    Convert,
     Derive,
     Embedded,
     EvalError,
@@ -338,6 +339,8 @@ def _expr_param_names(expr: ColExpr) -> set[str]:
         return _expr_param_names(expr.dividend) | _expr_param_names(expr.divisor) | _rounding_param_names(expr.rounding)
     if isinstance(expr, Rounded):
         return _expr_param_names(expr.expr) | _rounding_param_names(expr.rounding)
+    if isinstance(expr, Convert):
+        return _expr_param_names(expr.expr)
     return set()  # Col, Lit
 
 
@@ -390,6 +393,8 @@ def _substitute_expr(expr: ColExpr, env: dict[str, Cell]) -> ColExpr:
         )
     if isinstance(expr, Rounded):
         return Rounded(_substitute_expr(expr.expr, env), _bind_scale(expr.rounding, env))
+    if isinstance(expr, Convert):
+        return Convert(_substitute_expr(expr.expr, env), expr.unit)
     return expr  # Col, Lit
 
 
@@ -442,6 +447,8 @@ def _substitute_list_params_expr(expr: ColExpr, list_env: dict[str, list[Cell]])
         )
     if isinstance(expr, Rounded):
         return Rounded(_substitute_list_params_expr(expr.expr, list_env), expr.rounding)
+    if isinstance(expr, Convert):
+        return Convert(_substitute_list_params_expr(expr.expr, list_env), expr.unit)
     return expr  # Col, Lit, Param
 
 

@@ -12,15 +12,16 @@ a failure here, never a silently different sample. Nothing is counted by hand.
 Every ``evalPipeline`` vector runs — both inputs decoded and re-encoded byte for byte, the pipeline
 evaluated by THIS host, and the result's canonical encoding compared byte for byte with
 ``expected.table``; an ``error`` vector requires this host to refuse too, at decode or evaluation,
-and the error class is never compared (the file carries none). The exceptions are named and
-counted, never silent:
+and the error class is never compared (the file carries none). The ``-unit-`` vectors run like
+every other (Phase 2208): the evaluator carries field metadata (fuaran#2207) through every verb and
+checks units, so a refusal among them is the unit check's and an answer carries its schema's units,
+labels and descriptions. The one exception is named and counted, never silent: the ``columnOp`` and
+``delta`` case kinds, which this host has no surface for. The set of case kinds is pinned exactly,
+so a new kind fails loudly.
 
-* the ``-unit-`` vectors, which need field metadata (fuaran#2207) and the unit algebra — carried
-  by fuaran#2208. The set is DERIVED twice — from the ids, and from the content (a schema entry
-  carrying metadata, or a ``convert`` node) — and the two must agree, so a new unit vector, or a
-  renamed one, is noticed;
-* the ``columnOp`` and ``delta`` case kinds, which this host has no surface for. The set of case
-  kinds is pinned exactly, so a new kind fails loudly.
+The tests after the vector leg pin the unit rules past what the vectors draw: the whole schema entry
+through each verb class (kept, rebuilt with the derived unit), and a go-red — each refusal is a
+``UNIT_MISMATCH``, and the same pipeline over the same data answers once the units are withdrawn.
 
 A vector carrying ``expected.tolerance`` (Phase 2400) names the columns the reference marks
 host-rounded, each with a bound in ulps. Those columns are compared cell by cell — one type, one
@@ -43,15 +44,38 @@ import pytest
 
 from _corpus import CORPUS_ROOT
 from fuaran_ui.dataframe import (
+    Agg,
+    Binary,
+    Col,
     Column,
+    Convert,
+    Derive,
     Embedded,
+    Field,
+    FieldMeta,
+    Filter,
+    GroupBy,
+    Join,
+    Project,
     Table,
+    UnitOfMeasure,
+    Window,
+    WindowSpec,
+    cell_float,
+    cell_int,
+    cell_str,
     decode_pipeline,
     decode_source,
     encode_pipeline,
     encode_source,
     eval_pipeline,
+    parse_unit,
+    render_unit,
+    table_fields,
+    table_of_fields,
 )
+from fuaran_ui.dataframe.model import UNIT_MISMATCH
+from fuaran_ui.dataframe.unit import DIMENSIONLESS, compatible_units, conversion_factor, pow_unit
 
 FAMILY = "transformLaws"
 EVAL = "evalPipeline"
@@ -62,8 +86,6 @@ NOT_RUN = {
     "delta": "this host carries no table-delta surface",
 }
 CASE_KINDS = {EVAL, *NOT_RUN}
-
-UNIT_REASON = "carried by fuaran#2208 — this host does not yet carry field metadata (fuaran#2207) or the unit algebra"
 
 
 def _family() -> tuple[dict, dict]:
@@ -77,32 +99,6 @@ def _family() -> tuple[dict, dict]:
 ROW, FILE = _family()
 VECTORS: list[dict] = FILE["vectors"]
 EVAL_VECTORS = [v for v in VECTORS if v["case"] == EVAL]
-
-
-def _is_unit_by_id(vector: dict) -> bool:
-    return "-unit-" in vector["id"]
-
-
-def _carries_field_metadata(vector: dict) -> bool:
-    """Does this vector need field metadata or the unit algebra — read off its CONTENT?"""
-
-    def schema_has_metadata(source: object) -> bool:
-        return isinstance(source, dict) and any(set(entry) - {"name", "type"} for entry in source.get("schema", []))
-
-    def walk(el: object) -> bool:
-        if isinstance(el, dict):
-            if el.get("$type") == "convert" or ("source" in el and schema_has_metadata(el["source"])):
-                return True
-            return any(walk(v) for v in el.values())
-        if isinstance(el, list):
-            return any(walk(v) for v in el)
-        return False
-
-    source = json.loads(vector["input"]["source"])
-    return schema_has_metadata(source) or walk(json.loads(vector["input"]["pipeline"]))
-
-
-UNIT_IDS = sorted(v["id"] for v in EVAL_VECTORS if _is_unit_by_id(v))
 
 
 def test_the_file_agrees_with_its_manifest_row() -> None:
@@ -120,18 +116,14 @@ def test_the_case_kinds_are_exactly_the_known_set() -> None:
     assert {v["case"] for v in VECTORS} == CASE_KINDS
 
 
-def test_the_unit_skip_set_is_exactly_the_vectors_that_need_field_metadata() -> None:
-    """The ``-unit-`` ids, derived from the names, must be exactly the vectors whose CONTENT needs
-    field metadata or the unit algebra — so a unit vector under another name, or a ``-unit-`` id
-    over plain data, is noticed rather than skipped or run by accident."""
-    by_content = sorted(v["id"] for v in EVAL_VECTORS if _carries_field_metadata(v))
-    assert UNIT_IDS, "the family carries no -unit- vectors: the exception is stale, remove it"
-    assert by_content == UNIT_IDS
+def test_the_family_carries_unit_vectors() -> None:
+    """The unit leg is not vacuous: the family draws ``-unit-`` vectors, and every one runs."""
+    assert any("-unit-" in v["id"] for v in EVAL_VECTORS)
 
 
 def test_the_exceptions_are_reported_by_name() -> None:
     """The run output names every vector this leg does not run, and counts them."""
-    lines = [f"{len(UNIT_IDS)} {EVAL} vector(s) not run — {UNIT_REASON}: {', '.join(UNIT_IDS)}"]
+    lines = []
     for kind, reason in NOT_RUN.items():
         ids = [v["id"] for v in VECTORS if v["case"] == kind]
         lines.append(f"{len(ids)} {kind} vector(s) not run — {reason}: {', '.join(ids)}")
@@ -140,8 +132,6 @@ def test_the_exceptions_are_reported_by_name() -> None:
 
 @pytest.mark.parametrize("vector", EVAL_VECTORS, ids=[v["id"] for v in EVAL_VECTORS])
 def test_eval_pipeline_vector(vector: dict) -> None:
-    if _is_unit_by_id(vector):
-        pytest.skip(UNIT_REASON)
     expected = vector["expected"]
     src = decode_source(vector["input"]["source"])
     pipe = decode_pipeline(vector["input"]["pipeline"])
@@ -259,3 +249,83 @@ def test_power_rows_the_wire_cannot_carry() -> None:
     assert _pow_go(x, 5) == x * ((x * x) * (x * x))
     assert not _apply_scalar("pow", [Cell("int", 46341), Cell("int", 2)]).ok
     assert _apply_scalar("pow", [Cell("int", -2), Cell("int", 31)]).value == Cell("int", -(2**31))  # type: ignore[union-attr]
+
+
+# ── Phase 2208: the whole entry rides each verb class, and the refusals are the unit check ──
+
+
+def _units(text: str) -> UnitOfMeasure:
+    u = parse_unit(text)
+    assert isinstance(u, UnitOfMeasure)
+    return u
+
+
+def _unit_table(*, with_units: bool) -> Table:
+    """d metres (labelled), t seconds, dk kilometres, n unitless with a label, description and ext."""
+
+    def unit(text: str) -> UnitOfMeasure | None:
+        return _units(text) if with_units else None
+
+    fields = [
+        Field("g", "string"),
+        Field("d", "int", FieldMeta(unit=unit("m"), label="Distance")),
+        Field("t", "float", FieldMeta(unit=unit("s"))),
+        Field("dk", "float", FieldMeta(unit=unit("km"))),
+        Field("n", "int", FieldMeta(label="Count", description="How many", ext={"acme.k": "v"})),
+    ]
+    columns = [
+        Column("g", "string", [cell_str("a"), cell_str("b")]),
+        Column("d", "int", [cell_int(100), cell_int(200)]),
+        Column("t", "float", [cell_float(4.0), cell_float(8.0)]),
+        Column("dk", "float", [cell_float(0.5), cell_float(1.0)]),
+        Column("n", "int", [cell_int(1), cell_int(2)]),
+    ]
+    return table_of_fields(fields, columns)
+
+
+def _entry(pipeline: list, name: str) -> Field:
+    r = eval_pipeline(pipeline, _unit_table(with_units=True))
+    assert r.ok, getattr(r, "error", None)
+    return next(f for f in table_fields(r.value) if f.name == name)
+
+
+def test_unit_algebra_conversion_factor() -> None:
+    assert conversion_factor(_units("km/h"), _units("m/s")) == (5, 18)
+    assert conversion_factor(_units("[mi_i]"), _units("km")) == (25146, 15625)
+    assert conversion_factor(_units("m"), _units("s")) is None
+    assert compatible_units(_units("N"), _units("kg.m/s2"))
+    assert not compatible_units(_units("[GBP]"), _units("[USD]"))
+    assert render_unit(pow_unit(_units("m/s"), 2) or DIMENSIONLESS) == "m2/s2"
+
+
+def test_kept_a_projection_and_a_join_keep_the_whole_entry() -> None:
+    kept = _entry([Project([("n", "count")])], "count").meta
+    assert (kept.label, kept.description, kept.ext) == ("Count", "How many", {"acme.k": "v"})
+    right = _entry([Join(Embedded(_unit_table(with_units=True)), [("g", "g")], "inner")], "d_right").meta
+    assert (right.unit, right.label) == (_units("m"), "Distance")
+
+
+def test_rebuilt_a_derive_an_aggregate_and_a_window_carry_the_derived_unit_and_no_label() -> None:
+    assert _entry([Derive("v", Col("d"))], "v").meta == FieldMeta(unit=_units("m"))
+    assert _entry([Derive("n2", Col("n"))], "n2").meta.is_empty
+    assert _entry([GroupBy(["g"], [Agg("c", "count", "d")])], "c").meta.is_empty
+    assert _entry([GroupBy(["g"], [Agg("s", "sum", "d")])], "s").meta == FieldMeta(unit=_units("m"))
+    window = Window(WindowSpec([], [("n", "asc")], "lag", "d", "p"))
+    assert _entry([window], "p").meta == FieldMeta(unit=_units("m"))
+
+
+@pytest.mark.parametrize(
+    "step",
+    [
+        Derive("x", Binary("add", Col("d"), Col("t"))),
+        Derive("x", Binary("add", Col("dk"), Col("d"))),
+        Filter(Binary("gt", Col("d"), Col("t"))),
+        Derive("x", Convert(Col("d"), parse_unit("s"))),  # type: ignore[arg-type]
+    ],
+    ids=["m + s", "km + m", "m > s", "m to s"],
+)
+def test_go_red_each_refusal_is_the_unit_check(step: object) -> None:
+    refused = eval_pipeline([step], _unit_table(with_units=True))
+    assert not refused.ok
+    assert refused.error.code == UNIT_MISMATCH
+    assert eval_pipeline([step], _unit_table(with_units=False)).ok

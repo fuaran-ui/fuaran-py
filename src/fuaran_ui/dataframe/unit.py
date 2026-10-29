@@ -1,7 +1,7 @@
 """Published path of :mod:`fuaran_ui._core.dataframe.unit` — re-exported unchanged.
 
 The unit algebra's text: parse a column's unit and render its one canonical text (Phase 2207,
-WIRE_FORMAT §3.6.26).
+WIRE_FORMAT §3.6.26), and the algebra the evaluator's unit check reads (Phase 2208).
 """
 
 from __future__ import annotations

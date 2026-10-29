@@ -15,6 +15,25 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### behavioural — the dataframe evaluator propagates and checks units (Phase 2208)
+
+- Every verb carries the whole schema entry: a projection, filter, sort, limit, distinct, both sides of a
+  join, a group key, a pivot index and an unpivot id keep `unit`, `label`, `description` and `ext`; a
+  derive, an aggregate, a window column, a pivot value and the unpivot's `value` carry the unit the check
+  derives (a count and a ranking none) and no label. Before this, every verb answered fresh `(name, type)`
+  entries, so a result table lost the metadata its input stated.
+- Units are checked over a step's schema before any row: addition, subtraction, comparison, `Coalesce`,
+  `Case` arms, `least` / `greatest`, `InList` and a join's key pairs require one unit among the operands that
+  state one; products, quotients and integer-literal powers compose through the algebra; two stated units
+  that are not one unit (`km` beside `m` included) are refused as `UNIT_MISMATCH`, as are two in a union or a
+  set op's column pair. A pipeline over unitless columns answers exactly as it did.
+- `fuaran_ui.dataframe` gains `Convert(expr, unit)` (wire `{"$type":"convert",…}`): a tag over an operand
+  stating no unit, the float times the exact conversion factor over a compatible one, refused across
+  dimensions; and the scalar functions `least` / `greatest`. `fuaran_ui.dataframe.unit` gains `mul_unit`,
+  `div_unit`, `pow_unit`, `compatible_units`, the exact `conversion_factor` and `ratio_to_float`.
+- Certified by the corpus's `laws/transformLaws` family, whose `-unit-` vectors now run with every other, in
+  `tests/test_transform_laws.py` (with a test per verb class and a go-red over the refusals).
+
 ### additive — a column's schema entry carries field metadata: unit, label, description, ext (Phase 2207)
 
 - `fuaran_ui.dataframe` gains `Field(name, type, meta=FieldMeta())` and `FieldMeta(unit=None, label=None,

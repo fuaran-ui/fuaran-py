@@ -41,11 +41,13 @@ from .model import (
     FLOAT,
     INT,
     JOIN_ERROR,
+    NO_METADATA,
     STRING,
     TIMESTAMP,
     TIMESTAMP_UNIT_DIGITS,
     TYPE_ERROR,
     UNBOUND_PARAM,
+    UNIT_MISMATCH,
     UNKNOWN_COLUMN,
     UNRESOLVED_SOURCE,
     Agg,
@@ -58,12 +60,14 @@ from .model import (
     Col,
     ColExpr,
     Column,
+    Convert,
     Derive,
     Distinct,
     Embedded,
     Err,
     EvalError,
     Except,
+    FieldMeta,
     Filter,
     GroupBy,
     InList,
@@ -101,6 +105,16 @@ from .model import (
     is_null,
     type_of,
 )
+from .unit import (
+    DIMENSIONLESS,
+    UnitOfMeasure,
+    conversion_factor,
+    div_unit,
+    mul_unit,
+    pow_unit,
+    ratio_to_float,
+    render_unit,
+)
 
 # A row is a list of cells co-indexed with the frame's columns.
 Row = list[Cell]
@@ -113,11 +127,16 @@ _INT32_MIN, _INT32_MAX = -(2**31), 2**31 - 1
 
 
 class Frame:
-    __slots__ = ("cols", "rows")
+    """The working frame: the ``(name, type)`` schema, the rows, and the metadata of the columns
+    that state any, by name (Phase 2208: a verb carries the whole schema entry, not a fresh
+    ``(name, type)`` pair)."""
 
-    def __init__(self, cols: Schema, rows: list[Row]) -> None:
+    __slots__ = ("cols", "meta", "rows")
+
+    def __init__(self, cols: Schema, rows: list[Row], meta: dict[str, FieldMeta]) -> None:
         self.cols = cols
         self.rows = rows
+        self.meta = {n: m for n, m in meta.items() if not m.is_empty}
 
 
 def _to_frame(t: Table) -> Frame:
@@ -130,14 +149,14 @@ def _to_frame(t: Table) -> Frame:
             c = by_name.get(name)
             row.append(c.cells[i] if c is not None and i < len(c.cells) else NULL)
         rows.append(row)
-    return Frame(list(t.schema), rows)
+    return Frame(list(t.schema), rows, t.metadata)
 
 
 def _of_frame(f: Frame) -> Table:
     columns: list[Column] = []
     for ci, (name, ty) in enumerate(f.cols):
         columns.append(Column(name, ty, [row[ci] for row in f.rows]))
-    return Table(list(f.cols), columns)
+    return Table(list(f.cols), columns, {name: f.meta[name] for name, _ in f.cols if name in f.meta})
 
 
 def _col_index(cols: Schema, name: str) -> int | None:
@@ -793,6 +812,21 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
         if any(is_null(c) for c in args):
             return Ok(NULL)
         return Ok(cell_str("".join(cell_string(c) for c in args)))
+    if fn in ("least", "greatest"):
+        # Variadic (at least one). Any null propagates, as concat's does; incomparable operands are
+        # a typed error through the shared cell ordering, the one pinned comparison.
+        if not args:
+            return Err(EvalError("ARITY_ERROR", f"function '{fn.capitalize()}' expects 1 args, got 0"))
+        if any(is_null(c) for c in args):
+            return Ok(NULL)
+        best = args[0]
+        for c in args[1:]:
+            k = _compare_cells(best, c)
+            if k is None:
+                return Err(EvalError(TYPE_ERROR, "least/greatest over incompatible types"))
+            if (fn == "least") != (k <= 0):
+                best = c
+        return Ok(best)
     return Err(EvalError(TYPE_ERROR, f"unknown scalar fn {fn}"))
 
 
@@ -911,6 +945,10 @@ def _eval_expr(cols: Schema, row: Row, e: ColExpr) -> Result[Cell, EvalError]:  
         # Params are substituted from the host env before evaluation (see the compute
         # layer); one reaching the evaluator is genuinely unbound — a named failure.
         return Err(EvalError(UNBOUND_PARAM, f"unbound parameter '{e.name}'"))
+    if isinstance(e, Convert):
+        # Every step that carries an expression (filter, derive) resolves its conversions against
+        # the frame's units before any row, so one reaching the evaluator was never checked.
+        return Err(EvalError(TYPE_ERROR, "a convert reached evaluation unresolved against its schema's units"))
     return Err(EvalError(TYPE_ERROR, f"unknown ColExpr {type(e)!r}"))
 
 
@@ -1011,6 +1049,8 @@ def _typing_apply(fn: str, args: list[str]) -> str:  # noqa: PLR0911
     # be that pair, so it is undecided too; every other pair is a float.
     if fn in ("exp", "ln", "log10"):
         return unary(lambda _: FLOAT)
+    if fn in ("least", "greatest"):
+        return ABSENT if not args or any_absent else _join_all(args)
     if fn == "pow":
         if len(args) != 2 or any_absent:
             return ABSENT
@@ -1071,6 +1111,9 @@ def _typing(cols: Schema, e: ColExpr) -> str:  # noqa: C901, PLR0911
         if t == ABSENT:
             return ABSENT
         return DECIMAL if t in _EXACT else UNKNOWN
+    if isinstance(e, Convert):
+        # The float cast the conversion resolves to.
+        return ABSENT if _typing(cols, e.expr) == ABSENT else FLOAT
     return UNKNOWN
 
 
@@ -1381,7 +1424,275 @@ def _row_key_compare(cols: Schema, by: list[tuple[str, str]], r1: Row, r2: Row) 
 # ── per-verb evaluation ──────────────────────────────────────────────────────
 
 
-def _eval_filter(f: Frame, pred: ColExpr) -> Result[Frame, EvalError]:
+# ── the unit check (Phase 2208, the reference's Phase 429 / D29) ─────────────
+#
+# A column's unit is a fact of its schema entry, so the check is a static walk over the step's
+# schema before any row: an empty frame is checked exactly as a full one. The walk answers the
+# expression's unit — ``None`` is UNCONSTRAINED: a literal, a param, a column that states no unit;
+# it composes with anything, so a unitless pipeline passes and evaluates as it always did — and
+# rewrites every ``Convert`` to the cast (and factor) it stands for.
+
+#: What a power, product or quotient whose exponent would leave the algebra's range is refused against.
+_POWER_RANGE_TEXT = "a power the algebra can carry"
+
+
+def _col_unit(f: Frame, name: str) -> UnitOfMeasure | None:
+    """The unit the frame's schema states for a column, where it states one."""
+    return f.meta.get(name, NO_METADATA).unit
+
+
+def _stated(unit: UnitOfMeasure | None) -> FieldMeta:
+    """A verb's own column: the unit it derives, and no label, description or extension."""
+    return NO_METADATA if unit is None else FieldMeta(unit=unit)
+
+
+def _expr_text(e: ColExpr) -> str:  # noqa: C901, PLR0911
+    """A compact text of an expression for a refusal — the reference's ``exprText``."""
+
+    def args(xs: list[ColExpr]) -> str:
+        return ", ".join(_expr_text(x) for x in xs)
+
+    if isinstance(e, Col):
+        return f"'{e.name}'"
+    if isinstance(e, Lit):
+        return cell_string(e.cell)
+    if isinstance(e, Param):
+        return "$" + e.name
+    if isinstance(e, Binary):
+        return f"{e.op.lower()}({_expr_text(e.left)}, {_expr_text(e.right)})"
+    if isinstance(e, Not):
+        return f"not({_expr_text(e.expr)})"
+    if isinstance(e, Coalesce):
+        return f"coalesce({args(e.exprs)})"
+    if isinstance(e, Case):
+        arms = [x for w, t in e.cases for x in (w, t)]
+        return f"case({args(arms)}, {_expr_text(e.else_expr)})"
+    if isinstance(e, Cast):
+        return f"cast({e.type}, {_expr_text(e.expr)})"
+    if isinstance(e, ApplyFn):
+        return f"{e.fn.lower()}({args(e.args)})"
+    if isinstance(e, InList):
+        return f"in({_expr_text(e.expr)}; {args(e.items)})"
+    if isinstance(e, IsNull):
+        return f"isNull({_expr_text(e.expr)})"
+    if isinstance(e, InParam):
+        return f"in({_expr_text(e.expr)}; ${e.param})"
+    if isinstance(e, Quotient):
+        return f"quotient({_expr_text(e.dividend)}, {_expr_text(e.divisor)})"
+    if isinstance(e, Rounded):
+        return f"rounded({_expr_text(e.expr)})"
+    return f"convert({_expr_text(e.expr)}, {render_unit(e.unit)})"
+
+
+def _unit_mismatch(step: str, at: ColExpr, left: str, right: str) -> Err[EvalError]:
+    return Err(EvalError(UNIT_MISMATCH, f"unit mismatch in {step}: {left} against {right} in {_expr_text(at)}"))
+
+
+type _Resolved = tuple[UnitOfMeasure | None, ColExpr]
+
+
+def _resolve_units(step: str, f: Frame, e: ColExpr) -> Result[_Resolved, EvalError]:  # noqa: C901, PLR0911, PLR0912
+    """The unit of ``e`` over the frame's schema, and ``e`` with every ``Convert`` resolved — the
+    reference's ``resolveUnitsIn``. ``step`` names the step a refusal is about. Addition,
+    subtraction, comparison, ``coalesce``, ``case`` arms, ``least`` / ``greatest`` and ``in``
+    require ONE unit among the operands that state one, and the answer carries it; multiplication,
+    division, ``quotient`` and ``mod`` compose through the algebra; ``cast``, ``abs``, ``round``,
+    ``floor``, ``ceil`` and ``rounded`` keep their operand's unit; a boolean, a text and a date
+    carry none; a literal and a param are unconstrained."""
+
+    def mismatch(left: UnitOfMeasure, right: UnitOfMeasure) -> Err[EvalError]:
+        return _unit_mismatch(step, e, render_unit(left), render_unit(right))
+
+    def agree(acc: UnitOfMeasure | None, units: list[UnitOfMeasure | None]) -> Result[UnitOfMeasure | None, EvalError]:
+        # One unit among the stated ones: an unconstrained operand takes the other's.
+        for u in units:
+            if u is None:
+                continue
+            if acc is None:
+                acc = u
+            elif acc != u:
+                return mismatch(acc, u)
+        return Ok(acc)
+
+    def many(xs: list[ColExpr]) -> Result[list[_Resolved], EvalError]:
+        out: list[_Resolved] = []
+        for x in xs:
+            r = _resolve_units(step, f, x)
+            if not r.ok:
+                return r
+            out.append(r.value)
+        return Ok(out)
+
+    def product(a: UnitOfMeasure | None, b: UnitOfMeasure | None) -> Result[UnitOfMeasure | None, EvalError]:
+        if a is None or b is None:
+            return Ok(b if a is None else a)
+        p = mul_unit(a, b)
+        return _unit_mismatch(step, e, render_unit(a), _POWER_RANGE_TEXT) if p is None else Ok(p)
+
+    def quotient(a: UnitOfMeasure | None, b: UnitOfMeasure | None) -> Result[UnitOfMeasure | None, EvalError]:
+        # An unconstrained dividend is dimensionless over a stated divisor (1 / s is /s); an
+        # unconstrained divisor leaves the dividend's unit.
+        if b is None:
+            return Ok(a)
+        dividend = DIMENSIONLESS if a is None else a
+        q = div_unit(dividend, b)
+        return _unit_mismatch(step, e, render_unit(dividend), _POWER_RANGE_TEXT) if q is None else Ok(q)
+
+    def first_dimensioned(units: list[UnitOfMeasure | None]) -> UnitOfMeasure | None:
+        return next((u for u in units if u is not None and u != DIMENSIONLESS), None)
+
+    if isinstance(e, Col):
+        return Ok((_col_unit(f, e.name), e))
+    if isinstance(e, Lit | Param):
+        return Ok((None, e))
+    if isinstance(e, Binary):
+        rs = many([e.left, e.right])
+        if not rs.ok:
+            return rs  # type: ignore[return-value]
+        (ua, a), (ub, b) = rs.value
+        e2 = Binary(e.op, a, b)
+        if e.op in ("add", "sub"):
+            u = agree(ua, [ub])
+        elif e.op == "mul":
+            u = product(ua, ub)
+        elif e.op == "div":
+            u = quotient(ua, ub)
+        elif e.op == "mod":
+            u = Ok(ua)
+        elif e.op in ("eq", "ne", "lt", "le", "gt", "ge"):
+            u = agree(ua, [ub])
+            if u.ok:
+                u = Ok(None)
+        else:
+            u = Ok(None)
+        return u if not u.ok else Ok((u.value, e2))  # type: ignore[return-value]
+    if isinstance(e, Not | IsNull):
+        r = _resolve_units(step, f, e.expr)
+        return r if not r.ok else Ok((None, type(e)(r.value[1])))
+    if isinstance(e, InParam):
+        r = _resolve_units(step, f, e.expr)
+        return r if not r.ok else Ok((None, InParam(r.value[1], e.param)))
+    if isinstance(e, Coalesce):
+        rs = many(e.exprs)
+        if not rs.ok:
+            return rs  # type: ignore[return-value]
+        u = agree(None, [x for x, _ in rs.value])
+        return u if not u.ok else Ok((u.value, Coalesce([x for _, x in rs.value])))  # type: ignore[return-value]
+    if isinstance(e, Case):
+        whens = many([w for w, _ in e.cases])
+        if not whens.ok:
+            return whens  # type: ignore[return-value]
+        thens = many([t for _, t in e.cases])
+        if not thens.ok:
+            return thens  # type: ignore[return-value]
+        els = _resolve_units(step, f, e.else_expr)
+        if not els.ok:
+            return els
+        u = agree(els.value[0], [x for x, _ in thens.value])
+        if not u.ok:
+            return u  # type: ignore[return-value]
+        cases = [(w, t) for (_, w), (_, t) in zip(whens.value, thens.value, strict=True)]
+        return Ok((u.value, Case(cases, els.value[1])))
+    if isinstance(e, Cast):
+        r = _resolve_units(step, f, e.expr)
+        return r if not r.ok else Ok((r.value[0], Cast(e.type, r.value[1])))
+    if isinstance(e, ApplyFn):
+        rs = many(e.args)
+        if not rs.ok:
+            return rs  # type: ignore[return-value]
+        units = [x for x, _ in rs.value]
+        applied = ApplyFn(e.fn, [x for _, x in rs.value])
+        if e.fn in ("abs", "round", "floor", "ceil"):
+            return Ok((units[0] if units else None, applied))
+        if e.fn in ("least", "greatest"):
+            u = agree(None, units)
+            return u if not u.ok else Ok((u.value, applied))  # type: ignore[return-value]
+        if e.fn == "pow":
+            # An integer-LITERAL exponent composes the unit through the algebra (m squared is m2; to
+            # the power zero, unconstrained); any other power takes a dimensionless operand only.
+            exponent = e.args[1] if len(e.args) == 2 else None
+            if isinstance(exponent, Lit) and exponent.cell.kind == INT:
+                base, n = units[0], exponent.cell.value
+                assert isinstance(n, int)
+                if base is None or n == 0:
+                    return Ok((None, applied))
+                p = pow_unit(base, n)
+                return _unit_mismatch(step, e, render_unit(base), _POWER_RANGE_TEXT) if p is None else Ok((p, applied))
+            dimensioned = first_dimensioned(units)
+            return Ok((None, applied)) if dimensioned is None else mismatch(dimensioned, DIMENSIONLESS)
+        if e.fn in ("exp", "ln", "log10"):
+            dimensioned = first_dimensioned(units)
+            return Ok((None, applied)) if dimensioned is None else mismatch(dimensioned, DIMENSIONLESS)
+        return Ok((None, applied))
+    if isinstance(e, InList):
+        rs = many([e.expr, *e.items])
+        if not rs.ok:
+            return rs  # type: ignore[return-value]
+        u = agree(None, [x for x, _ in rs.value])
+        if not u.ok:
+            return u  # type: ignore[return-value]
+        resolved = [x for _, x in rs.value]
+        return Ok((None, InList(resolved[0], resolved[1:])))
+    if isinstance(e, Quotient):
+        rs = many([e.dividend, e.divisor])
+        if not rs.ok:
+            return rs  # type: ignore[return-value]
+        (ua, a), (ub, b) = rs.value
+        u = quotient(ua, ub)
+        return u if not u.ok else Ok((u.value, Quotient(a, b, e.rounding)))  # type: ignore[return-value]
+    if isinstance(e, Rounded):
+        r = _resolve_units(step, f, e.expr)
+        return r if not r.ok else Ok((r.value[0], Rounded(r.value[1], e.rounding)))
+    # Convert: over an operand stating no unit, a TAG — the operand as a float under the unit; over a
+    # compatible unit, the float times the exact factor as a float literal; across dimensions, refused.
+    r = _resolve_units(step, f, e.expr)
+    if not r.ok:
+        return r
+    source, inner = r.value
+    as_float = Cast(FLOAT, inner)
+    if source is None or source == e.unit:
+        return Ok((e.unit, as_float))
+    factor = conversion_factor(source, e.unit)
+    if factor is None:
+        return mismatch(source, e.unit)
+    return Ok((e.unit, Binary("mul", as_float, Lit(cell_float(ratio_to_float(*factor))))))
+
+
+def _aggregate_unit(fn: str, source: UnitOfMeasure | None) -> UnitOfMeasure | None:
+    """An aggregate's column unit: a count is dimensionless, every other keeps its source's."""
+    return None if fn in ("count", "countDistinct") else source
+
+
+def _window_unit(fn: str, source: UnitOfMeasure | None) -> UnitOfMeasure | None:
+    """A window column's unit: the ranking family none, the shifting and running families their source's."""
+    return None if fn in ("rowNumber", "rank") else source
+
+
+def _shared_unit(f: Frame, value_vars: list[str]) -> UnitOfMeasure | None:
+    """An unpivot's ``value`` unit: the one unit every value column states, none where they differ
+    or any states none."""
+    units = [_col_unit(f, n) for n in value_vars]
+    first = units[0] if units else None
+    return first if first is not None and all(u == first for u in units) else None
+
+
+def _units_agree(what: str, name: str, left: FieldMeta, right: FieldMeta) -> Result[FieldMeta, EvalError]:
+    """Two columns met as one (a union's pair, a set op's pair): the left's metadata under the one
+    unit the pair states, or the mismatch."""
+    if left.unit is not None and right.unit is not None and left.unit != right.unit:
+        return _unit_mismatch(f"{what} '{name}'", Col(name), render_unit(left.unit), render_unit(right.unit))
+    if left.unit is None and right.unit is not None:
+        return Ok(FieldMeta(right.unit, left.label, left.description, left.ext))
+    return Ok(left)
+
+
+def _eval_filter(f: Frame, written: ColExpr) -> Result[Frame, EvalError]:
+    # The predicate's units are checked over the schema before any row; the resolved predicate is
+    # what is evaluated.
+    checked = _resolve_units("filter", f, written)
+    if not checked.ok:
+        return checked  # type: ignore[return-value]
+    pred = checked.value[1]
     kept: list[Row] = []
     for row in f.rows:
         r = _eval_expr(f.cols, row, pred)
@@ -1389,7 +1700,7 @@ def _eval_filter(f: Frame, pred: ColExpr) -> Result[Frame, EvalError]:
             return r  # type: ignore[return-value]
         if r.value.kind == BOOL and r.value.value is True:
             kept.append(row)
-    return Ok(Frame(f.cols, kept))
+    return Ok(Frame(f.cols, kept, f.meta))
 
 
 def _repeated_output(verb: str, outs: list[tuple[str, str]]) -> Err[EvalError] | None:
@@ -1423,13 +1734,20 @@ def _eval_project(f: Frame, pairs: list[tuple[str, str]]) -> Result[Frame, EvalE
         return refused
     cols: Schema = [(o, ty) for o, ty, _ in resolved]
     rows = [[row[i] for _, _, i in resolved] for row in f.rows]
-    return Ok(Frame(cols, rows))
+    # A projection renames a column and states nothing new about it: every metadatum is kept.
+    meta = {o: f.meta.get(f.cols[i][0], NO_METADATA) for o, _, i in resolved}
+    return Ok(Frame(cols, rows, meta))
 
 
-def _eval_derive(f: Frame, name: str, expr: ColExpr) -> Result[Frame, EvalError]:
-    # The column's typing is read off the schema before any row: a derive refused statically is
-    # refused on every frame, an empty one included, and a decided one carries its type whatever
-    # rows the frame holds.
+def _eval_derive(f: Frame, name: str, written: ColExpr) -> Result[Frame, EvalError]:
+    # The column's unit and typing are read off the schema before any row: a derive refused
+    # statically is refused on every frame, an empty one included, and a decided one carries its
+    # type, and its unit, whatever rows the frame holds. The column's entry is its own.
+    checked = _resolve_units(f"derive '{name}'", f, written)
+    if not checked.ok:
+        return checked  # type: ignore[return-value]
+    unit, expr = checked.value
+    meta = {**f.meta, name: _stated(unit)}
     typing = _derived_typing(f.cols, expr)
     if typing == REFUSED:
         return _float_beside_decimal(name)
@@ -1449,10 +1767,10 @@ def _eval_derive(f: Frame, name: str, expr: ColExpr) -> Result[Frame, EvalError]
     if i is not None:
         cols = [(n, ty if j == i else t) for j, (n, t) in enumerate(f.cols)]
         rows = [[c if j == i else cell for j, cell in enumerate(row)] for row, c in zip(f.rows, new_cells, strict=True)]
-        return Ok(Frame(cols, rows))
+        return Ok(Frame(cols, rows, meta))
     cols = [*f.cols, (name, ty)]
     rows = [[*row, c] for row, c in zip(f.rows, new_cells, strict=True)]
-    return Ok(Frame(cols, rows))
+    return Ok(Frame(cols, rows, meta))
 
 
 def _eval_group_by(f: Frame, keys: list[str], aggs: list[Agg]) -> Result[Frame, EvalError]:
@@ -1500,7 +1818,11 @@ def _eval_group_by(f: Frame, keys: list[str], aggs: list[Agg]) -> Result[Frame, 
                 return r  # type: ignore[return-value]
             out.append(r.value)
         rows.append(out)
-    return Ok(Frame(key_cols + agg_cols, rows))
+    # A key keeps its entry; an aggregate's column keeps its source's unit, a count none.
+    meta = {k: f.meta.get(k, NO_METADATA) for k in keys} | {
+        a.name: _stated(_aggregate_unit(a.fn, _col_unit(f, a.of))) for a, _, _ in resolved
+    }
+    return Ok(Frame(key_cols + agg_cols, rows, meta))
 
 
 def _eval_sort(f: Frame, by: list[tuple[str, str]]) -> Frame:
@@ -1508,7 +1830,7 @@ def _eval_sort(f: Frame, by: list[tuple[str, str]]) -> Frame:
         return _row_key_compare(f.cols, by, a, b)
 
     rows = sorted(f.rows, key=cmp_to_key(cmp))
-    return Frame(f.cols, rows)
+    return Frame(f.cols, rows, f.meta)
 
 
 def _eval_distinct(f: Frame) -> Frame:
@@ -1519,12 +1841,12 @@ def _eval_distinct(f: Frame) -> Frame:
         if key not in seen:
             seen.add(key)
             out.append(row)
-    return Frame(f.cols, out)
+    return Frame(f.cols, out, f.meta)
 
 
 def _eval_limit(f: Frame, n: int, offset: int) -> Frame:
     start = min(max(0, offset), len(f.rows))
-    return Frame(f.cols, f.rows[start : start + max(0, n)])
+    return Frame(f.cols, f.rows[start : start + max(0, n)], f.meta)
 
 
 def _eval_join(f: Frame, right: Frame, on: list[tuple[str, str]], how: str) -> Result[Frame, EvalError]:
@@ -1539,12 +1861,26 @@ def _eval_join(f: Frame, right: Frame, on: list[tuple[str, str]], how: str) -> R
             return _unknown(right_name, right.cols)
         li.append(il)
         ri.append(ir)
+    # A key pair is an equality, so the comparison's rule holds it: two stated units must be one.
+    for left_name, right_name in on:
+        lu, ru = _col_unit(f, left_name), _col_unit(right, right_name)
+        if lu is not None and ru is not None and lu != ru:
+            return _unit_mismatch(
+                f"join key '{left_name}' = '{right_name}'",
+                Binary("eq", Col(left_name), Col(right_name)),
+                render_unit(lu),
+                render_unit(ru),
+            )
 
     def key_match(lr: Row, rr: Row) -> bool:
         return all(_cell_eq(lr[i], rr[j]) for i, j in zip(li, ri, strict=True))
 
     left_names = {n for n, _ in f.cols}
     right_cols: Schema = [((n + "_right" if n in left_names else n), ty) for n, ty in right.cols]
+    # Each side keeps its entries; a right column renamed for a collision keeps its metadata.
+    meta = f.meta | {
+        out: right.meta.get(n, NO_METADATA) for (out, _), (n, _) in zip(right_cols, right.cols, strict=True)
+    }
     out_cols = list(f.cols) + right_cols
     left_nulls = [NULL for _ in f.cols]
     right_nulls = [NULL for _ in right.cols]
@@ -1565,13 +1901,20 @@ def _eval_join(f: Frame, right: Frame, on: list[tuple[str, str]], how: str) -> R
             if not any(key_match(lr, rr) for lr in f.rows):
                 right_only.append(left_nulls + rr)
 
-    return Ok(Frame(out_cols, left_side + right_only))
+    return Ok(Frame(out_cols, left_side + right_only, meta))
 
 
 def _eval_union(f: Frame, other: Frame) -> Result[Frame, EvalError]:
     if _available(f.cols) != _available(other.cols):
         return Err(EvalError(JOIN_ERROR, "union requires matching column names"))
-    return Ok(Frame(f.cols, f.rows + other.rows))
+    # The unit is the left's, the right's where only the right states one; two are refused.
+    meta: dict[str, FieldMeta] = {}
+    for name, _ in f.cols:
+        m = _units_agree("union column", name, f.meta.get(name, NO_METADATA), other.meta.get(name, NO_METADATA))
+        if not m.ok:
+            return m  # type: ignore[return-value]
+        meta[name] = m.value
+    return Ok(Frame(f.cols, f.rows + other.rows, meta))
 
 
 def _eval_set_op(verb: str, keep_present: bool, f: Frame, other: Frame) -> Result[Frame, EvalError]:  # noqa: FBT001
@@ -1580,8 +1923,13 @@ def _eval_set_op(verb: str, keep_present: bool, f: Frame, other: Frame) -> Resul
     a float or a decimal. The left's order and duplicate multiplicity survive."""
     if _available(f.cols) != _available(other.cols):
         return Err(EvalError(JOIN_ERROR, f"{verb} requires matching column names"))
+    # Row identity across two units is the comparison's error; the left schema is what is kept.
+    for name, _ in f.cols:
+        m = _units_agree(f"{verb} column", name, f.meta.get(name, NO_METADATA), other.meta.get(name, NO_METADATA))
+        if not m.ok:
+            return m  # type: ignore[return-value]
     present = {_row_token(row) for row in other.rows}
-    return Ok(Frame(f.cols, [row for row in f.rows if (_row_token(row) in present) == keep_present]))
+    return Ok(Frame(f.cols, [row for row in f.rows if (_row_token(row) in present) == keep_present], f.meta))
 
 
 def _eval_window(f: Frame, spec: WindowSpec) -> Result[Frame, EvalError]:  # noqa: C901
@@ -1670,7 +2018,8 @@ def _eval_window(f: Frame, spec: WindowSpec) -> Result[Frame, EvalError]:  # noq
 
     cols = [*f.cols, (spec.as_, ty)]
     rows = [[*row, out] for row, out in zip(f.rows, out_cells, strict=True)]
-    return Ok(Frame(cols, rows))
+    meta = {**f.meta, spec.as_: _stated(_window_unit(spec.fn, _col_unit(f, spec.of)))}
+    return Ok(Frame(cols, rows, meta))
 
 
 def _eval_pivot(f: Frame, spec: Pivot) -> Result[Frame, EvalError]:
@@ -1735,7 +2084,11 @@ def _eval_pivot(f: Frame, spec: Pivot) -> Result[Frame, EvalError]:
                 return r  # type: ignore[return-value]
             cells.append(r.value)
         rows.append(cells)
-    return Ok(Frame(idx_cols + pivot_cols, rows))
+    # An index column keeps its entry; every value column is one aggregate of `values`, so each
+    # carries that aggregate's unit.
+    value_meta = _stated(_aggregate_unit(s.agg, _col_unit(f, s.values)))
+    meta = {n: f.meta.get(n, NO_METADATA) for n in s.index} | {name: value_meta for name, _ in pivot_cols}
+    return Ok(Frame(idx_cols + pivot_cols, rows, meta))
 
 
 def _eval_unpivot(f: Frame, id_vars: list[str], value_vars: list[str]) -> Result[Frame, EvalError]:
@@ -1777,7 +2130,8 @@ def _eval_unpivot(f: Frame, id_vars: list[str], value_vars: list[str]) -> Result
             return rty  # type: ignore[return-value]
         typing = rty.value
     cols: Schema = [*id_cols, ("variable", STRING), ("value", typing)]
-    return Ok(Frame(cols, rows))
+    meta = {n: f.meta.get(n, NO_METADATA) for n in id_vars} | {"value": _stated(_shared_unit(f, value_vars))}
+    return Ok(Frame(cols, rows, meta))
 
 
 # ── pipeline driver ──────────────────────────────────────────────────────────

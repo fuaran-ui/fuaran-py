@@ -320,6 +320,12 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "reject": "covered",
     "lenient-accept": "covered",
     "envelope-round-trip": "covered",
+    "binding-propagation": {
+        "pending": (
+            "this host has no binding walk deriving which bindings a write makes stale for the "
+            "vectors to run against yet"
+        )
+    },
     "formatting": {
         "pending": (
             "the cell formatter is not yet driven from the formatting vectors, and it diverges "

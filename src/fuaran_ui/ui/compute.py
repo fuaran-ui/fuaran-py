@@ -28,6 +28,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Protocol, runtime_checkable
 
+from .._core.dataframe.codec import _int32_value
 from ..canonical import encode_value
 from ..dataframe import (
     Agg,
@@ -476,7 +477,9 @@ def _infer_type(values: Sequence[object]) -> str:
     present = [v for v in values if v is not None]
     if present and all(isinstance(v, bool) for v in present):
         return "bool"
-    if present and all(isinstance(v, int) and not isinstance(v, bool) for v in present):
+    # An int column holds signed 32-bit integers (WIRE_FORMAT §3.6.28); whole values past the
+    # range infer `float`, exactly as the wire's inference reads them.
+    if present and all(isinstance(v, int) and _int32_value(v) is not None for v in present):
         return "int"
     if present and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in present):
         return "float"
@@ -487,8 +490,10 @@ def _cell_of(ty: str, v: object) -> Cell:
     if v is None:
         return NULL
     if ty == "int":
-        assert isinstance(v, (int, float))
-        return cell_int(int(v))
+        i = _int32_value(v)
+        if i is None:
+            raise ValueError(f"an int column holds signed 32-bit integers, and {v!r} is not one (WIRE_FORMAT §3.6.28)")
+        return cell_int(i)
     if ty == "float":
         assert isinstance(v, (int, float))
         return cell_float(float(v))

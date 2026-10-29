@@ -15,6 +15,19 @@ corpus, not by this file.
 
 ## Unreleased (the next minor after 0.10.0)
 
+### breaking (wire readers) — an `int` column value is a signed 32-bit integer (Phase 2484)
+
+- An embedded `Transform` source's `int` column now refuses a value outside the signed 32-bit range
+  (`2147483648`, `-2147483649`) and a fractional value (`2.5`) as `TYPE_MISMATCH`, which the node decoder
+  surfaces as `WRONG_TYPE` at the source (WIRE_FORMAT §3.6.28). Before this it accepted any Python `int`. A
+  whole value written with a point (`2.0`) is now read as the integer it denotes, where it was refused.
+- Inference reads a number by value: a whole value inside the range is an `int`, anything else a `float`, so a
+  schema-less column holding a whole value past the range infers `float`.
+- The authoring surface writes the same columns: `frame(...)` infers `float` for whole values past the range,
+  and a declared `int` column given one raises `ValueError` rather than emitting a document its readers refuse.
+- Certified by the corpus vectors `grid-transform-int-bounds`, `reject-transform-int-*` and
+  `lenient-transform-int-*`, and by `tests/test_int32_column.py`.
+
 ### behavioural — the dataframe evaluator propagates and checks units (Phase 2208)
 
 - Every verb carries the whole schema entry: a projection, filter, sort, limit, distinct, both sides of a

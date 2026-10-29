@@ -543,12 +543,36 @@ def _decode_instant(col: str, ty: str, v: object) -> Result[Cell, ColumnError] |
     return Ok(cell_timestamp(text))
 
 
+_INT32_MIN = -2147483648
+_INT32_MAX = 2147483647
+
+
+def _int32_value(v: object) -> int | None:
+    """The value of a JSON number that is whole-valued and inside the signed 32-bit range —
+    an ``int`` column's value under WIRE_FORMAT §3.6.28 (§7.1's integer-slot rule, read by
+    value rather than spelling) — or ``None``."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return None
+    if isinstance(v, float) and not (math.isfinite(v) and v.is_integer()):
+        return None
+    i = int(v)
+    return i if _INT32_MIN <= i <= _INT32_MAX else None
+
+
 def _decode_cell_value(col: str, ty: str, v: object) -> Result[Cell, ColumnError]:
     """Decode a present value into a cell of the declared column type. A float column
     accepts an integer token (lossless widening); a timestamp column of any unit reads
     through ``_decode_instant``; every other type requires its kind."""
-    if ty == "int" and isinstance(v, int) and not isinstance(v, bool):
-        return Ok(cell_int(v))
+    if ty == "int" and isinstance(v, (int, float)) and not isinstance(v, bool):
+        # An int column holds signed 32-bit integers, read by value (WIRE_FORMAT §3.6.28):
+        # 2.0 is 2; a fraction, or a value past either end, is refused — never truncated or widened.
+        i = _int32_value(v)
+        if i is None:
+            return _err(
+                TYPE_MISMATCH,
+                f"column '{col}': an int column holds signed 32-bit integers, and {v!r} is not one",
+            )
+        return Ok(cell_int(i))
     if ty == "float" and isinstance(v, bool) is False and isinstance(v, (int, float)):
         return Ok(cell_float(float(v)))
     if ty == "bool" and isinstance(v, bool):
@@ -729,7 +753,8 @@ def _null() -> Cell:
 
 def _infer_column_type(name: str, values: list) -> Result[str, ColumnError]:
     """fuaran-core#88 (lenient-ingest) — infer one column's type from its cells.
-    PINNED deterministic rules: all-int numerics ⇒ int, any fractional ⇒ float,
+    PINNED deterministic rules: all-int numerics ⇒ int (a whole value inside int32,
+    WIRE_FORMAT §3.6.28), any other number ⇒ float,
     all-bool ⇒ bool, all-string ⇒ string — NEVER date/timestamp (temporal types
     require a declared schema). Empty or mixed is a didactic reject."""
     if not values:
@@ -740,7 +765,11 @@ def _infer_column_type(name: str, values: list) -> Result[str, ColumnError]:
         )
     tags: list[str] = []
     for v in values:
+        # By value (WIRE_FORMAT §3.6.28): a whole number inside int32 is an int, any other
+        # number a float — so 2.0 infers int and a whole value past the range infers float.
         tag = _kind_name(v)
+        if tag in ("int", "float"):
+            tag = "int" if _int32_value(v) is not None else "float"
         if tag not in tags:
             tags.append(tag)
     tag_set = set(tags)

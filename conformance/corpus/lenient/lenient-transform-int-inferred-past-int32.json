@@ -1,0 +1,1 @@
+{"id":"lenient-transform-int-inferred-past-int32","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"big":[1,2147483648],"small":[2.0,-2147483648]}}}}}

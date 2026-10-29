@@ -1,0 +1,1 @@
+{"id":"grid-transform-int-bounds","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","pipeline":[],"source":{"columns":{"n":{"validity":[true,true,true,true,false],"values":[2147483647,-2147483648,0,-1,0]}},"schema":[{"name":"n","type":"int"}]}}}}

@@ -13,7 +13,11 @@ The package is pre-1.0, so a minor version may break; this record is how a consu
 ones did. The wire format itself is governed by the shared specification and its conformance
 corpus, not by this file.
 
-## Unreleased (the next minor after 0.10.0)
+## 0.11.0 (untagged until the operator's release)
+
+### behavioural — an explicit `multiple=False` on a Select is written as authored (Phase 1962)
+
+- `Select.multiple` is `bool | None` (default `None`, omitted); `fuaran.select(..., multiple=False)` now emits `"multiple":false`, which certifies `nodes/select-multiple-false.json`.
 
 ### breaking (wire readers) — an `int` column value is a signed 32-bit integer (Phase 2484)
 

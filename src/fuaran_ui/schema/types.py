@@ -2590,13 +2590,14 @@ class Select:
     value: Binding | None = None
     placeholder: TextSource | None = None
     disabled: Binding | None = None
-    # Multi-select (Phase 291): this authoring surface emits ``multiple`` only when
-    # ``True`` (a single-select stays byte-identical to the pre-multi corpus); on the
-    # wire it is an ordinary optional field, kept as authored, so an explicit
-    # ``false`` a document carries round-trips through the decoder (Phase 1962).
+    # Multi-select (Phase 291): ``multiple`` is an ordinary OPTIONAL wire field,
+    # emitted as authored (WIRE_FORMAT §3.2, Phase 1962) — NOT an omit-at-default
+    # one. ``None`` (the default) omits it, so a single-select stays byte-identical
+    # to the pre-multi corpus; an explicit ``False`` is kept and emitted
+    # (``nodes/select-multiple-false.json``), exactly as the decoder keeps it.
     # ``values`` is the ``Binding<string list>`` of selected option values, emitted
     # only when present.
-    multiple: bool = False
+    multiple: bool | None = None
     values: Binding | None = None
     #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
     #: closure and so rides as the sentinel; what matters is whether the key is there
@@ -2618,7 +2619,7 @@ class Select:
             {
                 "disabled": self.disabled,
                 "label": self.label,
-                "multiple": self.multiple if self.multiple else None,
+                "multiple": self.multiple,
                 "onChange": CLOSURE if self.on_change else None,
                 "onChangeMulti": CLOSURE if self.on_change_multi else None,
                 "placeholder": self.placeholder,

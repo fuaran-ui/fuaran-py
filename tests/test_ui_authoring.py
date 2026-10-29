@@ -458,6 +458,17 @@ def _authored() -> dict[str, t.UiNode]:
                 disabled=binding.state("selectBusy", False),
             )
         ),
+        # Phase 1962 — `multiple` is an ordinary optional field, emitted as
+        # authored: an explicit `False` is kept, never folded into the default.
+        "select-multiple-false": node.bare(
+            fuaran.select(
+                "select-multiple-false",
+                label="Size",
+                source=binding.static([t.SelectOption("Small", "s"), t.SelectOption("Large", "l")]),
+                value=binding.static("s"),
+                multiple=False,
+            )
+        ),
         # ── Visualisation ────────────────────────────────────────────────────
         "table-1": fuaran.table(
             "table-1",

@@ -1258,7 +1258,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         value: Binding | None = None,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
-        multiple: bool = False,
+        multiple: bool | None = None,
         values: Binding | None = None,
         on_change: bool = True,
         on_change_multi: bool = False,
@@ -1270,7 +1270,8 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         the constructor enforces the single/multi ``value`` rule the record cannot
         state: a multi-select (``multiple=True``) carries ``values`` and no ``value``,
         so a ``value`` handed to it is dropped; a single-select always carries one, so
-        an absent ``value`` becomes the empty ``Static`` ("no selection")."""
+        an absent ``value`` becomes the empty ``Static`` ("no selection"). ``multiple``
+        is emitted as authored: ``None`` omits it, an explicit ``False`` is kept."""
         kind = t.Select(
             _text(label),
             source,

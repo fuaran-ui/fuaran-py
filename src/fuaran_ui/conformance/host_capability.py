@@ -345,6 +345,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "apply/duplicateIdsApply": "covered",
     "apply/limitsApply": "covered",
     "apply/styleNormaliseApply": "covered",
+    "apply/updatePropApply": "covered",
     "apply/skeletonApply": {"pending": "the apply engine's suite does not yet run the skeleton-apply vectors"},
     "chain": "covered",  # tests/test_op_stream.py
     "dag": "covered",

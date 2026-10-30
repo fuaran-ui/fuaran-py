@@ -171,8 +171,8 @@ def _reverse_fields(tag: str | None) -> dict[str, str] | None:
     if table is None:
         return None
     rev: dict[str, str] = {}
-    for pascal, (camel, coercer) in table.items():
-        if coercer == _NOT_SUPPORTED:
+    for pascal, camel in table.items():
+        if camel == _NOT_SUPPORTED:
             continue
         rev[camel] = pascal
     return rev

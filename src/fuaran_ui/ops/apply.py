@@ -25,27 +25,25 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import cast
 
 from ..limits import MAX_NODE_DEPTH, MAX_NODES
 from ..model import Arr, Node, Obj, Value
+from ..result import LIMIT_EXCEEDED as DECODE_LIMIT_EXCEEDED
 from ..result import Ok
 from ..schema.decode import (
+    _DROP,
     _STYLE_DEFAULTS,
-    BADGE_VARIANT,
     BINDING_CASES,
     CELL_FORMAT_CASES,
-    EMPHASIS,
-    HEADING_VARIANT,
-    ICON_SIZE,
-    IMAGE_ASPECT,
-    IMAGE_FIT,
-    IMAGE_LOADING,
-    IMAGE_VARIANT,
+    KIND_SCHEMAS,
     ORIENTATION,
     TEXT_SOURCE_CASES,
-    TONE,
-    TREND_POLARITY,
-    WEIGHT,
+    _expect_bool,
+    _expect_int,
+    _expect_string,
+    _Fail,
+    _unpack_schema,
 )
 
 # ── Error + result surface ──────────────────────────────────────────────────
@@ -319,9 +317,6 @@ def _coerce_binding(expected: str, py_types: tuple[type, ...]) -> Callable[[Valu
     return coerce
 
 
-_coerce_binding_number = _coerce_binding("number", (int, float))
-_coerce_binding_string = _coerce_binding("string", (str,))
-_coerce_binding_int = _coerce_binding("integer", (int,))
 _coerce_binding_bool = _coerce_binding("boolean", (bool,))
 
 
@@ -340,121 +335,99 @@ def _coerce_enum(allowed: frozenset[str]) -> Callable[[Value], _Coerced]:
     return coerce
 
 
-def _coerce_int(v: Value) -> _Coerced:
-    if isinstance(v, bool) or not isinstance(v, int):
-        return _Coerced(False, detail="expected an integer")
-    return _Coerced(True, v)
+def _via_decoder(dec: Callable[[object, str], object]) -> Callable[[Value], _Coerced]:
+    """A coercer that reads through one of the decoder's own primitives (Phase 1925)."""
+
+    def coerce(v: Value) -> _Coerced:
+        try:
+            return _Coerced(True, cast(Value, dec(_to_raw(v), "$value")))
+        except _Fail as f:
+            return _Coerced(False, detail=f.error.message)
+
+    return coerce
 
 
-def _coerce_float(v: Value) -> _Coerced:
-    if isinstance(v, bool) or not isinstance(v, (int, float)):
-        return _Coerced(False, detail="expected a number")
-    return _Coerced(True, float(v))
-
-
-def _coerce_bool(v: Value) -> _Coerced:
-    if not isinstance(v, bool):
-        return _Coerced(False, detail="expected a boolean")
-    return _Coerced(True, v)
-
-
-def _coerce_string(v: Value) -> _Coerced:
-    if not isinstance(v, str):
-        return _Coerced(False, detail="expected a string")
-    return _Coerced(True, v)
-
-
-def _coerce_string_option(v: Value) -> _Coerced:
-    """An optional string field (Phase 821 — `Icon.Label`, the F#
-    ``tryStringOption`` twin): a string sets it, ``null`` clears it. A cleared
-    field is REMOVED from the model (absence is structural, never ``"k":null``)
-    — `_update_field` drops the key on an ok ``None``."""
-    if v is None or isinstance(v, str):
-        return _Coerced(True, v)
-    return _Coerced(False, detail="expected a string or null")
-
-
-def _coerce_text_source_option(v: Value) -> _Coerced:
-    """An optional TextSource field (fuaran#1078 — ``Image.Caption``): a value sets
-    it, ``null`` clears it. A cleared field is REMOVED from the model — absence is
-    structural, never ``"k":null`` — which `_update_field` does on an ok ``None``."""
-    if v is None:
-        return _Coerced(True, None)
-    return _coerce_text_source(v)
+# The Box and nested-path surfaces' scalar slots. `_coerce_int` is the 7.1 integer
+# slot: `2.0` is the integer 2; a fractional or out-of-32-bit value is refused.
+_coerce_int = _via_decoder(_expect_int)
+_coerce_bool = _via_decoder(_expect_bool)
+_coerce_string = _via_decoder(_expect_string)
 
 
 _Coercer = Callable[[Value], _Coerced]
 _NOT_SUPPORTED = "__not_supported__"
 
-# (PascalCase op path) -> (camelCase wire key, coercer | _NOT_SUPPORTED) per kind.
+# (PascalCase op path) -> camelCase wire key | _NOT_SUPPORTED, per kind. The VALUE
+# is read by the decoder's own field decoder for that key (``KIND_SCHEMAS``), so an
+# UpdateProp admits exactly what a decode admits (Phase 1925) - see ``_update_field``.
 # Children entries map to _NOT_SUPPORTED (use the structural child ops instead);
 # a kind absent from this table has no field-level surface (PathNotSupportedYet).
-_FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
+_FIELDS: dict[str, dict[str, str]] = {
     # Display
     "Metric": {
-        "Label": ("label", _coerce_text_source),
+        "Label": "label",
         # 0.2.0 rename law - the scalar displayed value is `Value`.
-        "Value": ("value", _coerce_binding_number),
-        "Format": ("format", _coerce_cell_format),
-        "Tone": ("tone", _coerce_enum(TONE)),
-        "Weight": ("weight", _coerce_enum(WEIGHT)),
-        "Emphasis": ("emphasis", _coerce_enum(EMPHASIS)),
-        "Trend": ("trend", _coerce_binding_number),
-        "TrendFormat": ("trendFormat", _coerce_cell_format),
+        "Value": "value",
+        "Format": "format",
+        "Tone": "tone",
+        "Weight": "weight",
+        "Emphasis": "emphasis",
+        "Trend": "trend",
+        "TrendFormat": "trendFormat",
         # fuaran#867 — the UpdateProp twin of the decoder's `trendPolarity`
         # slot. `_coerce_enum` refuses anything outside the two-case set, so
         # the reserved `Neutral` is rejected here exactly as it is on decode.
-        "TrendPolarity": ("trendPolarity", _coerce_enum(TREND_POLARITY)),
-        "Icon": ("icon", _coerce_string),
-        "Subtext": ("subtext", _coerce_text_source),
+        "TrendPolarity": "trendPolarity",
+        "Icon": "icon",
+        "Subtext": "subtext",
     },
     "Heading": {
-        "Level": ("level", _coerce_int),
-        "Text": ("text", _coerce_text_source),
-        "Variant": ("variant", _coerce_enum(HEADING_VARIANT)),
+        "Level": "level",
+        "Text": "text",
+        "Variant": "variant",
     },
-    "Markdown": {"Text": ("text", _coerce_text_source)},
+    "Markdown": {"Text": "text"},
     "Badge": {
-        "Label": ("label", _coerce_text_source),
-        "Variant": ("variant", _coerce_enum(BADGE_VARIANT)),
+        "Label": "label",
+        "Variant": "variant",
     },
-    "Skeleton": {"Rows": ("rows", _coerce_int)},
+    "Skeleton": {"Rows": "rows"},
     # Phase 821 — the standalone Icon display kind's field surface (mirrors the
     # F# `updateIcon`).
     "Icon": {
-        "Icon": ("icon", _coerce_string),
-        "Size": ("size", _coerce_enum(ICON_SIZE)),
-        "Tone": ("tone", _coerce_enum(TONE)),
-        "Label": ("label", _coerce_string_option),
+        "Icon": "icon",
+        "Size": "size",
+        "Tone": "tone",
+        "Label": "label",
     },
     "Callout": {
-        "Tone": ("tone", _coerce_enum(TONE)),
-        "Body": ("body", _coerce_text_source),
-        "Dismissable": ("dismissable", _coerce_bool),
-        "Heading": ("heading", _coerce_text_source),
-        "Icon": ("icon", _coerce_string),
+        "Tone": "tone",
+        "Body": "body",
+        "Dismissable": "dismissable",
+        "Heading": "heading",
+        "Icon": "icon",
     },
     "Progress": {
-        "Fraction": ("fraction", _coerce_binding_number),
-        "Indeterminate": ("indeterminate", _coerce_bool),
-        "Tone": ("tone", _coerce_enum(TONE)),
-        "Label": ("label", _coerce_text_source),
-        "Caveat": ("caveat", _coerce_text_source),
+        "Fraction": "fraction",
+        "Indeterminate": "indeterminate",
+        "Tone": "tone",
+        "Label": "label",
+        "Caveat": "caveat",
     },
     "LabelValueRow": {
-        "Label": ("label", _coerce_text_source),
+        "Label": "label",
         # 0.2.0 rename law - the scalar displayed value is `Value`.
-        "Value": ("value", _coerce_binding_number),
-        "Format": ("format", _coerce_cell_format),
-        "Emphasis": ("emphasis", _coerce_bool),
-        "Help": ("help", _coerce_text_source),
+        "Value": "value",
+        "Format": "format",
+        "Emphasis": "emphasis",
+        "Help": "help",
     },
     "Link": {
-        "Href": ("href", _coerce_binding_string),
-        "Label": ("label", _coerce_text_source),
-        "Rel": ("rel", _coerce_string),
-        "Target": ("target", _coerce_string),
-        "Download": ("download", _coerce_bool),
+        "Href": "href",
+        "Label": "label",
+        "Rel": "rel",
+        "Target": "target",
+        "Download": "download",
     },
     # fuaran#1077–1080 — the `Image` field surface (mirrors the reference
     # `updateImage`). The presentation slots are ordinary closed-enum fields and
@@ -468,15 +441,15 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
     # structure; inventing one for these slots alone would put a bespoke parser on
     # the update path. Reach them with `EditNode`.
     "Image": {
-        "Alt": ("alt", _coerce_text_source),
-        "Variant": ("variant", _coerce_enum(IMAGE_VARIANT)),
-        "Fit": ("fit", _coerce_enum(IMAGE_FIT)),
-        "AspectRatio": ("aspectRatio", _coerce_enum(IMAGE_ASPECT)),
-        "Loading": ("loading", _coerce_enum(IMAGE_LOADING)),
-        "Caption": ("caption", _coerce_text_source_option),
-        "Expandable": ("expandable", _coerce_bool),
-        "Src": ("src", _NOT_SUPPORTED),
-        "SrcSet": ("srcSet", _NOT_SUPPORTED),
+        "Alt": "alt",
+        "Variant": "variant",
+        "Fit": "fit",
+        "AspectRatio": "aspectRatio",
+        "Loading": "loading",
+        "Caption": "caption",
+        "Expandable": "expandable",
+        "Src": _NOT_SUPPORTED,
+        "SrcSet": _NOT_SUPPORTED,
     },
     # fuaran#1076 — the `Media` field surface. `Label`, `Controls` and `Loop` are
     # ordinary coercible scalars. `Src` and `Kind` are both named, for the two
@@ -487,11 +460,11 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
     # slots" or silently resetting the video-only slots on every switch — a
     # whole-node `EditNode` says what the author means without either.
     "Media": {
-        "Label": ("label", _coerce_text_source),
-        "Controls": ("controls", _coerce_bool),
-        "Loop": ("loop", _coerce_bool),
-        "Src": ("src", _NOT_SUPPORTED),
-        "Kind": ("kind", _NOT_SUPPORTED),
+        "Label": "label",
+        "Controls": "controls",
+        "Loop": "loop",
+        "Src": _NOT_SUPPORTED,
+        "Kind": _NOT_SUPPORTED,
     },
     # Layout (Children -> structural child ops)
     # Box (Phase 390) is NOT in this flat table — its legacy-compat field surface
@@ -499,30 +472,30 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
     # `layout` object (or top-level `heading`) and is layout-mode-sensitive, so it
     # is handled by `_update_box` in `_update_field`.
     "SplitPanel": {
-        "Weight": ("weight", _coerce_float),
-        "Children": ("children", _NOT_SUPPORTED),
+        "Weight": "weight",
+        "Children": _NOT_SUPPORTED,
     },
     "Tabs": {
-        "Orientation": ("orientation", _coerce_enum(ORIENTATION)),
-        "Children": ("children", _NOT_SUPPORTED),
+        "Orientation": "orientation",
+        "Children": _NOT_SUPPORTED,
     },
     "Stepper": {
-        "ActiveStep": ("activeStep", _coerce_binding_int),
-        "Children": ("children", _NOT_SUPPORTED),
+        "ActiveStep": "activeStep",
+        "Children": _NOT_SUPPORTED,
     },
     "SummaryList": {
-        "Heading": ("heading", _coerce_text_source),
-        "Children": ("children", _NOT_SUPPORTED),
+        "Heading": "heading",
+        "Children": _NOT_SUPPORTED,
     },
     "Disclosure": {
-        "Heading": ("heading", _coerce_text_source),
-        "Open": ("open", _coerce_binding_bool),
-        "DefaultOpen": ("defaultOpen", _coerce_bool),
-        "Children": ("children", _NOT_SUPPORTED),
+        "Heading": "heading",
+        "Open": "open",
+        "DefaultOpen": "defaultOpen",
+        "Children": _NOT_SUPPORTED,
     },
     # Structural
-    "FragmentDecl": {"Name": ("name", _coerce_string)},
-    "FragmentRef": {"Name": ("name", _coerce_string)},
+    "FragmentDecl": {"Name": "name"},
+    "FragmentRef": {"Name": "name"},
 }
 
 
@@ -591,29 +564,59 @@ def _update_box(field: str, value: Value, kind: Obj) -> _Outcome:
     return _Outcome("unknownField")
 
 
+def _to_raw(v: Value) -> object:
+    """The JSON value a model ``Value`` came from - ``from_json``'s inverse, so a
+    field decoder reads an op's value exactly as it reads the member in a tree."""
+    if isinstance(v, Arr):
+        return [_to_raw(item) for item in v.items]
+    if isinstance(v, Obj):
+        members = {k: _to_raw(x) for k, x in v.fields.items()}
+        return members if v.tag is None else {"$type": v.tag, **members}
+    return v
+
+
 def _update_field(field: str, value: Value, kind: Obj) -> _Outcome:
+    """A top-level field write, read by the decoder's OWN field decoder (Phase 1925).
+
+    The decoder's rules are the field's rules: the 7.1 integer slot (``2.0`` is the
+    integer ``2``; ``2.5`` and a value outside 32-bit are refused), a 21 bound
+    (``Skeleton.rows`` - refused as ``LimitExceeded``, never a type mismatch), the
+    lenient aliases, and omission at a declared default: a decoder that answers
+    ``_DROP`` drops the key, so ``encode(apply(op))`` is the bytes a decode of the
+    same tree produces. ``null`` clears an OPTIONAL field (absence is structural,
+    never ``"k":null``) and is a type mismatch at a required one.
+    """
     if kind.tag == "Box":
         return _update_box(field, value, kind)
     table = _FIELDS.get(kind.tag or "")
     if table is None:
         return _Outcome("notSupported")
-    entry = table.get(field)
-    if entry is None:
+    camel = table.get(field)
+    if camel is None:
         return _Outcome("unknownField")
-    camel, coercer = entry
-    if coercer == _NOT_SUPPORTED:
+    if camel == _NOT_SUPPORTED:
         return _Outcome("notSupported")
-    assert callable(coercer)
-    result = coercer(value)
-    if not result.ok:
-        return _Outcome("typeMismatch", detail=result.detail)
+    entry = next(
+        (e for e in (_unpack_schema(x) for x in KIND_SCHEMAS[kind.tag or ""]) if e[0] == camel),
+        None,
+    )
+    assert entry is not None, f"{kind.tag}.{camel} has no schema entry"
+    _, required, dec, _ = entry
     fields = dict(kind.fields)
-    if result.value is None:
-        # An optional field cleared (only `_coerce_string_option` yields an ok
-        # `None`) — absence is structural, so the key is dropped, never nulled.
+    if value is None:
+        if required:
+            return _Outcome("typeMismatch", detail=f"'{camel}' is required and cannot be cleared")
+        fields.pop(camel, None)
+        return _Outcome("updated", Obj(kind.tag, fields))
+    try:
+        decoded = dec(_to_raw(value), "$value")
+    except _Fail as f:
+        tag = "overLimit" if f.error.code == DECODE_LIMIT_EXCEEDED else "typeMismatch"
+        return _Outcome(tag, detail=f.error.message)
+    if decoded is _DROP:
         fields.pop(camel, None)
     else:
-        fields[camel] = result.value
+        fields[camel] = cast(Value, decoded)
     return _Outcome("updated", Obj(kind.tag, fields))
 
 
@@ -880,6 +883,11 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
                 return _fail(
                     PATH_NOT_SUPPORTED_YET,
                     f"Path '{path}' on node '{target}' is not yet supported by the apply engine.",
+                )
+            if outcome.tag == "overLimit":
+                return _fail(
+                    LIMIT_EXCEEDED,
+                    f"UpdateProp value for '{path}' on '{target}' is past a wire limit: {outcome.detail}",
                 )
             return _fail(
                 KIND_MISMATCH,

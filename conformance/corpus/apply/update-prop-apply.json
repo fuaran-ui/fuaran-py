@@ -1,0 +1,100 @@
+{
+  "family": "updatePropApply",
+  "description": "UpdateProp writes a field through the same rules the wire decoder reads it with (WIRE_FORMAT section 3.4): the slot rule for a typed integer (section 7.1), a field's resource bound (section 21.9), and omission at a declared default (section 3.6). The decoder bounds what arrives; these vectors pin that the write path into a tree cannot store what no decode could produce. Each vector carries `input.tree` (a wire node) and `input.op` (a wire op) as JSON STRINGS, decoded by the host's own wire decoder; the op strings are canonical except where a vector says otherwise. `expected.verdict` is `reject` or `accept`. A `reject` vector requires apply to refuse with `expected.code` (`LimitExceeded` for a bound, `KindMismatch` for a value the slot cannot hold); an `accept` vector requires apply to succeed AND the host's canonical re-encoding of the applied tree to equal `expected.tree` byte for byte.",
+  "limits": {
+    "maxSkeletonRows": 10000
+  },
+  "vectors": [
+    {
+      "id": "updateprop-skeleton-rows-past-the-bound",
+      "case": "UpdateProp",
+      "description": "Rows set past MaxSkeletonRows (section 21.9) to the signed 32-bit maximum. The slot rule (section 7.1) admits the value, so the bound refuses it with the shared code a decode of the same tree carries. The value is the 32-bit maximum rather than 10001 for the reason section 21.9 gives for its own reject fixture: only it separates a host that applies the bound from one that reads the bound as a narrowing of the slot's type.",
+      "input": {
+        "tree": "{\"id\":\"s\",\"kind\":{\"$type\":\"Skeleton\",\"rows\":3}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Rows\",\"target\":\"s\",\"value\":2147483647}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "LimitExceeded"
+      }
+    },
+    {
+      "id": "updateprop-skeleton-rows-at-the-bound",
+      "case": "UpdateProp",
+      "description": "The control: Rows set exactly to MaxSkeletonRows applies, and the applied tree carries it.",
+      "input": {
+        "tree": "{\"id\":\"s\",\"kind\":{\"$type\":\"Skeleton\",\"rows\":3}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Rows\",\"target\":\"s\",\"value\":10000}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"s\",\"kind\":{\"$type\":\"Skeleton\",\"rows\":10000}}"
+      }
+    },
+    {
+      "id": "updateprop-skeleton-rows-outside-32-bit",
+      "case": "UpdateProp",
+      "description": "Rows set to 10^15. The slot rule decides FIRST (section 7.1): the value is outside the signed 32-bit range, so it is a type refusal and never a limit breach - the decoder's order, on the write path. A host that truncated or wrapped the number would store a different count, or loop 10^15 times at render.",
+      "input": {
+        "tree": "{\"id\":\"s\",\"kind\":{\"$type\":\"Skeleton\",\"rows\":3}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Rows\",\"target\":\"s\",\"value\":1000000000000000}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "KindMismatch"
+      }
+    },
+    {
+      "id": "updateprop-heading-level-fractional",
+      "case": "UpdateProp",
+      "description": "Level set to 2.5. An integer slot admits no fractional value (section 7.1), so the op is refused; a host that truncated it would store level 2, discarding the author's value.",
+      "input": {
+        "tree": "{\"id\":\"h\",\"kind\":{\"$type\":\"Heading\",\"level\":2,\"text\":\"Title\"}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Level\",\"target\":\"h\",\"value\":2.5}"
+      },
+      "expected": {
+        "verdict": "reject",
+        "code": "KindMismatch"
+      }
+    },
+    {
+      "id": "updateprop-heading-level-integral-number",
+      "case": "UpdateProp",
+      "description": "Level set to 3.0. The op text spells the number with a fractional part on purpose: its value is integral, which is all section 7.1 asks, so the op applies exactly as a decode of the same number would, and the applied tree carries the canonical 3.",
+      "input": {
+        "tree": "{\"id\":\"h\",\"kind\":{\"$type\":\"Heading\",\"level\":2,\"text\":\"Title\"}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Level\",\"target\":\"h\",\"value\":3.0}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"h\",\"kind\":{\"$type\":\"Heading\",\"level\":3,\"text\":\"Title\"}}"
+      }
+    },
+    {
+      "id": "updateprop-callout-tone-default-is-omitted",
+      "case": "UpdateProp",
+      "description": "Tone set to its declared default, Default (section 3.6). The applied tree encodes byte-identical to the one that never set it: the member is absent, so encode(apply(op)) is a canonical fixed point. A host that stored the string it was handed would emit `\"tone\":\"Default\"`, which no decode produces.",
+      "input": {
+        "tree": "{\"id\":\"c\",\"kind\":{\"$type\":\"Callout\",\"body\":\"Body\",\"tone\":\"Warning\"}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Tone\",\"target\":\"c\",\"value\":\"Default\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"c\",\"kind\":{\"$type\":\"Callout\",\"body\":\"Body\"}}"
+      }
+    },
+    {
+      "id": "updateprop-callout-tone-nondefault",
+      "case": "UpdateProp",
+      "description": "The control: Tone set to a case other than the default is stored and encoded.",
+      "input": {
+        "tree": "{\"id\":\"c\",\"kind\":{\"$type\":\"Callout\",\"body\":\"Body\",\"tone\":\"Warning\"}}",
+        "op": "{\"$type\":\"UpdateProp\",\"path\":\"Tone\",\"target\":\"c\",\"value\":\"Success\"}"
+      },
+      "expected": {
+        "verdict": "accept",
+        "tree": "{\"id\":\"c\",\"kind\":{\"$type\":\"Callout\",\"body\":\"Body\",\"tone\":\"Success\"}}"
+      }
+    }
+  ]
+}

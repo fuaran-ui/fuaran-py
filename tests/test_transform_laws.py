@@ -15,9 +15,14 @@ evaluated by THIS host, and the result's canonical encoding compared byte for by
 and the error class is never compared (the file carries none). The ``-unit-`` vectors run like
 every other (Phase 2208): the evaluator carries field metadata (fuaran#2207) through every verb and
 checks units, so a refusal among them is the unit check's and an answer carries its schema's units,
-labels and descriptions. The one exception is named and counted, never silent: the ``columnOp`` and
-``delta`` case kinds, which this host has no surface for. The set of case kinds is pinned exactly,
-so a new kind fails loudly.
+labels and descriptions.
+
+Every ``columnOp`` vector runs (Phase 2500 gave this host the surface): the op decodes through
+``decode_op_json``, re-encodes byte for byte to ``expected.op``, and applies through ``apply_op``,
+compared as an ``evalPipeline`` vector is. The one exception is named and counted, never silent: the
+``delta`` case kind, whose vectors ask for the diff of two tables, where this host's ``delta_of``
+derives a row delta from an op over the before table. The set of case kinds is pinned exactly, so a
+new kind fails loudly.
 
 The tests after the vector leg pin the unit rules past what the vectors draw: the whole schema entry
 through each verb class (kept, rebuilt with the derived unit), and a go-red — each refusal is a
@@ -74,18 +79,20 @@ from fuaran_ui.dataframe import (
     table_fields,
     table_of_fields,
 )
+from fuaran_ui.dataframe.grid_edit import apply_op, decode_op_json, encode_op
 from fuaran_ui.dataframe.model import UNIT_MISMATCH
 from fuaran_ui.dataframe.unit import DIMENSIONLESS, compatible_units, conversion_factor, pow_unit
 
 FAMILY = "transformLaws"
 EVAL = "evalPipeline"
+COLUMN_OP = "columnOp"
 
-#: The case kinds the file may carry, and why this host runs only the first.
+#: The case kinds the file may carry that this host does not run, and why.
 NOT_RUN = {
-    "columnOp": "this host carries no ColumnOp surface",
-    "delta": "this host carries no table-delta surface",
+    "delta": "this host derives a row delta from an op over the before table (delta_of); "
+    "it has no surface that diffs two tables",
 }
-CASE_KINDS = {EVAL, *NOT_RUN}
+CASE_KINDS = {EVAL, COLUMN_OP, *NOT_RUN}
 
 
 def _family() -> tuple[dict, dict]:
@@ -99,6 +106,7 @@ def _family() -> tuple[dict, dict]:
 ROW, FILE = _family()
 VECTORS: list[dict] = FILE["vectors"]
 EVAL_VECTORS = [v for v in VECTORS if v["case"] == EVAL]
+COLUMN_OP_VECTORS = [v for v in VECTORS if v["case"] == COLUMN_OP]
 
 
 def test_the_file_agrees_with_its_manifest_row() -> None:
@@ -119,6 +127,13 @@ def test_the_case_kinds_are_exactly_the_known_set() -> None:
 def test_the_family_carries_unit_vectors() -> None:
     """The unit leg is not vacuous: the family draws ``-unit-`` vectors, and every one runs."""
     assert any("-unit-" in v["id"] for v in EVAL_VECTORS)
+
+
+def test_every_vector_but_the_delta_kind_runs() -> None:
+    assert COLUMN_OP_VECTORS, "the family carries no columnOp vector"
+    not_run = [v for v in VECTORS if v["case"] in NOT_RUN]
+    assert {v["case"] for v in not_run} == {"delta"}
+    assert len(EVAL_VECTORS) + len(COLUMN_OP_VECTORS) + len(not_run) == len(VECTORS)
 
 
 def test_the_exceptions_are_reported_by_name() -> None:
@@ -158,6 +173,26 @@ def test_eval_pipeline_vector(vector: dict) -> None:
         assert encode_source(Embedded(result.value)) == expected["table"], f"{vector['id']}: this host ≠ the reference"
         return
     _compare_within_tolerance(vector["id"], tolerance, result.value, expected["table"])
+
+
+@pytest.mark.parametrize("vector", COLUMN_OP_VECTORS, ids=[v["id"] for v in COLUMN_OP_VECTORS])
+def test_column_op_vector(vector: dict) -> None:
+    expected = vector["expected"]
+    op = decode_op_json(json.loads(vector["input"]["op"]))
+    assert op.ok, f"{vector['id']}: op decode failed: {getattr(op, 'error', None)}"
+    assert encode_op(op.value) == expected["op"], f"{vector['id']}: the op does not re-encode"
+    src = decode_source(vector["input"]["source"])
+    assert src.ok, f"{vector['id']}: source decode failed: {getattr(src, 'error', None)}"
+    assert isinstance(src.value, Embedded)
+
+    result = apply_op(op.value, src.value.table)
+    if expected["verdict"] == "error":
+        # The error class is never compared; the file carries none.
+        assert not result.ok, f"{vector['id']}: this host applied an op the reference refused"
+        return
+    assert expected["verdict"] == "ok", f"{vector['id']}: unknown verdict {expected['verdict']!r}"
+    assert result.ok, f"{vector['id']}: this host refused, the reference applied: {getattr(result, 'error', None)}"
+    assert encode_source(Embedded(result.value)) == expected["table"], f"{vector['id']}: this host ≠ the reference"
 
 
 def _ulp_distance(a: float, b: float) -> int:
@@ -220,7 +255,7 @@ def _compare_within_tolerance(vid: str, tolerance: dict[str, int], answer: Table
 
 
 @pytest.mark.parametrize("kind", sorted(NOT_RUN))
-def test_case_kinds_this_host_has_no_surface_for(kind: str) -> None:
+def test_case_kinds_this_host_does_not_run(kind: str) -> None:
     ids = [v["id"] for v in VECTORS if v["case"] == kind]
     pytest.skip(f"{len(ids)} {kind} vector(s) not run — {NOT_RUN[kind]}: {', '.join(ids)}")
 

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "6c868d199afb85263b42344ce1930b1604dd6abf3a209dfab1d4267e081a47f3"
+IDL_SHA256 = "3d7b02a648d9b15cfd67622ede39e11272f227893097986a786bd2b86e825a8c"
 IDL_VERSION = 1
 
 
@@ -1600,6 +1600,10 @@ OP_FIELDS: dict[str, tuple[F, ...]] = {
         F("target", "required", T_str),
     ),
     "ReplaceRoot": (F("node", "required", T_node),),
+    "UpdateAccessibility": (
+        F("accessibility", "required", T_record_Accessibility),
+        F("target", "required", T_str),
+    ),
     "UpdateProp": (
         F("path", "required", T_str),
         F("target", "required", T_str),
@@ -1612,6 +1616,10 @@ OP_FIELDS: dict[str, tuple[F, ...]] = {
     "UpdateStyle": (
         F("style", "required", T_record_SemanticStyle),
         F("target", "required", T_str),
+    ),
+    "UpdateTooltip": (
+        F("target", "required", T_str),
+        F("tooltip", "optional", T_union_TextSource),
     ),
 }
 

@@ -418,3 +418,35 @@ def test_diff_batched_wraps_multi_op() -> None:
     assert batched[0].tag == "Batch"
     rebuilt = _apply_all(batched, before)
     assert encode_node(rebuilt) == encode_node(after)
+
+
+# ── the trait edits (Phase 2527) ─────────────────────────────────────────────
+
+
+def _leaf(envelope: str = "") -> Node:
+    result = decode_node(f'{{{envelope}"id":"m","kind":{{"$type":"Markdown","text":"x"}}}}')
+    assert result.ok
+    return result.value
+
+
+@pytest.mark.parametrize(
+    ("before", "after", "op"),
+    [
+        (
+            "",
+            '"accessibility":{"role":"status"},',
+            '{"$type":"UpdateAccessibility","accessibility":{"role":"status"},"target":"m"}',
+        ),
+        (
+            '"accessibility":{"role":"status"},',
+            "",
+            '{"$type":"UpdateAccessibility","accessibility":{},"target":"m"}',
+        ),
+        ("", '"tooltip":"t",', '{"$type":"UpdateTooltip","target":"m","tooltip":"t"}'),
+        ('"tooltip":"t",', "", '{"$type":"UpdateTooltip","target":"m"}'),
+    ],
+)
+def test_a_trait_only_change_is_one_trait_op(before: str, after: str, op: str) -> None:
+    script = diff(_leaf(before), _leaf(after))
+    assert [encode_op(o) for o in script] == [op]
+    _round_trips(_leaf(before), _leaf(after))

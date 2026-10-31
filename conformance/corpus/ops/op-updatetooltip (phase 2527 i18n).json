@@ -1,0 +1,1 @@
+{"$type":"UpdateTooltip","target":"metric-1","tooltip":{"$type":"I18n","args":{},"key":"metric.help"}}

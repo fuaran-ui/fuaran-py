@@ -1290,7 +1290,8 @@ any op holding a node (`InsertChild`, `ReplaceRoot`, an `EditNode` whose new kin
 holds children, an `UpdateState` attaching `onLoading` / `onEmpty`), plus `MoveNode`,
 which adds no node but can stack two legal depths. A `Batch` is measured once, on the
 tree it produces, and refused whole as `LimitExceeded` rather than `BatchAborted`.
-`UpdateProp`, `ReplaceBinding`, `UpdateStyle`, `PatchStyle`, `RemoveNode` and
+`UpdateProp`, `ReplaceBinding`, `UpdateStyle`, `PatchStyle`, `UpdateAccessibility`,
+`UpdateTooltip`, `RemoveNode` and
 `ReorderChildren` cannot grow a tree and are never refused for one. Depth and count are measured the
 way the decoder measures them: every node is a level, wherever it sits — a layout
 child, a `Switch` case, an `ErrorBoundary` arm, a `State` alternative, a `fallback`.

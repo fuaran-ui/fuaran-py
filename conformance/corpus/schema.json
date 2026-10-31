@@ -9977,6 +9977,43 @@
           "type": "object",
           "properties": {
             "$type": {
+              "const": "UpdateAccessibility"
+            },
+            "accessibility": {
+              "$ref": "#/$defs/Accessibility"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "accessibility",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateTooltip"
+            },
+            "target": {
+              "type": "string"
+            },
+            "tooltip": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
               "const": "InsertChild"
             },
             "child": {

@@ -24,7 +24,8 @@ the same oracle the corpus commits to — *not* Python object identity.
    field-level refinement (``UpdateProp`` per differing addressable field), **propose-then-verify**
    by applying the candidates and accepting only if they reproduce ``after``'s kind; otherwise
    take the coarse-but-correct floor ``EditNode(after.kind)`` (which carries ``after``'s whole
-   subtree). Then emit the style edit and ``UpdateState`` for a drifted facet. A style edit
+   subtree). Then emit the style edit and ``UpdateState`` for a drifted facet, and
+   ``UpdateAccessibility`` / ``UpdateTooltip`` for a trait that moved (Phase 2527). A style edit
    is field-level (Phase 2314, the F# engine's rule since Phase 2291): ``PatchStyle`` naming
    exactly the members that moved, and the whole-record ``UpdateStyle`` only when all six did.
 3. **Children** (layout child list): ``RemoveNode`` for dropped ids (before-order), ``InsertChild``
@@ -33,13 +34,14 @@ the same oracle the corpus commits to — *not* Python object identity.
 
 **Minimality is "coarse-but-correct floor + verified refinement":** correctness (the round-trip
 law) is unconditional; the granularity of the emitted ops can regress to a wholesale ``EditNode``
-without ever breaking round-trip. Two edits are inexpressible in the op vocabulary and therefore
-not emitted (mirroring the F# engine): an **accessibility-only** change (no ``UpdateAccessibility``
-op) and a state **removal** — a state present in ``before`` but absent in ``after`` (``UpdateState``
-can set the facet, never delete it). Neither arises from an op-reachable ``after``, which is the
-round-trip law's domain. A style removal IS expressible: an absent style slot is the all-default
-record (WIRE_FORMAT §3.1), so it diffs to the ``PatchStyle`` returning the moved members to their
-default tokens, which the apply engine stores as the absent slot (Phase 2313).
+without ever breaking round-trip. One edit is inexpressible in the op vocabulary and therefore
+not emitted (mirroring the F# engine): a state **removal** — a state present in ``before`` but
+absent in ``after`` (``UpdateState`` can set the facet, never delete it). It does not arise from an
+op-reachable ``after``, which is the round-trip law's domain. A style removal IS expressible: an
+absent style slot is the all-default record (WIRE_FORMAT §3.1), so it diffs to the ``PatchStyle``
+returning the moved members to their default tokens, which the apply engine stores as the absent
+slot (Phase 2313). So is an accessibility removal, the ``UpdateAccessibility`` carrying the empty
+record, and a tooltip removal, the ``UpdateTooltip`` carrying no ``tooltip`` member (Phase 2527).
 """
 
 from __future__ import annotations
@@ -231,14 +233,31 @@ def _style_ops(a: Node, b: Node) -> list[Obj]:
     return [Obj("PatchStyle", {"style": Obj(None, moved), "target": b.id})]
 
 
+def _trait_ops(a: Node, b: Node) -> list[Obj]:
+    """The ops taking ``a``'s two traits to ``b``'s, each only when it moved. An absent
+    accessibility and an empty one are the same trait, as the apply engine stores it."""
+    ops: list[Obj] = []
+    empty = Obj(None, {})
+    after = b.extras.get("accessibility", empty)
+    if _canon(a.extras.get("accessibility", empty)) != _canon(after):
+        ops.append(Obj("UpdateAccessibility", {"accessibility": after, "target": b.id}))
+    tooltip = b.extras.get("tooltip")
+    if _canon(a.extras.get("tooltip")) != _canon(tooltip):
+        fields: dict[str, Value] = {"target": b.id}
+        if tooltip is not None:
+            fields["tooltip"] = tooltip
+        ops.append(Obj("UpdateTooltip", fields))
+    return ops
+
+
 def _facet_ops(a: Node, b: Node) -> list[Obj]:
     """The style edit, then ``UpdateState`` for a state that drifted (and is present on
-    ``b`` — a state removal is not op-expressible)."""
+    ``b`` — a state removal is not op-expressible), then the trait edits."""
     ops = _style_ops(a, b)
     b_state = _state_of(b)
     if b_state is not None and _canon(_state_of(a)) != _canon(b_state):
         ops.append(Obj("UpdateState", {"state": b_state, "target": b.id}))
-    return ops
+    return ops + _trait_ops(a, b)
 
 
 # ── children diff (removes -> inserts -> reorders -> recurse) ─────────────────

@@ -3826,6 +3826,31 @@
       "category": "op",
       "fields": [
         {
+          "name": "accessibility",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "record",
+            "name": "Accessibility"
+          }
+        },
+        {
+          "name": "target",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        }
+      ],
+      "tag": "UpdateAccessibility"
+    },
+    {
+      "category": "op",
+      "fields": [
+        {
           "name": "path",
           "optionality": {
             "$type": "required"
@@ -3904,6 +3929,32 @@
         }
       ],
       "tag": "UpdateStyle"
+    },
+    {
+      "category": "op",
+      "fields": [
+        {
+          "name": "target",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "tooltip",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
+          }
+        }
+      ],
+      "tag": "UpdateTooltip"
     }
   ],
   "records": [

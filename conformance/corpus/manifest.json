@@ -78,9 +78,11 @@
     "ReorderChildren",
     "ReplaceBinding",
     "ReplaceRoot",
+    "UpdateAccessibility",
     "UpdateProp",
     "UpdateState",
-    "UpdateStyle"
+    "UpdateStyle",
+    "UpdateTooltip"
   ],
   "fixtures": [
     {
@@ -4172,6 +4174,24 @@
       "description": "ReplaceRoot"
     },
     {
+      "id": "op-updateaccessibility",
+      "kind": "op-round-trip",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "ops/op-updateaccessibility.json",
+      "expectedFile": "ops/op-updateaccessibility.json",
+      "description": "UpdateAccessibility"
+    },
+    {
+      "id": "op-updateaccessibility (phase 2527 empty record removes the trait)",
+      "kind": "op-round-trip",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "ops/op-updateaccessibility (phase 2527 empty record removes the trait).json",
+      "expectedFile": "ops/op-updateaccessibility (phase 2527 empty record removes the trait).json",
+      "description": "UpdateAccessibility (Phase 2527 empty record removes the trait)"
+    },
+    {
       "id": "op-updateprop",
       "kind": "op-round-trip",
       "since": "0.3.0",
@@ -4305,6 +4325,33 @@
       "inputFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
       "expectedFile": "ops/op-updatestyle (phase 1472 direction=ltr, the only style member).json",
       "description": "UpdateStyle (Phase 1472 Direction=Ltr, the only style member)"
+    },
+    {
+      "id": "op-updatetooltip",
+      "kind": "op-round-trip",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "ops/op-updatetooltip.json",
+      "expectedFile": "ops/op-updatetooltip.json",
+      "description": "UpdateTooltip"
+    },
+    {
+      "id": "op-updatetooltip (phase 2527 absent member clears the trait)",
+      "kind": "op-round-trip",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "ops/op-updatetooltip (phase 2527 absent member clears the trait).json",
+      "expectedFile": "ops/op-updatetooltip (phase 2527 absent member clears the trait).json",
+      "description": "UpdateTooltip (Phase 2527 absent member clears the trait)"
+    },
+    {
+      "id": "op-updatetooltip (phase 2527 i18n)",
+      "kind": "op-round-trip",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "ops/op-updatetooltip (phase 2527 i18n).json",
+      "expectedFile": "ops/op-updatetooltip (phase 2527 i18n).json",
+      "description": "UpdateTooltip (Phase 2527 i18n)"
     },
     {
       "id": "reject-1811-time-alias-variant-disagrees",
@@ -5901,6 +5948,36 @@
       "description": "Unknown op discriminator 'Yeet'"
     },
     {
+      "id": "reject-op-updateaccessibility-missing-accessibility",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updateaccessibility-missing-accessibility.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.accessibility",
+      "description": "UpdateAccessibility without its record: an absent trait is spelled {} (Phase 2527)"
+    },
+    {
+      "id": "reject-op-updateaccessibility-near-miss",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updateaccessibility-near-miss.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility.ariaLabel",
+      "description": "UpdateAccessibility near-miss member, refused as on the envelope (Phase 2527)"
+    },
+    {
+      "id": "reject-op-updateaccessibility-nonobject",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updateaccessibility-nonobject.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.accessibility",
+      "description": "UpdateAccessibility accessibility not a JSON object (Phase 2527)"
+    },
+    {
       "id": "reject-op-updateprop-missing-path",
       "kind": "reject",
       "since": "0.3.0",
@@ -5929,6 +6006,26 @@
       "expectedErrorCode": "UNKNOWN_DU_CASE",
       "expectedPath": "$.style.direction",
       "description": "UpdateStyle style.direction outside the closed set — the op arm's twin of the node vector above (Phase 1472)"
+    },
+    {
+      "id": "reject-op-updatetooltip-missing-target",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updatetooltip-missing-target.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.target",
+      "description": "UpdateTooltip without a target (Phase 2527)"
+    },
+    {
+      "id": "reject-op-updatetooltip-nontext",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "op",
+      "inputFile": "reject/reject-op-updatetooltip-nontext.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.tooltip",
+      "description": "UpdateTooltip tooltip not a TextSource (Phase 2527)"
     },
     {
       "id": "reject-rating-max-zero",

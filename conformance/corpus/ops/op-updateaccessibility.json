@@ -1,0 +1,1 @@
+{"$type":"UpdateAccessibility","accessibility":{"describedBy":"metric-1-help","label":{"$type":"Static","value":"Revenue, this quarter"},"liveRegion":"polite","role":"status"},"target":"metric-1"}

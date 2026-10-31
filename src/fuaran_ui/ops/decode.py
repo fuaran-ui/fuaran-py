@@ -23,12 +23,14 @@ from ..result import (
     Ok,
 )
 from ..schema.decode import (
+    _decode_accessibility,
     _decode_binding,
     _decode_kind,
     _decode_node_value,
     _decode_state,
     _decode_style,
     _decode_style_delta,
+    _decode_text_source,
     _dispatch,
     _expect_array,
     _expect_int,
@@ -51,6 +53,8 @@ OP_CASES = frozenset(
         "UpdateStyle",
         "PatchStyle",
         "UpdateState",
+        "UpdateAccessibility",
+        "UpdateTooltip",
         "InsertChild",
         "RemoveNode",
         "MoveNode",
@@ -118,6 +122,14 @@ def _op_state(value: object, path: str) -> Value:
     return _decode_state(value, path)
 
 
+def _op_accessibility(value: object, path: str) -> Value:
+    return _decode_accessibility(value, path)
+
+
+def _op_text_source(value: object, path: str) -> Value:
+    return _decode_text_source(value, path)
+
+
 def _op_id_list(value: object, path: str) -> Value:
     arr = _expect_array(value, path)
     return Arr([_expect_string(item, f"{path}[{i}]") for i, item in enumerate(arr)])
@@ -137,6 +149,9 @@ OP_SCHEMAS: dict[str, list[tuple[str, bool, OpFieldDecoder]]] = {
     "UpdateStyle": [("style", True, _op_style), ("target", True, _op_target)],
     "PatchStyle": [("style", True, _op_style_delta), ("target", True, _op_target)],
     "UpdateState": [("state", True, _op_state), ("target", True, _op_target)],
+    "UpdateAccessibility": [("accessibility", True, _op_accessibility), ("target", True, _op_target)],
+    # An absent `tooltip` clears the trait: the one optional member of any op.
+    "UpdateTooltip": [("target", True, _op_target), ("tooltip", False, _op_text_source)],
     "InsertChild": [("child", True, _op_node), ("parentId", True, _op_target)],
     "RemoveNode": [("target", True, _op_target)],
     "MoveNode": [("newParentId", True, _op_target), ("target", True, _op_target)],

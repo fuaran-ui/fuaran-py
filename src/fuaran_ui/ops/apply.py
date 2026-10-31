@@ -121,6 +121,10 @@ def _set_extra(node: Node, key: str, value: Value) -> Node:
     return Node(node.id, node.kind, extras)
 
 
+def _drop_extra(node: Node, key: str) -> Node:
+    return Node(node.id, node.kind, {k: v for k, v in node.extras.items() if k != key})
+
+
 def _store_style(node: Node, members: dict[str, Value]) -> Node:
     """Store a style record in the decoder's omitted-when-default form.
 
@@ -964,6 +968,33 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         return _ok(tree)
 
+    if tag == "UpdateAccessibility":
+        # The whole record replaces the trait; a record setting no member is stored
+        # as the ABSENT slot, which is how the trait is removed (Phase 2527).
+        target = _as_str(fields["target"])
+        accessibility = fields["accessibility"]
+        empty = isinstance(accessibility, Obj) and not accessibility.fields
+        tree = _map(
+            target,
+            lambda n: _drop_extra(n, "accessibility") if empty else _set_extra(n, "accessibility", accessibility),
+            root,
+        )
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
+    if tag == "UpdateTooltip":
+        # An absent `tooltip` member clears the trait (Phase 2527).
+        target = _as_str(fields["target"])
+        tree = _map(
+            target,
+            lambda n: _set_extra(n, "tooltip", fields["tooltip"]) if "tooltip" in fields else _drop_extra(n, "tooltip"),
+            root,
+        )
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
     if tag == "InsertChild":
         parent_id = _as_str(fields["parentId"])
         child = _as_node(fields["child"])
@@ -1173,7 +1204,8 @@ def _op_can_grow(op: Obj) -> bool:
     a payload whose ids repeat has fewer ids than nodes. ``MoveNode`` carries no node
     and is checked anyway: moving one legal branch under the leaf of another stacks
     two depths that each passed. Everything else - ``UpdateProp``, ``ReplaceBinding``,
-    ``UpdateStyle``, ``PatchStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow
+    ``UpdateStyle``, ``PatchStyle``, ``UpdateAccessibility``, ``UpdateTooltip``,
+    ``RemoveNode``, ``ReorderChildren`` - cannot grow
     the tree, is not charged the walk, and still applies to a tree already over a limit
     it did not put there.
     """

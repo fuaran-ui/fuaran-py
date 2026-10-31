@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "08ca738ed16bd740e160879588ee8aa778a2d6724beffc08126fedf462d47019"
+IDL_SHA256 = "6c868d199afb85263b42344ce1930b1604dd6abf3a209dfab1d4267e081a47f3"
 IDL_VERSION = 1
 
 
@@ -65,6 +65,7 @@ T_enum_ButtonVariant = T("enum", "ButtonVariant")
 T_str = T("str")
 T_fn = T("fn", wire="<closure>")
 T_union_Binding_bool = T("union", "Binding", args=(T_bool,))
+T_record_Affordance = T("record", "Affordance")
 T_enum_ToneVariant = T("enum", "ToneVariant")
 T_enum_ChartKind = T("enum", "ChartKind")
 T_hosted_json = T("hosted", wire="json")
@@ -148,6 +149,8 @@ T_record_Accessibility = T("record", "Accessibility")
 T_record_StateBehaviour = T("record", "StateBehaviour")
 T_record_SemanticStyle = T("record", "SemanticStyle")
 T_enum_LiveRegionKind = T("enum", "LiveRegionKind")
+T_record_AffordanceAlias = T("record", "AffordanceAlias")
+T_list_record_AffordanceAlias = T("list", of=T_record_AffordanceAlias)
 T_union_CellKindErased = T("union", "CellKindErased")
 T_union_ColumnWidth = T("union", "ColumnWidth")
 T_union_Binding_json = T("union", "Binding", args=(T_json,))
@@ -508,6 +511,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("icon", "optional", T_str),
         F("tooltip", "hostOnly", T_fn),
         F("disabled", "optional", T_union_Binding_bool),
+        F("affordance", "optional", T_record_Affordance),
     ),
     "Callout": (
         F("body", "required", T_union_TextSource),
@@ -751,6 +755,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("disabled", "optional", T_union_Binding_bool),
         F("multiple", "optional", T_bool),
         F("values", "optional", T_union_Binding_list_str),
+        F("affordance", "optional", T_record_Affordance),
     ),
     "Skeleton": (F("rows", "required", T_int),),
     "Sparkline": (F("source", "required", T_union_Binding_list_float),),
@@ -825,6 +830,18 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("role", "optional", T_hosted_json),
         F("speak", "optional", T_union_TextSource),
     ),
+    "Affordance": (
+        F("patterns", "omitDefault", T_list_str, default=[]),
+        F("readPatterns", "omitDefault", T_list_str, default=[]),
+        F("aliases", "omitDefault", T_list_record_AffordanceAlias, default=[]),
+        F("description", "optional", T_str),
+        F("clearable", "omitDefault", T_bool, default=False),
+        F("neverControllable", "omitDefault", T_bool, default=False),
+    ),
+    "AffordanceAlias": (
+        F("alias", "required", T_str),
+        F("value", "required", T_str),
+    ),
     "ButtonGroupItem": (
         F("label", "required", T_union_TextSource),
         F("onClick", "optional", T_fn),
@@ -897,6 +914,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("required", "omitDefault", T_bool, default=False),
         F("help", "optional", T_union_TextSource),
         F("rule", "optional", T_record_FieldRule),
+        F("affordance", "optional", T_record_Affordance),
     ),
     "GuestChannel": (
         F("direction", "required", T_enum_ChannelDirection),

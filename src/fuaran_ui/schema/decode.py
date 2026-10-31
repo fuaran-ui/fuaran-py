@@ -1105,6 +1105,89 @@ def _decode_metric_comparisons(value: object, path: str) -> object:
     return Arr([_decode_metric_comparison(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
 
 
+# ── The `affordance` member (Phase 2517, WIRE_FORMAT §31.1, §31.2) ──────────
+#
+# The record is decoded here; the SLOT RULE is the carrying kind's, so it is a parameter: a
+# `Select` or a form field is a SET (each `patterns` entry names exactly one `{value}`), a `Button`
+# is a CLICK (none does), and no `readPatterns` entry names one. Any other brace, and a blank
+# pattern, is refused as `WRONG_TYPE` at the offending entry. Every member is omit-at-default, so
+# `{}` is the affordance that declares nothing and survives as `{}`.
+_AFFORDANCE_SLOT = "{value}"
+
+
+def _affordance_slot_count(pattern: str) -> int | None:
+    """How many ``{value}`` slots ``pattern`` names, or ``None`` when it carries any other brace."""
+    stripped = pattern.replace(_AFFORDANCE_SLOT, "")
+    if "{" in stripped or "}" in stripped:
+        return None
+    return (len(pattern) - len(stripped)) // len(_AFFORDANCE_SLOT)
+
+
+def _decode_affordance_patterns(value: object, path: str, slots: int, expected: str) -> Value:
+    items = _expect_array(value, path)
+    out: list[Value] = []
+    for i, entry in enumerate(items):
+        epath = f"{path}[{i}]"
+        pattern = _expect_string(entry, epath)
+        if _affordance_slot_count(pattern) != slots or not pattern.strip():
+            _fail(WRONG_TYPE, epath, f"expected {expected} at {epath}", expected)
+        out.append(pattern)
+    return Arr(out)
+
+
+def _decode_affordance_alias(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "alias": _expect_string(_require(obj, "alias", path), f"{path}.alias"),
+            "value": _expect_string(_require(obj, "value", path), f"{path}.value"),
+        },
+    )
+
+
+def _affordance_decoder(set_patterns: bool) -> Callable[[object, str], Value]:
+    def decode(value: object, path: str) -> Value:
+        obj = _expect_object(value, path)
+        fields: dict[str, Value] = {}
+        if "patterns" in obj:
+            patterns = (
+                _decode_affordance_patterns(
+                    obj["patterns"], f"{path}.patterns", 1, "a set pattern naming exactly one {value} slot"
+                )
+                if set_patterns
+                else _decode_affordance_patterns(
+                    obj["patterns"], f"{path}.patterns", 0, "a click pattern naming no slot"
+                )
+            )
+            if isinstance(patterns, Arr) and patterns.items:
+                fields["patterns"] = patterns
+        if "readPatterns" in obj:
+            reads = _decode_affordance_patterns(
+                obj["readPatterns"], f"{path}.readPatterns", 0, "a read pattern naming no slot"
+            )
+            if isinstance(reads, Arr) and reads.items:
+                fields["readPatterns"] = reads
+        if "aliases" in obj:
+            aliases = _expect_array(obj["aliases"], f"{path}.aliases")
+            if aliases:
+                fields["aliases"] = Arr(
+                    [_decode_affordance_alias(a, f"{path}.aliases[{i}]") for i, a in enumerate(aliases)]
+                )
+        if "description" in obj:
+            fields["description"] = _expect_string(obj["description"], f"{path}.description")
+        for flag in ("clearable", "neverControllable"):
+            if flag in obj and _expect_bool(obj[flag], f"{path}.{flag}"):
+                fields[flag] = True
+        return Obj(None, fields)
+
+    return decode
+
+
+_decode_affordance_set = _affordance_decoder(True)
+_decode_affordance_click = _affordance_decoder(False)
+
+
 def _decode_permissions(value: object, path: str) -> object:
     """``EmbedSpec.permissions`` — the MISSING-LIST-FIELD class once more, and
     here the empty list carries a second meaning worth naming: it is TOTAL
@@ -2367,6 +2450,7 @@ _RECORD_DECODERS: dict[str, FieldDecoder] = {
     "DrawStyle": _decode_draw_style,
     "GuestChannel": _decode_guest_channel,
     "ContentHash": _decode_json_value,
+    "Affordance": _decode_affordance_set,
 }
 _UNION_DECODERS: dict[str, FieldDecoder] = {
     "TextSource": _decode_text_source,
@@ -2708,7 +2792,12 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # was optional here and `icon` / `disabled` passed through structurally; the IDL
     # declares `variant` required, and every member is now typed.
     "Button": _kind_schema(
-        "Button", {"variant": _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant")}
+        "Button",
+        {
+            "variant": _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant"),
+            # Phase 2517 — a button is a CLICK: its patterns name no slot (WIRE_FORMAT §31.2).
+            "affordance": _decode_affordance_click,
+        },
     ),
     # Switch (Phase 392, selector widened Phase 768) — decoded by a dedicated
     # builder (`_decode_switch`), not a flat field schema, because the selector
@@ -4019,8 +4108,11 @@ def _decode_form_fields(value: object, path: str) -> Value:
             ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
         if "rule" in fobj:
             ffields["rule"] = _decode_field_rule(fobj["rule"], f"{fpath}.rule")
+        # Phase 2517 — a field is a SET: its patterns name the slot (WIRE_FORMAT §31.2).
+        if "affordance" in fobj:
+            ffields["affordance"] = _decode_affordance_set(fobj["affordance"], f"{fpath}.affordance")
         for key, raw in fobj.items():
-            if key not in ("id", "name", "kind", "label", "required", "help", "rule"):
+            if key not in ("id", "name", "kind", "label", "required", "help", "rule", "affordance"):
                 ffields[key] = from_json(raw)
         norm.append(Obj(None, ffields))
     return Arr(norm)

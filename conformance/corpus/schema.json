@@ -7532,6 +7532,9 @@
         },
         "rule": {
           "$ref": "#/$defs/FieldRule"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
         }
       },
       "required": [
@@ -7561,6 +7564,53 @@
             ]
           }
         }
+      ]
+    },
+    "Affordance": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "readPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AffordanceAlias"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "clearable": {
+          "type": "boolean"
+        },
+        "neverControllable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "AffordanceAlias": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "alias",
+        "value"
       ]
     },
     "FormSpec": {
@@ -7624,6 +7674,9 @@
         },
         "disabled": {
           "$ref": "#/$defs/Binding_bool"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
         }
       },
       "required": [
@@ -7660,6 +7713,9 @@
         },
         "onChangeMulti": {
           "const": "<closure>"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
         }
       },
       "required": [

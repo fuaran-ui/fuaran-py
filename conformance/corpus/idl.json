@@ -634,6 +634,16 @@
             ],
             "name": "Binding"
           }
+        },
+        {
+          "name": "affordance",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "record",
+            "name": "Affordance"
+          }
         }
       ],
       "tag": "Button"
@@ -3030,6 +3040,16 @@
             ],
             "name": "Binding"
           }
+        },
+        {
+          "name": "affordance",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "record",
+            "name": "Affordance"
+          }
         }
       ],
       "tag": "Select"
@@ -3979,6 +3999,118 @@
     {
       "fields": [
         {
+          "name": "patterns",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "str"
+            }
+          }
+        },
+        {
+          "name": "readPatterns",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "str"
+            }
+          }
+        },
+        {
+          "name": "aliases",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "record",
+              "name": "AffordanceAlias"
+            }
+          }
+        },
+        {
+          "name": "description",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "clearable",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "bool",
+              "value": false
+            }
+          },
+          "type": {
+            "$type": "bool"
+          }
+        },
+        {
+          "name": "neverControllable",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "bool",
+              "value": false
+            }
+          },
+          "type": {
+            "$type": "bool"
+          }
+        }
+      ],
+      "name": "Affordance"
+    },
+    {
+      "fields": [
+        {
+          "name": "alias",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "value",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        }
+      ],
+      "name": "AffordanceAlias"
+    },
+    {
+      "fields": [
+        {
           "name": "label",
           "optionality": {
             "$type": "required"
@@ -4560,6 +4692,16 @@
           "type": {
             "$type": "record",
             "name": "FieldRule"
+          }
+        },
+        {
+          "name": "affordance",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "record",
+            "name": "Affordance"
           }
         }
       ],

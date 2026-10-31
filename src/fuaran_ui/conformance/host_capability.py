@@ -371,6 +371,13 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
     "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
+    "operability": {
+        "pending": (
+            "the operability family (WIRE_FORMAT section 31: affordances, derivation, resolution) "
+            "lands with fuaran#2517; this host decodes the affordance member leniently and does not yet run the family"
+        ),
+    },
+    "page-document": {"notApplicable": "this host renders no stored page"},
     "repair": {"pending": "this host has no §28 repair function yet"},
     "row-encode": "covered",  # tests/test_row_encode.py
     "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},

@@ -1214,6 +1214,21 @@ class StateBehaviour:
 
 
 @dataclass(frozen=True)
+class SelectOptionGroup:
+    """Phase 2571 — a named group of a :class:`Select`'s options (WIRE_FORMAT §3.6.30).
+
+    ``values`` names options of the same select by their ``value``; a value named by
+    two groups, or (over static options) naming no option, is refused on decode.
+    """
+
+    label: str
+    values: tuple[str, ...]
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"label": self.label, "values": tuple(self.values)})
+
+
+@dataclass(frozen=True)
 class SelectOption:
     """A single option in a Select / Choice / Filter options list.
 
@@ -2612,6 +2627,10 @@ class Select:
     #: `controls-closure` carries both. `False` by default — the record never
     #: emitted the key before this phase.
     on_change_multi: bool = False
+    #: Phase 2571 — option groups (WIRE_FORMAT §3.6.30): each names options of this
+    #: select by ``value``; options no group names render after the groups. Empty (the
+    #: default) is no grouping and writes no key.
+    groups: tuple[SelectOptionGroup, ...] = ()
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2626,6 +2645,8 @@ class Select:
                 "source": self.source,
                 "value": self.value,
                 "values": self.values,
+                # Phase 2571 — omit-at-default: no groups writes no key.
+                "groups": self.groups or None,
             },
         )
 

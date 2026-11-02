@@ -3050,6 +3050,23 @@
             "$type": "record",
             "name": "Affordance"
           }
+        },
+        {
+          "name": "groups",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "record",
+              "name": "SelectOptionGroup"
+            }
+          }
         }
       ],
       "tag": "Select"
@@ -4943,6 +4960,32 @@
         }
       ],
       "name": "SelectOption"
+    },
+    {
+      "fields": [
+        {
+          "name": "label",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "values",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "str"
+            }
+          }
+        }
+      ],
+      "name": "SelectOptionGroup"
     },
     {
       "fields": [

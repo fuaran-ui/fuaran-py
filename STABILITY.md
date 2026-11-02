@@ -13,6 +13,16 @@ The package is pre-1.0, so a minor version may break; this record is how a consu
 ones did. The wire format itself is governed by the shared specification and its conformance
 corpus, not by this file.
 
+## Unreleased — after the `v0.11.0` tag (the version is not yet advanced)
+
+### additive — a Select carries optional option groups (Phase 2571)
+
+- `Select.groups: tuple[SelectOptionGroup, ...]` (default empty, omitted on the wire) and the new
+  `SelectOptionGroup(label, values)`; `SelectOption` is unchanged. The decoder reads `groups`
+  (omit-at-default: `[]` is the absent member) and refuses, `WRONG_TYPE` at the offending `values`
+  element, a value named more than once and, over static options, a value naming no option
+  (WIRE_FORMAT §3.6.30). Certified by `nodes/select-option-groups*.json` and `reject/reject-2571-*`.
+
 ## 0.11.0 (untagged until the operator's release)
 
 ### behavioural — an explicit `multiple=False` on a Select is written as authored (Phase 1962)

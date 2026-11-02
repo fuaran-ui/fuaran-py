@@ -3661,6 +3661,24 @@
       "description": "Input/Select (Phase 1962 — an explicit multiple:false, emitted as authored)"
     },
     {
+      "id": "select-option-groups",
+      "kind": "node-round-trip",
+      "since": "0.101.0",
+      "decoder": "node",
+      "inputFile": "nodes/select-option-groups.json",
+      "expectedFile": "nodes/select-option-groups.json",
+      "description": "Input/Select (Phase 2571 — option groups, every option grouped)"
+    },
+    {
+      "id": "select-option-groups-remainder",
+      "kind": "node-round-trip",
+      "since": "0.101.0",
+      "decoder": "node",
+      "inputFile": "nodes/select-option-groups-remainder.json",
+      "expectedFile": "nodes/select-option-groups-remainder.json",
+      "description": "Input/Select (Phase 2571 — option groups, an ungrouped remainder)"
+    },
+    {
       "id": "shared-source-seeded-pair",
       "kind": "node-round-trip",
       "since": "0.46.0",
@@ -4602,6 +4620,26 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.weight",
       "description": "the IDL-required `SplitPanel.weight` absent from an otherwise canonical document (`split-1` less that member): MISSING_FIELD at the member's own path. One of the members a hand decoder once never checked (fuaran#2296)"
+    },
+    {
+      "id": "reject-2571-select-group-value-twice",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2571-select-group-value-twice.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.groups[1].values[1]",
+      "description": "a Select option group naming a value an earlier group already names. An option belongs to at most one group: drawn twice it would be two entries a reader cannot tell apart, and drawn once the document would not say which group holds it, so no rendering could be the one the author meant (WIRE_FORMAT §3.6.30, Phase 2571)"
+    },
+    {
+      "id": "reject-2571-select-group-value-unknown",
+      "kind": "reject",
+      "since": "0.101.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-2571-select-group-value-unknown.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.groups[0].values[1]",
+      "description": "a Select option group naming a value no static option carries. A group gathers the Select's own options and adds none, so a value it cannot find is an author's typo the document would otherwise drop in silence. Over a BOUND source the options are not in the document, and the same miss is reported at render instead (WIRE_FORMAT §3.6.30, Phase 2571)"
     },
     {
       "id": "reject-a11y-hidden-nonbool",

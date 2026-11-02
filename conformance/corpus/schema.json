@@ -7716,6 +7716,12 @@
         },
         "affordance": {
           "$ref": "#/$defs/Affordance"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectOptionGroup"
+          }
         }
       },
       "required": [
@@ -7737,6 +7743,24 @@
           "value"
         ]
       }
+    },
+    "SelectOptionGroup": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "label",
+        "values"
+      ]
     },
     "FileUploadSpec": {
       "type": "object",

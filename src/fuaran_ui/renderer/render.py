@@ -1959,7 +1959,7 @@ class Renderer:
 
     def _select(self, node: Node, fields: dict[str, Value]) -> str:
         label = element("span", [("class", "fuaran-select-label")], escape_text(self._text(fields.get("label"))))
-        options_html = self._render_options(fields.get("source"), fields.get("placeholder"))
+        options_html = self._render_options(fields.get("source"), fields.get("placeholder"), fields.get("groups"))
         disabled = resolve_binding(fields.get("disabled"), self.sources)
         select_attrs: list[tuple[str, str]] = [("class", "fuaran-select-control")]
         # Phase 291 — a multi-select emits the `multiple` attribute; a controlled
@@ -1971,22 +1971,32 @@ class Renderer:
         control = element("select", select_attrs, options_html)
         return element("label", [("class", "fuaran-select")], label + control)
 
-    def _render_options(self, source: Value, placeholder: Value) -> str:
+    def _render_options(self, source: Value, placeholder: Value, groups: Value = None) -> str:
+        """The placeholder, then the options. Under Phase 2571 ``groups`` (WIRE_FORMAT
+        §3.6.30): one ``<optgroup label>`` per group in list order holding the options it
+        names in ``source`` order, then the options no group names."""
         items: list[str] = []
         if placeholder is not None:
             items.append(text_element("option", [("value", "")], self._text(placeholder)))
         resolved = resolve_source(source, self.sources)
-        if isinstance(resolved, Arr):
-            for opt in resolved.items:
-                if isinstance(opt, Obj):
-                    value = opt.fields.get("value", "")
-                    items.append(
-                        text_element(
-                            "option",
-                            [("value", str(value))],
-                            self._text(opt.fields.get("label", value)),
-                        )
-                    )
+        options = [o for o in resolved.items if isinstance(o, Obj)] if isinstance(resolved, Arr) else []
+
+        def option(opt: Obj) -> str:
+            value = opt.fields.get("value", "")
+            return text_element("option", [("value", str(value))], self._text(opt.fields.get("label", value)))
+
+        group_list = [g for g in groups.items if isinstance(g, Obj)] if isinstance(groups, Arr) else []
+        if not group_list:
+            items.extend(option(o) for o in options)
+            return "".join(items)
+        named: set[str] = set()
+        for group in group_list:
+            values = group.fields.get("values")
+            members = {str(v) for v in values.items} if isinstance(values, Arr) else set()
+            named |= members
+            inner = "".join(option(o) for o in options if str(o.fields.get("value", "")) in members)
+            items.append(element("optgroup", [("label", str(group.fields.get("label", "")))], inner))
+        items.extend(option(o) for o in options if str(o.fields.get("value", "")) not in named)
         return "".join(items)
 
     def _form(self, node: Node, fields: dict[str, Value]) -> str:

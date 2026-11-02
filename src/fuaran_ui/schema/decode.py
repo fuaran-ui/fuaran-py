@@ -644,6 +644,73 @@ def _decode_binding_select_options(value: object, path: str) -> Value:
     return _typed_static_binding(value, path, _decode_select_option_array, opaque_placeholder, Arr([]))
 
 
+def _decode_select_option_groups(value: object, path: str) -> Value:
+    """Phase 2571 — ``Select.groups`` (WIRE_FORMAT §3.6.30): a list of
+    ``{"label":<str>,"values":[<str>,…]}``, omit-at-default (``[]`` decodes to the
+    absent member). The two cross-member refusals are :func:`_check_select_groups`'s."""
+    arr = _expect_array(value, path)
+    groups: list[Value] = []
+    for i, item in enumerate(arr):
+        gp = f"{path}[{i}]"
+        obj = _expect_object(item, gp)
+        label = _expect_string(_require(obj, "label", gp), f"{gp}.label")
+        values = _expect_array(_require(obj, "values", gp), f"{gp}.values")
+        groups.append(
+            Obj(
+                None,
+                {
+                    "label": label,
+                    "values": Arr([_expect_string(v, f"{gp}.values[{j}]") for j, v in enumerate(values)]),
+                },
+            )
+        )
+    return Arr(groups) if groups else _DROP  # type: ignore[return-value]
+
+
+def _check_select_groups(fields: dict[str, Value], path: str) -> None:
+    """Phase 2571 — the option-group refusals, both ``WRONG_TYPE`` at the offending
+    ``values`` element: a value named more than once (by two groups, or twice by one),
+    and — over STATIC options only — a value naming no option. A bound source resolves
+    at render; the decoder cannot judge it. Mirror of the reference host."""
+    groups = fields.get("groups")
+    if not isinstance(groups, Arr):
+        return
+    source = fields.get("source")
+    known: set[str] | None = None
+    if isinstance(source, Obj) and source.tag == "Static":
+        options = source.fields.get("value")
+        items = options.items if isinstance(options, Arr) else []
+        values = [o.fields.get("value") for o in items if isinstance(o, Obj)]
+        if OPAQUE not in values:
+            known = {v for v in values if isinstance(v, str)}
+    seen: dict[str, tuple[int, str]] = {}
+    for gi, group in enumerate(groups.items):
+        assert isinstance(group, Obj)
+        label = cast(str, group.fields["label"])
+        named = cast(Arr, group.fields["values"])
+        for vi, raw in enumerate(named.items):
+            value = cast(str, raw)
+            at = f"{path}.groups[{gi}].values[{vi}]"
+            if value in seen:
+                first, first_label = seen[value]
+                _fail(
+                    WRONG_TYPE,
+                    at,
+                    f"option value '{value}' is already named by group {first} ('{first_label}'): "
+                    "an option belongs to at most one group",
+                    "a value no other group (and no earlier entry of this group) names",
+                )
+            if known is not None and value not in known:
+                _fail(
+                    WRONG_TYPE,
+                    at,
+                    f"option value '{value}' names no option of this Select: "
+                    "a group can only gather the options its Select carries",
+                    "the value of one of this Select's options: " + ", ".join(f"'{v}'" for v in sorted(known)),
+                )
+            seen[value] = (gi, label)
+
+
 def _decode_binding_string_opt(value: object, path: str) -> Value:
     # `<opaque>` → the scalar sentinel string; `null` → null (a genuine `None` option).
     return _typed_static_binding(value, path, lambda v, p: _expect_string(v, p), OPAQUE, None)
@@ -2747,6 +2814,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         {
             "source": (_decode_binding_select_options, ("options", "data")),
             "value": _decode_binding_string_opt,
+            # Phase 2571 — omit-at-default; the cross-member refusals run after the
+            # fields are read (`_check_select_groups`).
+            "groups": _decode_select_option_groups,
         },
     ),
     # Phase 426 — `onDismiss` is a genuine wire-survivable Action, decoded null-strict when present.
@@ -3002,6 +3072,9 @@ def _decode_kind(value: object, path: str) -> Obj:
                 fields[name] = cast(Value, decoded)
         elif required:
             _fail(MISSING_FIELD, f"{path}.{name}", f"missing required field '{name}'")
+    if tag == "Select":
+        # Phase 2571 — the option groups, checked against the static options.
+        _check_select_groups(fields, path)
     # Preserve any extra (unknown) keys structurally so the round-trip is lossless
     # and tolerant of fields a later spec version adds (decoder tolerance, §2 rule 2).
     # Retired vocabulary (0.2.0 clean break) is NEVER preserved — the reference

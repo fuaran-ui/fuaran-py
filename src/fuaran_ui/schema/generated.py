@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "3d7b02a648d9b15cfd67622ede39e11272f227893097986a786bd2b86e825a8c"
+IDL_SHA256 = "514121018ffc157776d234c63295c8686f399d42a55f589a2756fe3974968f18"
 IDL_VERSION = 1
 
 
@@ -136,6 +136,8 @@ T_record_SelectOption = T("record", "SelectOption")
 T_list_record_SelectOption = T("list", of=T_record_SelectOption)
 T_union_Binding_list_record_SelectOption = T("union", "Binding", args=(T_list_record_SelectOption,))
 T_union_Binding_list_str = T("union", "Binding", args=(T_list_str,))
+T_record_SelectOptionGroup = T("record", "SelectOptionGroup")
+T_list_record_SelectOptionGroup = T("list", of=T_record_SelectOptionGroup)
 T_list_float = T("list", of=T_float)
 T_union_Binding_list_float = T("union", "Binding", args=(T_list_float,))
 T_record_SwitchCase = T("record", "SwitchCase")
@@ -756,6 +758,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("multiple", "optional", T_bool),
         F("values", "optional", T_union_Binding_list_str),
         F("affordance", "optional", T_record_Affordance),
+        F("groups", "omitDefault", T_list_record_SelectOptionGroup, default=[]),
     ),
     "Skeleton": (F("rows", "required", T_int),),
     "Sparkline": (F("source", "required", T_union_Binding_list_float),),
@@ -942,6 +945,10 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
     "SelectOption": (
         F("label", "required", T_str),
         F("value", "required", T_str),
+    ),
+    "SelectOptionGroup": (
+        F("label", "required", T_str),
+        F("values", "required", T_list_str),
     ),
     "SemanticStyle": (
         F("direction", "omitDefault", T_enum_TextDirection, default="auto"),

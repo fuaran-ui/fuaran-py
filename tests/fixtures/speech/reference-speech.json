@@ -1089,6 +1089,43 @@
       ],
       "omissions": []
     },
+    "emitter-panel": {
+      "text": "Cold room 3\nTemperature: 4\nCooling\nButton: Start defrost\nForm, 2 fields\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Cold room 3</emphasis></s><break strength=\"strong\"/>\n<s>Temperature: 4</s><break strength=\"medium\"/>\n<s>Cooling</s><break strength=\"medium\"/>\n<s>Button: Start defrost</s><break strength=\"medium\"/>\n<s>Form, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "panel-title",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "panel-temp",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-status",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-defrost",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-schedule",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "empty-state-card": {
       "text": "No saved searches yet\nSearches you save will appear here so you can re-run them with one click.\nButton: Browse jobs\n",
       "ssml": "<speak>\n<s><emphasis level=\"moderate\">No saved searches yet</emphasis></s><break strength=\"strong\"/>\n<s>Searches you save will appear here so you can re-run them with one click.</s><break strength=\"medium\"/>\n<s>Button: Browse jobs</s><break strength=\"medium\"/>\n</speak>\n",

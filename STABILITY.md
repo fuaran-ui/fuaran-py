@@ -46,6 +46,17 @@ corpus, not by this file.
   element, a value named more than once and, over static options, a value naming no option
   (WIRE_FORMAT §3.6.30). Certified by `nodes/select-option-groups*.json` and `reject/reject-2571-*`.
 
+### additive and behavioural — accessibility and tooltip edits are TreeOps (Phase 2527)
+
+- The op decoder and apply engine carry `updateAccessibility` and `updateTooltip`. The tree diff now emits them, after the
+  style and state edits, so a diff over a changed trait returns ops it did not return before. Certified by
+  `ops/op-updateaccessibility*.json`, `ops/op-updatetooltip*.json` and their `reject/` vectors.
+
+### behavioural (wire readers) — the affordance member is decoded and refused (Phase 2522)
+
+- The decoder reads the `affordance` member and refuses a malformed one (WIRE_FORMAT §31.1, §31.2). Certified by
+  `tests/test_operability_wire_corpus.py`.
+
 ## 0.11.0
 
 ### behavioural — an explicit `multiple=False` on a Select is written as authored (Phase 1962)

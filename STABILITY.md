@@ -15,6 +15,14 @@ corpus, not by this file.
 
 ## Unreleased — after the `v0.11.0` tag (the version is not yet advanced)
 
+### additive — a table cell cites its figure (Phase 2592)
+
+- `DataGrid.staticRows.citations` and `TableCitation` (omitted when empty) and the `fuaran.table(..., citations=...)`
+  parameter. The decoder reads each coordinate against the rows, and refuses an empty array, a negative or out-of-range
+  row or column and two entries for one cell (WIRE_FORMAT §3.6.33). A cited `<td>` carries `data-fact`, with a label as a
+  `fuaran-cited-label` first child; the email projection keeps the attribute and drops the label. Certified by
+  `nodes/table-citation-*.json` and `reject/reject-table-citation*.json`.
+
 ### additive — a cited figure reads inside a sentence (Phase 2591)
 
 - `Markdown.citations` and `MarkdownCitation` (omitted when empty) and the `fuaran.markdown(..., citations=...)`

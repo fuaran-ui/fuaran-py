@@ -3406,10 +3406,48 @@ def _validate_static_rows(raw: object, path: str) -> None:
     sortable = raw.get("sortable")
     if sortable is not None and not isinstance(sortable, bool):
         _fail(WRONG_TYPE, f"{path}.sortable", "sortable must be a boolean")
+    if "citations" in raw:
+        _validate_table_citations(raw["citations"], raw.get("rows"), f"{path}.citations")
     default_sort = raw.get("defaultSort")
     if default_sort is None:
         return
     _validate_default_sort(default_sort, f"{path}.defaultSort")
+
+
+def _table_coordinate(obj: dict[str, object], name: str, path: str) -> int:
+    """A cited cell's ``row`` or ``column``: a non-negative integer, as the header index is."""
+    value = _require(obj, name, path)
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    _fail(WRONG_TYPE, f"{path}.{name}", f"{name} must be a non-negative integer index")
+    return 0
+
+
+def _validate_table_citations(raw: object, rows: object, path: str) -> None:
+    """Phase 2592 (WIRE_FORMAT §3.6.33) — ``staticRows.citations``, read against the rows they
+    address. Absent is the one spelling of none, so an empty array is refused, a coordinate
+    names a cell that exists, and a cell is cited once. ``reference`` is opaque, as on ``Fact``."""
+    items = _expect_array(raw, path)
+    if not items:
+        _fail(WRONG_TYPE, path, "a non-empty citation list, or no member at all", "citation list")
+    table = rows if isinstance(rows, list) else []
+    seen: set[tuple[int, int]] = set()
+    for i, entry in enumerate(items):
+        at = f"{path}[{i}]"
+        obj = _expect_object(entry, at)
+        row = _table_coordinate(obj, "row", at)
+        if row >= len(table):
+            _fail(WRONG_TYPE, f"{at}.row", "a row index this table has", "citation row")
+        column = _table_coordinate(obj, "column", at)
+        cells = table[row]
+        if column >= (len(cells) if isinstance(cells, list) else 0):
+            _fail(WRONG_TYPE, f"{at}.column", "a column index the cited row has", "citation column")
+        _expect_string(_require(obj, "reference", at), f"{at}.reference")
+        if "label" in obj:
+            _decode_text_source(obj["label"], f"{at}.label")
+        if (row, column) in seen:
+            _fail(WRONG_TYPE, at, "a cell no other citation in this list names", "citation cell")
+        seen.add((row, column))
 
 
 def _validate_default_sort(default_sort: object, ds_path: str) -> None:

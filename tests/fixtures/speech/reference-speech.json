@@ -4671,6 +4671,45 @@
         }
       ]
     },
+    "table-citation-all": {
+      "text": "Table, 2 rows, 4 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 4 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-all",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "table-citation-none": {
+      "text": "Table, 2 rows, 4 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 4 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-none",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "table-citation-some": {
+      "text": "Table, 2 rows, 3 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 3 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-some",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "table-1": {
       "text": "Table, 2 rows, 2 columns\n",
       "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",

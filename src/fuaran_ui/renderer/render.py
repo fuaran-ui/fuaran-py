@@ -165,6 +165,16 @@ def _field_rule_attrs(rule: Value, control_tag: str | None) -> list[tuple[str, s
     return out
 
 
+def table_citations(fields: dict[str, Value]) -> dict[tuple[int, int], Obj]:
+    """Phase 2592 (§3.6.33) — a static table's cited cells by ``(row, column)``."""
+    citations = fields.get("citations")
+    return {
+        (c.fields["row"], c.fields["column"]): c  # type: ignore[misc]
+        for c in (citations.items if isinstance(citations, Arr) else ())
+        if isinstance(c, Obj)
+    }
+
+
 def _a11y_name(value: Value, sources: BindingSourcesLike | None) -> str | None:
     """Resolve an accessibility name slot to its display string.
 
@@ -2168,12 +2178,11 @@ class Renderer:
             )
         rows = fields.get("rows")
         body_rows = ""
+        cited = table_citations(fields)
         if isinstance(rows, Arr):
-            for row in rows.items:
+            for i, row in enumerate(rows.items):
                 if isinstance(row, Arr):
-                    cells = "".join(
-                        text_element("td", [("class", "fuaran-table-cell")], self._text(c)) for c in row.items
-                    )
+                    cells = "".join(self._table_cell(c, cited.get((i, j))) for j, c in enumerate(row.items))
                     body_rows += element("tr", [("class", "fuaran-table-row")], cells)
         thead = element("thead", [], element("tr", [], header_cells))
         tbody = element("tbody", [], body_rows)
@@ -2194,6 +2203,18 @@ class Renderer:
                 attrs.append(("data-fuaran-sort-column", str(column)))
                 attrs.append(("data-fuaran-sort-direction", direction))
         return element("table", attrs, thead + tbody)
+
+    def _table_cell(self, cell: Value, citation: Obj | None) -> str:
+        """Phase 2592 (§3.6.33) — the reference on the cell, a label as its first child."""
+        if citation is None:
+            return text_element("td", [("class", "fuaran-table-cell")], self._text(cell))
+        label = self._text(citation.fields["label"]) if "label" in citation.fields else ""
+        return element(
+            "td",
+            [("class", "fuaran-table-cell"), ("data-fact", str(citation.fields["reference"]))],
+            (text_element("span", [("class", "fuaran-cited-label")], label + " ") if label else "")
+            + escape_text(self._text(cell)),
+        )
 
     def _make_vis_placeholder(self, css: str, name: str, count: int, text: str) -> str:
         return text_element(

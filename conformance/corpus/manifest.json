@@ -4014,6 +4014,33 @@
       "description": "Visualisation/Grid (static-table mode — staticRows; absorbed the retired Table kind)"
     },
     {
+      "id": "table-citation-all",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/table-citation-all.json",
+      "expectedFile": "nodes/table-citation-all.json",
+      "description": "Visualisation/Grid (Phase 2592 — static table with every figure cited)"
+    },
+    {
+      "id": "table-citation-none",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/table-citation-none.json",
+      "expectedFile": "nodes/table-citation-none.json",
+      "description": "Visualisation/Grid (Phase 2592 — static table citing nothing)"
+    },
+    {
+      "id": "table-citation-some",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/table-citation-some.json",
+      "expectedFile": "nodes/table-citation-some.json",
+      "description": "Visualisation/Grid (Phase 2592 — static table with some figures cited, beside a toned column and sort intent)"
+    },
+    {
       "id": "table-selectable-detail",
       "kind": "node-round-trip",
       "since": "0.98.0",
@@ -6434,6 +6461,86 @@
       "expectedErrorCode": "MISSING_FIELD",
       "expectedPath": "$.kind.cases[0].match",
       "description": "a Switch case carrying neither `match` nor `when` — no condition, so no rendering could be right. Refused at decode rather than skipped silently at render: skipping it renders the `default` and reports nothing, which is the exact class of silence this phase's finding was filed about. The message names both fields, so the author is told which two spellings exist (Phase 1535)"
+    },
+    {
+      "id": "reject-table-citation-cell-repeated",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-cell-repeated.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[1]",
+      "description": "two citations for one cell — the cell would stamp whichever a host found first; the later occurrence is the path"
+    },
+    {
+      "id": "reject-table-citation-column-jagged",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-column-jagged.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[0].column",
+      "description": "the column is read against the cited row, so a column another row has is still no cell here"
+    },
+    {
+      "id": "reject-table-citation-column-negative",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-column-negative.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[0].column",
+      "description": "a negative column — the schema says the same with minimum:0"
+    },
+    {
+      "id": "reject-table-citation-column-range",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-column-range.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[0].column",
+      "description": "a citation whose column names no cell of its row"
+    },
+    {
+      "id": "reject-table-citation-reference-missing",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-reference-missing.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.staticRows.citations[0].reference",
+      "description": "a citation that cites nothing — `reference` is the member that makes it one"
+    },
+    {
+      "id": "reject-table-citation-row-negative",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-row-negative.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[0].row",
+      "description": "a negative row — the schema says the same with minimum:0"
+    },
+    {
+      "id": "reject-table-citation-row-range",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citation-row-range.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations[0].row",
+      "description": "a citation whose row names no row of the table"
+    },
+    {
+      "id": "reject-table-citations-empty",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-table-citations-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.staticRows.citations",
+      "description": "an empty `citations` array — absent is the one spelling of none, so a document has one byte form"
     },
     {
       "id": "reject-tokens-closed-without-suggestions",

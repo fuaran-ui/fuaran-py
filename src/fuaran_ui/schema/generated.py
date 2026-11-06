@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "59b30bfa4b6bf50e0623f6672dc27a23170dead76c4cbda6c181bd7e6e704c59"
+IDL_SHA256 = "5defc2bc8886228c73a3f41b4b225de6df5b9e0068db44ac74378471ff9a6665"
 IDL_VERSION = 1
 
 
@@ -172,6 +172,8 @@ T_enum_ChannelDirection = T("enum", "ChannelDirection")
 T_enum_TextDirection = T("enum", "TextDirection")
 T_enum_StyleRole = T("enum", "StyleRole")
 T_enum_FontVoice = T("enum", "FontVoice")
+T_record_TableCitation = T("record", "TableCitation")
+T_list_record_TableCitation = T("list", of=T_record_TableCitation)
 T_list_list_union_TextSource = T("list", of=T_list_union_TextSource)
 T_enum_TrackKind = T("enum", "TrackKind")
 T_list_union_Action = T("list", of=T_union_Action)
@@ -979,6 +981,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("onLoading", "optional", T_node),
     ),
     "StaticRows": (
+        F("citations", "omitDefault", T_list_record_TableCitation, default=[]),
         F("defaultSort", "optional", T_record_DefaultSort),
         F("headers", "required", T_list_union_TextSource),
         F("rows", "required", T_list_list_union_TextSource),
@@ -1001,6 +1004,12 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_union_TextSource),
         F("icon", "optional", T_str),
         F("disabled", "optional", T_union_Binding_bool),
+    ),
+    "TableCitation": (
+        F("column", "required", T_int),
+        F("label", "optional", T_union_TextSource),
+        F("reference", "required", T_str),
+        F("row", "required", T_int),
     ),
     "TrackEntry": (
         F("default", "omitDefault", T_bool, default=False),

@@ -3021,6 +3021,22 @@ class DefaultSort:
 
 
 @dataclass(frozen=True)
+class TableCitation:
+    """Phase 2592 (WIRE_FORMAT §3.6.33) — one cell of a static table that cites its figure, by
+    zero-based ``row`` and ``column``. ``reference`` is opaque, as on :class:`Fact`; ``label``
+    is for a screen reader and is never printed.
+    """
+
+    row: int
+    column: int
+    reference: str
+    label: TextSource | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"column": self.column, "label": self.label, "reference": self.reference, "row": self.row})
+
+
+@dataclass(frozen=True)
 class Table:
     """Author-facing carrier for a static read-only table.
 
@@ -3046,6 +3062,8 @@ class Table:
     #: Phase 2474 — the declared column whose cell identifies each row. Naming one
     #: of ``columns`` makes the table SELECTABLE. Absent is omitted on the wire.
     row_key_field: str | None = None
+    #: Phase 2592 — the cells that cite their figures. Empty is no member on the wire.
+    citations: tuple[TableCitation, ...] = ()
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -3060,6 +3078,7 @@ class Table:
                 "staticRows": _obj(
                     None,
                     {
+                        "citations": list(self.citations) if self.citations else None,
                         "defaultSort": self.default_sort,
                         "headers": list(self.headers),
                         "rows": [list(r) for r in self.rows],

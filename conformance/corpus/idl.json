@@ -5206,6 +5206,23 @@
     {
       "fields": [
         {
+          "name": "citations",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "record",
+              "name": "TableCitation"
+            }
+          }
+        },
+        {
           "name": "defaultSort",
           "optionality": {
             "$type": "optional"
@@ -5400,6 +5417,49 @@
         }
       ],
       "name": "TabHeader"
+    },
+    {
+      "fields": [
+        {
+          "name": "column",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "int"
+          }
+        },
+        {
+          "name": "label",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
+          }
+        },
+        {
+          "name": "reference",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "row",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "int"
+          }
+        }
+      ],
+      "name": "TableCitation"
     },
     {
       "fields": [

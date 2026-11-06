@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "3ce196fda6ce09924bd2a9f38c97c2a0c4492e99411169fbccaeff8c66d73b33"
+IDL_SHA256 = "59b30bfa4b6bf50e0623f6672dc27a23170dead76c4cbda6c181bd7e6e704c59"
 IDL_VERSION = 1
 
 
@@ -120,6 +120,8 @@ T_list_union_TextSource = T("list", of=T_union_TextSource)
 T_record_MapMarker = T("record", "MapMarker")
 T_list_record_MapMarker = T("list", of=T_record_MapMarker)
 T_union_Binding_list_record_MapMarker = T("union", "Binding", args=(T_list_record_MapMarker,))
+T_record_MarkdownCitation = T("record", "MarkdownCitation")
+T_list_record_MarkdownCitation = T("list", of=T_record_MarkdownCitation)
 T_enum_MathDisplay = T("enum", "MathDisplay")
 T_union_MediaKind = T("union", "MediaKind")
 T_record_TrackEntry = T("record", "TrackEntry")
@@ -691,7 +693,10 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("zoom", "required", T_int),
         F("onMarkerClick", "optional", T_fn),
     ),
-    "Markdown": (F("text", "required", T_union_TextSource),),
+    "Markdown": (
+        F("citations", "omitDefault", T_list_record_MarkdownCitation, default=[]),
+        F("text", "required", T_union_TextSource),
+    ),
     "Math": (
         F("source", "required", T_str),
         F("display", "required", T_enum_MathDisplay),
@@ -932,6 +937,11 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_str),
         F("latitude", "required", T_float),
         F("longitude", "required", T_float),
+    ),
+    "MarkdownCitation": (
+        F("label", "optional", T_union_TextSource),
+        F("name", "required", T_str),
+        F("reference", "required", T_str),
     ),
     "MetricComparison": (
         F("label", "required", T_union_TextSource),

@@ -418,6 +418,16 @@ _FIELDS: dict[str, dict[str, tuple[str, _Coercer | str]]] = {
         "Variant": ("variant", _coerce_enum(HEADING_VARIANT)),
     },
     "Markdown": {"Text": ("text", _coerce_text_source)},
+    # The row 2535 left out: every other host's Fact takes these six fields.
+    "Fact": {
+        "Label": ("label", _coerce_text_source),
+        "Value": ("value", _coerce_text_source),
+        "Tone": ("tone", _coerce_enum(TONE)),
+        "Emphasis": ("emphasis", _coerce_bool),
+        "Help": ("help", _coerce_text_source),
+        "Icon": ("icon", _coerce_string),
+        "Reference": ("reference", _coerce_string),
+    },
     "Badge": {
         "Label": ("label", _coerce_text_source),
         "Variant": ("variant", _coerce_enum(BADGE_VARIANT)),

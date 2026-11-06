@@ -439,7 +439,7 @@ _TASK_CHECKBOX_SUBSTITUTIONS: Final = (
 )
 
 
-def email_safe_markdown(policy: EgressPolicy, source: str) -> str:
+def email_safe_markdown(policy: EgressPolicy, source: str, citations: Sequence[_markdown.Citation] = ()) -> str:
     """Render a markdown body to email-safe HTML.
 
     The GFM renderer escapes raw HTML by construction, so its output is a closed tag set —
@@ -448,8 +448,11 @@ def email_safe_markdown(policy: EgressPolicy, source: str) -> str:
     above: a digest is the surface where an undeclared markdown image IS the tracking pixel,
     so leaving this one unchecked would be the largest remaining hole rather than the
     smallest.
+
+    A citation (§3.6.32) keeps its span and reference but not its label: a mail client has no
+    reference stylesheet, so a hidden label would be printed in the sentence.
     """
-    html = _strip_egress_markers(sanitize_markdown_html(_markdown.to_html_with_egress(policy, source)))
+    html = _strip_egress_markers(sanitize_markdown_html(_markdown.to_html_cited(policy, citations, source)))
     for control, glyph in _TASK_CHECKBOX_SUBSTITUTIONS:
         html = html.replace(control, glyph)
     return html
@@ -785,7 +788,13 @@ class _EmailRenderer:
         return text_element(f"h{level}", [("style", style)], self._text(fields.get("text")))
 
     def _markdown(self, node: Node, fields: dict[str, Value], depth: int) -> str:
-        body = email_safe_markdown(self.options.egress_policy, self._text(fields.get("text")))
+        citations = fields.get("citations")
+        cited = [
+            _markdown.Citation(name=str(entry.fields["name"]), reference=str(entry.fields["reference"]))
+            for entry in (citations.items if isinstance(citations, Arr) else ())
+            if isinstance(entry, Obj)
+        ]
+        body = email_safe_markdown(self.options.egress_policy, self._text(fields.get("text")), cited)
         return _layout_table(
             "",
             element(

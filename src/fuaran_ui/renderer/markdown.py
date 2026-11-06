@@ -44,6 +44,9 @@ marker — see :func:`_markdown_destination`.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+
 from .egress import (
     EGRESS_REFUSAL_URL,
     PERMISSIVE_EGRESS,
@@ -60,6 +63,15 @@ from .sanitize import sanitize_markdown_html
 # Explicit whitespace / digit classes (NOT str.isspace / str.isdigit) so F#,
 # TS, and Python classify identically — their Unicode sets differ at the edges,
 # which would be a parity hazard. This fixed ASCII set is the cross-host contract.
+
+
+@dataclass(frozen=True)
+class Citation:
+    """Phase 2591 (WIRE_FORMAT §3.6.32): one figure a text cites, its label already a string."""
+
+    name: str
+    reference: str
+    label: str | None = None
 
 
 def _is_ws(c: str) -> bool:
@@ -436,7 +448,23 @@ def _scan_bare_autolink(policy: EgressPolicy, text: str, i: int) -> tuple[tuple,
     )
 
 
-def _tokenize(policy: EgressPolicy, refs: dict, text: str) -> list:
+def _cited_span(citation: Citation, title_attr: str, inner: str) -> str:
+    """The span a cited figure draws, in the line of text. The reference stylesheet hides the
+    label visually, so it reaches a screen reader without being printed in the sentence."""
+    label = '<span class="fuaran-cited-label">' + _escape_html(citation.label) + " </span>" if citation.label else ""
+    return (
+        '<span class="fuaran-cited" data-fact="'
+        + _escape_html(citation.reference)
+        + '"'
+        + title_attr
+        + ">"
+        + label
+        + inner
+        + "</span>"
+    )
+
+
+def _tokenize(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, text: str) -> list:
     toks: list = []
     n = len(text)
     i = 0
@@ -452,7 +480,7 @@ def _tokenize(policy: EgressPolicy, refs: dict, text: str) -> list:
 
     def make_image(label_text: str, url: str, title_opt: str | None) -> None:
         flush()
-        alt = _plain_text(_parse_inlines(policy, refs, label_text))
+        alt = _plain_text(_parse_inlines(policy, citations, refs, label_text))
         safe, markers = _markdown_destination(policy, EgressClass.MEDIA, url)
         title_attr = (' title="' + _escape_html(title_opt) + '"') if title_opt is not None else ""
         toks.append(
@@ -474,9 +502,13 @@ def _tokenize(policy: EgressPolicy, refs: dict, text: str) -> list:
 
     def make_link(label_text: str, url: str, title_opt: str | None) -> None:
         flush()
-        inner = _render_inlines(_parse_inlines(policy, refs, label_text))
-        safe, markers = _markdown_destination(policy, EgressClass.HYPERLINK, url)
+        inner = _render_inlines(_parse_inlines(policy, citations, refs, label_text))
         title_attr = (' title="' + _escape_html(title_opt) + '"') if title_opt is not None else ""
+        citation = next((c for c in citations if "cite:" + c.name == url), None)
+        if citation is not None:
+            toks.append(("node", ("raw", _cited_span(citation, title_attr, inner))))
+            return
+        safe, markers = _markdown_destination(policy, EgressClass.HYPERLINK, url)
         toks.append(
             (
                 "node",
@@ -728,12 +760,12 @@ def _process_emphasis(toks: list) -> list:
     return result
 
 
-def _parse_inlines(policy: EgressPolicy, refs: dict, text: str) -> list:
-    return _process_emphasis(_tokenize(policy, refs, text))
+def _parse_inlines(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, text: str) -> list:
+    return _process_emphasis(_tokenize(policy, citations, refs, text))
 
 
-def _render_inline(policy: EgressPolicy, refs: dict, text: str) -> str:
-    return _render_inlines(_parse_inlines(policy, refs, text))
+def _render_inline(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, text: str) -> str:
+    return _render_inlines(_parse_inlines(policy, citations, refs, text))
 
 
 # ── Block parsing ─────────────────────────────────────────────────────────────
@@ -1094,19 +1126,19 @@ def _align_attr(a: str) -> str:
     return ""
 
 
-def _render_blocks(policy: EgressPolicy, refs: dict, blocks: list) -> str:
-    return "".join(_render_block(policy, refs, b) for b in blocks)
+def _render_blocks(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, blocks: list) -> str:
+    return "".join(_render_block(policy, citations, refs, b) for b in blocks)
 
 
-def _render_block(policy: EgressPolicy, refs: dict, b: tuple) -> str:
+def _render_block(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, b: tuple) -> str:
     tag = b[0]
     if tag == "hr":
         return "<hr />\n"
     if tag == "heading":
         lvl = b[1]
-        return "<h" + str(lvl) + ">" + _render_inline(policy, refs, b[2]) + "</h" + str(lvl) + ">\n"
+        return "<h" + str(lvl) + ">" + _render_inline(policy, citations, refs, b[2]) + "</h" + str(lvl) + ">\n"
     if tag == "paragraph":
-        return "<p>" + _render_inline(policy, refs, b[1]) + "</p>\n"
+        return "<p>" + _render_inline(policy, citations, refs, b[1]) + "</p>\n"
     if tag == "fenced":
         lang, content = b[1], b[2]
         cls = "" if lang == "" else ' class="language-' + _escape_html(lang) + '"'
@@ -1114,14 +1146,18 @@ def _render_block(policy: EgressPolicy, refs: dict, b: tuple) -> str:
     if tag == "indented":
         return "<pre><code>" + _escape_html(b[1]) + "\n</code></pre>\n"
     if tag == "blockquote":
-        return "<blockquote>\n" + _render_blocks(policy, refs, b[1]) + "</blockquote>\n"
+        return "<blockquote>\n" + _render_blocks(policy, citations, refs, b[1]) + "</blockquote>\n"
     if tag == "table":
         headers, aligns, rows = b[1], b[2], b[3]
         out: list[str] = ['<table class="fuaran-table"><thead><tr>']
         for idx, h in enumerate(headers):
             a = aligns[idx] if idx < len(aligns) else "none"
             out.append(
-                '<th class="fuaran-table-header"' + _align_attr(a) + ">" + _render_inline(policy, refs, h) + "</th>"
+                '<th class="fuaran-table-header"'
+                + _align_attr(a)
+                + ">"
+                + _render_inline(policy, citations, refs, h)
+                + "</th>"
             )
         out.append("</tr></thead><tbody>")
         for row in rows:
@@ -1133,22 +1169,22 @@ def _render_block(policy: EgressPolicy, refs: dict, b: tuple) -> str:
                     '<td class="fuaran-table-cell"'
                     + _align_attr(a)
                     + ">"
-                    + _render_inline(policy, refs, cell)
+                    + _render_inline(policy, citations, refs, cell)
                     + "</td>"
                 )
             out.append("</tr>")
         out.append("</tbody></table>\n")
         return "".join(out)
     if tag == "bullet":
-        return "<ul>\n" + _render_items(policy, refs, b[1], b[2]) + "</ul>\n"
+        return "<ul>\n" + _render_items(policy, citations, refs, b[1], b[2]) + "</ul>\n"
     if tag == "ordered":
         start_num, tight, items = b[1], b[2], b[3]
         start_attr = "" if start_num == 1 else ' start="' + str(start_num) + '"'
-        return "<ol" + start_attr + ">\n" + _render_items(policy, refs, tight, items) + "</ol>\n"
+        return "<ol" + start_attr + ">\n" + _render_items(policy, citations, refs, tight, items) + "</ol>\n"
     return ""
 
 
-def _render_items(policy: EgressPolicy, refs: dict, tight: bool, items: list) -> str:
+def _render_items(policy: EgressPolicy, citations: Sequence[Citation], refs: dict, tight: bool, items: list) -> str:
     out: list[str] = []
     for item in items:
         task = item["task"]
@@ -1163,20 +1199,28 @@ def _render_items(policy: EgressPolicy, refs: dict, tight: bool, items: list) ->
             inner_parts: list[str] = []
             for blk in item["blocks"]:
                 if blk[0] == "paragraph":
-                    inner_parts.append(_render_inline(policy, refs, blk[1]))
+                    inner_parts.append(_render_inline(policy, citations, refs, blk[1]))
                 else:
-                    inner_parts.append("\n" + _render_block(policy, refs, blk))
+                    inner_parts.append("\n" + _render_block(policy, citations, refs, blk))
             out.append("<li" + li_class + ">" + checkbox + "".join(inner_parts) + "</li>\n")
         else:
-            out.append("<li" + li_class + ">\n" + checkbox + _render_blocks(policy, refs, item["blocks"]) + "</li>\n")
+            out.append(
+                "<li"
+                + li_class
+                + ">\n"
+                + checkbox
+                + _render_blocks(policy, citations, refs, item["blocks"])
+                + "</li>\n"
+            )
     return "".join(out)
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
 
-def to_html_with_egress(policy: EgressPolicy, source: str) -> str:
-    """Render GFM markdown ``source`` under a destination policy (§14.1).
+def to_html_cited(policy: EgressPolicy, citations: Sequence[Citation], source: str) -> str:
+    """Render GFM markdown ``source`` under a destination policy (§14.1), with the figures it
+    cites (§3.6.32).
 
     Every link and image destination is checked against ``policy``: an allowed
     one emits the normalised URL exactly as before, and a refused one emits the
@@ -1194,8 +1238,13 @@ def to_html_with_egress(policy: EgressPolicy, source: str) -> str:
     raw_lines = normalized.split("\n")
     refs, lines = _extract_ref_defs(raw_lines)
     blocks = _parse_blocks(lines)
-    html = _render_blocks(policy, refs, blocks)
+    html = _render_blocks(policy, citations, refs, blocks)
     return sanitize_markdown_html(html)
+
+
+def to_html_with_egress(policy: EgressPolicy, source: str) -> str:
+    """:func:`to_html_cited` for a text that declares no citation: every link is a link."""
+    return to_html_cited(policy, (), source)
 
 
 def to_html(source: str) -> str:

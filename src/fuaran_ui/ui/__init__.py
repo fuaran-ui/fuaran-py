@@ -819,8 +819,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.Heading(_text(text), level, variant), accessibility.none)
 
     @staticmethod
-    def markdown(id: str, body: t.TextInput) -> UiNode:  # noqa: A002
-        return _node(id, t.Markdown(_text(body)), accessibility.none)
+    def markdown(id: str, body: t.TextInput, *, citations: Sequence[t.MarkdownCitation] = ()) -> UiNode:  # noqa: A002
+        # Phase 2591 — `citations` are the figures the body cites, each placed by a link whose
+        # destination is `cite:<name>`; the display text is the link's own.
+        return _node(id, t.Markdown(_text(body), citations=tuple(citations)), accessibility.none)
 
     @staticmethod
     def metric(

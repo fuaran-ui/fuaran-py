@@ -3402,6 +3402,33 @@
       "description": "Display/Markdown"
     },
     {
+      "id": "markdown-citation-none",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/markdown-citation-none.json",
+      "expectedFile": "nodes/markdown-citation-none.json",
+      "description": "Display/Markdown (Phase 2591 — a sentence citing nothing)"
+    },
+    {
+      "id": "markdown-citation-one",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/markdown-citation-one.json",
+      "expectedFile": "nodes/markdown-citation-one.json",
+      "description": "Display/Markdown (Phase 2591 — a sentence citing one figure)"
+    },
+    {
+      "id": "markdown-citation-several",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/markdown-citation-several.json",
+      "expectedFile": "nodes/markdown-citation-several.json",
+      "description": "Display/Markdown (Phase 2591 — a sentence citing several figures)"
+    },
+    {
       "id": "masonry-1",
       "kind": "node-round-trip",
       "since": "0.70.0",
@@ -5523,6 +5550,56 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.fields[0].kind.value.commitTo",
       "description": "a Binding.Local carrying BOTH an `onCommit` closure sentinel and a declared `commitTo` key. The SetState value/valueFrom law, applied to the buffer's flush: exactly one commit destination. A decoding host can honour only the declared one — the closure is `\"<closure>\"` and nothing more — so admitting the pair would make the same bytes commit to two different places depending on who read them (Fuaran-UI Phase 1538)"
+    },
+    {
+      "id": "reject-markdown-citation-name-empty",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-markdown-citation-name-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.citations[0].name",
+      "description": "an empty citation name — no destination names it"
+    },
+    {
+      "id": "reject-markdown-citation-name-grammar",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-markdown-citation-name-grammar.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.citations[0].name",
+      "description": "a citation name outside letters, digits, `-` and `_` — a `cite:` destination could not say it without escaping"
+    },
+    {
+      "id": "reject-markdown-citation-name-repeated",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-markdown-citation-name-repeated.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.citations[1].name",
+      "description": "a citation name used twice — the figure would stamp whichever a host found first; the second occurrence is the path"
+    },
+    {
+      "id": "reject-markdown-citation-reference-missing",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-markdown-citation-reference-missing.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.citations[0].reference",
+      "description": "a citation that cites nothing — `reference` is the member that makes it one"
+    },
+    {
+      "id": "reject-markdown-citations-empty",
+      "kind": "reject",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-markdown-citations-empty.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.citations",
+      "description": "an empty `citations` array — absent is the one spelling of none, so a document has one byte form"
     },
     {
       "id": "reject-media-autoplay-nonbool",

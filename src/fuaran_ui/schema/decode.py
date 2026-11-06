@@ -1172,6 +1172,41 @@ def _decode_metric_comparisons(value: object, path: str) -> object:
     return Arr([_decode_metric_comparison(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
 
 
+def _decode_citation_name(value: object, path: str) -> str:
+    """What a ``cite:<name>`` destination can say without escaping (WIRE_FORMAT §3.6.32)."""
+    name = _expect_string(value, path)
+    if not name or not all(c.isascii() and (c.isalnum() or c in "-_") for c in name):
+        _fail(WRONG_TYPE, path, "a citation name of letters, digits, '-' and '_'", "citation name")
+    return name
+
+
+def _decode_markdown_citation(value: object, path: str) -> Obj:
+    """One ``MarkdownCitation`` (Phase 2591). ``reference`` is opaque, as on ``Fact``."""
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "label" in obj:
+        fields["label"] = _decode_text_source(obj["label"], f"{path}.label")
+    fields["name"] = _decode_citation_name(_require(obj, "name", path), f"{path}.name")
+    fields["reference"] = _expect_string(_require(obj, "reference", path), f"{path}.reference")
+    return Obj(None, fields)
+
+
+def _decode_markdown_citations(value: object, path: str) -> Arr:
+    """``MarkdownSpec.citations`` (Phase 2591). Absent is the one spelling of none, so an empty
+    array is refused rather than dropped, and a name may be used once."""
+    items = _expect_array(value, path)
+    if not items:
+        _fail(WRONG_TYPE, path, "a non-empty citation list, or no member at all", "citation list")
+    decoded = [_decode_markdown_citation(entry, f"{path}[{i}]") for i, entry in enumerate(items)]
+    seen: set[object] = set()
+    for i, entry in enumerate(decoded):
+        name = entry.fields["name"]
+        if name in seen:
+            _fail(WRONG_TYPE, f"{path}[{i}].name", "a citation name no other citation uses", "citation name")
+        seen.add(name)
+    return Arr([*decoded])
+
+
 # ── The `affordance` member (Phase 2517, WIRE_FORMAT §31.1, §31.2) ──────────
 #
 # The record is decoded here; the SLOT RULE is the carrying kind's, so it is a parameter: a
@@ -2547,6 +2582,7 @@ _LIST_DECODERS: dict[str, FieldDecoder] = {
     "record:TabHeader": _decode_tab_headers,
     "record:TrackEntry": _decode_tracks,
     "record:MetricComparison": _decode_metric_comparisons,
+    "record:MarkdownCitation": _decode_markdown_citations,
     "record:SrcSetEntry": _decode_srcset,
     "enum:EmbedPermission": _decode_permissions,
 }

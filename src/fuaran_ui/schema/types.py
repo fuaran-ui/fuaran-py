@@ -1636,11 +1636,27 @@ class Heading:
 
 
 @dataclass(frozen=True)
-class Markdown:
-    text: TextSource
+class MarkdownCitation:
+    """Phase 2591 (WIRE_FORMAT §3.6.32) — one figure a :class:`Markdown` text cites, placed by
+    a ``cite:<name>`` link. ``reference`` is opaque, as on :class:`Fact`; ``label`` is for a
+    screen reader and is never printed.
+    """
+
+    name: str
+    reference: str
+    label: TextSource | None = None
 
     def to_wire(self) -> Obj:
-        return _obj("Markdown", {"text": self.text})
+        return _obj(None, {"label": self.label, "name": self.name, "reference": self.reference})
+
+
+@dataclass(frozen=True)
+class Markdown:
+    text: TextSource
+    citations: tuple[MarkdownCitation, ...] = ()
+
+    def to_wire(self) -> Obj:
+        return _obj("Markdown", {"citations": list(self.citations) if self.citations else None, "text": self.text})
 
 
 @dataclass(frozen=True)

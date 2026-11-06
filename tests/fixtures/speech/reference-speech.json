@@ -5058,6 +5058,45 @@
       ],
       "omissions": []
     },
+    "markdown-citation-one": {
+      "text": "Online.com took 23% of the category.\n",
+      "ssml": "<speak>\n<s>Online.com took 23% of the category.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-one",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-citation-none": {
+      "text": "Online.com took 23% of the category.\n",
+      "ssml": "<speak>\n<s>Online.com took 23% of the category.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-none",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-citation-several": {
+      "text": "Online.com took 23% from £412k placed by 17 brands, against a forecast of about 20 .\n",
+      "ssml": "<speak>\n<s>Online.com took 23% from £412k placed by 17 brands, against a forecast of about 20 .</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-several",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "fact-cited": {
       "text": "Revenue: £412k\n",
       "ssml": "<speak>\n<s>Revenue: £412k</s><break strength=\"medium\"/>\n</speak>\n",

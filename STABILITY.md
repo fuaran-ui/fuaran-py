@@ -15,6 +15,15 @@ corpus, not by this file.
 
 ## Unreleased — after the `v0.11.0` tag (the version is not yet advanced)
 
+### additive — a cited figure reads inside a sentence (Phase 2591)
+
+- `Markdown.citations` and `MarkdownCitation` (omitted when empty) and the `fuaran.markdown(..., citations=...)`
+  parameter. The decoder refuses an empty array, a name outside the grammar and a repeated name. A declared `cite:` link
+  renders as `span.fuaran-cited[data-fact]` in the line of text (WIRE_FORMAT §3.6.32); `markdown.to_html_cited` is new
+  and `to_html_with_egress` is its no-citation case. The email projection keeps the span and drops the label. Certified
+  by `nodes/markdown-citation-*.json`, `reject/reject-markdown-citation*.json` and `markdown/corpus.json`.
+- `UpdateProp` gains the `Fact` row, which Phase 2535 left out of the field table.
+
 ### additive — a Fact carries its reference on the wire (Phase 2535)
 
 - `Fact.reference: str | None` (omitted when absent) and the `fuaran.fact(..., reference=...)` parameter. The decoder

@@ -108,12 +108,19 @@ def test_markdown_corpus_exercises_a_non_permissive_policy() -> None:
 @pytest.mark.parametrize("fixture", _markdown_fixtures(), ids=lambda f: f["id"])
 def test_markdown_render_matches_corpus(fixture: dict) -> None:
     policy = _policy_for(fixture)
-    assert markdown.to_html_with_egress(policy, fixture["source"]) == fixture["html"], fixture["id"]
+    citations = [
+        markdown.Citation(name=c["name"], reference=c["reference"], label=c.get("label"))
+        for c in fixture.get("citations", ())
+    ]
+    assert markdown.to_html_cited(policy, citations, fixture["source"]) == fixture["html"], fixture["id"]
 
 
-def _markdown_node(source: str) -> Node:
+def _markdown_node(source: str, citations: list | None = None) -> Node:
     """A decoded ``Markdown`` node carrying ``source`` as its literal text."""
-    result = decode_node(json.dumps({"id": "md", "kind": {"$type": "Markdown", "text": source}}))
+    kind: dict = {"$type": "Markdown", "text": source}
+    if citations:
+        kind["citations"] = citations
+    result = decode_node(json.dumps({"id": "md", "kind": kind}))
     assert result.ok, getattr(result, "error", result)
     return result.value
 
@@ -138,7 +145,7 @@ def test_markdown_node_renders_the_deny_fixture_with_no_caller_opt_in(fixture: d
     host's markdown wrapper. It is the acceptance criterion ("no caller opt-in")
     expressed as an assertion rather than a claim.
     """
-    html = render_html(_markdown_node(fixture["source"]))
+    html = render_html(_markdown_node(fixture["source"], fixture.get("citations")))
     assert fixture["html"] in html, fixture["id"]
 
 
@@ -156,14 +163,14 @@ def test_markdown_node_renders_the_named_policy_fixtures(fixture: dict) -> None:
     directions — the deny cases with nothing named, these with the fixture's own
     policy constructed by this host.
     """
-    html = render_html(_markdown_node(fixture["source"]), egress_policy=_policy_for(fixture))
+    html = render_html(_markdown_node(fixture["source"], fixture.get("citations")), egress_policy=_policy_for(fixture))
     assert fixture["html"] in html, fixture["id"]
 
 
 @corpus_required
 @pytest.mark.parametrize(
     "fixture",
-    [f for f in _markdown_fixtures() if f.get("policy", "permissive") == "permissive"],
+    [f for f in _markdown_fixtures() if f.get("policy", "permissive") == "permissive" and "citations" not in f],
     ids=lambda f: f["id"],
 )
 def test_pure_to_html_is_the_permissive_case(fixture: dict) -> None:

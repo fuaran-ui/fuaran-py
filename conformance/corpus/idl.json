@@ -2344,6 +2344,23 @@
       "category": "Display",
       "fields": [
         {
+          "name": "citations",
+          "optionality": {
+            "$type": "omitDefault",
+            "default": {
+              "$type": "list",
+              "items": []
+            }
+          },
+          "type": {
+            "$type": "list",
+            "of": {
+              "$type": "record",
+              "name": "MarkdownCitation"
+            }
+          }
+        },
+        {
           "name": "text",
           "optionality": {
             "$type": "required"
@@ -4862,6 +4879,40 @@
         }
       ],
       "name": "MapMarker"
+    },
+    {
+      "fields": [
+        {
+          "name": "label",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
+          }
+        },
+        {
+          "name": "name",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "name": "reference",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        }
+      ],
+      "name": "MarkdownCitation"
     },
     {
       "fields": [

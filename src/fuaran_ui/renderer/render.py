@@ -847,7 +847,17 @@ class Renderer:
         # definition. `to_html` stays published for a host rendering markdown it
         # authored itself; a DECODED tree reaching it would be the ambient
         # guarantee's one blind spot.
-        html = markdown.to_html_with_egress(self.egress_policy, self._text(fields.get("text")))
+        citations = fields.get("citations")
+        cited = [
+            markdown.Citation(
+                name=str(entry.fields["name"]),
+                reference=str(entry.fields["reference"]),
+                label=self._text(entry.fields["label"]) if "label" in entry.fields else None,
+            )
+            for entry in (citations.items if isinstance(citations, Arr) else ())
+            if isinstance(entry, Obj)
+        ]
+        html = markdown.to_html_cited(self.egress_policy, cited, self._text(fields.get("text")))
         return element("div", [("class", "fuaran-markdown")], html)
 
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:

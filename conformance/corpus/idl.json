@@ -1551,6 +1551,15 @@
             "args": [],
             "name": "TextSource"
           }
+        },
+        {
+          "name": "reference",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
         }
       ],
       "tag": "Fact"

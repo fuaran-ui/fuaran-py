@@ -1735,6 +1735,8 @@ class Fact:
     emphasis: bool = False
     help: TextSource | None = None
     icon: str | None = None
+    # WIRE_FORMAT 3.6.31 - the Fact this figure cites, opaque to the language.
+    reference: str | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1743,6 +1745,7 @@ class Fact:
                 "emphasis": True if self.emphasis else None,
                 "help": self.help,
                 "icon": self.icon,
+                "reference": self.reference,
                 "label": self.label,
                 "tone": None if self.tone == "Default" else self.tone,
                 "value": self.value,

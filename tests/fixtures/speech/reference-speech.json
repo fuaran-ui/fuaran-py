@@ -5057,6 +5057,19 @@
         }
       ],
       "omissions": []
+    },
+    "fact-cited": {
+      "text": "Revenue: £412k\n",
+      "ssml": "<speak>\n<s>Revenue: £412k</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "fact-cited",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
     }
   }
 }

@@ -1050,7 +1050,12 @@ class Renderer:
         help_text = fields.get("help")
         if help_text is not None:
             parts.append(text_element("div", [("class", "fuaran-fact-help")], self._text(help_text)))
-        return element("div", [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")], "".join(parts))
+        attrs = [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")]
+        reference = fields.get("reference")
+        if isinstance(reference, str):
+            # WIRE_FORMAT 3.6.31 — the citation, through the ordinary attribute encoder.
+            attrs.append(("data-fact", reference))
+        return element("div", attrs, "".join(parts))
 
     def _link(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         # The scheme floor answers whether this URL is safe to HAVE; the ambient

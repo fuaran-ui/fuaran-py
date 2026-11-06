@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "514121018ffc157776d234c63295c8686f399d42a55f589a2756fe3974968f18"
+IDL_SHA256 = "3ce196fda6ce09924bd2a9f38c97c2a0c4492e99411169fbccaeff8c66d73b33"
 IDL_VERSION = 1
 
 
@@ -606,6 +606,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_union_TextSource),
         F("tone", "omitDefault", T_enum_ToneVariant, default="Default"),
         F("value", "required", T_union_TextSource),
+        F("reference", "optional", T_str),
     ),
     "FileUpload": (
         F("accept", "required", T_list_str),

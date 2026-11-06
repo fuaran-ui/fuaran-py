@@ -15,6 +15,12 @@ corpus, not by this file.
 
 ## Unreleased — after the `v0.11.0` tag (the version is not yet advanced)
 
+### additive — a Fact carries its reference on the wire (Phase 2535)
+
+- `Fact.reference: str | None` (omitted when absent) and the `fuaran.fact(..., reference=...)` parameter. The decoder
+  takes the member from the generated field table, and the renderer stamps it as `data-fact` on the tile's root
+  (WIRE_FORMAT §3.6.31). Certified by `nodes/fact-cited.json`.
+
 ### additive — a Select carries optional option groups (Phase 2571)
 
 - `Select.groups: tuple[SelectOptionGroup, ...]` (default empty, omitted on the wire) and the new

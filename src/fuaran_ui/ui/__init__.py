@@ -872,6 +872,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         emphasis: bool = False,
         help: t.TextInput | None = None,  # noqa: A002
         icon: str | None = None,
+        reference: str | None = None,
     ) -> UiNode:
         """``Fact`` — the labelled TEXT statement beside :meth:`metric`'s number.
 
@@ -888,6 +889,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             emphasis=emphasis,
             help=_text(help) if help is not None else None,
             icon=icon,
+            reference=reference,
         )
         return _node(id, kind, accessibility.none)
 

@@ -2376,6 +2376,15 @@
       "description": "Display/Fact"
     },
     {
+      "id": "fact-cited",
+      "kind": "node-round-trip",
+      "since": "0.102.0",
+      "decoder": "node",
+      "inputFile": "nodes/fact-cited.json",
+      "expectedFile": "nodes/fact-cited.json",
+      "description": "Display/Fact (Phase 2535 — a figure citing the Fact behind it)"
+    },
+    {
       "id": "figure-decimals-en-gb",
       "kind": "node-round-trip",
       "since": "0.99.0",

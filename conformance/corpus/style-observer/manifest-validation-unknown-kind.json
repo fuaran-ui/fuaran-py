@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-unknown-kind",
+  "description": "An invariant kind outside the vocabulary is kept with its members and reported unenforced at its index, never dropped.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"MotionVoice\"},{\"kind\":\"FocusRing\",\"minWidthPx\":2}],\"tokens\":{}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"INVARIANT_KIND_UNKNOWN\",\"index\":1,\"subject\":\"FocusRing\"}"
+  ]
+}

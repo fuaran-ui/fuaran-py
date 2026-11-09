@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-undeclared-token",
+  "description": "A usage budget on a token the manifest does not declare can never be measured: the token is undeclared.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"UsageBudget\",\"targetPct\":10,\"tolerancePct\":5,\"token\":\"color.ghost\"}],\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"USAGE_BUDGET_TOKEN_UNDECLARED\",\"index\":0,\"subject\":\"color.ghost\"}"
+  ]
+}

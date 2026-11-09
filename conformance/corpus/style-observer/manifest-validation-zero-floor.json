@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-zero-floor",
+  "description": "A contrast floor whose minRatio is omitted decodes to 0, a floor every pair passes: out of range.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"ContrastFloor\",\"role\":\"Brand\"}],\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"CONTRAST_FLOOR_OUT_OF_RANGE\",\"index\":0,\"subject\":\"Brand\"}"
+  ]
+}

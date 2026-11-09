@@ -1,0 +1,7 @@
+{
+  "id": "manifest-validation-accepts-omitted-defaults",
+  "description": "A canonical manifest whose invariants omit their defaulted members (a zero budget, a zero motion ceiling, a default weight) and bind every role and token: it validates clean.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"ContrastFloor\",\"minRatio\":7,\"role\":\"Brand\"},{\"kind\":\"UsageBudget\",\"token\":\"color.brand\"},{\"kind\":\"MotionVoice\"}],\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}}}",
+  "expectedManifestDefects": []
+}

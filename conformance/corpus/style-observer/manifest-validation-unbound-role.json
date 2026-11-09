@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-unbound-role",
+  "description": "A contrast floor on a role no binding binds checks nothing: the role is unbound.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"ContrastFloor\",\"minRatio\":7,\"role\":\"body-text\"}],\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"CONTRAST_FLOOR_ROLE_UNBOUND\",\"index\":0,\"subject\":\"body-text\"}"
+  ]
+}

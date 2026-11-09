@@ -8,7 +8,8 @@ DTCG lacks:
 1. A per-token role → tone mapping (:class:`RoleBinding`), so ``Tone.Brand`` is
    known to resolve to the manifest's brand token.
 2. An invariant block — contrast floors, colour-usage budgets, motion voice —
-   each soft-weighted.
+   each soft-weighted. A kind outside that vocabulary is kept as an
+   :class:`UnknownInvariant` and reported by the validation pass.
 
 Tones are represented as their wire strings (``"Default"`` … ``"Info"``); the
 package is dependency-light (stdlib only).
@@ -17,6 +18,10 @@ package is dependency-light (stdlib only).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
+
+from ..canonical import encode_value
+from ..model import from_json
 
 # The canonical ToneVariant palette, as wire strings.
 _TONES = ("Default", "Subdued", "Brand", "Success", "Warning", "Critical", "Info")
@@ -114,7 +119,35 @@ class MotionVoice:
     budget: MotionBudget
 
 
-InvariantKind = ContrastFloor | UsageBudget | MotionVoice
+@dataclass(frozen=True)
+class UnknownInvariant:
+    """An invariant whose wire ``kind`` this host does not know (Phase 2133).
+
+    It is KEPT, never dropped: ``name`` is the wire kind as written and ``members``
+    its other members except ``weight`` (carried on the :class:`Invariant`), as
+    parsed and in document order. So it round-trips through decode and encode, and
+    :func:`~fuaran_ui.theme_manifest.validate.validate` reports it as
+    ``INVARIANT_KIND_UNKNOWN`` — declared, and enforced by nothing here.
+    """
+
+    name: str
+    members: dict[str, Any] = field(default_factory=dict)
+
+    def _key(self) -> tuple[str, str]:
+        # Identity is the canonical bytes, as on the other hosts (a merge keys an
+        # unknown invariant by them): member order and an int-vs-float spelling of
+        # one number do not distinguish two invariants, and `true` vs `1` does —
+        # which plain dict equality would get wrong in both directions.
+        return self.name, encode_value(from_json(self.members))
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, UnknownInvariant) and self._key() == other._key()
+
+    def __hash__(self) -> int:
+        return hash(self._key())
+
+
+InvariantKind = ContrastFloor | UsageBudget | MotionVoice | UnknownInvariant
 
 DEFAULT_WEIGHT = 1.0
 
@@ -138,8 +171,8 @@ def weighted_invariant(weight: float, kind: InvariantKind) -> Invariant:
 
 
 def invariant_kind_name(inv: Invariant) -> str:
-    """Stable discriminator string for an invariant."""
-    return type(inv.kind).__name__
+    """Stable discriminator string for an invariant — the wire kind, as written, for an unknown one."""
+    return inv.kind.name if isinstance(inv.kind, UnknownInvariant) else type(inv.kind).__name__
 
 
 @dataclass(frozen=True)

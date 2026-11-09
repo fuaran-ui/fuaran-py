@@ -520,8 +520,11 @@ DTCG-compatible token model + semantic role bindings + quantified invariants
 contract the observer's manifest-aware tier (`per_node_flags` /
 `verify_usage_budgets`) verifies resolved style against. Both modules are
 stdlib-only; the Pyodide-only `js` / `pyodide.ffi` imports are lazy and
-import-guarded (the `#if FABLE_COMPILER` analogue). Manifest JSON encode + the F#
-`ThemeBridge` (typed-`Theme` projector) are not yet ported (follow-up).
+import-guarded (the `#if FABLE_COMPILER` analogue). The manifest's canonical JSON
+encode (`theme_manifest.encode`, byte-identical with the other hosts) and its validation
+pass (`theme_manifest.validate`, the shared defect codes of the style-observer family's
+`manifest-validation` tier; an unknown invariant kind is kept and reported, never dropped)
+landed in Phase 2627. The F# `ThemeBridge` (typed-`Theme` projector) is not yet ported.
 
 ## Cross-repo dependencies
 

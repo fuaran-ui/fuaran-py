@@ -15,6 +15,12 @@ Two surfaces:
 
 Custom-subtree policy: EXEMPT. Every per-node check fires only for TONED nodes;
 untoned content (Custom / domain SVG) is exempt by construction.
+
+Unknown invariant kinds: an :class:`~fuaran_ui.theme_manifest.UnknownInvariant`
+raises no flag here, as on every other host — there is nothing to enforce it
+against. It is reported unenforced, as ``INVARIANT_KIND_UNKNOWN``, by the
+manifest validation pass (:func:`fuaran_ui.theme_manifest.validate`, Phase 2133),
+which is where a manifest's declared-but-unenforceable invariants are surfaced.
 """
 
 from __future__ import annotations

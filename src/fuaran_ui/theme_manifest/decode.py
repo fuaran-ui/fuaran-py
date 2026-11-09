@@ -8,6 +8,14 @@ Two top-level shapes are accepted:
 
 Detection: presence of a top-level ``tokens`` key selects shape (1). Uses the
 stdlib :mod:`json` parser (dependency-light).
+
+**Tolerant, and total.** An absent member decodes to its default: the cross-host
+byte law OMITS a member at its default value (:mod:`.encode`), so a strict decoder
+would refuse every other host's canonical output. An invariant kind this host does
+not know is kept as an :class:`UnknownInvariant`. Whether the decoded values MEAN
+anything — a contrast floor of 0, a role nothing binds, a budget on an undeclared
+token, an unknown kind — is the validation pass's question
+(:func:`~fuaran_ui.theme_manifest.validate.validate`, Phase 2133), asked after decode.
 """
 
 from __future__ import annotations
@@ -31,6 +39,7 @@ from .manifest import (
     RoleBinding,
     ThemeManifest,
     ToneRole,
+    UnknownInvariant,
     UsageBudget,
     tone_of_string,
 )
@@ -110,6 +119,9 @@ def _parse_invariant(j: Any) -> Invariant | None:
     weight = _as_num(obj.get("weight"))
     weight = weight if weight is not None else DEFAULT_WEIGHT
     kind_str = _as_str(obj.get("kind"))
+    # An object with no non-empty string `kind` is not an invariant of any kind.
+    if not kind_str:
+        return None
     inner: InvariantKind
     if kind_str == "ContrastFloor":
         inner = ContrastFloor(role=_as_str(obj.get("role")) or "", min_ratio=_as_num(obj.get("minRatio")) or 0.0)
@@ -124,7 +136,9 @@ def _parse_invariant(j: Any) -> Invariant | None:
             MotionBudget(max_duration_ms=int(_as_num(obj.get("maxDurationMs")) or 0), easing=_as_str(obj.get("easing")))
         )
     else:
-        return None
+        # Phase 2133 — kept with its members, never dropped: the validation pass
+        # reports it unenforced.
+        inner = UnknownInvariant(kind_str, {k: v for k, v in obj.items() if k not in ("kind", "weight")})
     return Invariant(inner, weight)
 
 

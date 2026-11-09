@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-empty-role",
+  "description": "A contrast floor with its role omitted floors nothing: the role is empty.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"ContrastFloor\",\"minRatio\":7}],\"tokens\":{}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"CONTRAST_FLOOR_ROLE_EMPTY\",\"index\":0,\"subject\":\"\"}"
+  ]
+}

@@ -15,6 +15,14 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — an op reaches a node held in a slot argument (Phase 2705)
+
+- `fuaran_ui.ops.apply` looks a node or a parent up through the slot trees of a `FragmentRef`'s `args` and a `Mount`'s
+  `inputs`, in key order (WIRE_FORMAT §34.2; value arguments hold no node). An op addressed to a node held there, which
+  stopped as `NodeNotFound` / `ParentNotFound`, now applies; the footprint's keyed walk reaches the same positions.
+  Certified by `merge-conformance/fold-mount-input-insert` and `fold-refusal-mount-input-{tone,disjoint,delete-modify}`
+  at specification commit `0b2ec20`.
+
 ### breaking — the three-way tree merge retires; merge by fold is the only merge (Phase 2646)
 
 - Removed from `fuaran_ui` and `fuaran_ui.merge`: `merge_3way`, `merge3`, `merge3_way_with_author`,

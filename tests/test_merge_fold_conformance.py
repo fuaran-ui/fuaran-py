@@ -14,6 +14,13 @@ same tree whichever branch is named first.
 
 Since fuaran#2645 ``foldFixtures`` is the manifest's only family (version 2): the
 three-way tree merge and its triad tests retired with it (fuaran#2646).
+
+Since fuaran#2705 the host certifies the four fixtures over nodes held only in a
+``Mount``'s inputs (specification commit ``0b2ec20``, Phase 2701):
+``fold-mount-input-insert``, ``fold-refusal-mount-input-tone``,
+``fold-refusal-mount-input-disjoint`` and ``fold-refusal-mount-input-delete-modify``.
+The apply lookup visits slot arguments (WIRE_FORMAT §34.2), so each delta applies
+and the fold judges it; ``disjoint`` refuses as the reference draws it.
 """
 
 from __future__ import annotations
@@ -272,3 +279,44 @@ def test_the_merge_corpus_is_the_fold_family_alone() -> None:
     assert manifest["version"] == 2
     for retired in ("fixtures", "refusalFixtures", "totalityFixtures"):
         assert retired not in manifest
+
+
+_FRAGMENT_REF = (
+    '{"id":"ref","kind":{"$type":"FragmentRef","args":{'
+    '"content":{"$type":"SlotArg","tree":{"id":"slot-tree","kind":{"$type":"Box","children":'
+    '[{"id":"inner","kind":{"$type":"Markdown","text":"Bound slot"}}],"layout":{"$type":"Auto"},"role":"Dashboard"}}},'
+    '"count":{"$type":"Int","value":7}},"name":"stat-card"}}'
+)
+
+
+def test_an_op_reaches_a_node_held_in_a_fragment_ref_argument() -> None:
+    """The lookup visits a FragmentRef's slot arguments as it visits a Mount's inputs
+    (fuaran#2705, WIRE_FORMAT §34.2); the value argument holds no node and is kept
+    as it was. The corpus draws the Mount shape; this pins the FragmentRef one."""
+    from fuaran_ui.ops.apply import apply
+
+    base = decode_node(_FRAGMENT_REF)
+    assert base.ok, base
+    insert = _op(
+        '{"$type":"InsertChild","child":{"id":"added","kind":{"$type":"Markdown","text":"A"}},"parentId":"slot-tree"}'
+    )
+    result = apply(insert, base.value)
+    assert result.ok, result
+    args = result.value.kind.fields["args"]
+    assert isinstance(args, Obj)
+    tree = args.fields["content"]
+    assert isinstance(tree, Obj) and isinstance(tree.fields["tree"], Node)
+    assert [c.id for c in tree.fields["tree"].kind.fields["children"].items] == ["inner", "added"]
+    assert args.fields["count"] == base.value.kind.fields["args"].fields["count"]
+    removed = apply(_op('{"$type":"RemoveNode","target":"inner"}'), base.value)
+    assert removed.ok, removed
+    # The footprint's keyed walk reaches the same position: removing the FragmentRef
+    # writes the nodes held in its argument, as removing a Mount writes its inputs'.
+    wrapped = decode_node(
+        '{"id":"root","kind":{"$type":"Box","children":['
+        + _FRAGMENT_REF
+        + '],"layout":{"$type":"Auto"},"role":"Dashboard"}}'
+    )
+    assert wrapped.ok, wrapped
+    written = footprint_in(wrapped.value, _op('{"$type":"RemoveNode","target":"ref"}')).content_writes
+    assert {"ref", "slot-tree", "inner"} <= written, written

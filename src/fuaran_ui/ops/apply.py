@@ -222,6 +222,29 @@ def _child_slots(node: Node) -> list[ChildSlot]:
         if isinstance(body, Node):
             slots.append((body, lambda c: _set_kind_field(node, "body", c)))
 
+    # fuaran#2705 -- the subtree of every slot argument, a FragmentRef's `args` and a
+    # Mount's `inputs`, in key order (WIRE_FORMAT 34.2: the node walk includes slot
+    # arguments). The value arguments (Int / Float / Bool / Str) hold no node.
+    for bag_key in ("args", "inputs"):
+        bag = fields.get(bag_key)
+        if not isinstance(bag, Obj):
+            continue
+        for arg_key in sorted(bag.fields):
+            arg = bag.fields[arg_key]
+            if not (isinstance(arg, Obj) and arg.tag == "SlotArg"):
+                continue
+            tree = arg.fields.get("tree")
+            if not isinstance(tree, Node):
+                continue
+
+            def rebuild_arg(
+                c: Node, bag_key: str = bag_key, bag: Obj = bag, arg_key: str = arg_key, arg: Obj = arg
+            ) -> Node:
+                new_arg = Obj(arg.tag, {**arg.fields, "tree": c})
+                return _set_kind_field(node, bag_key, Obj(bag.tag, {**bag.fields, arg_key: new_arg}))
+
+            slots.append((tree, rebuild_arg))
+
     state = node.extras.get("state")
     if isinstance(state, Obj):
         on_loading = state.fields.get("onLoading")

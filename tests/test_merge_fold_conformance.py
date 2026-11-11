@@ -11,6 +11,9 @@ to ``verdictFile``, sha256 == ``verdictHash``).
 Two laws ride on the same fixtures: swapping the branches swaps every refusal
 entry's ``left`` and ``right`` and changes nothing else, and a derivation is the
 same tree whichever branch is named first.
+
+Since fuaran#2645 ``foldFixtures`` is the manifest's only family (version 2): the
+three-way tree merge and its triad tests retired with it (fuaran#2646).
 """
 
 from __future__ import annotations
@@ -232,3 +235,40 @@ def test_concurrent_appends_report_only_the_parent_and_interleave() -> None:
     assert isinstance(result, Reconciled) and result.interleaves == 1
     # The fold order is z, m; the rule orders the appended run m, z and records it.
     assert [c.fields["newOrder"] for c in result.script] == [Arr(["left", "right", "m", "z"])]
+    # Swapped, the fold order is already the rule's, and the script is recorded
+    # anyway (fuaran#2645: the script fixes the order a replay reaches).
+    swapped = reconcile(_base(), [b], [a])
+    assert isinstance(swapped, Reconciled)
+    assert [c.fields["newOrder"] for c in swapped.script] == [Arr(["left", "right", "m", "z"])]
+
+
+def test_a_reorder_beside_an_append_is_rebased() -> None:
+    """A reorder beside an append to its parent is a rebase (fuaran#2671): the
+    reorder applies to the children the parent holds when the fold reaches it and
+    the append follows, in both orders; two differing reorders still refuse."""
+    reorder = _op('{"$type":"ReorderChildren","newOrder":["right","left"],"parentId":"dash"}')
+    append = _op('{"$type":"InsertChild","child":{"id":"z","kind":{"$type":"Markdown","text":"Z"}},"parentId":"dash"}')
+    trees = []
+    for d1, d2 in (([reorder], [append]), ([append], [reorder])):
+        result = reconcile(_base(), d1, d2)
+        assert isinstance(result, Reconciled) and result.interleaves == 1
+        trees.append(encode_node(result.tree))
+    assert trees[0] == trees[1]
+    derived = reconcile(_base(), [reorder], [append])
+    assert isinstance(derived, Reconciled)
+    assert [c.id for c in derived.tree.kind.fields["children"].items] == ["right", "left", "z"]
+    other = _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}')
+    assert isinstance(reconcile(_base(), [reorder], [other]), Refused)
+
+
+def test_the_merge_corpus_is_the_fold_family_alone() -> None:
+    """The manifest is version 2: ``foldFixtures`` alone. A retired tree-merge key
+    reappearing would be a family this host no longer certifies."""
+    if not (MERGE_CORPUS_ROOT / "manifest.json").is_file():
+        pytest.skip("merge-conformance sub-corpus not found")
+    import json
+
+    manifest = json.loads((MERGE_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["version"] == 2
+    for retired in ("fixtures", "refusalFixtures", "totalityFixtures"):
+        assert retired not in manifest

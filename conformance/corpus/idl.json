@@ -1460,6 +1460,7 @@
       "category": "Meta",
       "fields": [
         {
+          "keyed": true,
           "name": "child",
           "optionality": {
             "$type": "required"
@@ -1469,6 +1470,7 @@
           }
         },
         {
+          "keyed": true,
           "name": "fallback",
           "optionality": {
             "$type": "required"
@@ -3279,6 +3281,7 @@
           }
         },
         {
+          "keyed": true,
           "name": "default",
           "optionality": {
             "$type": "required"

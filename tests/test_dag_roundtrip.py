@@ -4,6 +4,10 @@ Parametrized over every fixture in the additive ``dag/`` sub-corpus (its own
 manifest), plus hand-built round-trips for the wire surfaces the curated fixtures
 don't reach (the ``Failure`` envelope), and decode-error checks.
 
+Phase 2645 (the cut) retired the ``outcomeHash`` and ``tombstoned`` members: a
+merge node's op is its reconciliation script as a ``Batch``, and a record carrying
+either retired member is refused by name (fuaran#2646).
+
 Phase 1144 typed the record's author: the bare ``userId`` member became the
 ``actor`` object the linear chain has carried since Phase 320, moving to the
 front of the Ordinal-sorted envelope. The refusal cases below are the load-
@@ -44,7 +48,7 @@ def test_failure_envelope_roundtrips() -> None:
         '{"actor":{"kind":"human","id":"u1"},"hash":"abc",'
         '"op":{"$type":"RemoveNode","target":"n1"},"parents":[],'
         '"resultEnvelope":{"$type":"Failure","code":"E_CONFLICT","message":"refused"},'
-        '"streamId":"s1","timestamp":1700000000,"tombstoned":false}'
+        '"streamId":"s1","timestamp":1700000000}'
     )
     assert _roundtrip(wire) == wire
 
@@ -56,20 +60,38 @@ def test_failure_envelope_with_agent_actor_roundtrips() -> None:
         '{"actor":{"kind":"agent","model":"claude","version":"4.8","id":"planner"},'
         '"hash":"abc","op":{"$type":"RemoveNode","target":"n1"},"parents":[],'
         '"resultEnvelope":{"$type":"Failure","code":"E_CONFLICT","message":"refused"},'
-        '"streamId":"s1","timestamp":1700000000,"tombstoned":false}'
+        '"streamId":"s1","timestamp":1700000000}'
     )
     assert _roundtrip(wire) == wire
 
 
-def test_merge_outcome_hash_roundtrips() -> None:
+def test_merge_node_carries_its_script_as_a_batch() -> None:
     wire = (
         '{"actor":{"kind":"human","id":"merge"},"hash":"m1",'
-        '"op":{"$type":"Batch","ops":[]},'
-        '"outcomeHash":"deadbeef","parents":["p1","p2"],'
+        '"op":{"$type":"Batch","ops":[{"$type":"ReorderChildren","newOrder":["a","b"],"parentId":"root"}]},'
+        '"parents":["p1","p2"],'
         '"resultEnvelope":{"$type":"Success"},"streamId":"s1",'
-        '"timestamp":1700000120,"tombstoned":false}'
+        '"timestamp":1700000120}'
     )
     assert _roundtrip(wire) == wire
+
+
+@pytest.mark.parametrize(
+    ("member", "extra"), [("tombstoned", '"tombstoned":false'), ("outcomeHash", '"outcomeHash":"o1"')]
+)
+def test_pre_2645_record_is_refused_by_name(member: str, extra: str) -> None:
+    """A record carrying a member the cut retired is a pre-2645 record: its address
+    does not recompute, so it is REFUSED by name rather than lifted."""
+    post = (
+        '{"actor":{"kind":"human","id":"u1"},"hash":"abc",'
+        '"op":{"$type":"RemoveNode","target":"n1"},"parents":[],'
+        '"resultEnvelope":{"$type":"Success"},"streamId":"s1","timestamp":1700000000'
+    )
+    result = decode_dag_record(post + "," + extra + "}")
+    assert not result.ok
+    assert result.error.path == f"$.{member}"
+    assert "pre-2645" in result.error.message and "do not carry forward" in result.error.message
+    assert decode_dag_record(post + "}").ok
 
 
 def _full_record(**overrides: object) -> DagOpRecord:
@@ -81,8 +103,6 @@ def _full_record(**overrides: object) -> DagOpRecord:
         "actor": HumanActor("u1"),
         "timestamp": 1700000000,
         "result_envelope": DagResultEnvelope("Success"),
-        "tombstoned": False,
-        "outcome_hash": "o1",
         "prompt_id": "prompt-1",
     }
     fields.update(overrides)
@@ -118,10 +138,8 @@ def test_encode_omits_absent_optionals() -> None:
         actor=HumanActor("u1"),
         timestamp=1700000000,
         result_envelope=DagResultEnvelope("Success"),
-        tombstoned=False,
     )
     encoded = encode_dag_record(record)
-    assert "outcomeHash" not in encoded
     assert "promptId" not in encoded
 
 
@@ -139,7 +157,7 @@ def test_pre_1144_user_id_envelope_is_refused_by_name() -> None:
     wire = (
         '{"hash":"abc","op":{"$type":"RemoveNode","target":"n1"},"parents":[],'
         '"resultEnvelope":{"$type":"Success"},"streamId":"s1",'
-        '"timestamp":1700000000,"tombstoned":false,"userId":"u1"}'
+        '"timestamp":1700000000,"userId":"u1"}'
     )
     result = decode_dag_record(wire)
     assert not result.ok
@@ -166,7 +184,7 @@ def test_malformed_actor_is_named_not_defaulted(actor_json: str, code: str, path
         f'{{"actor":{actor_json},"hash":"abc",'
         '"op":{"$type":"RemoveNode","target":"n1"},"parents":[],'
         '"resultEnvelope":{"$type":"Success"},"streamId":"s1",'
-        '"timestamp":1700000000,"tombstoned":false}'
+        '"timestamp":1700000000}'
     )
     result = decode_dag_record(wire)
     assert not result.ok

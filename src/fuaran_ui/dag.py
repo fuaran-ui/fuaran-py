@@ -8,8 +8,8 @@ of the F# ``DagWire`` encoder/decoder and the TypeScript ``@fuaran-ui/ops``
 ``encodeDagRecord`` / ``decodeDagRecord``.
 
 The wire shape is a plain (non-``$type``) object whose keys sort in Ordinal order
-(``actor`` < ``hash`` < ``op`` < ``outcomeHash`` < ``parents`` < ``promptId`` <
-``resultEnvelope`` < ``streamId`` < ``timestamp`` < ``tombstoned``):
+(``actor`` < ``hash`` < ``op`` < ``parents`` < ``promptId`` < ``resultEnvelope`` <
+``streamId`` < ``timestamp``):
 
 * ``actor`` — the typed author, ``Human | Agent``: the same :data:`Actor
   <fuaran_ui.op_stream.types.Actor>` the linear op-stream has carried since
@@ -19,38 +19,35 @@ The wire shape is a plain (non-``$type``) object whose keys sort in Ordinal orde
   so there is one canonical actor encoding in this host, not two.
 * ``hash`` — the record's content address (hex). See the pre-image note below.
 * ``op`` — the nested canonical ``TreeOp`` (decoded / re-encoded by the same
-  :mod:`fuaran_ui.ops` codec the linear wire path uses).
-* ``outcomeHash`` — present only on a merge node (the hash of the resulting
-  tree); omitted otherwise (§2 rule 4).
+  :mod:`fuaran_ui.ops` codec the linear wire path uses). On a merge node it is the
+  reconciliation script as a ``Batch`` (§5.3.3).
 * ``parents`` — author-order parent hashes (head = primary parent). Empty for a
-  genesis record; a single element is the degenerate linear step.
+  genesis record; a single element is the degenerate linear step; two, a merge.
 * ``promptId`` — optional provenance of the authoring prompt; omitted when absent.
 * ``resultEnvelope`` — a ``$type`` DU, ``Success`` or ``Failure{code, message}``.
 * ``streamId`` — identity string.
 * ``timestamp`` — Unix seconds (integer).
-* ``tombstoned`` — whether the record's payload has been pruned (hash + parents
-  preserved for reachability).
+
+**The cut (Phase 2645).** Since fuaran#2645 a DAG record is a Fuaran Core DAG node
+over the linear chain's provenance entry (WIRE_FORMAT §5.3.3): ``hash`` is Core's
+``Dag.nodeId`` over the sorted parents, the actor and the v2 stream entry. The
+``outcomeHash`` and ``tombstoned`` members were retired at the cut; a record
+carrying either is a pre-2645 record whose address does not recompute, and
+:func:`decode_dag_record` refuses it BY NAME (fuaran#2646) rather than lifting it.
 
 The pre-1144 wire carried a bare ``"userId":"…"`` member, which sorted LAST;
 ``actor`` sorts FIRST, so the attribution member moved to the front of the
 envelope in the same change that typed it.
 
 **The ``hash`` pre-image, and why this host does not recompute it.** The DAG
-content address is minted by the reference host over a delimited envelope that
-folds the sorted parents, the op (or, on a merge node, the outcome tree hash
-under a ``"merge"`` tag) and the full provenance. Phase 1144 replaced that
-envelope's attribution member in place — ``…,"ts":<unix>,"userId":"alice",…``
-became ``…,"ts":<unix>,"actor":{"kind":"human","id":"alice"},…``, the same
-pinned :func:`~fuaran_ui.op_stream.hash_chain.encode_actor` bytes this module
-now emits on the wire — so **every DAG address was re-minted and pre-1144
-addresses do not carry forward**; there is no in-place upgrade for a persisted
-DAG. ``fuaran-py`` is a *codec* host for this artefact: it mints no DAG address
-and verifies none (the only hash pre-images it owns are the linear chain's, in
+content address is minted by the reference host (§5.3.3 above); Phase 1144 and
+the cut each re-minted every address, and **pre-1144 and pre-2645 addresses do
+not carry forward**; there is no in-place upgrade for a persisted DAG.
+``fuaran-py`` is a *codec* host for this artefact (§5.3.5 — it does not claim the
+address profile): it mints no DAG address and verifies none (the only hash
+pre-images it owns are the linear chain's, in
 :mod:`fuaran_ui.op_stream.hash_chain`), so ``hash`` is an opaque string it
-round-trips byte-for-byte. The pre-image is recorded here rather than
-implemented because a Python DAG addresser would be a new capability, not this
-adoption. Should one ever land, it folds the envelope above — not the
-``userId`` form.
+round-trips byte-for-byte.
 
 Because the actor is inside that address, :func:`decode_dag_record` **refuses** a
 pre-1144 ``userId`` envelope by name instead of lifting it to ``Human``: a lifted
@@ -76,6 +73,7 @@ from .ops.decode import _decode_op_value
 from .result import (
     MISSING_FIELD,
     UNKNOWN_DU_CASE,
+    WRONG_TYPE,
     DecodeResult,
     Err,
     Ok,
@@ -83,7 +81,6 @@ from .result import (
 from .schema.decode import (
     _dispatch,
     _expect_array,
-    _expect_bool,
     _expect_int,
     _expect_object,
     _expect_string,
@@ -111,9 +108,10 @@ SUCCESS: DagResultEnvelope = DagResultEnvelope("Success")
 @dataclass(frozen=True)
 class DagOpRecord:
     """A content-addressed, multi-parent op-stream record (the DAG generalisation
-    of the linear ``OpRecord``). ``parents`` is in author order; ``outcome_hash``
-    is set only on a merge node; a single-parent record is the degenerate linear
-    step and a zero-parent record is a genesis.
+    of the linear ``OpRecord``). ``parents`` is in author order; a two-parent
+    record is a merge node whose ``op`` is its script as a ``Batch``; a
+    single-parent record is the degenerate linear step and a zero-parent record is
+    a genesis.
 
     ``actor`` is the typed author (Phase 1144) — the same ``Human | Agent`` the
     linear :class:`~fuaran_ui.op_stream.types.OpRecord` carries, replacing the
@@ -129,8 +127,6 @@ class DagOpRecord:
     actor: Actor
     timestamp: int
     result_envelope: DagResultEnvelope
-    tombstoned: bool
-    outcome_hash: str | None = None
     prompt_id: str | None = None
 
 
@@ -143,8 +139,8 @@ def _envelope_obj(env: DagResultEnvelope) -> Obj:
 def encode_dag_record(record: DagOpRecord) -> str:
     """Encode a :class:`DagOpRecord` to its canonical wire JSON.
 
-    Keys are emitted in Ordinal order; the optional ``outcomeHash`` / ``promptId``
-    are included only when present. The nested ``op`` re-encodes through the
+    Keys are emitted in Ordinal order; the optional ``promptId`` is included only
+    when present. The nested ``op`` re-encodes through the
     shared ``TreeOp`` encoder, so the output is byte-identical to the F# and
     TypeScript hosts.
 
@@ -167,10 +163,7 @@ def encode_dag_record(record: DagOpRecord) -> str:
         "resultEnvelope": _envelope_obj(record.result_envelope),
         "streamId": record.stream_id,
         "timestamp": record.timestamp,
-        "tombstoned": record.tombstoned,
     }
-    if record.outcome_hash is not None:
-        fields["outcomeHash"] = record.outcome_hash
     if record.prompt_id is not None:
         fields["promptId"] = record.prompt_id
     rest = encode_value(Obj(None, fields))
@@ -219,6 +212,17 @@ def _decode_actor(value: object, path: str) -> Actor:
 def _decode_dag_value(value: object, path: str) -> DagOpRecord:
     obj = _expect_object(value, path)
 
+    for retired in ("tombstoned", "outcomeHash"):
+        if retired in obj:
+            # A pre-2645 envelope. Refused BY NAME: its address folded a merge
+            # outcome or a pre-cut pre-image, so it cannot recompute under the cut.
+            _fail(
+                WRONG_TYPE,
+                f"{path}.{retired}",
+                "pre-2645 record — 'tombstoned' / 'outcomeHash' were retired at the cut, "
+                "and DAG content addresses do not carry forward (re-mint the store)",
+            )
+
     if "actor" not in obj and "userId" in obj:
         # A pre-1144 envelope. Refused BY NAME rather than lifted to Human: the
         # actor is folded into the content address, so a lifted record would
@@ -240,8 +244,6 @@ def _decode_dag_value(value: object, path: str) -> DagOpRecord:
     parents = tuple(_expect_string(item, f"{path}.parents[{i}]") for i, item in enumerate(parents_raw))
 
     envelope = _decode_envelope(obj["resultEnvelope"], f"{path}.resultEnvelope") if "resultEnvelope" in obj else SUCCESS
-    tombstoned = _expect_bool(obj["tombstoned"], f"{path}.tombstoned") if "tombstoned" in obj else False
-    outcome_hash = _expect_string(obj["outcomeHash"], f"{path}.outcomeHash") if "outcomeHash" in obj else None
     prompt_id = _expect_string(obj["promptId"], f"{path}.promptId") if "promptId" in obj else None
 
     return DagOpRecord(
@@ -252,8 +254,6 @@ def _decode_dag_value(value: object, path: str) -> DagOpRecord:
         actor=_decode_actor(obj["actor"], f"{path}.actor"),
         timestamp=_expect_int(obj["timestamp"], f"{path}.timestamp"),
         result_envelope=envelope,
-        tombstoned=tombstoned,
-        outcome_hash=outcome_hash,
         prompt_id=prompt_id,
     )
 

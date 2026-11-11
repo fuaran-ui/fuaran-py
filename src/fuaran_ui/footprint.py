@@ -16,13 +16,28 @@ Two forms:
   the node, without which the removal of an ancestor would read as independent.
 * the **base-aware** form (:func:`footprint_in`) is computed at the tree the op
   applies to. A removal content-writes the whole subtree it destroys and names its
-  parent; a move names its source parent and reads the destination's ancestors; a
-  vertical op whose node the STRUCTURAL walk locates, and which applies, is
-  declared at the slot it changes (``kind``, ``state``, ``style``,
+  parent; a vertical op whose node the STRUCTURAL walk locates, and which applies,
+  is declared at the slot it changes (``kind``, ``state``, ``style``,
   ``style.<field>`` beside a read of ``style``, ``accessibility``, ``tooltip``) plus
   every id it puts in or takes out. A ``Batch`` is threaded member by member: each
   member at the tree the ones before it reach, and from a member that does not
   apply onwards every member takes the pure arm.
+
+  A resolved **move** (fuaran#2651, #2670, #2691) touches no parent whole: the
+  target is read and written at its ``parent`` slot, the source parent at its
+  ``kind`` and child-list slots, and the destination with every ancestor above it
+  is read at its ``parent`` slot (the cycle check reads the chain); the
+  destination keeps Core's named read and structure write. A resolved **reorder**
+  (fuaran#2670) reads and writes its parent at the ``kind`` and child-list slots
+  and reads each listed child at its ``parent`` slot.
+
+**The child list** (fuaran#2691, Core 0.42.0 D246). Core compares a structure
+write of ``p`` against a slot access as a read and a write of
+``(p, CHILD_LIST_SLOT)``, so every arm that reads or rewrites a node's structural
+children by slot declares that slot: a resolved reorder and a resolved move's
+source parent, an ``EditNode``, and any in-place edit whose held set moved. The
+three slot rules live in :func:`slot_clash`, :func:`slots_against_node` and
+:func:`structural`.
 
 Two walks, as on the reference: the **structural** walk is a layout node's ordered
 ``children`` alone (it locates nodes and their parents), and the **keyed** walk is
@@ -44,6 +59,8 @@ from .result import Ok
 __all__ = [
     "Footprint",
     "EMPTY",
+    "CHILD_LIST_SLOT",
+    "structural",
     "union",
     "slot_edit",
     "reading_slot",
@@ -102,16 +119,42 @@ def reading_slot(node_id: str, slot: str) -> Footprint:
     return Footprint(slot_reads=frozenset({(node_id, slot)}))
 
 
+#: Core's child-list slot (``Footprint.childListSlot``, fuaran-core Phase 625).
+CHILD_LIST_SLOT = "#children"
+
+
+def _child_list_slots(f: Footprint) -> frozenset[tuple[str, str]]:
+    """The child-list slots a footprint's structure writes denote (Core's ``childListSlots``)."""
+    return frozenset((p, CHILD_LIST_SLOT) for p in f.structure_writes)
+
+
 def slot_clash(a: Footprint, b: Footprint) -> frozenset[tuple[str, str]]:
-    """The slots one side writes and the other accesses, either way round."""
-    return (a.slot_writes & b.slot_writes) | (a.slot_writes & b.slot_reads) | (a.slot_reads & b.slot_writes)
+    """The slots one side writes and the other accesses, either way round, and the
+    child-list slot of each parent one side structure-writes that the other accesses
+    as a slot (Core 0.42.0's ``Footprint.slotClash``)."""
+    a_any, b_any = a.slot_writes | a.slot_reads, b.slot_writes | b.slot_reads
+    return (
+        (a.slot_writes & b.slot_writes)
+        | (a.slot_writes & b.slot_reads)
+        | (a.slot_reads & b.slot_writes)
+        | (_child_list_slots(a) & b_any)
+        | (a_any & _child_list_slots(b))
+    )
 
 
 def slots_against_node(a: Footprint, b: Footprint) -> frozenset[str]:
-    """The nodes ``a`` accesses through a slot that ``b`` touches whole."""
-    written = frozenset(n for n, _ in a.slot_writes)
-    read = frozenset(n for n, _ in a.slot_reads)
-    return (written & (b.content_writes | b.reads | b.structure_writes)) | (read & b.content_writes)
+    """The nodes ``a`` accesses through a slot that ``b`` WRITES WHOLE (Core 0.42.0):
+    a read is of the node's existence and a structure write is compared at the
+    child-list slot, so only a content write collides here."""
+    return frozenset(n for n, _ in a.slot_writes | a.slot_reads) & b.content_writes
+
+
+def structural(f: Footprint) -> frozenset[str]:
+    """Everything ``f`` touches of the tree's structure (Core 0.42.0's
+    ``Footprint.structural``): its named structure writes, its unknown-parent writes,
+    and every node whose child-list slot it reads or writes."""
+    child_list = frozenset(n for n, slot in f.slot_writes | f.slot_reads if slot == CHILD_LIST_SLOT)
+    return f.structure_writes | f.unknown_parent_writes | child_list
 
 
 # ─── walks ───────────────────────────────────────────────────────────────────
@@ -305,6 +348,19 @@ def _slotted(writes: list[str], reads: list[str], target: str, touched: frozense
     )
 
 
+def _child_list(node_id: str, f: Footprint) -> Footprint:
+    """``f`` with a read and a write of ``node_id``'s child-list slot beside it."""
+    return union(f, slot_edit(node_id, CHILD_LIST_SLOT))
+
+
+def _guarded(writes: list[str], reads: list[str], target: str, touched: frozenset[str]) -> Footprint:
+    """:func:`_slotted` for an op whose contract moves no node: where its held set
+    moved anyway (``touched`` non-empty), the child list is written too — a guard,
+    empty for every such op the engine has."""
+    f = _slotted(writes, reads, target, touched)
+    return _child_list(target, f) if touched else f
+
+
 def _held_change(node_id: str, node: Node, after: Node | None) -> frozenset[str]:
     """The ids an op whose contract puts no node in moved anyway — a guard."""
     before = _held(node)
@@ -334,11 +390,21 @@ def _structural_in(state: Node, op: Obj) -> Footprint:
         parent = _structural_parent(target, state)
         destination = _locate(new_parent, state)
         if located is not None and parent is not None and destination is not None:
-            return Footprint(
-                reads=frozenset({target, new_parent, parent.id}) | _proper_ancestors(new_parent, state),
-                structure_writes=frozenset({parent.id, new_parent}),
-                content_writes=frozenset({target}),
+            # No parent is touched WHOLE: the target at its ``parent`` slot, the
+            # source parent at its ``kind`` and child-list slots, the destination and
+            # every ancestor above it read at ``parent``; the destination keeps
+            # Core's named read and structure write. A move within one parent keeps
+            # the parent whole.
+            source = parent.id if parent.id != new_parent else None
+            acc = union(
+                Footprint(reads=frozenset({new_parent}), structure_writes=frozenset({new_parent})),
+                slot_edit(target, "parent"),
             )
+            for a in sorted((_proper_ancestors(new_parent, state) | {new_parent}) - {target, source}):
+                acc = union(acc, reading_slot(a, "parent"))
+            if source is not None:
+                acc = union(acc, _child_list(source, slot_edit(source, "kind")))
+            return acc
     return footprint_of(op)
 
 
@@ -349,7 +415,20 @@ def _style_fields(delta: Value) -> list[str]:
 def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
     """The base-aware arm of one non-batch op at ``state``, given the tree it reaches."""
     tag = op.tag
-    if tag in ("InsertChild", "RemoveNode", "MoveNode", "ReorderChildren"):
+    if tag == "ReorderChildren":
+        # A resolved reorder permutes the parent's child list, held in its ``kind``,
+        # and touches no child: the parent at ``kind`` + the child list, each listed
+        # child read at its ``parent`` slot.
+        parent_id = _str(op, "parentId")
+        if after is None or _locate(parent_id, state) is None:
+            return footprint_of(op)
+        acc = _child_list(parent_id, slot_edit(parent_id, "kind"))
+        order = op.fields.get("newOrder")
+        for c in order.items if isinstance(order, Arr) else []:
+            if isinstance(c, str):
+                acc = union(acc, reading_slot(c, "parent"))
+        return acc
+    if tag in ("InsertChild", "RemoveNode", "MoveNode"):
         return _structural_in(state, op)
     if tag == "ReplaceRoot":
         plain = footprint_of(op)
@@ -369,13 +448,13 @@ def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
         return footprint_of(op)
     if tag == "EditNode":
         old = _kind_held(target, node.kind)
-        return _slotted(["kind"], [], target, _ids_of(old) | _ids_of(inserted(op)))
+        return _slotted(["kind", CHILD_LIST_SLOT], [], target, _ids_of(old) | _ids_of(inserted(op)))
     if tag == "UpdateState":
         old = _state_alternatives(node.extras.get("state"))
         return _slotted(["state"], [], target, _ids_of(old) | _ids_of(inserted(op)))
     if tag == "PatchStyle":
         fields = [f"style.{f}" for f in _style_fields(op.fields.get("style"))]
-        return _slotted(fields, ["style"], target, _held_change(target, node, after))
+        return _guarded(fields, ["style"], target, _held_change(target, node, after))
     slot = {
         "UpdateProp": "kind",
         "ReplaceBinding": "kind",
@@ -383,7 +462,7 @@ def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
         "UpdateAccessibility": "accessibility",
         "UpdateTooltip": "tooltip",
     }[tag]
-    return _slotted([slot], [], target, _held_change(target, node, after))
+    return _guarded([slot], [], target, _held_change(target, node, after))
 
 
 def _threaded(state: Node | None, op: Obj) -> tuple[Footprint, Node | None]:

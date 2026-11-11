@@ -13,6 +13,21 @@ The package is pre-1.0, so a minor version may break; this record is how a consu
 ones did. The wire format itself is governed by the shared specification and its conformance
 corpus, not by this file.
 
+## 0.13.0 (draft — the release act sets the version)
+
+### breaking — the three-way tree merge retires; merge by fold is the only merge (Phase 2646)
+
+- Removed from `fuaran_ui` and `fuaran_ui.merge`: `merge_3way`, `merge3`, `merge3_way_with_author`,
+  `merge3_way_lenient`, `MergeOk`, `MergeConflicts`, `MergeConflict`, `MergeSide`, `MergeResult`, `MergeAuthor`,
+  `Primary`, `Secondary`, `encode_envelope` and the conflict-class constants. The op DAG's only merge since
+  fuaran#2645 is the fold: `fuaran_ui.reconcile.reconcile` over `fuaran_ui.merge.conflicts_in` (WIRE_FORMAT §34),
+  certified by the `foldFixtures` family, which is the merge-conformance manifest's only family (version 2).
+- `DagOpRecord` loses `tombstoned` and `outcome_hash`; `decode_dag_record` refuses a record carrying either member by
+  name (`WRONG_TYPE` at its path), because a pre-2645 address does not recompute (WIRE_FORMAT §5.3.3).
+- behavioural: the fold's script records the child-order reorder for every interleaved or rebased parent, a reorder
+  beside a concurrent append, removal or move of a listed child is rebased rather than refused (fuaran#2671), and the
+  footprint follows Core 0.42.0's child-list slot rules (fuaran#2651, #2670, #2691).
+
 ## 0.12.0
 
 ### additive — a table cell cites its figure (Phase 2592)

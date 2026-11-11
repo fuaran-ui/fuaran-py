@@ -32,21 +32,6 @@ from .function import (
     slot_hole,
     value_hole,
 )
-from .merge import (
-    MergeAuthor,
-    MergeConflict,
-    MergeConflicts,
-    MergeOk,
-    MergeResult,
-    MergeSide,
-    Primary,
-    Secondary,
-    encode_envelope,
-    merge3,
-    merge3_way_lenient,
-    merge3_way_with_author,
-    merge_3way,
-)
 from .model import Arr, Node, Obj, from_json
 from .ops import decode_op, diff, encode_op
 from .result import (
@@ -72,19 +57,6 @@ __all__ = [
     "encode_dag_record",
     "DagOpRecord",
     "DagResultEnvelope",
-    "merge_3way",
-    "merge3",
-    "merge3_way_with_author",
-    "merge3_way_lenient",
-    "MergeOk",
-    "MergeConflicts",
-    "MergeConflict",
-    "MergeSide",
-    "MergeResult",
-    "encode_envelope",
-    "MergeAuthor",
-    "Primary",
-    "Secondary",
     "diff",
     "FunctionRegistry",
     "FunctionEntry",

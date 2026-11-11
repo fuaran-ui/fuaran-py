@@ -12,17 +12,31 @@ thin policy over it, the Python port of the reference ``DagReconcile``
 2. an **interleave** — an ``InsertPositionClash`` at a parent both ops append a
    DIFFERENT node to (an ``InsertChild`` under it, or a ``MoveNode`` to it).
    Admitted, and ordered by the child-order rule;
-3. anything else — **refused**, classed ``DeleteModify`` when exactly one op
+3. a **rebase** (fuaran#2671) — one op is a ``ReorderChildren(p, order)`` and the
+   other changes ``p``'s child list: an ``InsertChild`` under ``p``, a
+   ``MoveNode`` to ``p``, or a ``RemoveNode`` or ``MoveNode`` of a child ``order``
+   lists (neither a ``Batch``). Admitted: the fold applies the reorder REBASED to
+   the children ``p`` holds when it is reached — the listed children still there,
+   in the declared order, then the rest in held order;
+4. anything else — **refused**, classed ``DeleteModify`` when exactly one op
    removes (a ``RemoveNode``, or a ``Batch`` holding one) and ``Conflict``
-   otherwise.
+   otherwise. Two reorders of one parent that differ stay refused.
 
-**The child-order rule.** Under an interleaved parent the children neither delta
-appended keep the fold's order, and the appended ones follow: each delta's appends
+**The child-order rule.** Under an interleaved or rebased parent the children
+neither delta appended keep the fold's order (the rebased reorder's, where a delta
+reordered the parent), and the appended ones follow: each delta's run of appends
 in its own order, the two runs merged by comparing heads ordinally by NodeId, the
-smaller first. Where that differs from the fold's order the merge records
-``ReorderChildren(parent, order)``. The fold runs in BOTH orders, each followed by
-the script, and a disagreement is refused as ``OrderSensitive`` — the admitted
+smaller first, and a node both runs hold (two agreeing moves) listed once, where
+the merge first reaches it. An append a later reorder of the same parent on the
+same delta lists is settled by that reorder and leaves the run. The merge records
+``ReorderChildren(parent, order)`` for EVERY interleaved or rebased parent
+(fuaran#2645): a merge node is replayed by Core's closure fold in its own drain
+order, so the script fixes the order. The fold runs in BOTH orders, each followed
+by the script, and a disagreement is refused as ``OrderSensitive`` — the admitted
 classes lie outside Core's independence theorem, so this is checked, not assumed.
+
+Since fuaran#2645 this is the op DAG's ONLY merge; the three-way tree merge
+retired with its ``merge-conformance`` keys (fuaran#2646).
 
 The refusal envelope (§34.5) is a JSON array of the refused pairs with
 ordinal-sorted keys; its sha256 is the cross-host refusal hash.
@@ -117,9 +131,9 @@ type ReconcileFault = DeltaDoesNotApply | Refused | OrderSensitive | FoldFaulted
 @dataclass(frozen=True)
 class Reconciled:
     """A derived merge: the tree, the script the merge records (one
-    ``ReorderChildren`` per interleaved parent the rule reorders, parents in
-    ordinal order), the distinct agreeing ops applied as no change, and how many
-    parents were interleaved."""
+    ``ReorderChildren`` per interleaved or rebased parent, parents in ordinal
+    order), the distinct agreeing ops applied as no change, and how many parents
+    were interleaved or rebased."""
 
     tree: Node
     script: tuple[Obj, ...]
@@ -187,9 +201,32 @@ def apply_held(op: Obj, tree: Node) -> Ok[Node] | ApplyError:
     return Ok(tree) if _held(op, tree) else result.error
 
 
-def _fold(ops: list[Obj], start: Node) -> Ok[Node] | ApplyError:
+def _order(op: Obj) -> list[str]:
+    order = op.fields.get("newOrder")
+    return [c for c in order.items if isinstance(c, str)] if isinstance(order, Arr) else []
+
+
+def _rebased(tree: Node, op: Obj) -> Obj:
+    """A reorder rebased to the children its parent holds in ``tree``: the listed
+    children still there, in the declared order, then the others in held order.
+    ``op`` itself where the parent is not in the tree."""
+    parent = _str(op, "parentId")
+    node = _find(parent, tree)
+    if node is None:
+        return op
+    kids = [c.id for c in _children(node)]
+    listed = list(dict.fromkeys(c for c in _order(op) if c in set(kids)))
+    order: list[Value] = [*listed, *(k for k in kids if k not in set(listed))]
+    return Obj("ReorderChildren", {"newOrder": Arr(order), "parentId": parent})
+
+
+def _fold(ops: list[Obj], start: Node, rebase: frozenset[str] = frozenset()) -> Ok[Node] | ApplyError:
+    """:func:`apply_held` op by op, with a reorder of a parent in ``rebase`` applied
+    rebased to the children the parent holds when the fold reaches it."""
     current = start
     for op in ops:
+        if op.tag == "ReorderChildren" and _str(op, "parentId") in rebase:
+            op = _rebased(current, op)
         step = apply_held(op, current)
         if not isinstance(step, Ok):
             return step
@@ -227,16 +264,37 @@ def _append_into(parent: str, op: Obj) -> str | None:
 
 
 _AGREEMENT = "agreement"
+_INTERLEAVE = "interleave"
+_REBASE = "rebase"
 
 
-def _judge(c: OpConflict) -> str:
-    """``agreement``, ``interleave`` or a refusal class."""
+def _rebase_of(reorder: Obj, other: Obj) -> str | None:
+    """The parent whose child list ``reorder`` and ``other`` both change, when
+    ``reorder`` is a ``ReorderChildren`` and ``other`` an append to its parent or a
+    removal or move of a child it lists."""
+    if reorder.tag != "ReorderChildren":
+        return None
+    parent, order = _str(reorder, "parentId"), _order(reorder)
+    if other.tag == "InsertChild" and _str(other, "parentId") == parent:
+        return parent
+    if other.tag == "MoveNode" and (_str(other, "newParentId") == parent or _str(other, "target") in order):
+        return parent
+    if other.tag == "RemoveNode" and _str(other, "target") in order:
+        return parent
+    return None
+
+
+def _judge(c: OpConflict) -> tuple[str, str | None]:
+    """``agreement``, ``interleave``, ``rebase`` (with its parent) or a refusal class."""
     if encode_op(c.left) == encode_op(c.right):
-        return _AGREEMENT
+        return _AGREEMENT, None
     left, right = _append_into(c.address, c.left), _append_into(c.address, c.right)
     if c.shape == INSERT_POSITION_CLASH and left is not None and right is not None and left != right:
-        return "interleave"
-    return DELETE_MODIFY if _removes(c.left) != _removes(c.right) else CONFLICT
+        return _INTERLEAVE, c.address
+    rebased = _rebase_of(c.left, c.right) or _rebase_of(c.right, c.left)
+    if rebased is not None:
+        return _REBASE, rebased
+    return (DELETE_MODIFY if _removes(c.left) != _removes(c.right) else CONFLICT), None
 
 
 def _order_key(r: Refusal) -> tuple[bytes, ...]:
@@ -260,7 +318,8 @@ def sort_canonical(refusals: list[Refusal] | tuple[Refusal, ...]) -> list[Refusa
 
 
 def _interleave(a: list[str], b: list[str]) -> list[str]:
-    """Two runs, each in its own order, merged by comparing heads ordinally."""
+    """Two runs, each in its own order, merged by comparing heads ordinally. An id
+    both runs hold appears twice; :func:`_reorder_for` keeps its first occurrence."""
     out: list[str] = []
     i = j = 0
     while i < len(a) and j < len(b):
@@ -274,6 +333,10 @@ def _interleave(a: list[str], b: list[str]) -> list[str]:
 
 
 def _reorder_for(tree: Node, parent: str, run_a: list[str], run_b: list[str]) -> Obj | None:
+    """The ``ReorderChildren`` the rule asks of ``parent``; ``None`` when the parent
+    is not in the tree. Recorded even where the fold already gives the rule's order
+    (fuaran#2645): a merge node's replay applies the branches in Core's drain order,
+    so the script has to fix the order."""
     node = _find(parent, tree)
     if node is None:
         return None
@@ -284,19 +347,33 @@ def _reorder_for(tree: Node, parent: str, run_a: list[str], run_b: list[str]) ->
     def keep(run: list[str]) -> list[str]:
         return list(dict.fromkeys(i for i in run if i in present))
 
-    order = [k for k in kids if k not in appended] + _interleave(keep(run_a), keep(run_b))
-    if order == kids:
-        return None
+    # A node both runs hold (two agreeing moves) is listed once, where the merge
+    # first reaches it — the same whichever run is named first.
+    order = [k for k in kids if k not in appended] + list(dict.fromkeys(_interleave(keep(run_a), keep(run_b))))
     new_order: list[Value] = list(order)
     return Obj("ReorderChildren", {"newOrder": Arr(new_order), "parentId": parent})
+
+
+def _appends_of(parent: str, delta: list[Obj]) -> list[str]:
+    """A delta's run of appends into ``parent``, in delta order. An append a later
+    reorder of the same parent on the delta lists is settled by that reorder: the
+    delta placed it, so it leaves the run."""
+    run: list[str] = []
+    for op in delta:
+        if op.tag == "ReorderChildren" and _str(op, "parentId") == parent:
+            listed = set(_order(op))
+            run = [x for x in run if x not in listed]
+            continue
+        appended = _append_into(parent, op)
+        if appended is not None and appended not in run:
+            run.append(appended)
+    return run
 
 
 def _script_for(tree: Node, parents: list[str], delta_a: list[Obj], delta_b: list[Obj]) -> list[Obj]:
     script: list[Obj] = []
     for p in parents:
-        run_a = [x for x in (_append_into(p, op) for op in delta_a) if x is not None]
-        run_b = [x for x in (_append_into(p, op) for op in delta_b) if x is not None]
-        reorder = _reorder_for(tree, p, run_a, run_b)
+        reorder = _reorder_for(tree, p, _appends_of(p, delta_a), _appends_of(p, delta_b))
         if reorder is not None:
             script.append(reorder)
     return script
@@ -311,15 +388,18 @@ def reconcile(base: Node, delta_a: list[Obj], delta_b: list[Obj]) -> Reconciled 
             return DeltaDoesNotApply(side, failure[0], failure[1])
 
     verdicts = [(c, _judge(c)) for c in conflicts_in(base, delta_a, delta_b)]
-    refusals = [Refusal(c, v) for c, v in verdicts if v in (DELETE_MODIFY, CONFLICT)]
+    refusals = [Refusal(c, v) for c, (v, _) in verdicts if v in (DELETE_MODIFY, CONFLICT)]
     if refusals:
         return Refused(tuple(sort_canonical(refusals)))
 
-    parents = sorted({c.address for c, v in verdicts if v == "interleave"}, key=utf16_order_key)
-    agreements = len({encode_op(c.left) for c, v in verdicts if v == _AGREEMENT})
+    rebase = frozenset(p for _, (v, p) in verdicts if v == _REBASE and p is not None)
+    parents = sorted(
+        {p for _, (v, p) in verdicts if v in (_INTERLEAVE, _REBASE) and p is not None}, key=utf16_order_key
+    )
+    agreements = len({encode_op(c.left) for c, (v, _) in verdicts if v == _AGREEMENT})
 
     def derive(first: list[Obj], second: list[Obj]) -> tuple[Node, list[Obj]] | ApplyError:
-        folded = _fold(first + second, base)
+        folded = _fold(first + second, base, rebase)
         if not isinstance(folded, Ok):
             return folded
         script = _script_for(folded.value, parents, delta_a, delta_b)

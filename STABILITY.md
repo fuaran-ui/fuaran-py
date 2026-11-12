@@ -15,6 +15,17 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — the select builder spells option groups; the manifest's claims are checked (Phase 2699)
+
+- `fuaran.select` and `control.select` take `groups` (a sequence of `SelectOptionGroup`): options named by `value` under
+  a label, the rest rendering after them. Absent and `[]` write no member. The builder does not judge the values; decode
+  refuses a value named twice or naming no static option. Certified by `select-option-groups` and
+  `select-option-groups-remainder`, authored through the builder.
+- `fuaran.switch` takes `auto_advance_ms` (fuaran#1122), which the `Switch` record already carried.
+- A test now walks the capability manifest's `Kind.*` claims and requires a builder parameter for every field of each
+  claimed kind, or a reasoned declaration. Declared gaps: `Box.keep_together` and `Box.break_before` have no container
+  builder (the record only).
+
 ### additive — an op reaches a node held in a slot argument (Phase 2705)
 
 - `fuaran_ui.ops.apply` looks a node or a parent up through the slot trees of a `FragmentRef`'s `args` and a `Mount`'s

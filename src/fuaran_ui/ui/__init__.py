@@ -1266,6 +1266,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         values: Binding | None = None,
         on_change: bool = True,
         on_change_multi: bool = False,
+        groups: Sequence[t.SelectOptionGroup] | None = None,
     ) -> UiNode:
         """The select control. ``on_change=False`` OMITS the handler key, which is what
         arms a renderer's write-back default against ``value`` / ``values`` — see
@@ -1275,7 +1276,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         state: a multi-select (``multiple=True``) carries ``values`` and no ``value``,
         so a ``value`` handed to it is dropped; a single-select always carries one, so
         an absent ``value`` becomes the empty ``Static`` ("no selection"). ``multiple``
-        is emitted as authored: ``None`` omits it, an explicit ``False`` is kept."""
+        is emitted as authored: ``None`` omits it, an explicit ``False`` is kept.
+
+        ``groups`` (Phase 2699, WIRE_FORMAT §3.6.30) names options of this select by
+        ``value`` under a label; options no group names render after the groups. Absent
+        and ``[]`` are one fact and both omit the member. The builder does not judge the
+        values: a value named twice, or naming no static option, is refused on decode."""
         kind = t.Select(
             _text(label),
             source,
@@ -1286,6 +1292,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             values,
             on_change,
             on_change_multi,
+            tuple(groups) if groups is not None else (),
         )
         return _node(id, kind, accessibility.select)
 
@@ -1543,6 +1550,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         default: UiNode,
         state_key: str | None = None,
         on: Binding | None = None,
+        auto_advance_ms: int | None = None,
     ) -> UiNode:
         """Binding-selected conditional child (Phase 392 / 768). ``default``
         renders when no case is taken. Give exactly one selector: the compact
@@ -1554,9 +1562,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         compared against the switch's selector; a ``Binding`` selector is the
         ``when`` predicate (fuaran#1535), evaluated at render time and consulting
         no selector at all — which is why ``switch-predicate-only`` carries an
-        empty ``state_key``."""
+        empty ``state_key``.
+
+        ``auto_advance_ms`` (fuaran#1122) advances to the next case on that interval;
+        absent declares no timer."""
         switch_cases = tuple(_switch_case(entry) for entry in cases)
-        return _node(id, t.Switch(state_key, switch_cases, default, on), accessibility.none)
+        return _node(id, t.Switch(state_key, switch_cases, default, on, auto_advance_ms), accessibility.none)
 
     @staticmethod
     def fragment_decl(

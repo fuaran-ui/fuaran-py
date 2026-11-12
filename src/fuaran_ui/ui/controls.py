@@ -67,7 +67,7 @@ from dataclasses import dataclass, replace
 from ..model import Arr
 from ..model import Value as WireValue
 from ..schema import types as t
-from ..schema.types import Binding, SelectOption, UiNode
+from ..schema.types import Binding, SelectOption, SelectOptionGroup, UiNode
 from . import fuaran
 from .compute import Frame, OptionSource, ParamDecl, TransformBinding
 from .quick import derive_id
@@ -172,6 +172,7 @@ def select(
     source: Frame | None = None,
     placeholder: str = "—",
     occurrence: int = 0,
+    groups: Sequence[SelectOptionGroup] | None = None,
 ) -> Control:
     """One value from a closed set, feeding the scalar parameter ``name``.
 
@@ -179,6 +180,7 @@ def select(
     options binding, or ``col(column).unique()`` with the ``source`` frame it derives
     from. Omitting ``default`` leaves the slot unseeded, so the parameter is unbound and
     the filter reading it prunes — the placeholder row shows and every row is visible.
+    ``groups`` (Phase 2699) names options by ``value`` under a label; the rest render after them.
     """
     slot = _state(name, default)
     node = fuaran.select(
@@ -188,6 +190,7 @@ def select(
         value=slot,
         placeholder=placeholder,
         on_change=False,
+        groups=groups,
     )
     return Control(node.id, node.kind, node.accessibility, params=(ParamDecl(name, slot),))
 

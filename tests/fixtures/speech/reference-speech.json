@@ -1089,6 +1089,43 @@
       ],
       "omissions": []
     },
+    "emitter-panel": {
+      "text": "Cold room 3\nTemperature: 4\nCooling\nButton: Start defrost\nForm, 2 fields\n",
+      "ssml": "<speak>\n<s><emphasis level=\"moderate\">Cold room 3</emphasis></s><break strength=\"strong\"/>\n<s>Temperature: 4</s><break strength=\"medium\"/>\n<s>Cooling</s><break strength=\"medium\"/>\n<s>Button: Start defrost</s><break strength=\"medium\"/>\n<s>Form, 2 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "panel-title",
+          "source": "derived",
+          "emphasis": true,
+          "pause": "long"
+        },
+        {
+          "nodeId": "panel-temp",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-status",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-defrost",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        },
+        {
+          "nodeId": "panel-schedule",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "empty-state-card": {
       "text": "No saved searches yet\nSearches you save will appear here so you can re-run them with one click.\nButton: Browse jobs\n",
       "ssml": "<speak>\n<s><emphasis level=\"moderate\">No saved searches yet</emphasis></s><break strength=\"strong\"/>\n<s>Searches you save will appear here so you can re-run them with one click.</s><break strength=\"medium\"/>\n<s>Button: Browse jobs</s><break strength=\"medium\"/>\n</speak>\n",
@@ -4172,6 +4209,32 @@
       ],
       "omissions": []
     },
+    "select-option-groups-remainder": {
+      "text": "Selection: Chart\n",
+      "ssml": "<speak>\n<s>Selection: Chart</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-option-groups-remainder",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "select-option-groups": {
+      "text": "Selection: Chart\n",
+      "ssml": "<speak>\n<s>Selection: Chart</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "select-option-groups",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "shared-source-seeded-pair": {
       "text": "Table\n2\n",
       "ssml": "<speak>\n<s>Table</s><break strength=\"medium\"/>\n<s>2</s><break strength=\"medium\"/>\n</speak>\n",
@@ -4608,6 +4671,45 @@
         }
       ]
     },
+    "table-citation-all": {
+      "text": "Table, 2 rows, 4 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 4 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-all",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "table-citation-none": {
+      "text": "Table, 2 rows, 4 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 4 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-none",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "table-citation-some": {
+      "text": "Table, 2 rows, 3 columns\n",
+      "ssml": "<speak>\n<s>Table, 2 rows, 3 columns</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "table-citation-some",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "table-1": {
       "text": "Table, 2 rows, 2 columns\n",
       "ssml": "<speak>\n<s>Table, 2 rows, 2 columns</s><break strength=\"medium\"/>\n</speak>\n",
@@ -4989,6 +5091,58 @@
         {
           "nodeId": "upload-paste-1",
           "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-citation-one": {
+      "text": "Online.com took 23% of the category.\n",
+      "ssml": "<speak>\n<s>Online.com took 23% of the category.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-one",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-citation-none": {
+      "text": "Online.com took 23% of the category.\n",
+      "ssml": "<speak>\n<s>Online.com took 23% of the category.</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-none",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "markdown-citation-several": {
+      "text": "Online.com took 23% from £412k placed by 17 brands, against a forecast of about 20 .\n",
+      "ssml": "<speak>\n<s>Online.com took 23% from £412k placed by 17 brands, against a forecast of about 20 .</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "markdown-citation-several",
+          "source": "derived",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
+    "fact-cited": {
+      "text": "Revenue: £412k\n",
+      "ssml": "<speak>\n<s>Revenue: £412k</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "fact-cited",
+          "source": "derived",
           "emphasis": false,
           "pause": "short"
         }

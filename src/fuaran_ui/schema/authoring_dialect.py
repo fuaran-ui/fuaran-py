@@ -69,6 +69,10 @@ _ROW_FN = (
     "a (row) -> ... closure of the cell kind; it erases on the wire, so the cell is authored by its "
     "discriminator alone (ColumnKind(kind))"
 )
+_AFFORDANCE_UNAUTHORED = (
+    "the operable-surface member (WIRE_FORMAT 31, Phase 2517): this host decodes, refuses and re-encodes it "
+    "but has no authoring spelling for it yet"
+)
 _EMPTY = "an empty list is authored by leaving it out; the wire spells it"
 _FALSE = "False is authored by leaving it out; the wire spells it"
 _IDENTITY_STYLE = "the all-default style record is authored by leaving it out; the wire spells it"
@@ -110,6 +114,8 @@ UNCLASSED: Mapping[str, str] = {
     "record:DateTimeRangePair": "authored as a (from, to) tuple of ISO strings in DateTimeRangeField.value",
     "record:RangePair": "authored as a (min, max) tuple in RangeField.value",
     "record:StyleDelta": "a PatchStyle op payload, written by the tree diff (fuaran_ui.ops.diff), never authored",
+    "record:Affordance": _AFFORDANCE_UNAUTHORED,
+    "record:AffordanceAlias": _AFFORDANCE_UNAUTHORED,
     "case:Binding.Computed": "a closure-valued binding; it erases on the wire and has no authoring spelling",
     "case:Binding.Expr": "declined by fuaran#1580: the predicate binding is not modelled by this host",
     "case:Binding.I18n": "authored as the TextSource.I18n case (I18n); a Binding-typed slot does not admit it yet",
@@ -187,7 +193,9 @@ AUTHORING_DEFAULTS: Mapping[str, Mapping[str, str]] = {
 
 #: Wire members that are not a parameter of their authoring class, and why.
 GAPS: Mapping[str, Mapping[str, str]] = {
-    "kind:Button": {"tooltip": _HOST_ONLY},
+    "kind:Button": {"tooltip": _HOST_ONLY, "affordance": _AFFORDANCE_UNAUTHORED},
+    "kind:Select": {"affordance": _AFFORDANCE_UNAUTHORED},
+    "record:FormField": {"affordance": _AFFORDANCE_UNAUTHORED},
     "kind:DataGrid": {
         "rowKey": "the erased row-key closure: emitted as <closure> unless row_key_field names the key",
         "staticRows": "authored through the Table record, which lowers to a DataGrid carrying staticRows",

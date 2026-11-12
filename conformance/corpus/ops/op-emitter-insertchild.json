@@ -1,0 +1,1 @@
+{"$type":"InsertChild","child":{"id":"panel-alarm","kind":{"$type":"Callout","body":"Door open","tone":"Critical"}},"parentId":"emitter-panel"}

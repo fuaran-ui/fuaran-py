@@ -1214,6 +1214,21 @@ class StateBehaviour:
 
 
 @dataclass(frozen=True)
+class SelectOptionGroup:
+    """Phase 2571 — a named group of a :class:`Select`'s options (WIRE_FORMAT §3.6.30).
+
+    ``values`` names options of the same select by their ``value``; a value named by
+    two groups, or (over static options) naming no option, is refused on decode.
+    """
+
+    label: str
+    values: tuple[str, ...]
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"label": self.label, "values": tuple(self.values)})
+
+
+@dataclass(frozen=True)
 class SelectOption:
     """A single option in a Select / Choice / Filter options list.
 
@@ -1621,11 +1636,27 @@ class Heading:
 
 
 @dataclass(frozen=True)
-class Markdown:
-    text: TextSource
+class MarkdownCitation:
+    """Phase 2591 (WIRE_FORMAT §3.6.32) — one figure a :class:`Markdown` text cites, placed by
+    a ``cite:<name>`` link. ``reference`` is opaque, as on :class:`Fact`; ``label`` is for a
+    screen reader and is never printed.
+    """
+
+    name: str
+    reference: str
+    label: TextSource | None = None
 
     def to_wire(self) -> Obj:
-        return _obj("Markdown", {"text": self.text})
+        return _obj(None, {"label": self.label, "name": self.name, "reference": self.reference})
+
+
+@dataclass(frozen=True)
+class Markdown:
+    text: TextSource
+    citations: tuple[MarkdownCitation, ...] = ()
+
+    def to_wire(self) -> Obj:
+        return _obj("Markdown", {"citations": list(self.citations) if self.citations else None, "text": self.text})
 
 
 @dataclass(frozen=True)
@@ -1720,6 +1751,8 @@ class Fact:
     emphasis: bool = False
     help: TextSource | None = None
     icon: str | None = None
+    # WIRE_FORMAT 3.6.31 - the Fact this figure cites, opaque to the language.
+    reference: str | None = None
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -1728,6 +1761,7 @@ class Fact:
                 "emphasis": True if self.emphasis else None,
                 "help": self.help,
                 "icon": self.icon,
+                "reference": self.reference,
                 "label": self.label,
                 "tone": None if self.tone == "Default" else self.tone,
                 "value": self.value,
@@ -2612,6 +2646,10 @@ class Select:
     #: `controls-closure` carries both. `False` by default — the record never
     #: emitted the key before this phase.
     on_change_multi: bool = False
+    #: Phase 2571 — option groups (WIRE_FORMAT §3.6.30): each names options of this
+    #: select by ``value``; options no group names render after the groups. Empty (the
+    #: default) is no grouping and writes no key.
+    groups: tuple[SelectOptionGroup, ...] = ()
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -2626,6 +2664,8 @@ class Select:
                 "source": self.source,
                 "value": self.value,
                 "values": self.values,
+                # Phase 2571 — omit-at-default: no groups writes no key.
+                "groups": self.groups or None,
             },
         )
 
@@ -2981,6 +3021,22 @@ class DefaultSort:
 
 
 @dataclass(frozen=True)
+class TableCitation:
+    """Phase 2592 (WIRE_FORMAT §3.6.33) — one cell of a static table that cites its figure, by
+    zero-based ``row`` and ``column``. ``reference`` is opaque, as on :class:`Fact`; ``label``
+    is for a screen reader and is never printed.
+    """
+
+    row: int
+    column: int
+    reference: str
+    label: TextSource | None = None
+
+    def to_wire(self) -> Obj:
+        return _obj(None, {"column": self.column, "label": self.label, "reference": self.reference, "row": self.row})
+
+
+@dataclass(frozen=True)
 class Table:
     """Author-facing carrier for a static read-only table.
 
@@ -3006,6 +3062,8 @@ class Table:
     #: Phase 2474 — the declared column whose cell identifies each row. Naming one
     #: of ``columns`` makes the table SELECTABLE. Absent is omitted on the wire.
     row_key_field: str | None = None
+    #: Phase 2592 — the cells that cite their figures. Empty is no member on the wire.
+    citations: tuple[TableCitation, ...] = ()
 
     def to_wire(self) -> Obj:
         return _obj(
@@ -3020,6 +3078,7 @@ class Table:
                 "staticRows": _obj(
                     None,
                     {
+                        "citations": list(self.citations) if self.citations else None,
                         "defaultSort": self.default_sort,
                         "headers": list(self.headers),
                         "rows": [list(r) for r in self.rows],

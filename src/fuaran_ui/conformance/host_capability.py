@@ -372,8 +372,21 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
     "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
+    "operability": {
+        "pending": (
+            "the codec round-trips and refuses the affordance member (WIRE_FORMAT 31.1, 31.2) and its suite runs the "
+            "family wire section; the derivation and the matcher (31.3-31.5) are not yet ported"
+        ),
+    },
+    "page-document": {"notApplicable": "this host renders no stored page"},
     "repair": {"pending": "this host has no §28 repair function yet"},
     "row-encode": "covered",  # tests/test_row_encode.py
+    "server-driven": {
+        "notApplicable": (
+            "this host neither produces nor applies a server-driven frame (WIRE_FORMAT section 33); "
+            "only the reference host does today"
+        )
+    },
     "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
 }
 

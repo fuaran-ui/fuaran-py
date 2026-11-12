@@ -119,6 +119,10 @@ def _set_extra(node: Node, key: str, value: Value) -> Node:
     return Node(node.id, node.kind, extras)
 
 
+def _drop_extra(node: Node, key: str) -> Node:
+    return Node(node.id, node.kind, {k: v for k, v in node.extras.items() if k != key})
+
+
 def _store_style(node: Node, members: dict[str, Value]) -> Node:
     """Store a style record in the decoder's omitted-when-default form.
 
@@ -215,6 +219,29 @@ def _child_slots(node: Node) -> list[ChildSlot]:
         body = fields.get("body")
         if isinstance(body, Node):
             slots.append((body, lambda c: _set_kind_field(node, "body", c)))
+
+    # fuaran#2705 -- the subtree of every slot argument, a FragmentRef's `args` and a
+    # Mount's `inputs`, in key order (WIRE_FORMAT 34.2: the node walk includes slot
+    # arguments). The value arguments (Int / Float / Bool / Str) hold no node.
+    for bag_key in ("args", "inputs"):
+        bag = fields.get(bag_key)
+        if not isinstance(bag, Obj):
+            continue
+        for arg_key in sorted(bag.fields):
+            arg = bag.fields[arg_key]
+            if not (isinstance(arg, Obj) and arg.tag == "SlotArg"):
+                continue
+            tree = arg.fields.get("tree")
+            if not isinstance(tree, Node):
+                continue
+
+            def rebuild_arg(
+                c: Node, bag_key: str = bag_key, bag: Obj = bag, arg_key: str = arg_key, arg: Obj = arg
+            ) -> Node:
+                new_arg = Obj(arg.tag, {**arg.fields, "tree": c})
+                return _set_kind_field(node, bag_key, Obj(bag.tag, {**bag.fields, arg_key: new_arg}))
+
+            slots.append((tree, rebuild_arg))
 
     state = node.extras.get("state")
     if isinstance(state, Obj):
@@ -387,6 +414,16 @@ _FIELDS: dict[str, dict[str, str]] = {
         "Variant": "variant",
     },
     "Markdown": {"Text": "text"},
+    # The row 2535 left out: every other host's Fact takes these fields.
+    "Fact": {
+        "Label": "label",
+        "Value": "value",
+        "Tone": "tone",
+        "Emphasis": "emphasis",
+        "Help": "help",
+        "Icon": "icon",
+        "Reference": "reference",
+    },
     "Badge": {
         "Label": "label",
         "Variant": "variant",
@@ -972,6 +1009,33 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         return _ok(tree)
 
+    if tag == "UpdateAccessibility":
+        # The whole record replaces the trait; a record setting no member is stored
+        # as the ABSENT slot, which is how the trait is removed (Phase 2527).
+        target = _as_str(fields["target"])
+        accessibility = fields["accessibility"]
+        empty = isinstance(accessibility, Obj) and not accessibility.fields
+        tree = _map(
+            target,
+            lambda n: _drop_extra(n, "accessibility") if empty else _set_extra(n, "accessibility", accessibility),
+            root,
+        )
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
+    if tag == "UpdateTooltip":
+        # An absent `tooltip` member clears the trait (Phase 2527).
+        target = _as_str(fields["target"])
+        tree = _map(
+            target,
+            lambda n: _set_extra(n, "tooltip", fields["tooltip"]) if "tooltip" in fields else _drop_extra(n, "tooltip"),
+            root,
+        )
+        if tree is None:
+            return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
+        return _ok(tree)
+
     if tag == "InsertChild":
         parent_id = _as_str(fields["parentId"])
         child = _as_node(fields["child"])
@@ -1181,7 +1245,8 @@ def _op_can_grow(op: Obj) -> bool:
     a payload whose ids repeat has fewer ids than nodes. ``MoveNode`` carries no node
     and is checked anyway: moving one legal branch under the leaf of another stacks
     two depths that each passed. Everything else - ``UpdateProp``, ``ReplaceBinding``,
-    ``UpdateStyle``, ``PatchStyle``, ``RemoveNode``, ``ReorderChildren`` - cannot grow
+    ``UpdateStyle``, ``PatchStyle``, ``UpdateAccessibility``, ``UpdateTooltip``,
+    ``RemoveNode``, ``ReorderChildren`` - cannot grow
     the tree, is not charged the walk, and still applies to a tree already over a limit
     it did not put there.
     """

@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "08ca738ed16bd740e160879588ee8aa778a2d6724beffc08126fedf462d47019"
+IDL_SHA256 = "c694bd27beacf7d3f6a9c794ec15f03e02b78ca98bbbe56333b648410d14ef19"
 IDL_VERSION = 1
 
 
@@ -65,6 +65,7 @@ T_enum_ButtonVariant = T("enum", "ButtonVariant")
 T_str = T("str")
 T_fn = T("fn", wire="<closure>")
 T_union_Binding_bool = T("union", "Binding", args=(T_bool,))
+T_record_Affordance = T("record", "Affordance")
 T_enum_ToneVariant = T("enum", "ToneVariant")
 T_enum_ChartKind = T("enum", "ChartKind")
 T_hosted_json = T("hosted", wire="json")
@@ -119,6 +120,8 @@ T_list_union_TextSource = T("list", of=T_union_TextSource)
 T_record_MapMarker = T("record", "MapMarker")
 T_list_record_MapMarker = T("list", of=T_record_MapMarker)
 T_union_Binding_list_record_MapMarker = T("union", "Binding", args=(T_list_record_MapMarker,))
+T_record_MarkdownCitation = T("record", "MarkdownCitation")
+T_list_record_MarkdownCitation = T("list", of=T_record_MarkdownCitation)
 T_enum_MathDisplay = T("enum", "MathDisplay")
 T_union_MediaKind = T("union", "MediaKind")
 T_record_TrackEntry = T("record", "TrackEntry")
@@ -135,6 +138,8 @@ T_record_SelectOption = T("record", "SelectOption")
 T_list_record_SelectOption = T("list", of=T_record_SelectOption)
 T_union_Binding_list_record_SelectOption = T("union", "Binding", args=(T_list_record_SelectOption,))
 T_union_Binding_list_str = T("union", "Binding", args=(T_list_str,))
+T_record_SelectOptionGroup = T("record", "SelectOptionGroup")
+T_list_record_SelectOptionGroup = T("list", of=T_record_SelectOptionGroup)
 T_list_float = T("list", of=T_float)
 T_union_Binding_list_float = T("union", "Binding", args=(T_list_float,))
 T_record_SwitchCase = T("record", "SwitchCase")
@@ -148,6 +153,8 @@ T_record_Accessibility = T("record", "Accessibility")
 T_record_StateBehaviour = T("record", "StateBehaviour")
 T_record_SemanticStyle = T("record", "SemanticStyle")
 T_enum_LiveRegionKind = T("enum", "LiveRegionKind")
+T_record_AffordanceAlias = T("record", "AffordanceAlias")
+T_list_record_AffordanceAlias = T("list", of=T_record_AffordanceAlias)
 T_union_CellKindErased = T("union", "CellKindErased")
 T_union_ColumnWidth = T("union", "ColumnWidth")
 T_union_Binding_json = T("union", "Binding", args=(T_json,))
@@ -165,6 +172,8 @@ T_enum_ChannelDirection = T("enum", "ChannelDirection")
 T_enum_TextDirection = T("enum", "TextDirection")
 T_enum_StyleRole = T("enum", "StyleRole")
 T_enum_FontVoice = T("enum", "FontVoice")
+T_record_TableCitation = T("record", "TableCitation")
+T_list_record_TableCitation = T("list", of=T_record_TableCitation)
 T_list_list_union_TextSource = T("list", of=T_list_union_TextSource)
 T_enum_TrackKind = T("enum", "TrackKind")
 T_list_union_Action = T("list", of=T_union_Action)
@@ -508,6 +517,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("icon", "optional", T_str),
         F("tooltip", "hostOnly", T_fn),
         F("disabled", "optional", T_union_Binding_bool),
+        F("affordance", "optional", T_record_Affordance),
     ),
     "Callout": (
         F("body", "required", T_union_TextSource),
@@ -600,6 +610,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_union_TextSource),
         F("tone", "omitDefault", T_enum_ToneVariant, default="Default"),
         F("value", "required", T_union_TextSource),
+        F("reference", "optional", T_str),
     ),
     "FileUpload": (
         F("accept", "required", T_list_str),
@@ -684,7 +695,10 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("zoom", "required", T_int),
         F("onMarkerClick", "optional", T_fn),
     ),
-    "Markdown": (F("text", "required", T_union_TextSource),),
+    "Markdown": (
+        F("citations", "omitDefault", T_list_record_MarkdownCitation, default=[]),
+        F("text", "required", T_union_TextSource),
+    ),
     "Math": (
         F("source", "required", T_str),
         F("display", "required", T_enum_MathDisplay),
@@ -751,6 +765,8 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("disabled", "optional", T_union_Binding_bool),
         F("multiple", "optional", T_bool),
         F("values", "optional", T_union_Binding_list_str),
+        F("affordance", "optional", T_record_Affordance),
+        F("groups", "omitDefault", T_list_record_SelectOptionGroup, default=[]),
     ),
     "Skeleton": (F("rows", "required", T_int),),
     "Sparkline": (F("source", "required", T_union_Binding_list_float),),
@@ -825,6 +841,18 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("role", "optional", T_hosted_json),
         F("speak", "optional", T_union_TextSource),
     ),
+    "Affordance": (
+        F("patterns", "omitDefault", T_list_str, default=[]),
+        F("readPatterns", "omitDefault", T_list_str, default=[]),
+        F("aliases", "omitDefault", T_list_record_AffordanceAlias, default=[]),
+        F("description", "optional", T_str),
+        F("clearable", "omitDefault", T_bool, default=False),
+        F("neverControllable", "omitDefault", T_bool, default=False),
+    ),
+    "AffordanceAlias": (
+        F("alias", "required", T_str),
+        F("value", "required", T_str),
+    ),
     "ButtonGroupItem": (
         F("label", "required", T_union_TextSource),
         F("onClick", "optional", T_fn),
@@ -897,6 +925,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("required", "omitDefault", T_bool, default=False),
         F("help", "optional", T_union_TextSource),
         F("rule", "optional", T_record_FieldRule),
+        F("affordance", "optional", T_record_Affordance),
     ),
     "GuestChannel": (
         F("direction", "required", T_enum_ChannelDirection),
@@ -911,6 +940,11 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("latitude", "required", T_float),
         F("longitude", "required", T_float),
     ),
+    "MarkdownCitation": (
+        F("label", "optional", T_union_TextSource),
+        F("name", "required", T_str),
+        F("reference", "required", T_str),
+    ),
     "MetricComparison": (
         F("label", "required", T_union_TextSource),
         F("value", "required", T_union_Binding_float),
@@ -924,6 +958,10 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
     "SelectOption": (
         F("label", "required", T_str),
         F("value", "required", T_str),
+    ),
+    "SelectOptionGroup": (
+        F("label", "required", T_str),
+        F("values", "required", T_list_str),
     ),
     "SemanticStyle": (
         F("direction", "omitDefault", T_enum_TextDirection, default="auto"),
@@ -943,6 +981,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("onLoading", "optional", T_node),
     ),
     "StaticRows": (
+        F("citations", "omitDefault", T_list_record_TableCitation, default=[]),
         F("defaultSort", "optional", T_record_DefaultSort),
         F("headers", "required", T_list_union_TextSource),
         F("rows", "required", T_list_list_union_TextSource),
@@ -965,6 +1004,12 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_union_TextSource),
         F("icon", "optional", T_str),
         F("disabled", "optional", T_union_Binding_bool),
+    ),
+    "TableCitation": (
+        F("column", "required", T_int),
+        F("label", "optional", T_union_TextSource),
+        F("reference", "required", T_str),
+        F("row", "required", T_int),
     ),
     "TrackEntry": (
         F("default", "omitDefault", T_bool, default=False),
@@ -1582,6 +1627,10 @@ OP_FIELDS: dict[str, tuple[F, ...]] = {
         F("target", "required", T_str),
     ),
     "ReplaceRoot": (F("node", "required", T_node),),
+    "UpdateAccessibility": (
+        F("accessibility", "required", T_record_Accessibility),
+        F("target", "required", T_str),
+    ),
     "UpdateProp": (
         F("path", "required", T_str),
         F("target", "required", T_str),
@@ -1594,6 +1643,10 @@ OP_FIELDS: dict[str, tuple[F, ...]] = {
     "UpdateStyle": (
         F("style", "required", T_record_SemanticStyle),
         F("target", "required", T_str),
+    ),
+    "UpdateTooltip": (
+        F("target", "required", T_str),
+        F("tooltip", "optional", T_union_TextSource),
     ),
 }
 

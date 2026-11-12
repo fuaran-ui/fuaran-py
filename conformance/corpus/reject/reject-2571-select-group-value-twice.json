@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"Select","groups":[{"label":"Trend","values":["revenue-trend"]},{"label":"Breakdown","values":["region-breakdown","revenue-trend"]}],"label":"Chart","source":{"$type":"Static","value":[{"label":"Revenue","value":"revenue-trend"},{"label":"By region","value":"region-breakdown"}]},"value":{"$type":"Static","value":"revenue-trend"}}}

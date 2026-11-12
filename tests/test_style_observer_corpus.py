@@ -41,8 +41,9 @@ from fuaran_ui.style_observer import (
     verify_usage_budgets,
 )
 from fuaran_ui.theme_manifest import decode as decode_manifest
+from fuaran_ui.theme_manifest import encode_manifest_defect, validate
 
-KNOWN_TIERS = {"observation", "per-node-manifest", "usage-budget"}
+KNOWN_TIERS = {"observation", "per-node-manifest", "usage-budget", "manifest-validation"}
 
 
 def _load(fixture: dict) -> dict:
@@ -106,6 +107,16 @@ def test_the_family_is_not_empty() -> None:
 
 
 @corpus_required
+@pytest.mark.parametrize("tier", sorted(KNOWN_TIERS))
+def test_every_known_tier_carries_vectors(tier: str) -> None:
+    """A tier this host claims to certify and the family carries no vector for
+    would be certified vacuously — the per-tier form of the guard above."""
+    assert any(_load(fx)["tier"] == tier for fx in _FIXTURES), (
+        f"the style-observer family carries no {tier!r} vector, so this host certifies that tier vacuously"
+    )
+
+
+@corpus_required
 @pytest.mark.parametrize("fixture", _FIXTURES, ids=lambda fx: fx["id"])
 def test_style_observer_vector(fixture: dict) -> None:
     case = _load(fixture)
@@ -134,6 +145,15 @@ def test_style_observer_vector(fixture: dict) -> None:
         flags = per_node_flags(manifest, _observation(case["observation"]))
         assert [encode_style_flag(f) for f in flags] == case["expectedManifestFlags"], (
             f"{fixture['id']}: the manifest-aware per-node flags do not encode to the family's bytes"
+        )
+
+    elif tier == "manifest-validation":
+        # Phase 2133's tier: the tolerant decode, then the shared validation pass,
+        # each defect in its canonical `{code,index,subject}` bytes.
+        manifest = decode_manifest(case["manifest"])
+        defects = [encode_manifest_defect(d) for d in validate(manifest)]
+        assert defects == case["expectedManifestDefects"], (
+            f"{fixture['id']}: the manifest validation defects do not encode to the family's bytes"
         )
 
     else:

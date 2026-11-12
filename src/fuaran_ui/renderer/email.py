@@ -89,7 +89,7 @@ from .projection import Disposition, disposition_of, omitted, open_live, rendere
 # call that module's internal text and number projections, "so a digest cannot disagree
 # with the page it links to". A second copy of `_as_node` here would be a second answer to
 # what counts as a child node.
-from .render import _EM_DASH, _a11y_name, _as_node, _child_nodes, _collect_fragments
+from .render import _EM_DASH, _a11y_name, _as_node, _child_nodes, _collect_fragments, table_citations
 from .sanitize import sanitize_markdown_html, sanitize_url_or_blank
 from .seeds import with_state_seeds
 
@@ -439,7 +439,7 @@ _TASK_CHECKBOX_SUBSTITUTIONS: Final = (
 )
 
 
-def email_safe_markdown(policy: EgressPolicy, source: str) -> str:
+def email_safe_markdown(policy: EgressPolicy, source: str, citations: Sequence[_markdown.Citation] = ()) -> str:
     """Render a markdown body to email-safe HTML.
 
     The GFM renderer escapes raw HTML by construction, so its output is a closed tag set —
@@ -448,8 +448,11 @@ def email_safe_markdown(policy: EgressPolicy, source: str) -> str:
     above: a digest is the surface where an undeclared markdown image IS the tracking pixel,
     so leaving this one unchecked would be the largest remaining hole rather than the
     smallest.
+
+    A citation (§3.6.32) keeps its span and reference but not its label: a mail client has no
+    reference stylesheet, so a hidden label would be printed in the sentence.
     """
-    html = _strip_egress_markers(sanitize_markdown_html(_markdown.to_html_with_egress(policy, source)))
+    html = _strip_egress_markers(sanitize_markdown_html(_markdown.to_html_cited(policy, citations, source)))
     for control, glyph in _TASK_CHECKBOX_SUBSTITUTIONS:
         html = html.replace(control, glyph)
     return html
@@ -785,7 +788,13 @@ class _EmailRenderer:
         return text_element(f"h{level}", [("style", style)], self._text(fields.get("text")))
 
     def _markdown(self, node: Node, fields: dict[str, Value], depth: int) -> str:
-        body = email_safe_markdown(self.options.egress_policy, self._text(fields.get("text")))
+        citations = fields.get("citations")
+        cited = [
+            _markdown.Citation(name=str(entry.fields["name"]), reference=str(entry.fields["reference"]))
+            for entry in (citations.items if isinstance(citations, Arr) else ())
+            if isinstance(entry, Obj)
+        ]
+        body = email_safe_markdown(self.options.egress_policy, self._text(fields.get("text")), cited)
         return _layout_table(
             "",
             element(
@@ -1096,7 +1105,18 @@ class _EmailRenderer:
             ),
         )
 
-    def _static_table(self, headers: Sequence[Value], rows: Sequence[Value]) -> str:
+    def _static_table(
+        self,
+        headers: Sequence[Value],
+        rows: Sequence[Value],
+        cited: dict[tuple[int, int], Obj] | None = None,
+    ) -> str:
+        # Phase 2592 — a mail client has no reference stylesheet, so a hidden label would be
+        # printed in the cell. The cell keeps its reference and draws no label.
+        def reference(i: int, j: int) -> list[tuple[str, str]]:
+            citation = (cited or {}).get((i, j))
+            return [] if citation is None else [("data-fact", str(citation.fields["reference"]))]
+
         header_cells = "".join(
             text_element(
                 "th",
@@ -1124,14 +1144,15 @@ class _EmailRenderer:
                                 "style",
                                 f"padding:8px 10px;border:1px solid {RULE_COLOUR};"
                                 + self._text_style("font-size:13px;line-height:18px;"),
-                            )
+                            ),
+                            *reference(i, j),
                         ],
                         self._text(cell),
                     )
-                    for cell in row.items
+                    for j, cell in enumerate(row.items)
                 ),
             )
-            for row in rows
+            for i, row in enumerate(rows)
             if isinstance(row, Arr)
         )
         return element(
@@ -1171,6 +1192,7 @@ class _EmailRenderer:
         return self._static_table(
             headers.items if isinstance(headers, Arr) else [],
             rows.items if isinstance(rows, Arr) else [],
+            table_citations(fields),
         )
 
     # ── Interactive + client-drawn: labelled open-live links, never controls ─

@@ -1,0 +1,9 @@
+{
+  "id": "manifest-validation-explicit-sub-1-floor",
+  "description": "A contrast floor written explicitly as 0.5 fails open exactly as an omitted one does: out of range.",
+  "tier": "manifest-validation",
+  "manifest": "{\"invariants\":[{\"kind\":\"ContrastFloor\",\"minRatio\":0.5,\"role\":\"Brand\"}],\"roles\":[{\"role\":{\"tone\":\"Brand\"},\"token\":\"color.brand\"}],\"tokens\":{\"color\":{\"brand\":{\"$type\":\"color\",\"$value\":\"#010203\"}}}}",
+  "expectedManifestDefects": [
+    "{\"code\":\"CONTRAST_FLOOR_OUT_OF_RANGE\",\"index\":0,\"subject\":\"Brand\"}"
+  ]
+}

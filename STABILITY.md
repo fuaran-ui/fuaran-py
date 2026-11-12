@@ -13,7 +13,74 @@ The package is pre-1.0, so a minor version may break; this record is how a consu
 ones did. The wire format itself is governed by the shared specification and its conformance
 corpus, not by this file.
 
-## 0.11.0 (untagged until the operator's release)
+## 0.13.0 (draft — the release act sets the version)
+
+### additive — an op reaches a node held in a slot argument (Phase 2705)
+
+- `fuaran_ui.ops.apply` looks a node or a parent up through the slot trees of a `FragmentRef`'s `args` and a `Mount`'s
+  `inputs`, in key order (WIRE_FORMAT §34.2; value arguments hold no node). An op addressed to a node held there, which
+  stopped as `NodeNotFound` / `ParentNotFound`, now applies; the footprint's keyed walk reaches the same positions.
+  Certified by `merge-conformance/fold-mount-input-insert` and `fold-refusal-mount-input-{tone,disjoint,delete-modify}`
+  at specification commit `0b2ec20`.
+
+### breaking — the three-way tree merge retires; merge by fold is the only merge (Phase 2646)
+
+- Removed from `fuaran_ui` and `fuaran_ui.merge`: `merge_3way`, `merge3`, `merge3_way_with_author`,
+  `merge3_way_lenient`, `MergeOk`, `MergeConflicts`, `MergeConflict`, `MergeSide`, `MergeResult`, `MergeAuthor`,
+  `Primary`, `Secondary`, `encode_envelope` and the conflict-class constants. The op DAG's only merge since
+  fuaran#2645 is the fold: `fuaran_ui.reconcile.reconcile` over `fuaran_ui.merge.conflicts_in` (WIRE_FORMAT §34),
+  certified by the `foldFixtures` family, which is the merge-conformance manifest's only family (version 2).
+- `DagOpRecord` loses `tombstoned` and `outcome_hash`; `decode_dag_record` refuses a record carrying either member by
+  name (`WRONG_TYPE` at its path), because a pre-2645 address does not recompute (WIRE_FORMAT §5.3.3).
+- behavioural: the fold's script records the child-order reorder for every interleaved or rebased parent, a reorder
+  beside a concurrent append, removal or move of a listed child is rebased rather than refused (fuaran#2671), and the
+  footprint follows Core 0.42.0's child-list slot rules (fuaran#2651, #2670, #2691).
+
+## 0.12.0
+
+### additive — a table cell cites its figure (Phase 2592)
+
+- `DataGrid.staticRows.citations` and `TableCitation` (omitted when empty) and the `fuaran.table(..., citations=...)`
+  parameter. The decoder reads each coordinate against the rows, and refuses an empty array, a negative or out-of-range
+  row or column and two entries for one cell (WIRE_FORMAT §3.6.33). A cited `<td>` carries `data-fact`, with a label as a
+  `fuaran-cited-label` first child; the email projection keeps the attribute and drops the label. Certified by
+  `nodes/table-citation-*.json` and `reject/reject-table-citation*.json`.
+
+### additive — a cited figure reads inside a sentence (Phase 2591)
+
+- `Markdown.citations` and `MarkdownCitation` (omitted when empty) and the `fuaran.markdown(..., citations=...)`
+  parameter. The decoder refuses an empty array, a name outside the grammar and a repeated name. A declared `cite:` link
+  renders as `span.fuaran-cited[data-fact]` in the line of text (WIRE_FORMAT §3.6.32); `markdown.to_html_cited` is new
+  and `to_html_with_egress` is its no-citation case. The email projection keeps the span and drops the label. Certified
+  by `nodes/markdown-citation-*.json`, `reject/reject-markdown-citation*.json` and `markdown/corpus.json`.
+- `UpdateProp` gains the `Fact` row, which Phase 2535 left out of the field table.
+
+### additive — a Fact carries its reference on the wire (Phase 2535)
+
+- `Fact.reference: str | None` (omitted when absent) and the `fuaran.fact(..., reference=...)` parameter. The decoder
+  takes the member from the generated field table, and the renderer stamps it as `data-fact` on the tile's root
+  (WIRE_FORMAT §3.6.31). Certified by `nodes/fact-cited.json`.
+
+### additive — a Select carries optional option groups (Phase 2571)
+
+- `Select.groups: tuple[SelectOptionGroup, ...]` (default empty, omitted on the wire) and the new
+  `SelectOptionGroup(label, values)`; `SelectOption` is unchanged. The decoder reads `groups`
+  (omit-at-default: `[]` is the absent member) and refuses, `WRONG_TYPE` at the offending `values`
+  element, a value named more than once and, over static options, a value naming no option
+  (WIRE_FORMAT §3.6.30). Certified by `nodes/select-option-groups*.json` and `reject/reject-2571-*`.
+
+### additive and behavioural — accessibility and tooltip edits are TreeOps (Phase 2527)
+
+- The op decoder and apply engine carry `updateAccessibility` and `updateTooltip`. The tree diff now emits them, after the
+  style and state edits, so a diff over a changed trait returns ops it did not return before. Certified by
+  `ops/op-updateaccessibility*.json`, `ops/op-updatetooltip*.json` and their `reject/` vectors.
+
+### behavioural (wire readers) — the affordance member is decoded and refused (Phase 2522)
+
+- The decoder reads the `affordance` member and refuses a malformed one (WIRE_FORMAT §31.1, §31.2). Certified by
+  `tests/test_operability_wire_corpus.py`.
+
+## 0.11.0
 
 ### behavioural — an explicit `multiple=False` on a Select is written as authored (Phase 1962)
 

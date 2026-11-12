@@ -1,0 +1,1 @@
+{"id":"t","kind":{"$type":"DataGrid","columns":[],"source":{"$type":"Static","value":[]},"staticRows":{"citations":[{"column":0,"reference":"r","row":1}],"headers":["A","B"],"rows":[["a","b"]]}}}

@@ -4285,7 +4285,558 @@
             "$type",
             "source"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "define"
+            },
+            "body": {
+              "type": "object"
+            },
+            "name": {
+              "type": "string"
+            },
+            "params": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "default": {
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          },
+          "required": [
+            "$type",
+            "body",
+            "name",
+            "params"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "fit"
+            },
+            "control": {
+              "type": "object",
+              "properties": {
+                "maxIter": {
+                  "anyOf": [
+                    {
+                      "type": "integer"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "$param": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "$param"
+                      ]
+                    }
+                  ]
+                },
+                "tol": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "enum": [
+                            "NaN",
+                            "Infinity",
+                            "-Infinity"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "$param": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "$param"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "maxIter",
+                "tol"
+              ]
+            },
+            "family": {
+              "type": "string",
+              "enum": [
+                "gaussian",
+                "poisson",
+                "gamma",
+                "tweedie",
+                "quasiPoisson",
+                "binomial",
+                "quasiBinomial",
+                "inverseGaussian",
+                "negativeBinomial"
+              ]
+            },
+            "groupBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "intercept": {
+              "type": "boolean"
+            },
+            "link": {
+              "type": "string",
+              "enum": [
+                "identity",
+                "log",
+                "logit",
+                "probit",
+                "cloglog",
+                "inverse",
+                "inverseSquare",
+                "sqrt"
+              ]
+            },
+            "offset": {
+              "type": "object"
+            },
+            "output": {
+              "type": "string",
+              "enum": [
+                "coefficients",
+                "summary",
+                "fitted",
+                "residuals"
+              ]
+            },
+            "power": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "predictors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "expr": {
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "expr",
+                  "name"
+                ]
+              }
+            },
+            "response": {
+              "type": "string"
+            },
+            "ridge": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "enum": [
+                        "NaN",
+                        "Infinity",
+                        "-Infinity"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            },
+            "stdErrors": {
+              "type": "string",
+              "enum": [
+                "classical",
+                "hc0",
+                "hc1",
+                "hc2",
+                "hc3",
+                "robust"
+              ]
+            },
+            "theta": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "weights": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "control",
+            "family",
+            "groupBy",
+            "intercept",
+            "link",
+            "output",
+            "predictors",
+            "response"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "predict"
+            },
+            "fit": {
+              "$ref": "#/$defs/TransformFitSpec"
+            },
+            "interval": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "confidence",
+                    "prediction"
+                  ]
+                },
+                "level": {
+                  "anyOf": [
+                    {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "enum": [
+                            "NaN",
+                            "Infinity",
+                            "-Infinity"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "$param": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "$param"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "level"
+              ]
+            },
+            "model": {
+              "type": "object",
+              "properties": {
+                "from": {
+                  "type": "string",
+                  "enum": [
+                    "training",
+                    "coefficients"
+                  ]
+                },
+                "source": {
+                  "type": "object"
+                }
+              },
+              "required": [
+                "from",
+                "source"
+              ]
+            },
+            "scale": {
+              "type": "string",
+              "enum": [
+                "link",
+                "response"
+              ]
+            }
+          },
+          "required": [
+            "$type",
+            "fit",
+            "model",
+            "scale"
+          ]
         }
+      ]
+    },
+    "TransformFitSpec": {
+      "type": "object",
+      "properties": {
+        "control": {
+          "type": "object",
+          "properties": {
+            "maxIter": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            },
+            "tol": {
+              "anyOf": [
+                {
+                  "anyOf": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "enum": [
+                        "NaN",
+                        "Infinity",
+                        "-Infinity"
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "maxIter",
+            "tol"
+          ]
+        },
+        "family": {
+          "type": "string",
+          "enum": [
+            "gaussian",
+            "poisson",
+            "gamma",
+            "tweedie",
+            "quasiPoisson",
+            "binomial",
+            "quasiBinomial",
+            "inverseGaussian",
+            "negativeBinomial"
+          ]
+        },
+        "groupBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "intercept": {
+          "type": "boolean"
+        },
+        "link": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "log",
+            "logit",
+            "probit",
+            "cloglog",
+            "inverse",
+            "inverseSquare",
+            "sqrt"
+          ]
+        },
+        "offset": {
+          "type": "object"
+        },
+        "output": {
+          "type": "string",
+          "enum": [
+            "coefficients",
+            "summary",
+            "fitted",
+            "residuals"
+          ]
+        },
+        "power": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
+        },
+        "predictors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "expr": {
+                "type": "object"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "expr",
+              "name"
+            ]
+          }
+        },
+        "response": {
+          "type": "string"
+        },
+        "ridge": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "object",
+              "properties": {
+                "$param": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "$param"
+              ]
+            }
+          ]
+        },
+        "stdErrors": {
+          "type": "string",
+          "enum": [
+            "classical",
+            "hc0",
+            "hc1",
+            "hc2",
+            "hc3",
+            "robust"
+          ]
+        },
+        "theta": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "enum": [
+                "NaN",
+                "Infinity",
+                "-Infinity"
+              ]
+            }
+          ]
+        },
+        "weights": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "control",
+        "family",
+        "groupBy",
+        "intercept",
+        "link",
+        "output",
+        "predictors",
+        "response"
       ]
     },
     "TransformRename": {
@@ -5838,10 +6389,60 @@
       "properties": {
         "text": {
           "$ref": "#/$defs/TextSource"
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/MarkdownCitation"
+          }
         }
       },
       "required": [
         "text"
+      ]
+    },
+    "TableCitation": {
+      "type": "object",
+      "properties": {
+        "column": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "column",
+        "reference",
+        "row"
+      ]
+    },
+    "MarkdownCitation": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "name",
+        "reference"
       ]
     },
     "BadgeSpec": {
@@ -6315,6 +6916,9 @@
           "$ref": "#/$defs/TextSource"
         },
         "icon": {
+          "type": "string"
+        },
+        "reference": {
           "type": "string"
         }
       },
@@ -7532,6 +8136,9 @@
         },
         "rule": {
           "$ref": "#/$defs/FieldRule"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
         }
       },
       "required": [
@@ -7561,6 +8168,53 @@
             ]
           }
         }
+      ]
+    },
+    "Affordance": {
+      "type": "object",
+      "properties": {
+        "patterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "readPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AffordanceAlias"
+          }
+        },
+        "description": {
+          "type": "string"
+        },
+        "clearable": {
+          "type": "boolean"
+        },
+        "neverControllable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "AffordanceAlias": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "alias",
+        "value"
       ]
     },
     "FormSpec": {
@@ -7624,6 +8278,9 @@
         },
         "disabled": {
           "$ref": "#/$defs/Binding_bool"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
         }
       },
       "required": [
@@ -7660,6 +8317,15 @@
         },
         "onChangeMulti": {
           "const": "<closure>"
+        },
+        "affordance": {
+          "$ref": "#/$defs/Affordance"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/SelectOptionGroup"
+          }
         }
       },
       "required": [
@@ -7681,6 +8347,24 @@
           "value"
         ]
       }
+    },
+    "SelectOptionGroup": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "label",
+        "values"
+      ]
     },
     "FileUploadSpec": {
       "type": "object",
@@ -7950,6 +8634,13 @@
         "staticRows": {
           "type": "object",
           "properties": {
+            "citations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/TableCitation"
+              }
+            },
             "defaultSort": {
               "type": "object",
               "properties": {
@@ -9914,6 +10605,43 @@
           "required": [
             "$type",
             "state",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateAccessibility"
+            },
+            "accessibility": {
+              "$ref": "#/$defs/Accessibility"
+            },
+            "target": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "$type",
+            "accessibility",
+            "target"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "UpdateTooltip"
+            },
+            "target": {
+              "type": "string"
+            },
+            "tooltip": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
             "target"
           ]
         },

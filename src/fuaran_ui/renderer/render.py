@@ -165,6 +165,16 @@ def _field_rule_attrs(rule: Value, control_tag: str | None) -> list[tuple[str, s
     return out
 
 
+def table_citations(fields: dict[str, Value]) -> dict[tuple[int, int], Obj]:
+    """Phase 2592 (§3.6.33) — a static table's cited cells by ``(row, column)``."""
+    citations = fields.get("citations")
+    return {
+        (c.fields["row"], c.fields["column"]): c  # type: ignore[misc]
+        for c in (citations.items if isinstance(citations, Arr) else ())
+        if isinstance(c, Obj)
+    }
+
+
 def _a11y_name(value: Value, sources: BindingSourcesLike | None) -> str | None:
     """Resolve an accessibility name slot to its display string.
 
@@ -847,7 +857,17 @@ class Renderer:
         # definition. `to_html` stays published for a host rendering markdown it
         # authored itself; a DECODED tree reaching it would be the ambient
         # guarantee's one blind spot.
-        html = markdown.to_html_with_egress(self.egress_policy, self._text(fields.get("text")))
+        citations = fields.get("citations")
+        cited = [
+            markdown.Citation(
+                name=str(entry.fields["name"]),
+                reference=str(entry.fields["reference"]),
+                label=self._text(entry.fields["label"]) if "label" in entry.fields else None,
+            )
+            for entry in (citations.items if isinstance(citations, Arr) else ())
+            if isinstance(entry, Obj)
+        ]
+        html = markdown.to_html_cited(self.egress_policy, cited, self._text(fields.get("text")))
         return element("div", [("class", "fuaran-markdown")], html)
 
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:
@@ -1050,7 +1070,12 @@ class Renderer:
         help_text = fields.get("help")
         if help_text is not None:
             parts.append(text_element("div", [("class", "fuaran-fact-help")], self._text(help_text)))
-        return element("div", [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")], "".join(parts))
+        attrs = [("class", f"fuaran-fact fuaran-fact-{tone}{emphasis}")]
+        reference = fields.get("reference")
+        if isinstance(reference, str):
+            # WIRE_FORMAT 3.6.31 — the citation, through the ordinary attribute encoder.
+            attrs.append(("data-fact", reference))
+        return element("div", attrs, "".join(parts))
 
     def _link(self, node: Node, fields: dict[str, Value], semantic_attrs: Sequence[tuple[str, str]] = ()) -> str:
         # The scheme floor answers whether this URL is safe to HAVE; the ambient
@@ -1959,7 +1984,7 @@ class Renderer:
 
     def _select(self, node: Node, fields: dict[str, Value]) -> str:
         label = element("span", [("class", "fuaran-select-label")], escape_text(self._text(fields.get("label"))))
-        options_html = self._render_options(fields.get("source"), fields.get("placeholder"))
+        options_html = self._render_options(fields.get("source"), fields.get("placeholder"), fields.get("groups"))
         disabled = resolve_binding(fields.get("disabled"), self.sources)
         select_attrs: list[tuple[str, str]] = [("class", "fuaran-select-control")]
         # Phase 291 — a multi-select emits the `multiple` attribute; a controlled
@@ -1971,22 +1996,32 @@ class Renderer:
         control = element("select", select_attrs, options_html)
         return element("label", [("class", "fuaran-select")], label + control)
 
-    def _render_options(self, source: Value, placeholder: Value) -> str:
+    def _render_options(self, source: Value, placeholder: Value, groups: Value = None) -> str:
+        """The placeholder, then the options. Under Phase 2571 ``groups`` (WIRE_FORMAT
+        §3.6.30): one ``<optgroup label>`` per group in list order holding the options it
+        names in ``source`` order, then the options no group names."""
         items: list[str] = []
         if placeholder is not None:
             items.append(text_element("option", [("value", "")], self._text(placeholder)))
         resolved = resolve_source(source, self.sources)
-        if isinstance(resolved, Arr):
-            for opt in resolved.items:
-                if isinstance(opt, Obj):
-                    value = opt.fields.get("value", "")
-                    items.append(
-                        text_element(
-                            "option",
-                            [("value", str(value))],
-                            self._text(opt.fields.get("label", value)),
-                        )
-                    )
+        options = [o for o in resolved.items if isinstance(o, Obj)] if isinstance(resolved, Arr) else []
+
+        def option(opt: Obj) -> str:
+            value = opt.fields.get("value", "")
+            return text_element("option", [("value", str(value))], self._text(opt.fields.get("label", value)))
+
+        group_list = [g for g in groups.items if isinstance(g, Obj)] if isinstance(groups, Arr) else []
+        if not group_list:
+            items.extend(option(o) for o in options)
+            return "".join(items)
+        named: set[str] = set()
+        for group in group_list:
+            values = group.fields.get("values")
+            members = {str(v) for v in values.items} if isinstance(values, Arr) else set()
+            named |= members
+            inner = "".join(option(o) for o in options if str(o.fields.get("value", "")) in members)
+            items.append(element("optgroup", [("label", str(group.fields.get("label", "")))], inner))
+        items.extend(option(o) for o in options if str(o.fields.get("value", "")) not in named)
         return "".join(items)
 
     def _form(self, node: Node, fields: dict[str, Value]) -> str:
@@ -2143,12 +2178,11 @@ class Renderer:
             )
         rows = fields.get("rows")
         body_rows = ""
+        cited = table_citations(fields)
         if isinstance(rows, Arr):
-            for row in rows.items:
+            for i, row in enumerate(rows.items):
                 if isinstance(row, Arr):
-                    cells = "".join(
-                        text_element("td", [("class", "fuaran-table-cell")], self._text(c)) for c in row.items
-                    )
+                    cells = "".join(self._table_cell(c, cited.get((i, j))) for j, c in enumerate(row.items))
                     body_rows += element("tr", [("class", "fuaran-table-row")], cells)
         thead = element("thead", [], element("tr", [], header_cells))
         tbody = element("tbody", [], body_rows)
@@ -2169,6 +2203,18 @@ class Renderer:
                 attrs.append(("data-fuaran-sort-column", str(column)))
                 attrs.append(("data-fuaran-sort-direction", direction))
         return element("table", attrs, thead + tbody)
+
+    def _table_cell(self, cell: Value, citation: Obj | None) -> str:
+        """Phase 2592 (§3.6.33) — the reference on the cell, a label as its first child."""
+        if citation is None:
+            return text_element("td", [("class", "fuaran-table-cell")], self._text(cell))
+        label = self._text(citation.fields["label"]) if "label" in citation.fields else ""
+        return element(
+            "td",
+            [("class", "fuaran-table-cell"), ("data-fact", str(citation.fields["reference"]))],
+            (text_element("span", [("class", "fuaran-cited-label")], label + " ") if label else "")
+            + escape_text(self._text(cell)),
+        )
 
     def _make_vis_placeholder(self, css: str, name: str, count: int, text: str) -> str:
         return text_element(

@@ -9,12 +9,15 @@ verifies resolved style against::
     from fuaran_ui.theme_manifest import decode, resolve_role
 
     manifest = decode(tokens_json)        # DTCG file or { meta, tokens, roles, invariants }
+    defects = validate(manifest)          # what the decoded invariants MEAN (Phase 2133)
     brand = resolve_role("Brand", manifest)
+    canonical = encode(manifest)          # canonical JSON, byte-identical with every host
 """
 
 from __future__ import annotations
 
 from .decode import decode, of_json
+from .encode import encode, to_json
 from .manifest import (
     ANONYMOUS_META,
     DEFAULT_WEIGHT,
@@ -31,6 +34,7 @@ from .manifest import (
     RoleBinding,
     ThemeManifest,
     ToneRole,
+    UnknownInvariant,
     UsageBudget,
     invariant,
     invariant_kind_name,
@@ -50,6 +54,7 @@ from .project import (
     project_from_fuaran_tone_vars,
     scan_css_blocks,
 )
+from .validate import ManifestDefect, ManifestDefectCode, encode_manifest_defect, validate
 
 __all__ = [
     # contract
@@ -64,6 +69,7 @@ __all__ = [
     "ContrastFloor",
     "UsageBudget",
     "MotionVoice",
+    "UnknownInvariant",
     "Invariant",
     "ThemeManifest",
     "ANONYMOUS_META",
@@ -81,6 +87,14 @@ __all__ = [
     # decode
     "decode",
     "of_json",
+    # encode
+    "encode",
+    "to_json",
+    # validate (Phase 2133)
+    "ManifestDefect",
+    "ManifestDefectCode",
+    "validate",
+    "encode_manifest_defect",
     # project
     "CssBlock",
     "scan_css_blocks",

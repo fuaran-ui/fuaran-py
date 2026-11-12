@@ -819,8 +819,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.Heading(_text(text), level, variant), accessibility.none)
 
     @staticmethod
-    def markdown(id: str, body: t.TextInput) -> UiNode:  # noqa: A002
-        return _node(id, t.Markdown(_text(body)), accessibility.none)
+    def markdown(id: str, body: t.TextInput, *, citations: Sequence[t.MarkdownCitation] = ()) -> UiNode:  # noqa: A002
+        # Phase 2591 — `citations` are the figures the body cites, each placed by a link whose
+        # destination is `cite:<name>`; the display text is the link's own.
+        return _node(id, t.Markdown(_text(body), citations=tuple(citations)), accessibility.none)
 
     @staticmethod
     def metric(
@@ -872,6 +874,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         emphasis: bool = False,
         help: t.TextInput | None = None,  # noqa: A002
         icon: str | None = None,
+        reference: str | None = None,
     ) -> UiNode:
         """``Fact`` — the labelled TEXT statement beside :meth:`metric`'s number.
 
@@ -888,6 +891,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             emphasis=emphasis,
             help=_text(help) if help is not None else None,
             icon=icon,
+            reference=reference,
         )
         return _node(id, kind, accessibility.none)
 
@@ -1411,6 +1415,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         default_sort: t.DefaultSort | None = None,
         columns: list[t.Column] | None = None,
         row_key_field: str | None = None,
+        citations: list[t.TableCitation] | None = None,
     ) -> UiNode:
         """``sortable`` is TRI-STATE: absent is the pre-801 wire byte-for-byte,
         and an explicit ``False`` is an author declining the affordance rather
@@ -1420,7 +1425,10 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         ``columns`` (Phase 2473) say how the cells render, read by position;
         ``row_key_field`` (Phase 2474) names the column whose cell identifies a
         row, which makes the table selectable: a ``Selection`` on its id with a
-        ``field`` reads that cell of the selected row."""
+        ``field`` reads that cell of the selected row.
+
+        ``citations`` (Phase 2592) name the cells that cite their figures, by zero-based
+        row and column."""
         spec = t.Table(
             tuple(_text(h) for h in headers),
             tuple(tuple(_text(c) for c in row) for row in rows),
@@ -1428,6 +1436,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             default_sort=default_sort,
             columns=tuple(columns or ()),
             row_key_field=row_key_field,
+            citations=tuple(citations or ()),
         )
         return _node(id, spec, accessibility.table)
 

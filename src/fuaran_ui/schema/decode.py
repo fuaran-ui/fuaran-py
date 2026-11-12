@@ -644,6 +644,73 @@ def _decode_binding_select_options(value: object, path: str) -> Value:
     return _typed_static_binding(value, path, _decode_select_option_array, opaque_placeholder, Arr([]))
 
 
+def _decode_select_option_groups(value: object, path: str) -> Value:
+    """Phase 2571 — ``Select.groups`` (WIRE_FORMAT §3.6.30): a list of
+    ``{"label":<str>,"values":[<str>,…]}``, omit-at-default (``[]`` decodes to the
+    absent member). The two cross-member refusals are :func:`_check_select_groups`'s."""
+    arr = _expect_array(value, path)
+    groups: list[Value] = []
+    for i, item in enumerate(arr):
+        gp = f"{path}[{i}]"
+        obj = _expect_object(item, gp)
+        label = _expect_string(_require(obj, "label", gp), f"{gp}.label")
+        values = _expect_array(_require(obj, "values", gp), f"{gp}.values")
+        groups.append(
+            Obj(
+                None,
+                {
+                    "label": label,
+                    "values": Arr([_expect_string(v, f"{gp}.values[{j}]") for j, v in enumerate(values)]),
+                },
+            )
+        )
+    return Arr(groups) if groups else _DROP  # type: ignore[return-value]
+
+
+def _check_select_groups(fields: dict[str, Value], path: str) -> None:
+    """Phase 2571 — the option-group refusals, both ``WRONG_TYPE`` at the offending
+    ``values`` element: a value named more than once (by two groups, or twice by one),
+    and — over STATIC options only — a value naming no option. A bound source resolves
+    at render; the decoder cannot judge it. Mirror of the reference host."""
+    groups = fields.get("groups")
+    if not isinstance(groups, Arr):
+        return
+    source = fields.get("source")
+    known: set[str] | None = None
+    if isinstance(source, Obj) and source.tag == "Static":
+        options = source.fields.get("value")
+        items = options.items if isinstance(options, Arr) else []
+        values = [o.fields.get("value") for o in items if isinstance(o, Obj)]
+        if OPAQUE not in values:
+            known = {v for v in values if isinstance(v, str)}
+    seen: dict[str, tuple[int, str]] = {}
+    for gi, group in enumerate(groups.items):
+        assert isinstance(group, Obj)
+        label = cast(str, group.fields["label"])
+        named = cast(Arr, group.fields["values"])
+        for vi, raw in enumerate(named.items):
+            value = cast(str, raw)
+            at = f"{path}.groups[{gi}].values[{vi}]"
+            if value in seen:
+                first, first_label = seen[value]
+                _fail(
+                    WRONG_TYPE,
+                    at,
+                    f"option value '{value}' is already named by group {first} ('{first_label}'): "
+                    "an option belongs to at most one group",
+                    "a value no other group (and no earlier entry of this group) names",
+                )
+            if known is not None and value not in known:
+                _fail(
+                    WRONG_TYPE,
+                    at,
+                    f"option value '{value}' names no option of this Select: "
+                    "a group can only gather the options its Select carries",
+                    "the value of one of this Select's options: " + ", ".join(f"'{v}'" for v in sorted(known)),
+                )
+            seen[value] = (gi, label)
+
+
 def _decode_binding_string_opt(value: object, path: str) -> Value:
     # `<opaque>` → the scalar sentinel string; `null` → null (a genuine `None` option).
     return _typed_static_binding(value, path, lambda v, p: _expect_string(v, p), OPAQUE, None)
@@ -1103,6 +1170,124 @@ def _decode_metric_comparisons(value: object, path: str) -> object:
     if not items:
         return _DROP
     return Arr([_decode_metric_comparison(entry, f"{path}[{i}]") for i, entry in enumerate(items)])
+
+
+def _decode_citation_name(value: object, path: str) -> str:
+    """What a ``cite:<name>`` destination can say without escaping (WIRE_FORMAT §3.6.32)."""
+    name = _expect_string(value, path)
+    if not name or not all(c.isascii() and (c.isalnum() or c in "-_") for c in name):
+        _fail(WRONG_TYPE, path, "a citation name of letters, digits, '-' and '_'", "citation name")
+    return name
+
+
+def _decode_markdown_citation(value: object, path: str) -> Obj:
+    """One ``MarkdownCitation`` (Phase 2591). ``reference`` is opaque, as on ``Fact``."""
+    obj = _expect_object(value, path)
+    fields: dict[str, Value] = {}
+    if "label" in obj:
+        fields["label"] = _decode_text_source(obj["label"], f"{path}.label")
+    fields["name"] = _decode_citation_name(_require(obj, "name", path), f"{path}.name")
+    fields["reference"] = _expect_string(_require(obj, "reference", path), f"{path}.reference")
+    return Obj(None, fields)
+
+
+def _decode_markdown_citations(value: object, path: str) -> Arr:
+    """``MarkdownSpec.citations`` (Phase 2591). Absent is the one spelling of none, so an empty
+    array is refused rather than dropped, and a name may be used once."""
+    items = _expect_array(value, path)
+    if not items:
+        _fail(WRONG_TYPE, path, "a non-empty citation list, or no member at all", "citation list")
+    decoded = [_decode_markdown_citation(entry, f"{path}[{i}]") for i, entry in enumerate(items)]
+    seen: set[object] = set()
+    for i, entry in enumerate(decoded):
+        name = entry.fields["name"]
+        if name in seen:
+            _fail(WRONG_TYPE, f"{path}[{i}].name", "a citation name no other citation uses", "citation name")
+        seen.add(name)
+    return Arr([*decoded])
+
+
+# ── The `affordance` member (Phase 2517, WIRE_FORMAT §31.1, §31.2) ──────────
+#
+# The record is decoded here; the SLOT RULE is the carrying kind's, so it is a parameter: a
+# `Select` or a form field is a SET (each `patterns` entry names exactly one `{value}`), a `Button`
+# is a CLICK (none does), and no `readPatterns` entry names one. Any other brace, and a blank
+# pattern, is refused as `WRONG_TYPE` at the offending entry. Every member is omit-at-default, so
+# `{}` is the affordance that declares nothing and survives as `{}`.
+_AFFORDANCE_SLOT = "{value}"
+
+
+def _affordance_slot_count(pattern: str) -> int | None:
+    """How many ``{value}`` slots ``pattern`` names, or ``None`` when it carries any other brace."""
+    stripped = pattern.replace(_AFFORDANCE_SLOT, "")
+    if "{" in stripped or "}" in stripped:
+        return None
+    return (len(pattern) - len(stripped)) // len(_AFFORDANCE_SLOT)
+
+
+def _decode_affordance_patterns(value: object, path: str, slots: int, expected: str) -> Value:
+    items = _expect_array(value, path)
+    out: list[Value] = []
+    for i, entry in enumerate(items):
+        epath = f"{path}[{i}]"
+        pattern = _expect_string(entry, epath)
+        if _affordance_slot_count(pattern) != slots or not pattern.strip():
+            _fail(WRONG_TYPE, epath, f"expected {expected} at {epath}", expected)
+        out.append(pattern)
+    return Arr(out)
+
+
+def _decode_affordance_alias(value: object, path: str) -> Value:
+    obj = _expect_object(value, path)
+    return Obj(
+        None,
+        {
+            "alias": _expect_string(_require(obj, "alias", path), f"{path}.alias"),
+            "value": _expect_string(_require(obj, "value", path), f"{path}.value"),
+        },
+    )
+
+
+def _affordance_decoder(set_patterns: bool) -> Callable[[object, str], Value]:
+    def decode(value: object, path: str) -> Value:
+        obj = _expect_object(value, path)
+        fields: dict[str, Value] = {}
+        if "patterns" in obj:
+            patterns = (
+                _decode_affordance_patterns(
+                    obj["patterns"], f"{path}.patterns", 1, "a set pattern naming exactly one {value} slot"
+                )
+                if set_patterns
+                else _decode_affordance_patterns(
+                    obj["patterns"], f"{path}.patterns", 0, "a click pattern naming no slot"
+                )
+            )
+            if isinstance(patterns, Arr) and patterns.items:
+                fields["patterns"] = patterns
+        if "readPatterns" in obj:
+            reads = _decode_affordance_patterns(
+                obj["readPatterns"], f"{path}.readPatterns", 0, "a read pattern naming no slot"
+            )
+            if isinstance(reads, Arr) and reads.items:
+                fields["readPatterns"] = reads
+        if "aliases" in obj:
+            aliases = _expect_array(obj["aliases"], f"{path}.aliases")
+            if aliases:
+                fields["aliases"] = Arr(
+                    [_decode_affordance_alias(a, f"{path}.aliases[{i}]") for i, a in enumerate(aliases)]
+                )
+        if "description" in obj:
+            fields["description"] = _expect_string(obj["description"], f"{path}.description")
+        for flag in ("clearable", "neverControllable"):
+            if flag in obj and _expect_bool(obj[flag], f"{path}.{flag}"):
+                fields[flag] = True
+        return Obj(None, fields)
+
+    return decode
+
+
+_decode_affordance_set = _affordance_decoder(True)
+_decode_affordance_click = _affordance_decoder(False)
 
 
 def _decode_permissions(value: object, path: str) -> object:
@@ -2367,6 +2552,7 @@ _RECORD_DECODERS: dict[str, FieldDecoder] = {
     "DrawStyle": _decode_draw_style,
     "GuestChannel": _decode_guest_channel,
     "ContentHash": _decode_json_value,
+    "Affordance": _decode_affordance_set,
 }
 _UNION_DECODERS: dict[str, FieldDecoder] = {
     "TextSource": _decode_text_source,
@@ -2396,6 +2582,7 @@ _LIST_DECODERS: dict[str, FieldDecoder] = {
     "record:TabHeader": _decode_tab_headers,
     "record:TrackEntry": _decode_tracks,
     "record:MetricComparison": _decode_metric_comparisons,
+    "record:MarkdownCitation": _decode_markdown_citations,
     "record:SrcSetEntry": _decode_srcset,
     "enum:EmbedPermission": _decode_permissions,
 }
@@ -2663,6 +2850,9 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
         {
             "source": (_decode_binding_select_options, ("options", "data")),
             "value": _decode_binding_string_opt,
+            # Phase 2571 — omit-at-default; the cross-member refusals run after the
+            # fields are read (`_check_select_groups`).
+            "groups": _decode_select_option_groups,
         },
     ),
     # Phase 426 — `onDismiss` is a genuine wire-survivable Action, decoded null-strict when present.
@@ -2708,7 +2898,12 @@ KIND_SCHEMAS: dict[str, list[SchemaEntry]] = {
     # was optional here and `icon` / `disabled` passed through structurally; the IDL
     # declares `variant` required, and every member is now typed.
     "Button": _kind_schema(
-        "Button", {"variant": _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant")}
+        "Button",
+        {
+            "variant": _enum_aliased_decoder(BUTTON_VARIANT, BUTTON_VARIANT_ALIASES, "variant"),
+            # Phase 2517 — a button is a CLICK: its patterns name no slot (WIRE_FORMAT §31.2).
+            "affordance": _decode_affordance_click,
+        },
     ),
     # Switch (Phase 392, selector widened Phase 768) — decoded by a dedicated
     # builder (`_decode_switch`), not a flat field schema, because the selector
@@ -2913,6 +3108,9 @@ def _decode_kind(value: object, path: str) -> Obj:
                 fields[name] = cast(Value, decoded)
         elif required:
             _fail(MISSING_FIELD, f"{path}.{name}", f"missing required field '{name}'")
+    if tag == "Select":
+        # Phase 2571 — the option groups, checked against the static options.
+        _check_select_groups(fields, path)
     # Preserve any extra (unknown) keys structurally so the round-trip is lossless
     # and tolerant of fields a later spec version adds (decoder tolerance, §2 rule 2).
     # Retired vocabulary (0.2.0 clean break) is NEVER preserved — the reference
@@ -3208,10 +3406,48 @@ def _validate_static_rows(raw: object, path: str) -> None:
     sortable = raw.get("sortable")
     if sortable is not None and not isinstance(sortable, bool):
         _fail(WRONG_TYPE, f"{path}.sortable", "sortable must be a boolean")
+    if "citations" in raw:
+        _validate_table_citations(raw["citations"], raw.get("rows"), f"{path}.citations")
     default_sort = raw.get("defaultSort")
     if default_sort is None:
         return
     _validate_default_sort(default_sort, f"{path}.defaultSort")
+
+
+def _table_coordinate(obj: dict[str, object], name: str, path: str) -> int:
+    """A cited cell's ``row`` or ``column``: a non-negative integer, as the header index is."""
+    value = _require(obj, name, path)
+    if isinstance(value, int) and not isinstance(value, bool) and value >= 0:
+        return value
+    _fail(WRONG_TYPE, f"{path}.{name}", f"{name} must be a non-negative integer index")
+    return 0
+
+
+def _validate_table_citations(raw: object, rows: object, path: str) -> None:
+    """Phase 2592 (WIRE_FORMAT §3.6.33) — ``staticRows.citations``, read against the rows they
+    address. Absent is the one spelling of none, so an empty array is refused, a coordinate
+    names a cell that exists, and a cell is cited once. ``reference`` is opaque, as on ``Fact``."""
+    items = _expect_array(raw, path)
+    if not items:
+        _fail(WRONG_TYPE, path, "a non-empty citation list, or no member at all", "citation list")
+    table = rows if isinstance(rows, list) else []
+    seen: set[tuple[int, int]] = set()
+    for i, entry in enumerate(items):
+        at = f"{path}[{i}]"
+        obj = _expect_object(entry, at)
+        row = _table_coordinate(obj, "row", at)
+        if row >= len(table):
+            _fail(WRONG_TYPE, f"{at}.row", "a row index this table has", "citation row")
+        column = _table_coordinate(obj, "column", at)
+        cells = table[row]
+        if column >= (len(cells) if isinstance(cells, list) else 0):
+            _fail(WRONG_TYPE, f"{at}.column", "a column index the cited row has", "citation column")
+        _expect_string(_require(obj, "reference", at), f"{at}.reference")
+        if "label" in obj:
+            _decode_text_source(obj["label"], f"{at}.label")
+        if (row, column) in seen:
+            _fail(WRONG_TYPE, at, "a cell no other citation in this list names", "citation cell")
+        seen.add((row, column))
 
 
 def _validate_default_sort(default_sort: object, ds_path: str) -> None:
@@ -4019,8 +4255,11 @@ def _decode_form_fields(value: object, path: str) -> Value:
             ffields["help"] = _decode_text_source(fobj["help"], f"{fpath}.help")
         if "rule" in fobj:
             ffields["rule"] = _decode_field_rule(fobj["rule"], f"{fpath}.rule")
+        # Phase 2517 — a field is a SET: its patterns name the slot (WIRE_FORMAT §31.2).
+        if "affordance" in fobj:
+            ffields["affordance"] = _decode_affordance_set(fobj["affordance"], f"{fpath}.affordance")
         for key, raw in fobj.items():
-            if key not in ("id", "name", "kind", "label", "required", "help", "rule"):
+            if key not in ("id", "name", "kind", "label", "required", "help", "rule", "affordance"):
                 ffields[key] = from_json(raw)
         norm.append(Obj(None, ffields))
     return Arr(norm)

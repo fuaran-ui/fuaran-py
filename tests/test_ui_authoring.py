@@ -1793,6 +1793,12 @@ def _authored() -> dict[str, t.UiNode]:
             ],
         ),
         # ── Phase 1579 — Fact (6) ────────────────────────────────────────────
+        "fact-cited": fuaran.fact(
+            "fact-cited",
+            label="Revenue",
+            value="£412k",
+            reference="9f04f29b27c86926a1c3e5d7b8f0a2c4e6d8f0a1b3c5d7e9f1a3b5c7d9e1f3a5",
+        ),
         "fact-1": fuaran.fact(
             "fact-1",
             label="Patient",

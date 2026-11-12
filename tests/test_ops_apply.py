@@ -518,3 +518,45 @@ def test_nested_list_segment_without_index_is_path_invalid() -> None:
 def test_nested_closure_leaf_is_path_not_supported() -> None:
     op = Obj("UpdateProp", {"path": "Columns[0].Kind", "target": "grid-1", "value": "Text"})
     assert _err(_apply_op(op, _channel_grid())) == "PathNotSupportedYet"
+
+
+# ── the trait ops (Phase 2527) ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("op", "before", "after"),
+    [
+        (
+            '{"$type":"UpdateAccessibility","accessibility":{"describedBy":"h"},"target":"m"}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+            '{"accessibility":{"describedBy":"h"},"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+        ),
+        (
+            '{"$type":"UpdateAccessibility","accessibility":{"labelledBy":"l"},"target":"m"}',
+            '{"accessibility":{"describedBy":"h"},"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+            '{"accessibility":{"labelledBy":"l"},"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+        ),
+        (
+            '{"$type":"UpdateAccessibility","accessibility":{},"target":"m"}',
+            '{"accessibility":{"describedBy":"h"},"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+        ),
+        (
+            '{"$type":"UpdateTooltip","target":"m","tooltip":"t"}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"},"tooltip":"t"}',
+        ),
+        (
+            '{"$type":"UpdateTooltip","target":"m"}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"},"tooltip":"t"}',
+            '{"id":"m","kind":{"$type":"Markdown","text":"x"}}',
+        ),
+    ],
+)
+def test_a_trait_op_replaces_or_removes_its_slot(op: str, before: str, after: str) -> None:
+    decoded_op = decode_op(op)
+    decoded_tree = decode_node(before)
+    assert isinstance(decoded_op, Ok) and isinstance(decoded_tree, Ok)
+    result = apply(decoded_op.value, decoded_tree.value)
+    assert isinstance(result, Ok)
+    assert encode_node(result.value) == after

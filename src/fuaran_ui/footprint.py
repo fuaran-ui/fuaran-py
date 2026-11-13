@@ -29,7 +29,9 @@ Two forms:
   is read at its ``parent`` slot (the cycle check reads the chain); the
   destination keeps Core's named read and structure write. A resolved **reorder**
   (fuaran#2670) reads and writes its parent at the ``kind`` and child-list slots
-  and reads each listed child at its ``parent`` slot.
+  and reads each listed child at its ``parent`` slot; an **unchanged** one (its
+  list is the parent's child order where it applies, fuaran#2696) reads those two
+  parent slots and writes neither.
 
 **The child list** (fuaran#2691, Core 0.42.0 D246). Core compares a structure
 write of ``p`` against a slot access as a read and a write of
@@ -419,12 +421,24 @@ def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
         # A resolved reorder permutes the parent's child list, held in its ``kind``,
         # and touches no child: the parent at ``kind`` + the child list, each listed
         # child read at its ``parent`` slot.
+        #
+        # An UNCHANGED reorder (fuaran#2696) — its list is the parent's child order
+        # in ``state``: the same ids, in the same order — changes nothing where it
+        # applies, so it reads those two slots and writes neither. Every op that
+        # changes the child list writes a slot it still reads, so it stays ordered
+        # against them, a real reorder of the same parent included; what it frees
+        # is a pair of reorders that each restate their own order.
         parent_id = _str(op, "parentId")
-        if after is None or _locate(parent_id, state) is None:
+        parent = _locate(parent_id, state)
+        if after is None or parent is None:
             return footprint_of(op)
-        acc = _child_list(parent_id, slot_edit(parent_id, "kind"))
         order = op.fields.get("newOrder")
-        for c in order.items if isinstance(order, Arr) else []:
+        listed = list(order.items) if isinstance(order, Arr) else []
+        if listed == [c.id for c in _structural(parent)]:
+            acc = union(reading_slot(parent_id, "kind"), reading_slot(parent_id, CHILD_LIST_SLOT))
+        else:
+            acc = _child_list(parent_id, slot_edit(parent_id, "kind"))
+        for c in listed:
             if isinstance(c, str):
                 acc = union(acc, reading_slot(c, "parent"))
         return acc

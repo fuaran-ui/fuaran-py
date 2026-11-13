@@ -21,6 +21,11 @@ Since fuaran#2705 the host certifies the four fixtures over nodes held only in a
 ``fold-refusal-mount-input-disjoint`` and ``fold-refusal-mount-input-delete-modify``.
 The apply lookup visits slot arguments (WIRE_FORMAT §34.2), so each delta applies
 and the fold judges it; ``disjoint`` refuses as the reference draws it.
+
+Since Phase 2718 the host certifies the unchanged-reorder fixtures (specification
+commit ``5a9b4bb``, Phase 2696): ``fold-two-restated-orders`` derives, and
+``fold-refusal-two-reorders`` / ``fold-refusal-two-real-reorders`` refuse. A reorder
+whose list is its parent's child order reads that list and writes nothing.
 """
 
 from __future__ import annotations
@@ -32,7 +37,7 @@ import pytest
 from _corpus import MERGE_CORPUS_ROOT, merge_corpus_required, merge_fold_fixtures
 from _merge_sample_validator import encode_verdict, introduced_defects
 from fuaran_ui import decode_node, decode_op, encode_node
-from fuaran_ui.footprint import footprint_in, footprint_of
+from fuaran_ui.footprint import CHILD_LIST_SLOT, footprint_in, footprint_of
 from fuaran_ui.merge import CONCURRENT_UPDATE, INSERT_POSITION_CLASH, conflicts_in
 from fuaran_ui.model import Arr, Node, Obj
 from fuaran_ui.reconcile import (
@@ -266,6 +271,58 @@ def test_a_reorder_beside_an_append_is_rebased() -> None:
     assert [c.id for c in derived.tree.kind.fields["children"].items] == ["right", "left", "z"]
     other = _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}')
     assert isinstance(reconcile(_base(), [reorder], [other]), Refused)
+
+
+@merge_corpus_required
+def test_the_unchanged_reorder_fixtures_are_certified() -> None:
+    """The fixtures Phase 2696 pinned (WIRE_FORMAT §34.3, §34.6) are in the family the
+    parametrised legs above run, under the kind each is certified as: two reorders that
+    each restate their own order derive; a restated order beside a real reorder, and
+    two real reorders, refuse."""
+    kinds = {fx["id"]: fx["kind"] for fx in merge_fold_fixtures()}
+    assert kinds.get("fold-two-restated-orders") == "merge-fold-derive"
+    assert kinds.get("fold-refusal-two-reorders") == "merge-fold-refusal"
+    assert kinds.get("fold-refusal-two-real-reorders") == "merge-fold-refusal"
+
+
+def test_an_unchanged_reorder_reads_its_parent_list_and_writes_nothing() -> None:
+    """A reorder whose list is the parent's child order where it applies changes
+    nothing (fuaran#2696): it reads the parent's ``kind`` and child-list slots and each
+    listed child's ``parent`` slot, and writes none of them. A real reorder writes both."""
+    unchanged = footprint_in(_base(), _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}'))
+    assert not unchanged.slot_writes and not unchanged.structure_writes and not unchanged.content_writes
+    assert unchanged.slot_reads == {
+        ("dash", "kind"),
+        ("dash", CHILD_LIST_SLOT),
+        ("left", "parent"),
+        ("right", "parent"),
+    }
+    real = footprint_in(_base(), _op('{"$type":"ReorderChildren","newOrder":["right","left"],"parentId":"dash"}'))
+    assert {("dash", "kind"), ("dash", CHILD_LIST_SLOT)} <= real.slot_writes
+
+
+def test_an_unchanged_reorder_still_meets_a_removal_of_a_listed_child() -> None:
+    """Freeing the write must not free the reads: removing a child the unchanged
+    reorder lists writes the parent's child list, which the reorder reads, so the
+    conflict report still sees the pair in both orders (what the fold then does with
+    it is the reconcile policy's, fuaran#2671, not the footprint's)."""
+    unchanged = _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}')
+    remove = _op('{"$type":"RemoveNode","target":"left"}')
+    assert "dash" in {c.address for c in conflicts_in(_base(), [unchanged], [remove])}
+    assert "dash" in {c.address for c in conflicts_in(_base(), [remove], [unchanged])}
+    # Without the reads it would not be: the same pair against a footprint that
+    # dropped them is what this test exists to catch.
+    restated = footprint_in(_base(), unchanged)
+    assert ("dash", CHILD_LIST_SLOT) in restated.slot_reads
+
+
+def test_two_reorders_that_each_restate_the_order_derive() -> None:
+    """Two unchanged reorders of one parent write nothing, so nothing clashes and the
+    fold derives the base order on either side."""
+    restate = _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}')
+    result = reconcile(_base(), [restate], [restate])
+    assert isinstance(result, Reconciled), result
+    assert encode_node(result.tree) == encode_node(_base())
 
 
 def test_the_merge_corpus_is_the_fold_family_alone() -> None:

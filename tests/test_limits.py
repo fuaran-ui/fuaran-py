@@ -133,6 +133,16 @@ def test_accepts_bare_nesting_at_exactly_max_json_depth() -> None:
     assert result.error.code != LIMIT_EXCEEDED
 
 
+def test_a_scalar_in_the_deepest_container_adds_no_level() -> None:
+    # §21.1 counts every `{` and `[`; the scalar inside the 256th container is not
+    # a 257th level. The shape check charged it one until Phase 2653, refusing a
+    # document every other host accepts.
+    n = MAX_JSON_DEPTH
+    result = decode_node("[" * n + "0" + "]" * n)
+    assert not result.ok
+    assert result.error.code != LIMIT_EXCEEDED
+
+
 def test_still_calls_genuinely_malformed_input_invalid_json() -> None:
     # Non-vacuity for the classification: it must distinguish, not relabel.
     result = decode_node("}{ not json")

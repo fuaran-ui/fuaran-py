@@ -300,7 +300,11 @@ def check_shape(value: Any) -> DecodeError | None:
     while stack:
         current, depth = stack.pop()
 
-        if depth > MAX_JSON_DEPTH:
+        # §21.1 counts every `{` and `[`, so only a CONTAINER can breach the depth
+        # bound. A scalar sits inside the deepest container without adding a level;
+        # charging it one refused a document 256 containers deep with a string at
+        # the bottom, which every other host accepts (Phase 2653).
+        if depth > MAX_JSON_DEPTH and isinstance(current, (dict, list)):
             return _limit_exceeded_depth()
 
         if isinstance(current, str):

@@ -15,6 +15,15 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — a scalar in the deepest container adds no JSON depth (Phase 2653)
+
+- The shape check every reader runs after parsing charged a scalar one nesting level, so a document 256 `{` / `[`
+  deep with a string or number at the bottom was refused as `LIMIT_EXCEEDED` at depth 257. WIRE_FORMAT §21.1 counts
+  every `{` and `[`, and the other hosts accept it; it now decodes here too. Only containers can breach the depth
+  bound, so nothing that decoded before is refused. This reaches every reader, the theme-manifest decoder among them,
+  which WIRE_FORMAT now reads under §21.1's syntactic limits on every host (certified at the edges by
+  `tests/test_theme_manifest_limits.py`).
+
 ### additive — the select builder spells option groups; the manifest's claims are checked (Phase 2699)
 
 - `fuaran.select` and `control.select` take `groups` (a sequence of `SelectOptionGroup`): options named by `value` under

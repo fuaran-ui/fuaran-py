@@ -35,6 +35,15 @@ corpus, not by this file.
   claimed kind, or a reasoned declaration. Declared gaps: `Box.keep_together` and `Box.break_before` have no container
   builder (the record only).
 
+### additive — a reorder that leaves the order unchanged writes nothing (Phase 2718)
+
+- `fuaran_ui.footprint.footprint_in`: a `ReorderChildren` whose list is its parent's child order in the tree it applies
+  to (the same ids, in the same order) reads the parent's `kind` and child-list slots and each listed child's `parent`
+  slot, and writes none of them (WIRE_FORMAT §34.3, §34.6; fuaran#2696). Two reorders that each restate their own order
+  now derive; a restated order beside a real reorder of the same parent, and a removal of a listed child, are still
+  reported. Certified by `merge-conformance/fold-two-restated-orders`, `fold-refusal-two-reorders` and
+  `fold-refusal-two-real-reorders` at specification commit `5a9b4bb`.
+
 ### additive — an op reaches a node held in a slot argument (Phase 2705)
 
 - `fuaran_ui.ops.apply` looks a node or a parent up through the slot trees of a `FragmentRef`'s `args` and a `Mount`'s

@@ -26,6 +26,12 @@ Since Phase 2718 the host certifies the unchanged-reorder fixtures (specificatio
 commit ``5a9b4bb``, Phase 2696): ``fold-two-restated-orders`` derives, and
 ``fold-refusal-two-reorders`` / ``fold-refusal-two-real-reorders`` refuse. A reorder
 whose list is its parent's child order reads that list and writes nothing.
+
+Since Phase 2731 the host follows the yield rule (Phase 2724, WIRE_FORMAT §34.3):
+``fold-reorder-beside-restated-order``, ``fold-restated-order-beside-reorder`` and
+``fold-append-restated-beside-reorder`` derive, and ``fold-refusal-two-reorders`` is
+retired (the manifest's ``retiredFoldFixtures``). The manifest's ``precedenceFixtures``
+is not read: this host offers no precedence merge (§34.6).
 """
 
 from __future__ import annotations
@@ -49,6 +55,7 @@ from fuaran_ui.reconcile import (
     encode_refusal_envelope,
     reconcile,
     reconcile_gated,
+    yield_unchanged_reorders,
 )
 
 
@@ -269,20 +276,95 @@ def test_a_reorder_beside_an_append_is_rebased() -> None:
     derived = reconcile(_base(), [reorder], [append])
     assert isinstance(derived, Reconciled)
     assert [c.id for c in derived.tree.kind.fields["children"].items] == ["right", "left", "z"]
-    other = _op('{"$type":"ReorderChildren","newOrder":["left","right"],"parentId":"dash"}')
-    assert isinstance(reconcile(_base(), [reorder], [other]), Refused)
+    # Two reorders that each change the order and differ still refuse (the yield
+    # rule frees only a reorder that changes nothing on its own branch).
+    first, second = _two_real_reorders()
+    assert isinstance(reconcile(_three_children(), [first], [second]), Refused)
 
 
 @merge_corpus_required
 def test_the_unchanged_reorder_fixtures_are_certified() -> None:
-    """The fixtures Phase 2696 pinned (WIRE_FORMAT §34.3, §34.6) are in the family the
-    parametrised legs above run, under the kind each is certified as: two reorders that
-    each restate their own order derive; a restated order beside a real reorder, and
-    two real reorders, refuse."""
+    """The fixtures Phases 2696 and 2724 pinned (WIRE_FORMAT §34.3, §34.6) are in the
+    family the parametrised legs above run, under the kind each is certified as: two
+    reorders that each restate their own order derive; a restated order beside a real
+    reorder yields and derives, on either side and after an append; two real reorders
+    refuse. A retired id is listed in ``retiredFoldFixtures`` and is no live fixture."""
+    import json
+
     kinds = {fx["id"]: fx["kind"] for fx in merge_fold_fixtures()}
     assert kinds.get("fold-two-restated-orders") == "merge-fold-derive"
-    assert kinds.get("fold-refusal-two-reorders") == "merge-fold-refusal"
+    assert kinds.get("fold-reorder-beside-restated-order") == "merge-fold-derive"
+    assert kinds.get("fold-restated-order-beside-reorder") == "merge-fold-derive"
+    assert kinds.get("fold-append-restated-beside-reorder") == "merge-fold-derive"
     assert kinds.get("fold-refusal-two-real-reorders") == "merge-fold-refusal"
+    manifest = json.loads((MERGE_CORPUS_ROOT / "manifest.json").read_text(encoding="utf-8"))
+    retired = {r["id"] for r in manifest.get("retiredFoldFixtures", [])}
+    assert "fold-refusal-two-reorders" in retired
+    assert not retired & set(kinds), retired & set(kinds)
+
+
+_THREE = (
+    '{"id":"dash","kind":{"$type":"Box","children":['
+    '{"id":"a","kind":{"$type":"Markdown","text":"A"}},'
+    '{"id":"b","kind":{"$type":"Markdown","text":"B"}},'
+    '{"id":"c","kind":{"$type":"Markdown","text":"C"}}],"layout":{"$type":"Auto"},"role":"Dashboard"}}'
+)
+
+
+def _three_children() -> Node:
+    result = decode_node(_THREE)
+    assert result.ok, result
+    return result.value
+
+
+def _two_real_reorders() -> tuple[Obj, Obj]:
+    return (
+        _op('{"$type":"ReorderChildren","newOrder":["c","b","a"],"parentId":"dash"}'),
+        _op('{"$type":"ReorderChildren","newOrder":["b","a","c"],"parentId":"dash"}'),
+    )
+
+
+_RESTATED = '{"$type":"ReorderChildren","newOrder":["a","b","c"],"parentId":"dash"}'
+
+
+def test_an_unchanged_reorder_yields_to_a_real_reorder_and_the_script_records_it() -> None:
+    """The yield rule (Phase 2724): beside a real reorder of its parent the restated
+    order leaves its delta, in both namings, the real order survives, and the script
+    records the yielded parent's order."""
+    real, _ = _two_real_reorders()
+    restated = _op(_RESTATED)
+    assert yield_unchanged_reorders(_three_children(), [restated], [real]) == ([], [real], ["dash"])
+    assert yield_unchanged_reorders(_three_children(), [real], [restated]) == ([real], [], ["dash"])
+    for d1, d2 in (([restated], [real]), ([real], [restated])):
+        result = reconcile(_three_children(), d1, d2)
+        assert isinstance(result, Reconciled), result
+        assert [c.id for c in result.tree.kind.fields["children"].items] == ["c", "b", "a"]
+        assert [c.fields["newOrder"] for c in result.script] == [Arr(["c", "b", "a"])]
+        assert result.interleaves == 0
+
+
+def test_an_unchanged_reorder_beside_a_removal_of_a_listed_child_still_conflicts() -> None:
+    """The rule yields only to a REAL reorder: beside a removal of a child it lists the
+    restated order is not dropped, the pair is still reported, and it is judged as
+    before (a rebase, fuaran#2671)."""
+    restated, remove = _op(_RESTATED), _op('{"$type":"RemoveNode","target":"b"}')
+    assert yield_unchanged_reorders(_three_children(), [restated], [remove]) == ([restated], [remove], [])
+    assert "dash" in {c.address for c in conflicts_in(_three_children(), [restated], [remove])}
+    result = reconcile(_three_children(), [restated], [remove])
+    assert isinstance(result, Reconciled) and result.interleaves == 1, result
+
+
+def test_two_real_reorders_still_refuse_and_a_batched_reorder_frees_nothing() -> None:
+    """Two reorders that each change the order refuse, in both namings; a restated
+    order beside a real reorder held inside a ``Batch`` is not dropped and refuses."""
+    first, second = _two_real_reorders()
+    assert yield_unchanged_reorders(_three_children(), [first], [second]) == ([first], [second], [])
+    assert isinstance(reconcile(_three_children(), [first], [second]), Refused)
+    assert isinstance(reconcile(_three_children(), [second], [first]), Refused)
+    restated = _op(_RESTATED)
+    batch = Obj("Batch", {"ops": Arr([first])})
+    assert yield_unchanged_reorders(_three_children(), [restated], [batch]) == ([restated], [batch], [])
+    assert isinstance(reconcile(_three_children(), [restated], [batch]), Refused)
 
 
 def test_an_unchanged_reorder_reads_its_parent_list_and_writes_nothing() -> None:

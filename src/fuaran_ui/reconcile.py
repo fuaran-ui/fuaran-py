@@ -22,6 +22,13 @@ thin policy over it, the Python port of the reference ``DagReconcile``
    removes (a ``RemoveNode``, or a ``Batch`` holding one) and ``Conflict``
    otherwise. Two reorders of one parent that differ stay refused.
 
+**The yield rule** (Phase 2724), before Core is asked: a top-level reorder that
+leaves its parent's order as it was on its own branch carries no intent, so beside
+the other branch's REAL top-level reorder of the same parent it is dropped from its
+delta (:func:`yield_unchanged_reorders`), the real order survives, and the script
+records it for that parent. Beside an append, a removal, another unchanged reorder
+or a reorder inside a ``Batch`` it is judged as before.
+
 **The child-order rule.** Under an interleaved or rebased parent the children
 neither delta appended keep the fold's order (the rebased reorder's, where a delta
 reordered the parent), and the appended ones follow: each delta's run of appends
@@ -71,6 +78,7 @@ __all__ = [
     "reconcile_gated",
     "sort_canonical",
     "encode_refusal_envelope",
+    "yield_unchanged_reorders",
 ]
 
 #: The two refusal classes, by their wire names.
@@ -131,9 +139,9 @@ type ReconcileFault = DeltaDoesNotApply | Refused | OrderSensitive | FoldFaulted
 @dataclass(frozen=True)
 class Reconciled:
     """A derived merge: the tree, the script the merge records (one
-    ``ReorderChildren`` per interleaved or rebased parent, parents in ordinal
-    order), the distinct agreeing ops applied as no change, and how many parents
-    were interleaved or rebased."""
+    ``ReorderChildren`` per interleaved, rebased or yielded parent, parents in
+    ordinal order), the distinct agreeing ops applied as no change, and how many
+    parents were interleaved or rebased (a yielded parent is not counted)."""
 
     tree: Node
     script: tuple[Obj, ...]
@@ -379,6 +387,67 @@ def _script_for(tree: Node, parents: list[str], delta_a: list[Obj], delta_b: lis
     return script
 
 
+def _threaded(base: Node, delta: list[Obj]) -> list[tuple[Obj, Node]]:
+    """Each op of ``delta`` with the tree its own branch applies it to, threaded
+    from ``base``. :func:`reconcile` refuses a delta that does not apply before it
+    reads this, so the fallback never decides a verdict."""
+    out: list[tuple[Obj, Node]] = []
+    current = base
+    for op in delta:
+        out.append((op, current))
+        result = apply(op, current)
+        if isinstance(result, Ok):
+            current = result.value
+    return out
+
+
+def _reorder_in(tree: Node, op: Obj) -> tuple[str, bool] | None:
+    """The parent a top-level ``ReorderChildren`` reorders, with whether its list is
+    the parent's child order in ``tree`` — the same ids, in the same order, of the
+    same length (the footprint's unchanged-reorder equality, fuaran#2696). ``None``
+    for any other op, a ``Batch`` included, and for a parent ``tree`` does not hold."""
+    if op.tag != "ReorderChildren":
+        return None
+    parent = _str(op, "parentId")
+    node = _find(parent, tree)
+    if node is None:
+        return None
+    return parent, [c.id for c in _children(node)] == _order(op)
+
+
+def yield_unchanged_reorders(
+    base: Node, delta_a: list[Obj], delta_b: list[Obj]
+) -> tuple[list[Obj], list[Obj], list[str]]:
+    """THE YIELD RULE (Phase 2724, WIRE_FORMAT §34.3), applied before anything is
+    judged: a top-level ``ReorderChildren`` that leaves its parent's order as it was
+    in the tree its own branch applies it to is dropped from its delta when the
+    other delta holds a top-level ``ReorderChildren`` of the same parent that changes
+    the order on its own branch. Nothing else is dropped: an unchanged reorder beside
+    an append or a removal in its parent, beside another unchanged reorder, or beside
+    a reorder inside a ``Batch`` is judged as before. Returns the two deltas without
+    the yielded reorders and the parents they reordered (distinct, ordinal): the
+    merge script records each such parent's surviving order."""
+    a, b = _threaded(base, delta_a), _threaded(base, delta_b)
+
+    def real_parents(ops: list[tuple[Obj, Node]]) -> set[str]:
+        return {r[0] for op, t in ops if (r := _reorder_in(t, op)) is not None and not r[1]}
+
+    def split(ops: list[tuple[Obj, Node]], other_real: set[str]) -> tuple[list[Obj], list[str]]:
+        kept: list[Obj] = []
+        yielded: list[str] = []
+        for op, t in ops:
+            r = _reorder_in(t, op)
+            if r is not None and r[1] and r[0] in other_real:
+                yielded.append(r[0])
+            else:
+                kept.append(op)
+        return kept, yielded
+
+    kept_a, yielded_a = split(a, real_parents(b))
+    kept_b, yielded_b = split(b, real_parents(a))
+    return kept_a, kept_b, sorted(set(yielded_a) | set(yielded_b), key=utf16_order_key)
+
+
 def reconcile(base: Node, delta_a: list[Obj], delta_b: list[Obj]) -> Reconciled | ReconcileFault:
     """Reconcile two branch deltas from their common base under the policy: the
     derived tree and the script a merge records, or a typed refusal."""
@@ -386,6 +455,10 @@ def reconcile(base: Node, delta_a: list[Obj], delta_b: list[Obj]) -> Reconciled 
         failure = _first_failure(delta, base)
         if failure is not None:
             return DeltaDoesNotApply(side, failure[0], failure[1])
+
+    # The yield rule runs first (Phase 2724): what follows judges and folds the
+    # deltas without the yielded reorders.
+    delta_a, delta_b, yielded = yield_unchanged_reorders(base, delta_a, delta_b)
 
     verdicts = [(c, _judge(c)) for c in conflicts_in(base, delta_a, delta_b)]
     refusals = [Refusal(c, v) for c, (v, _) in verdicts if v in (DELETE_MODIFY, CONFLICT)]
@@ -397,12 +470,15 @@ def reconcile(base: Node, delta_a: list[Obj], delta_b: list[Obj]) -> Reconciled 
         {p for _, (v, p) in verdicts if v in (_INTERLEAVE, _REBASE) and p is not None}, key=utf16_order_key
     )
     agreements = len({encode_op(c.left) for c, (v, _) in verdicts if v == _AGREEMENT})
+    # A yielded parent is recorded too: its order in the fold is the surviving
+    # reorder's, which the script fixes for replay.
+    scripted = sorted(set(parents) | set(yielded), key=utf16_order_key)
 
     def derive(first: list[Obj], second: list[Obj]) -> tuple[Node, list[Obj]] | ApplyError:
         folded = _fold(first + second, base, rebase)
         if not isinstance(folded, Ok):
             return folded
-        script = _script_for(folded.value, parents, delta_a, delta_b)
+        script = _script_for(folded.value, scripted, delta_a, delta_b)
         normalised = _fold(script, folded.value)
         return normalised if not isinstance(normalised, Ok) else (normalised.value, script)
 

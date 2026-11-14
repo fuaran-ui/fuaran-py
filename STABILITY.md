@@ -15,6 +15,19 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — an unchanged reorder yields to the other side's real reorder (Phase 2731)
+
+- `fuaran_ui.reconcile.reconcile`: before the conflict report, a top-level `ReorderChildren` whose list is its
+  parent's child order in the tree its own branch applies it to is dropped from its delta when the other delta holds a
+  top-level `ReorderChildren` of the same parent that changes the order (the yield rule, WIRE_FORMAT §34.3; fuaran#2724).
+  The real order survives and the merge script records `ReorderChildren(parent, order)` for each yielded parent. Beside
+  an append, a removal or move of a listed child, another unchanged reorder, or a reorder inside a `Batch`, nothing is
+  dropped; two real reorders still refuse. A merge that was refused now derives; nothing that derived changes. The rule
+  is exposed as `fuaran_ui.reconcile.yield_unchanged_reorders`. Certified by `merge-conformance/`
+  `fold-reorder-beside-restated-order`, `fold-restated-order-beside-reorder` and `fold-append-restated-beside-reorder`
+  at specification commit `ff3b637`; `fold-refusal-two-reorders` is retired there (`retiredFoldFixtures`). The
+  manifest's `precedenceFixtures` is not read: this host offers no precedence merge.
+
 ### additive — a scalar in the deepest container adds no JSON depth (Phase 2653)
 
 - The shape check every reader runs after parsing charged a scalar one nesting level, so a document 256 `{` / `[`

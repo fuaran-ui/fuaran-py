@@ -57,8 +57,9 @@ from dataclasses import dataclass
 from .canonical import escape_string, utf16_order_key
 from .merge import INSERT_POSITION_CLASH, SLOT_CLASH, OpConflict, conflicts_in
 from .model import Arr, Node, Obj, Value
-from .ops.apply import ApplyError, _layout_children, apply
+from .ops.apply import ApplyError, apply
 from .ops.encode import encode_op
+from .ops.enumeration import STRUCTURAL, children
 from .result import Ok
 from .schema import encode_node
 
@@ -152,14 +153,10 @@ class Reconciled:
 # ─── the fold ────────────────────────────────────────────────────────────────
 
 
-def _children(node: Node) -> list[Node]:
-    return _layout_children(node) or []
-
-
 def _find(node_id: str, node: Node) -> Node | None:
     if node.id == node_id:
         return node
-    for child in _children(node):
+    for child in children(node, STRUCTURAL):
         found = _find(node_id, child)
         if found is not None:
             return found
@@ -182,7 +179,7 @@ def _held(op: Obj, tree: Node) -> bool:
         if parent is None or not isinstance(child, Node):
             return False
         wanted = encode_node(child)
-        return any(c.id == child.id and encode_node(c) == wanted for c in _children(parent))
+        return any(c.id == child.id and encode_node(c) == wanted for c in children(parent, STRUCTURAL))
     return False
 
 
@@ -222,7 +219,7 @@ def _rebased(tree: Node, op: Obj) -> Obj:
     node = _find(parent, tree)
     if node is None:
         return op
-    kids = [c.id for c in _children(node)]
+    kids = [c.id for c in children(node, STRUCTURAL)]
     listed = list(dict.fromkeys(c for c in _order(op) if c in set(kids)))
     order: list[Value] = [*listed, *(k for k in kids if k not in set(listed))]
     return Obj("ReorderChildren", {"newOrder": Arr(order), "parentId": parent})
@@ -348,7 +345,7 @@ def _reorder_for(tree: Node, parent: str, run_a: list[str], run_b: list[str]) ->
     node = _find(parent, tree)
     if node is None:
         return None
-    kids = [c.id for c in _children(node)]
+    kids = [c.id for c in children(node, STRUCTURAL)]
     present = set(kids)
     appended = set(run_a) | set(run_b)
 
@@ -412,7 +409,7 @@ def _reorder_in(tree: Node, op: Obj) -> tuple[str, bool] | None:
     node = _find(parent, tree)
     if node is None:
         return None
-    return parent, [c.id for c in _children(node)] == _order(op)
+    return parent, [c.id for c in children(node, STRUCTURAL)] == _order(op)
 
 
 def yield_unchanged_reorders(

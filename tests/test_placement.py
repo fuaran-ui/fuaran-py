@@ -38,10 +38,7 @@ from fuaran_ui.ops.apply import (
     KIND_MISMATCH,
     ORDERING_MISMATCH,
     _all_ids,
-    _child_slots,
-    _find,
     _find_layout_parent,
-    _layout_children,
 )
 from fuaran_ui.ops.apply import (
     NODE_NOT_FOUND as APPLY_NODE_NOT_FOUND,
@@ -49,6 +46,7 @@ from fuaran_ui.ops.apply import (
 from fuaran_ui.ops.apply import (
     PARENT_NOT_FOUND as APPLY_PARENT_NOT_FOUND,
 )
+from fuaran_ui.ops.enumeration import KEYED, children, find_node, ordered_children
 from fuaran_ui.ops.placement import (
     CANNOT_NUDGE_ROOT,
     CHILDLESS_KIND,
@@ -123,9 +121,9 @@ def _fresh(node_id: str = "x") -> Node:
 
 
 def _child_ids(root: Node, parent_id: str) -> list[str]:
-    parent = _find(parent_id, root)
+    parent = find_node(root, parent_id)
     assert parent is not None, f"parent '{parent_id}' not found in tree"
-    return [c.id for c in (_layout_children(parent) or [])]
+    return [c.id for c in (ordered_children(parent) or [])]
 
 
 def _applied(op: Obj, root: Node) -> Node:
@@ -164,7 +162,7 @@ def _kind_shape(n: Node) -> list[str]:
     """Preorder kind tags over the whole traversal surface — structural equality
     modulo ids."""
     shape = [n.kind.tag or ""]
-    for child, _ in _child_slots(n):
+    for child in children(n, KEYED):
         shape.extend(_kind_shape(child))
     return shape
 
@@ -377,7 +375,7 @@ def test_duplicate_places_a_fresh_id_clone_beside_its_source() -> None:
 def test_duplicate_is_structurally_equal_to_its_source_modulo_ids() -> None:
     tree = _fixture()
     op = _op(duplicate_op(tree, "left", Target("right", Last())))
-    source = _find("left", tree)
+    source = find_node(tree, "left")
     assert source is not None
     assert _kind_shape(_inserted_child(op)) == _kind_shape(source)
 
@@ -552,10 +550,10 @@ _SETTINGS = settings(max_examples=200, deadline=None, suppress_health_check=[Hea
 
 
 def _child_node_ids(root: Node, parent_id: str) -> list[str]:
-    parent = _find(parent_id, root)
+    parent = find_node(root, parent_id)
     if parent is None:
         return []
-    return [c.id for c in (_layout_children(parent) or [])]
+    return [c.id for c in (ordered_children(parent) or [])]
 
 
 def _anchor_of(placement: Placement) -> str | None:
@@ -715,7 +713,7 @@ def test_property_duplicate_never_collides_grows_by_the_subtree_and_clones_the_s
         assert updated.ok, f"apply refused an emitted op: {updated}"
         assert isinstance(updated, Ok)
 
-        source_node = _find(source, tree)
+        source_node = find_node(tree, source)
         assert source_node is not None
         ids = _raw_ids(updated.value)
 
@@ -726,12 +724,12 @@ def test_property_duplicate_never_collides_grows_by_the_subtree_and_clones_the_s
 
     error = _refusal(result)
     if error.code == NODE_NOT_FOUND:
-        assert error.subject == source and _find(source, tree) is None
+        assert error.subject == source and find_node(tree, source) is None
     elif error.code == PARENT_NOT_FOUND:
-        assert error.subject == target.parent_id and _find(target.parent_id, tree) is None
+        assert error.subject == target.parent_id and find_node(tree, target.parent_id) is None
     elif error.code == CHILDLESS_KIND:
-        parent = _find(target.parent_id, tree)
-        assert parent is not None and _layout_children(parent) is None
+        parent = find_node(tree, target.parent_id)
+        assert parent is not None and ordered_children(parent) is None
     elif error.code == UNKNOWN_ANCHOR:
         # The clone's fresh root id is never its own anchor, so exclusion is moot.
         assert _anchor_of(target.placement) == error.subject
@@ -746,7 +744,7 @@ def test_property_paste_remaps_collisions_preserves_the_rest_and_never_duplicate
     scenario: tuple[Node, Node, str, Target],
 ) -> None:
     tree_a, tree_b, source, target = scenario
-    lifted = _find(source, tree_a)
+    lifted = find_node(tree_a, source)
     if lifted is None:
         return  # only tree ids are generated; a ghost source is not the contract under test
 
@@ -767,10 +765,10 @@ def test_property_paste_remaps_collisions_preserves_the_rest_and_never_duplicate
 
     error = _refusal(result)
     if error.code == PARENT_NOT_FOUND:
-        assert _find(target.parent_id, tree_b) is None
+        assert find_node(tree_b, target.parent_id) is None
     elif error.code == CHILDLESS_KIND:
-        parent = _find(target.parent_id, tree_b)
-        assert parent is not None and _layout_children(parent) is None
+        parent = find_node(tree_b, target.parent_id)
+        assert parent is not None and ordered_children(parent) is None
     elif error.code == UNKNOWN_ANCHOR:
         assert _anchor_of(target.placement) == error.subject
     else:

@@ -55,7 +55,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .model import Arr, Node, Obj, Value
-from .ops.apply import _all_ids, _child_slots, _layout_children, apply
+from .ops.apply import apply
+from .ops.enumeration import KEYED, STRUCTURAL, children, state_arms, walk
 from .result import Ok
 
 __all__ = [
@@ -162,27 +163,13 @@ def structural(f: Footprint) -> frozenset[str]:
 # ─── walks ───────────────────────────────────────────────────────────────────
 
 
-def _structural(node: Node) -> list[Node]:
-    return _layout_children(node) or []
-
-
-def _preorder(root: Node) -> list[Node]:
-    out: list[Node] = []
-    stack = [root]
-    while stack:
-        n = stack.pop()
-        out.append(n)
-        stack.extend(reversed(_structural(n)))
-    return out
-
-
 def _locate(node_id: str, root: Node) -> Node | None:
     """The node carrying ``node_id`` over the structural walk."""
-    return next((n for n in _preorder(root) if n.id == node_id), None)
+    return next((n for n in walk(root, STRUCTURAL) if n.id == node_id), None)
 
 
 def _structural_parent(node_id: str, root: Node) -> Node | None:
-    return next((n for n in _preorder(root) if any(c.id == node_id for c in _structural(n))), None)
+    return next((n for n in walk(root, STRUCTURAL) if any(c.id == node_id for c in children(n, STRUCTURAL))), None)
 
 
 def _proper_ancestors(node_id: str, root: Node) -> frozenset[str]:
@@ -191,7 +178,7 @@ def _proper_ancestors(node_id: str, root: Node) -> frozenset[str]:
     def path(n: Node) -> list[str] | None:
         if n.id == node_id:
             return [n.id]
-        for c in _structural(n):
+        for c in children(n, STRUCTURAL):
             below = path(c)
             if below is not None:
                 return [n.id, *below]
@@ -203,7 +190,7 @@ def _proper_ancestors(node_id: str, root: Node) -> frozenset[str]:
 
 def _ids(node: Node) -> frozenset[str]:
     """Every id in ``node``'s subtree over the keyed walk, ``node`` included."""
-    return frozenset(_all_ids(node))
+    return frozenset(n.id for n in walk(node, KEYED))
 
 
 def _ids_of(nodes: list[Node]) -> frozenset[str]:
@@ -222,13 +209,7 @@ def _kind_held(node_id: str, kind: Value) -> list[Node]:
     """The nodes a kind holds: the keyed walk of a carrier that has only that kind."""
     if not isinstance(kind, Obj):
         return []
-    return [child for child, _ in _child_slots(Node(node_id, kind))]
-
-
-def _state_alternatives(state: Value) -> list[Node]:
-    if not isinstance(state, Obj):
-        return []
-    return [n for n in (state.fields.get("onLoading"), state.fields.get("onEmpty")) if isinstance(n, Node)]
+    return children(Node(node_id, kind), KEYED)
 
 
 def _ops_of(op: Obj) -> list[Obj]:
@@ -247,7 +228,7 @@ def inserted(op: Obj) -> list[Node]:
     if tag == "EditNode":
         return _kind_held(_str(op, "target"), op.fields.get("newKind"))
     if tag == "UpdateState":
-        return _state_alternatives(op.fields.get("state"))
+        return state_arms(op.fields.get("state"))
     if tag == "InsertChild":
         child = op.fields.get("child")
         return [child] if isinstance(child, Node) else []
@@ -434,7 +415,7 @@ def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
             return footprint_of(op)
         order = op.fields.get("newOrder")
         listed = list(order.items) if isinstance(order, Arr) else []
-        if listed == [c.id for c in _structural(parent)]:
+        if listed == [c.id for c in children(parent, STRUCTURAL)]:
             acc = union(reading_slot(parent_id, "kind"), reading_slot(parent_id, CHILD_LIST_SLOT))
         else:
             acc = _child_list(parent_id, slot_edit(parent_id, "kind"))
@@ -464,7 +445,7 @@ def _resolved_at(state: Node, after: Node | None, op: Obj) -> Footprint:
         old = _kind_held(target, node.kind)
         return _slotted(["kind", CHILD_LIST_SLOT], [], target, _ids_of(old) | _ids_of(inserted(op)))
     if tag == "UpdateState":
-        old = _state_alternatives(node.extras.get("state"))
+        old = state_arms(node.extras.get("state"))
         return _slotted(["state"], [], target, _ids_of(old) | _ids_of(inserted(op)))
     if tag == "PatchStyle":
         fields = [f"style.{f}" for f in _style_fields(op.fields.get("style"))]

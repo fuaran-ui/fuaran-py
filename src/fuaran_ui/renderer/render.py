@@ -39,6 +39,7 @@ import math
 from collections.abc import Callable, Sequence
 
 from ..model import Arr, Node, Obj, Value
+from ..ops.enumeration import FRAGMENT_SCOPE, walk
 from . import markdown
 from .bindings import (
     BindingSourcesLike,
@@ -299,28 +300,15 @@ def _child_nodes(fields: dict[str, Value], key: str = "children") -> list[Node]:
 
 
 def _collect_fragments(node: Node, acc: dict[str, Node]) -> None:
-    kind = node.kind
-    if kind.tag == "FragmentDecl":
-        name = kind.fields.get("name")
-        body = _as_node(kind.fields.get("body"))
-        if isinstance(name, str) and body is not None:
-            acc[name] = body
-    for child in _child_nodes(kind.fields):
-        _collect_fragments(child, acc)
-    boundary_child = _as_node(kind.fields.get("child"))
-    if boundary_child is not None:
-        _collect_fragments(boundary_child, acc)
-    if kind.tag == "Switch":
-        cases = kind.fields.get("cases")
-        if isinstance(cases, Arr):
-            for case in cases.items:
-                if isinstance(case, Obj):
-                    case_child = _as_node(case.fields.get("child"))
-                    if case_child is not None:
-                        _collect_fragments(case_child, acc)
-        switch_default = _as_node(kind.fields.get("default"))
-        if switch_default is not None:
-            _collect_fragments(switch_default, acc)
+    """Register every ``FragmentDecl`` in the fragment scope (the ordered lists, the
+    kind's arms — a fragment body included — and the ``state`` alternatives), in walk
+    order; a later declaration of a name replaces an earlier one."""
+    for held in walk(node, FRAGMENT_SCOPE):
+        if held.kind.tag == "FragmentDecl":
+            name = held.kind.fields.get("name")
+            body = _as_node(held.kind.fields.get("body"))
+            if isinstance(name, str) and body is not None:
+                acc[name] = body
 
 
 class Renderer:

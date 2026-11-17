@@ -23,10 +23,10 @@ as ``OrderingMismatch``; saying so before emission is friendlier than a rejectio
 it.
 
 The clone verbs lift a subtree and rewrite its ids to a fresh, collision-free set before
-the insert. The remap runs over the **whole traversal surface** — every position
-:func:`~fuaran_ui.ops.apply._child_slots` reaches, not just the structural child lists —
-because the id-uniqueness contract is tree-wide, and a clone that kept an old id inside
-a ``Switch`` case or a ``State`` slot would smuggle a duplicate past it.
+the insert. The remap runs over the **whole traversal surface** — every position the
+keyed walk of :mod:`~fuaran_ui.ops.enumeration` reaches, not just the structural child
+lists — because the id-uniqueness contract is tree-wide, and a clone that kept an old id
+inside a ``Switch`` case or a ``State`` slot would smuggle a duplicate past it.
 
 This is a sibling of the F# ``Fuaran.UI.Ops.Placement`` module, built to the same
 semantics rather than transpiled: the traversal is this host's own apply-engine
@@ -40,14 +40,8 @@ from dataclasses import dataclass
 
 from ..model import Arr, Node, Obj
 from ..result import Ok
-from .apply import (
-    _all_ids,
-    _child_slots,
-    _find,
-    _find_layout_parent,
-    _is_ancestor,
-    _layout_children,
-)
+from .apply import _all_ids, _find_layout_parent, _is_ancestor
+from .enumeration import KEYED, find_node, map_children, ordered_children
 
 # ── Placement vocabulary ─────────────────────────────────────────────────────
 
@@ -250,10 +244,10 @@ def sequential_ids(prefix: str) -> FreshIds:
 
 def _container_children(root: Node, parent_id: str) -> Ok[list[str]] | PlaceErr:
     """The destination's current child ids, or the mirrored apply-side refusal."""
-    parent = _find(parent_id, root)
+    parent = find_node(root, parent_id)
     if parent is None:
         return _refuse(PARENT_NOT_FOUND, parent_id)
-    children = _layout_children(parent)
+    children = ordered_children(parent)
     if children is None:
         return _refuse(CHILDLESS_KIND, parent_id)
     return Ok([c.id for c in children])
@@ -307,28 +301,12 @@ def _placed(op: Obj, parent_id: str, appended: list[str], wanted: list[str]) -> 
 
 
 def _remap_ids(node: Node, rename: dict[str, str]) -> Node:
-    """Rewrite every id in ``rename`` across the whole traversal surface, returning the
-    node UNCHANGED (by identity) where nothing beneath it moved.
-
-    The one non-obvious line: ``_child_slots`` hands back rebuild closures that each
-    capture the node they were computed from, so applying several rebuilds drawn from a
-    single call would discard all but the last. The slot list is therefore recomputed
-    against the accumulator on every step. An id-only rewrite never changes the slot
-    count or order, so the index walk is stable.
-    """
+    """Rewrite every id in ``rename`` across the whole traversal surface (the keyed walk),
+    returning the node UNCHANGED (by identity) where nothing beneath it moved. Each node's
+    positions are enumerated once."""
     new_id = rename.get(node.id, node.id)
     current = node if new_id == node.id else Node(new_id, node.kind, node.extras)
-
-    i = 0
-    while True:
-        slots = _child_slots(current)
-        if i >= len(slots):
-            return current
-        child, rebuild = slots[i]
-        replaced = _remap_ids(child, rename)
-        if replaced is not child:
-            current = rebuild(replaced)
-        i += 1
+    return map_children(current, KEYED, lambda child: _remap_ids(child, rename))
 
 
 def _remap_for_insert(fresh_ids: FreshIds, target_root: Node, incoming: Node) -> Node:
@@ -457,7 +435,7 @@ def nudge_op(root: Node, node_id: str, delta: int) -> PlaceResult:
     if parent is None:
         return _refuse(NODE_NOT_FOUND, node_id)
 
-    ids = [c.id for c in (_layout_children(parent) or [])]
+    ids = [c.id for c in (ordered_children(parent) or [])]
     index = ids.index(node_id)
     swap_with = index + delta
     if swap_with < 0 or swap_with >= len(ids):
@@ -478,7 +456,7 @@ def duplicate_op_with(fresh_ids: FreshIds, root: Node, source: str, target: Targ
     The emitted op is an ordinary placed insert — the clone is a fresh subtree, so the
     standard apply gate (including the tree-wide duplicate-id check) accepts it unchanged.
     """
-    sub = _find(source, root)
+    sub = find_node(root, source)
     if sub is None:
         return _refuse(NODE_NOT_FOUND, source)
     return place_op(root, _remap_for_insert(fresh_ids, root, sub), target)

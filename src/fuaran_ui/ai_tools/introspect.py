@@ -20,6 +20,8 @@ from dataclasses import dataclass
 
 from ..model import Arr, Node, Obj
 from ..model import Value as WireValue
+from ..ops.enumeration import KEYED, children, walk
+from ..ops.enumeration import find_node as _find_node
 from ..schema.decode import BINDING_CASES
 
 
@@ -119,30 +121,12 @@ def binding_slots(node: Node) -> tuple[BindingSlot, ...]:
 
 
 def child_nodes(node: Node) -> tuple[Node, ...]:
-    """The immediate structural child nodes — every ``Node`` reachable within the
-    kind without passing through another ``Node`` (so grandchildren are excluded)."""
-    children: list[Node] = []
-
-    def walk(value: WireValue) -> None:
-        if isinstance(value, Node):
-            children.append(value)  # stop — its own children are its concern
-        elif isinstance(value, Obj):
-            for field_value in value.fields.values():
-                walk(field_value)
-        elif isinstance(value, Arr):
-            for item in value.items:
-                walk(item)
-
-    for field_value in node.kind.fields.values():
-        walk(field_value)
-    # fuaran#1812 -- the author-declared `fallback` is a node-valued envelope
-    # slot: a full node a BEHIND reader renders in place of this one. It is a
-    # node position of the document (its ids share the one id space, 8.1), so
-    # every consumer of the decoded tree sees it.
-    fallback = node.extras.get("fallback")
-    if isinstance(fallback, Node):
-        children.append(fallback)
-    return tuple(children)
+    """The immediate child nodes over the keyed walk — every position the node holds
+    another node in: the kind's children and arms, its slot arguments, the
+    ``state.onLoading`` / ``state.onEmpty`` alternatives and the author-declared
+    ``fallback`` (fuaran#1812). Every one is a node position of the document, sharing
+    the one id space (8.1), so every consumer of the decoded tree sees it."""
+    return tuple(children(node, KEYED))
 
 
 def child_ids(node: Node) -> tuple[str, ...]:
@@ -150,24 +134,14 @@ def child_ids(node: Node) -> tuple[str, ...]:
 
 
 def walk_nodes(tree: Node) -> list[Node]:
-    """Depth-first walk of every node in the tree, root first."""
-    acc: list[Node] = []
-
-    def visit(node: Node) -> None:
-        acc.append(node)
-        for child in child_nodes(node):
-            visit(child)
-
-    visit(tree)
-    return acc
+    """Depth-first walk of every node in the tree, root first (the keyed walk)."""
+    return walk(tree, KEYED)
 
 
 def find_node(tree: Node, node_id: str) -> Node | None:
-    """The first node with ``node_id`` (depth-first), or ``None``."""
-    for node in walk_nodes(tree):
-        if node.id == node_id:
-            return node
-    return None
+    """The first node with ``node_id`` (depth-first, the keyed walk), or ``None`` —
+    the same lookup the apply engine locates an op's target by."""
+    return _find_node(tree, node_id)
 
 
 def _introspect(node: Node) -> NodeIntrospection:

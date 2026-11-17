@@ -20,8 +20,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..compute import ComputeResult, ComputeState, evaluate_tree
-from ..model import Arr, Node, Obj, Value
+from ..model import Arr, Node, Obj
 from ..ops import ApplyErr, ApplyResult, apply
+from ..ops.enumeration import KEYED, walk
 from ..renderer import render_html
 from ..renderer.bindings import BindingSourcesLike, as_sources
 from ..renderer.egress import DENY_NON_LOCAL_EGRESS, EgressPolicy
@@ -73,49 +74,6 @@ def _pyodide_deps() -> BrowserDeps:
         set_inner_html=set_inner_html,
         add_event_listener=add_event_listener,
     )
-
-
-# ── Node-id enumeration over the decoded tree ────────────────────────────────
-
-
-def _as_node(value: Value) -> Node | None:
-    """Coerce a child position to a ``Node`` (typed or structurally-decoded)."""
-    if isinstance(value, Node):
-        return value
-    if isinstance(value, Obj) and isinstance(value.fields.get("kind"), Obj):
-        node_id = value.fields.get("id")
-        kind = value.fields["kind"]
-        if isinstance(node_id, str) and isinstance(kind, Obj):
-            extras: dict[str, Value] = {
-                k: value.fields[k] for k in ("state", "style", "accessibility") if k in value.fields
-            }
-            return Node(node_id, kind, extras)
-    return None
-
-
-def _node_ids(node: Node, acc: list[str]) -> None:
-    """Every node id in the tree (the binding set), mirroring the render walk."""
-    acc.append(node.id)
-    fields = node.kind.fields
-    children = fields.get("children")
-    if isinstance(children, Arr):
-        for item in children.items:
-            child = _as_node(item)
-            if child is not None:
-                _node_ids(child, acc)
-    for key in ("child", "fallback", "body"):
-        child = _as_node(fields.get(key))
-        if child is not None:
-            _node_ids(child, acc)
-    state = node.extras.get("state")
-    if isinstance(state, Obj):
-        for key in ("onLoading", "onEmpty"):
-            child = _as_node(state.fields.get(key))
-            if child is not None:
-                _node_ids(child, acc)
-    fallback = _as_node(node.extras.get("fallback"))  # fuaran#1812
-    if fallback is not None:
-        _node_ids(fallback, acc)
 
 
 # ── The runtime ──────────────────────────────────────────────────────────────
@@ -237,9 +195,9 @@ class FuaranRuntime:
         self._cleanups = []
         if self._on_event is None:
             return
-        ids: list[str] = []
-        _node_ids(self._tree, ids)
-        for node_id in ids:
+        # Every node id in the tree (the keyed walk); a node the render did not paint
+        # has no element, and is skipped below.
+        for node_id in (n.id for n in walk(self._tree, KEYED)):
             element = self._deps.get_element_by_id(node_id)
             if element is None:
                 continue

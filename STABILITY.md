@@ -15,6 +15,28 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — one child enumeration; every walk reaches what the IDL holds (Phase 2663)
+
+- New module `fuaran_ui.ops.enumeration`: the host's one answer to "which nodes does this node hold", derived from the
+  generated IDL tables. Each position has a class (`Position`: `ORDERED`, `ARM`, `STATE_ARM`, `FALLBACK`, `ARGUMENT`)
+  and a walk names its reach (`STRUCTURAL`, `KIND_HELD`, `FRAGMENT_SCOPE`, `KEYED`). It exposes `slots`, `children`,
+  `map_children`, `walk`, `find_node(tree, id)`, `ordered_children`, `with_ordered_children` and `state_arms`.
+- The apply engine's structural ops and lookup reach the ordered `children` of `Modal` and `ScrollArea`, as the IDL,
+  the reference host and the Go and Rust hosts do: an op on a node inside one, or an `InsertChild` / `ReorderChildren`
+  on one, applies where it was refused (`NodeNotFound` / `ChildlessKind`). The placement helpers and the merge
+  footprint follow the same reach. The tree diff still floors a change inside either to `EditNode` at the container,
+  the script the shared diff goldens pin for this host.
+- `fuaran_ui.ai_tools.child_nodes` / `child_ids` / `walk_nodes` / `inspect_tree` now include the `state.onLoading` /
+  `state.onEmpty` alternatives (after the kind's positions, before the envelope `fallback`), and `find_node` finds a
+  node held there. The argument order is unchanged (tree first).
+- `validate_node` walks the state alternatives: a duplicate id there is reported as `FUARAN-DUP-ID`, and every rule
+  applies inside them. A node is walked through the positions its kind declares in the IDL; a hand-built node of an
+  unknown kind is reported and not descended.
+- `evaluate_tree` evaluates a `Transform` source held in a slot argument; the runtime binds events on nodes held in
+  `Switch` arms and slot arguments; the renderers' fragment registry registers a `FragmentDecl` held in an
+  `ErrorBoundary` fallback, a state alternative or another fragment's body, so its references resolve.
+- Nothing that applied, validated or rendered before changes, except where it now reaches a position it missed.
+
 ### additive — an unchanged reorder yields to the other side's real reorder (Phase 2731)
 
 - `fuaran_ui.reconcile.reconcile`: before the conflict report, a top-level `ReorderChildren` whose list is its

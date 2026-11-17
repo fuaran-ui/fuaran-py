@@ -27,6 +27,7 @@ import pytest
 from _corpus import CORPUS_ROOT, SNAPSHOT_ROOT
 from fuaran_ui import decode_node
 from fuaran_ui.model import Node
+from fuaran_ui.ops.enumeration import KIND_HELD, children
 from fuaran_ui.renderer import project_speech, speech, speech_plain_text, speech_ssml
 from fuaran_ui.renderer.bindings import BindingSources
 from fuaran_ui.renderer.speech import OmissionReason, Pause, SpeechOmission, SpeechScript, UtteranceSource
@@ -130,7 +131,7 @@ def test_every_ruled_kind_is_exercised_by_a_corpus_root() -> None:
 
 
 def _reachable(node: Node, fragments: dict[str, Node]) -> list[Node]:
-    kids = speech._structural_children(node)
+    kids = children(node, KIND_HELD)
     if node.kind.tag == "FragmentRef":
         body = fragments.get(node.kind.fields.get("name"))  # type: ignore[arg-type]
         kids = [body] if body is not None else []

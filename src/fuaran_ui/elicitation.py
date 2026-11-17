@@ -23,6 +23,7 @@ from dataclasses import dataclass
 
 from .canonical import encode_value
 from .model import Arr, Node, Obj, Value, from_json
+from .ops.enumeration import KEYED, walk
 from .result import (
     MISSING_FIELD,
     UNKNOWN_DU_CASE,
@@ -293,24 +294,6 @@ def _validate_answer(answer: dict, contract: Contract, path_prefix: str) -> None
         _conforms_to_space(answer[field.name], field.space, f"{path_prefix}.{field.name}")
 
 
-# ── tree node-id collection (for CONTRACT_UNKNOWN_NODE) ──────────────────────
-
-
-def _collect_node_ids(value: Value, into: set[str]) -> None:
-    """Collect every ``Node.id`` reachable in a decoded structural value."""
-    if isinstance(value, Node):
-        into.add(value.id)
-        _collect_node_ids(value.kind, into)
-        for v in value.extras.values():
-            _collect_node_ids(v, into)
-    elif isinstance(value, Obj):
-        for v in value.fields.values():
-            _collect_node_ids(v, into)
-    elif isinstance(value, Arr):
-        for item in value.items:
-            _collect_node_ids(item, into)
-
-
 # ── elicitation envelope (§18.2) ────────────────────────────────────────────
 
 
@@ -381,8 +364,7 @@ def _decode_elicitation(text: str) -> Elicitation:
     if raw_contract is _MISSING:
         _fail(MISSING_FIELD, "$.contract", "missing 'contract'")
     contract = _decode_contract(raw_contract, "$.contract")
-    ids: set[str] = set()
-    _collect_node_ids(tree, ids)
+    ids = {n.id for n in walk(tree, KEYED)}
     for i, field in enumerate(contract.fields):
         if field.node_id not in ids:
             _fail(

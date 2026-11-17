@@ -99,6 +99,7 @@ from ..dataframe import (
 )
 from ..dataframe.model import NULL, UNRESOLVED_SOURCE, is_null
 from ..model import Arr, Node, Obj, Value
+from ..ops.enumeration import KEYED, walk
 
 # ── result ────────────────────────────────────────────────────────────────────
 
@@ -663,44 +664,12 @@ def evaluate_transform(transform: Obj, state: ComputeState) -> ComputeResult:
 # ── tree walk ─────────────────────────────────────────────────────────────────
 
 
-def _child_nodes(node: Node) -> list[Node]:
-    out: list[Node] = []
-    fields = node.kind.fields
-    children = fields.get("children")
-    if isinstance(children, Arr):
-        out.extend(c for c in children.items if isinstance(c, Node))
-    for key in ("child", "fallback", "body", "default"):
-        value = fields.get(key)
-        if isinstance(value, Node):
-            out.append(value)
-    cases = fields.get("cases")
-    if isinstance(cases, Arr):
-        for case in cases.items:
-            if isinstance(case, Obj):
-                case_child = case.fields.get("child")
-                if isinstance(case_child, Node):
-                    out.append(case_child)
-    state_extra = node.extras.get("state")
-    if isinstance(state_extra, Obj):
-        for key in ("onLoading", "onEmpty"):
-            value = state_extra.fields.get(key)
-            if isinstance(value, Node):
-                out.append(value)
-    fallback = node.extras.get("fallback")  # fuaran#1812 -- the envelope fallback
-    if isinstance(fallback, Node):
-        out.append(fallback)
-    return out
-
-
 def evaluate_tree(tree: Node, state: ComputeState) -> dict[str, ComputeResult]:
     """Evaluate every ``Binding.Transform`` ``source`` in the tree against ``state``,
     keyed by the owning node id."""
     derived: dict[str, ComputeResult] = {}
-    stack = [tree]
-    while stack:
-        node = stack.pop()
+    for node in walk(tree, KEYED):
         source = node.kind.fields.get("source")
         if isinstance(source, Obj) and source.tag == "Transform":
             derived[node.id] = evaluate_transform(source, state)
-        stack.extend(reversed(_child_nodes(node)))
     return derived

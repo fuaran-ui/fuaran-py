@@ -9,7 +9,10 @@ wrap an op list in ``Batch`` for all-or-nothing atomicity).
 This is a sibling port of the F# (``Fuaran.UI.Ops.Apply``) and TypeScript
 (``@fuaran-ui/ops`` ``apply``) engines, built to match their semantics: structural
 child ops (``InsertChild`` / ``RemoveNode`` / ``MoveNode`` / ``ReorderChildren``)
-address layout kinds only (every layout spec carries an ordered ``children`` list);
+address the container kinds only — those whose IDL field table carries an ordered
+``children`` list, ``Modal`` and ``ScrollArea`` among them — and every op locates its
+target over the keyed walk (:mod:`fuaran_ui.ops.enumeration`, the host's one child
+enumeration);
 ``UpdateProp`` paths follow the WIRE_FORMAT.md §3.4 grammar — dot-separated field
 segments with optional 0-based ``[i]`` list indices, traversed through the same
 per-kind nested surface the sibling engines implement (grid ``Columns[i]``, chart
@@ -45,6 +48,7 @@ from ..schema.decode import (
     _Fail,
     _unpack_schema,
 )
+from .enumeration import KEYED, children, find_node, map_children, ordered_children, walk, with_ordered_children
 
 # ── Error + result surface ──────────────────────────────────────────────────
 
@@ -99,11 +103,6 @@ def _fail(code: str, message: str, batch_index: int | None = None) -> ApplyErr:
     return ApplyErr(ApplyError(code, message, batch_index))
 
 
-# ── The layout-kind set (the kinds that carry an ordered `children` array) ───
-
-LAYOUT_KINDS = frozenset({"Box", "SplitPanel", "Tabs", "Stepper", "SummaryList", "Disclosure"})
-
-
 # ── Structural node helpers (over the flat generic model) ────────────────────
 
 
@@ -147,164 +146,44 @@ def _patch_style(node: Node, delta: Value) -> Node:
     return _store_style(node, merged)
 
 
-def _set_state_child(node: Node, key: str, child: Node) -> Node:
-    state = node.extras.get("state")
-    fields = dict(state.fields) if isinstance(state, Obj) else {}
-    fields[key] = child
-    return _set_extra(node, "state", Obj(None, fields))
-
-
-def _layout_children(node: Node) -> list[Node] | None:
-    """The ordered child list for a layout node, else ``None`` (childless kind)."""
-    if node.kind.tag in LAYOUT_KINDS:
-        children = node.kind.fields.get("children")
-        if isinstance(children, Arr):
-            return [c for c in children.items if isinstance(c, Node)]
-    return None
-
-
-def _with_layout_children(node: Node, children: list[Node]) -> Node:
-    return _set_kind_field(node, "children", Arr(list(children)))
-
-
-ChildSlot = tuple[Node, Callable[[Node], Node]]
-
-
-def _child_slots(node: Node) -> list[ChildSlot]:
-    """Every immediate sub-node position, each with a rebuild that swaps it."""
-    slots: list[ChildSlot] = []
-    tag = node.kind.tag
-    fields = node.kind.fields
-
-    children = _layout_children(node)
-    if children is not None:
-        for i, child in enumerate(children):
-
-            def rebuild(c: Node, i: int = i, children: list[Node] = children) -> Node:
-                swapped = list(children)
-                swapped[i] = c
-                return _with_layout_children(node, swapped)
-
-            slots.append((child, rebuild))
-    elif tag == "ErrorBoundary":
-        eb_child = fields.get("child")
-        eb_fallback = fields.get("fallback")
-        if isinstance(eb_child, Node):
-            slots.append((eb_child, lambda c: _set_kind_field(node, "child", c)))
-        if isinstance(eb_fallback, Node):
-            slots.append((eb_fallback, lambda c: _set_kind_field(node, "fallback", c)))
-    elif tag == "Switch":
-        # Phase 392: the default child + each case child are editable slots
-        # (mirrors the ErrorBoundary handling above); a case's `match` is
-        # preserved on rebuild.
-        default_node = fields.get("default")
-        if isinstance(default_node, Node):
-            slots.append((default_node, lambda c: _set_kind_field(node, "default", c)))
-        cases = fields.get("cases")
-        if isinstance(cases, Arr):
-            for i, case in enumerate(cases.items):
-                if isinstance(case, Obj):
-                    case_child = case.fields.get("child")
-                    if isinstance(case_child, Node):
-
-                        def rebuild_case(c: Node, i: int = i, cases: Arr = cases) -> Node:
-                            new_items = list(cases.items)
-                            old = new_items[i]
-                            assert isinstance(old, Obj)
-                            new_items[i] = Obj(old.tag, {**old.fields, "child": c})
-                            return _set_kind_field(node, "cases", Arr(new_items))
-
-                        slots.append((case_child, rebuild_case))
-    elif tag == "FragmentDecl":
-        body = fields.get("body")
-        if isinstance(body, Node):
-            slots.append((body, lambda c: _set_kind_field(node, "body", c)))
-
-    # fuaran#2705 -- the subtree of every slot argument, a FragmentRef's `args` and a
-    # Mount's `inputs`, in key order (WIRE_FORMAT 34.2: the node walk includes slot
-    # arguments). The value arguments (Int / Float / Bool / Str) hold no node.
-    for bag_key in ("args", "inputs"):
-        bag = fields.get(bag_key)
-        if not isinstance(bag, Obj):
-            continue
-        for arg_key in sorted(bag.fields):
-            arg = bag.fields[arg_key]
-            if not (isinstance(arg, Obj) and arg.tag == "SlotArg"):
-                continue
-            tree = arg.fields.get("tree")
-            if not isinstance(tree, Node):
-                continue
-
-            def rebuild_arg(
-                c: Node, bag_key: str = bag_key, bag: Obj = bag, arg_key: str = arg_key, arg: Obj = arg
-            ) -> Node:
-                new_arg = Obj(arg.tag, {**arg.fields, "tree": c})
-                return _set_kind_field(node, bag_key, Obj(bag.tag, {**bag.fields, arg_key: new_arg}))
-
-            slots.append((tree, rebuild_arg))
-
-    state = node.extras.get("state")
-    if isinstance(state, Obj):
-        on_loading = state.fields.get("onLoading")
-        if isinstance(on_loading, Node):
-            slots.append((on_loading, lambda c: _set_state_child(node, "onLoading", c)))
-        on_empty = state.fields.get("onEmpty")
-        if isinstance(on_empty, Node):
-            slots.append((on_empty, lambda c: _set_state_child(node, "onEmpty", c)))
-
-    # fuaran#1812 -- a `TreeOp` addresses a node inside the author-declared
-    # `fallback` like any child position (WIRE_FORMAT 3.1): the same lens as the
-    # State arms, which are alternative renderings too.
-    fallback = node.extras.get("fallback")
-    if isinstance(fallback, Node):
-        slots.append((fallback, lambda c: _set_extra(node, "fallback", c)))
-
-    return slots
-
-
-def _find(target: str, node: Node) -> Node | None:
-    if node.id == target:
-        return node
-    for child, _ in _child_slots(node):
-        found = _find(target, child)
-        if found is not None:
-            return found
-    return None
-
-
 def _map(target: str, f: Callable[[Node], Node], node: Node) -> Node | None:
+    """``node`` with ``f`` applied to the first node carrying ``target`` (the keyed walk),
+    or ``None`` when no node carries it."""
     if node.id == target:
         return f(node)
-    for child, rebuild in _child_slots(node):
+    found = False
+
+    def step(child: Node) -> Node:
+        nonlocal found
+        if found:
+            return child
         mapped = _map(target, f, child)
-        if mapped is not None:
-            return rebuild(mapped)
-    return None
+        if mapped is None:
+            return child
+        found = True
+        return mapped
+
+    rebuilt = map_children(node, KEYED, step)
+    return rebuilt if found else None
 
 
 def _all_ids(node: Node) -> list[str]:
-    ids = [node.id]
-    for child, _ in _child_slots(node):
-        ids.extend(_all_ids(child))
-    return ids
+    return [n.id for n in walk(node, KEYED)]
 
 
 def _find_layout_parent(target: str, node: Node) -> Node | None:
-    children = _layout_children(node)
-    if children is not None and any(c.id == target for c in children):
-        return node
-    for child, _ in _child_slots(node):
-        found = _find_layout_parent(target, child)
-        if found is not None:
-            return found
-    return None
+    """The node whose ORDERED child list holds ``target``, searched over the keyed walk."""
+    return next(
+        (n for n in walk(node, KEYED) if any(c.id == target for c in ordered_children(n) or [])),
+        None,
+    )
 
 
 def _is_ancestor(ancestor_id: str, descendant_id: str, root: Node) -> bool:
-    ancestor = _find(ancestor_id, root)
+    ancestor = find_node(root, ancestor_id)
     if ancestor is None:
         return False
-    return any(descendant_id in _all_ids(child) for child, _ in _child_slots(ancestor))
+    return any(descendant_id in _all_ids(child) for child in children(ancestor, KEYED))
 
 
 # ── UpdateProp field-coercion surface ────────────────────────────────────────
@@ -896,7 +775,7 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
         segs = _parse_path(path)
         if isinstance(segs, str):
             return _fail(PATH_INVALID, f"Path '{path}' is structurally invalid: {segs}.")
-        node = _find(target, root)
+        node = find_node(root, target)
         if node is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
 
@@ -968,7 +847,7 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
     if tag == "ReplaceBinding":
         target = _as_str(fields["target"])
         slot = _as_str(fields["slot"])
-        node = _find(target, root)
+        node = find_node(root, target)
         if node is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
         new_kind = _replace_binding(slot, fields["binding"], node.kind)
@@ -1039,11 +918,11 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
     if tag == "InsertChild":
         parent_id = _as_str(fields["parentId"])
         child = _as_node(fields["child"])
-        parent = _find(parent_id, root)
+        parent = find_node(root, parent_id)
         if parent is None:
             return _fail(PARENT_NOT_FOUND, f"Parent node '{parent_id}' not found in tree.")
-        children = _layout_children(parent)
-        if children is None:
+        siblings = ordered_children(parent)
+        if siblings is None:
             return _fail(
                 CHILDLESS_KIND,
                 f"Node '{parent_id}' (kind={parent.kind.tag}) has no children field — "
@@ -1055,8 +934,8 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return _fail(DUPLICATE_NODE_ID, f"NodeId '{duplicate}' is already present in the tree; ids must be unique.")
         # 0.4.0: InsertChild APPENDS. Placing a node anywhere else is
         # Batch [InsertChild, ReorderChildren] — order is stated by naming ids.
-        new_children = children + [child]
-        tree = _map(parent_id, lambda n: _with_layout_children(n, new_children), root)
+        new_children = siblings + [child]
+        tree = _map(parent_id, lambda n: with_ordered_children(n, new_children), root)
         assert tree is not None
         return _ok(tree)
 
@@ -1067,8 +946,8 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
         parent = _find_layout_parent(target, root)
         if parent is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
-        kept = [c for c in (_layout_children(parent) or []) if c.id != target]
-        tree = _map(parent.id, lambda n: _with_layout_children(n, kept), root)
+        kept = [c for c in (ordered_children(parent) or []) if c.id != target]
+        tree = _map(parent.id, lambda n: with_ordered_children(n, kept), root)
         assert tree is not None
         return _ok(tree)
 
@@ -1079,13 +958,13 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
             return _fail(KIND_MISMATCH, "Cannot move a node into itself.")
         if _is_ancestor(target, new_parent_id, root):
             return _fail(KIND_MISMATCH, "Cannot move a node into its own descendant (would create a cycle).")
-        moving = _find(target, root)
+        moving = find_node(root, target)
         if moving is None:
             return _fail(NODE_NOT_FOUND, f"Node '{target}' not found in tree.")
-        new_parent = _find(new_parent_id, root)
+        new_parent = find_node(root, new_parent_id)
         if new_parent is None:
             return _fail(PARENT_NOT_FOUND, f"Parent node '{new_parent_id}' not found in tree.")
-        if _layout_children(new_parent) is None:
+        if ordered_children(new_parent) is None:
             return _fail(CHILDLESS_KIND, f"Node '{new_parent_id}' (kind={new_parent.kind.tag}) has no children field.")
         after_remove = _apply_one(Obj("RemoveNode", {"target": target}), root)
         if not after_remove.ok:
@@ -1100,20 +979,20 @@ def _apply_one(op: Obj, root: Node) -> ApplyResult:
     if tag == "ReorderChildren":
         parent_id = _as_str(fields["parentId"])
         new_order = [_as_str(x) for x in _as_arr(fields["newOrder"])]
-        parent = _find(parent_id, root)
+        parent = find_node(root, parent_id)
         if parent is None:
             return _fail(PARENT_NOT_FOUND, f"Parent node '{parent_id}' not found in tree.")
-        children = _layout_children(parent)
-        if children is None:
+        siblings = ordered_children(parent)
+        if siblings is None:
             return _fail(CHILDLESS_KIND, f"Node '{parent_id}' (kind={parent.kind.tag}) has no children field.")
-        if sorted(c.id for c in children) != sorted(new_order):
+        if sorted(c.id for c in siblings) != sorted(new_order):
             return _fail(
                 ORDERING_MISMATCH,
                 f"ReorderChildren for '{parent_id}' did not list exactly the current child ids.",
             )
-        by_id = {c.id: c for c in children}
+        by_id = {c.id: c for c in siblings}
         reordered = [by_id[cid] for cid in new_order]
-        tree = _map(parent_id, lambda n: _with_layout_children(n, reordered), root)
+        tree = _map(parent_id, lambda n: with_ordered_children(n, reordered), root)
         assert tree is not None
         return _ok(tree)
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from ..charts import _string_of, _try_parse_day
 from ..model import Arr, Node, Obj, Value
+from ..ops.enumeration import slots
 from ..schema.decode import KNOWN_KINDS
 
 # ``_string_of`` / ``_try_parse_day`` are the LOWERING's own projections, imported
@@ -67,14 +68,12 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
 
     _check_inert_control(node, node.kind, f"{path}.kind", findings)
 
-    for child, child_path in _child_nodes(node.kind, f"{path}.kind"):
-        _walk(child, child_path, findings, seen_ids)
-
-    # fuaran#1812 -- the author-declared `fallback` is walked like any subtree,
-    # so NodeId uniqueness (8.1) holds across it.
-    fallback = node.extras.get("fallback")
-    if isinstance(fallback, Node):
-        _walk(fallback, f"{path}.fallback", findings, seen_ids)
+    # Every position the node holds another node in (the keyed walk): the kind's own
+    # children and arms, slot arguments, the `state` alternatives and the author-declared
+    # `fallback` (fuaran#1812), so NodeId uniqueness (8.1) and every rule hold across them.
+    for slot in slots(node):
+        child_path = path + "".join(f".{step}" for step in slot.address)
+        _walk(slot.node, child_path, findings, seen_ids)
 
 
 def _check_media_label(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:
@@ -686,20 +685,6 @@ def _check_field_rules(node: Node, kind: Obj, path: str, findings: list[Finding]
                 "which is what the rule slot is for",
             )
         )
-
-
-def _child_nodes(value: Value, path: str) -> list[tuple[Node, str]]:
-    """Find directly-nested ``Node`` values (e.g. layout ``children``)."""
-    out: list[tuple[Node, str]] = []
-    if isinstance(value, Node):
-        out.append((value, path))
-    elif isinstance(value, Arr):
-        for i, item in enumerate(value.items):
-            out.extend(_child_nodes(item, f"{path}.{i}"))
-    elif isinstance(value, Obj):
-        for key, field_value in value.fields.items():
-            out.extend(_child_nodes(field_value, f"{path}.{key}"))
-    return out
 
 
 # ── FUARAN069 — the inert-control rule (Phase 426 write-back doctrine) ───────

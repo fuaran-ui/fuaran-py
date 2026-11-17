@@ -248,16 +248,14 @@ def _children_ids(node: Node) -> list[Node]:
     return [c for c in children.items if isinstance(c, Node)]
 
 
-# ── non-layout container interiors (Modal / ScrollArea) ──────────────────────
+# ── floored container interiors (Modal / ScrollArea) ─────────────────────────
 #
-# Modal and ScrollArea carry a `children` field but are NOT layout kinds — the
-# apply engine addresses no node *inside* them structurally (see
-# ops/apply.py LAYOUT_KINDS). The diff's traversal MUST stay bounded to apply's
-# addressable set: descending into a Modal and emitting an op targeting its
-# interior would break the round-trip law (the target is unaddressable —
-# NodeNotFound). Instead a Modal/ScrollArea-interior change escalates to the
-# coarse-but-correct EditNode floor at the container itself (an addressable
-# layout child). Mirrors the Go producer's layoutKinds-bounded recursion.
+# Modal and ScrollArea carry an ordered `children` list, and the apply engine
+# addresses a node inside them like any container's child (fuaran#2663). This
+# producer still floors a change inside one to EditNode at the container, because
+# the shared diff goldens pin that script for this host (`ops/diff.py`
+# `_FLOORED_CONTAINERS`); recursing there is a change to the shared golden first.
+# Both scripts round-trip; the floor is depth, never correctness.
 
 
 def _md(node_id: str, text: str) -> Node:
@@ -270,13 +268,7 @@ def _box_of(child: Node) -> Node:
 
 @corpus_required
 def test_modal_interior_change_round_trips() -> None:
-    """A text change inside a Modal round-trips (floored to EditNode at the Modal).
-
-    Regression for the traversal/addressing mismatch: the diff's structural-child
-    traversal once treated any `children`-bearing node as addressable, descended
-    into the Modal, and emitted `UpdateProp target=md` — which `apply` could not
-    locate (NodeNotFound), breaking `fold(apply, before, diff(before, after))`.
-    """
+    """A text change inside a Modal round-trips, floored to EditNode at the Modal."""
     modal_before = Node(
         "modal",
         Obj(
@@ -303,7 +295,7 @@ def test_modal_interior_change_round_trips() -> None:
     )
     before, after = _box_of(modal_before), _box_of(modal_after)
     ops = diff(before, after)
-    # The op targets the addressable Modal, never the unaddressable interior `md`.
+    # The op targets the Modal (the floor), not the interior `md`.
     assert all(op.fields.get("target") != "md" for op in ops)
     assert any(op.tag == "EditNode" and op.fields.get("target") == "modal" for op in ops)
     _round_trips(before, after)

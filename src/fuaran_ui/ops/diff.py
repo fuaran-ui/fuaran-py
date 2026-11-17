@@ -50,46 +50,40 @@ from ..canonical import encode_value
 from ..model import Arr, Node, Obj, Value
 from ..result import Ok
 from ..schema.decode import _STYLE_DEFAULTS
-from .apply import _FIELDS, _NOT_SUPPORTED, LAYOUT_KINDS, apply
+from .apply import _FIELDS, _NOT_SUPPORTED, apply
+from .enumeration import STRUCTURAL, children, with_ordered_children
 
 # ── facet-isolation helpers (closure-safe canonical probes) ──────────────────
 #
-# **Traversal must not exceed apply's addressable set.** A ``children`` array is a
-# *structural* (op-addressable) child list only for the ``LAYOUT_KINDS`` — the same
-# six kinds ``apply``'s ``_layout_children`` / ``_child_slots`` descend into. Other
-# kinds carry a ``children`` field too (``Modal`` / ``ScrollArea``), but the apply
-# engine has no structural-child surface for those, so a node inside one is *not*
-# addressable by ``UpdateProp`` / ``RemoveNode`` / ``InsertChild`` / recursion. If the
-# diff descended into a ``Modal`` and emitted an op targeting its interior, the apply
-# engine could not locate the target and the round-trip law would break
-# (``NodeNotFound``). So both the traversal (``_children``) and the kind-change probe
-# (``_childless_kind``, which treats ``children`` as a neutralisable structural facet)
-# bound to ``LAYOUT_KINDS``. A ``Modal``/``ScrollArea``-interior change then reads as a
-# *kind* change and escalates to the coarse-but-correct ``EditNode`` floor at the Modal
-# itself (an addressable layout child) — carrying its whole new subtree. This mirrors
-# the Go producer's `layoutKinds`-bounded recursion (the Rust producer instead extends
-# *apply* to address Modal/ScrollArea; the Python apply engine addresses the six, so the
-# Python producer bounds to match — self-consistency is the contract, not host parity).
+# **Traversal never exceeds apply's addressable set**: the diff recurses through the
+# STRUCTURAL child lists of :mod:`~fuaran_ui.ops.enumeration`, the surface the apply
+# engine's structural ops edit, so every op it emits targets a node apply can locate.
+#
+# One bound is this producer's own granularity, and it is DECLARED rather than derived:
+# a change inside a ``Modal`` or a ``ScrollArea`` takes the ``EditNode`` floor at the
+# container, carrying its whole new kind, instead of recursing into its ordered list.
+# The cross-host diff goldens pin exactly that script for this host (the
+# ``modal-interior-change`` / ``scrollarea-interior-change`` entries of the shared
+# golden family's ``divergent`` section), so recursing there is a change to the shared
+# golden first. Both scripts satisfy the round-trip law; only the depth differs.
+_FLOORED_CONTAINERS = frozenset({"Modal", "ScrollArea"})
 
 
 def _children(node: Node) -> list[Node]:
-    """The ordered structural (layout) child list; ``[]`` for a kind apply does not
-    address structurally (a non-``LAYOUT_KINDS`` kind, or a childless one)."""
-    if node.kind.tag not in LAYOUT_KINDS:
+    """The structural child list the diff recurses through; ``[]`` for a childless kind
+    and for a container the diff floors (:data:`_FLOORED_CONTAINERS`)."""
+    if node.kind.tag in _FLOORED_CONTAINERS:
         return []
-    children = node.kind.fields.get("children")
-    if isinstance(children, Arr):
-        return [c for c in children.items if isinstance(c, Node)]
-    return []
+    return children(node, STRUCTURAL)
 
 
 def _childless_kind(kind: Obj) -> Obj:
-    """The kind with its structural ``children`` list emptied (isolates the kind-own
-    fields). Only a ``LAYOUT_KINDS`` ``children`` is structural; on any other kind the
+    """The kind with the structural child list the diff recurses through emptied (isolates
+    the kind-own fields). On a floored container, or a kind holding no ordered list, the
     ``children`` field is kind-own content and stays part of the kind-change probe."""
-    if kind.tag in LAYOUT_KINDS and isinstance(kind.fields.get("children"), Arr):
-        return Obj(kind.tag, {**kind.fields, "children": Arr([])})
-    return kind
+    if kind.tag in _FLOORED_CONTAINERS:
+        return kind
+    return with_ordered_children(Node("", kind, {}), []).kind
 
 
 def _kind_canonical(node: Node) -> str:

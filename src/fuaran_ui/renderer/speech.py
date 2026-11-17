@@ -52,6 +52,7 @@ from typing import Final, Literal
 
 from ..limits import MAX_NODE_DEPTH
 from ..model import Arr, Node, Obj, Value
+from ..ops.enumeration import KIND_HELD, children
 from . import markdown as _markdown
 from .bindings import (
     BindingSourcesLike,
@@ -354,28 +355,6 @@ def _arr_len(value: Value | None) -> int:
     return len(value.items) if isinstance(value, Arr) else 0
 
 
-def _structural_children(node: Node) -> list[Node]:
-    """The one containment relation omissions are measured over — the reference host's
-    ``StructuralQuery.children``: every node a kind holds, taken or not."""
-    kind = node.kind
-    fields = kind.fields
-    tag = kind.tag
-    if tag in ("Box", "SplitPanel", "Tabs", "Stepper", "SummaryList", "Disclosure", "Modal", "ScrollArea"):
-        return _child_nodes(fields)
-    raw: list[Value | None]
-    if tag == "ErrorBoundary":
-        raw = [fields.get("child"), fields.get("fallback")]
-    elif tag == "Switch":
-        cases = fields.get("cases")
-        raw = [c.fields.get("child") for c in cases.items if isinstance(c, Obj)] if isinstance(cases, Arr) else []
-        raw.append(fields.get("default"))
-    elif tag == "FragmentDecl":
-        raw = [fields.get("body")]
-    else:
-        return []
-    return [n for v in raw if (n := _as_node(v)) is not None]
-
-
 class _Projector:
     """One projection pass: the sources, the fragment registry, and the two accumulators."""
 
@@ -439,7 +418,7 @@ class _Projector:
 
     def omit_subtree(self, reason: OmissionReason, decided_at: str, node: Node) -> None:
         self.omitted.append(SpeechOmission(node.id, node.kind.tag or "", reason, decided_at))
-        for child in _structural_children(node):
+        for child in children(node, KIND_HELD):
             self.omit_subtree(reason, decided_at, child)
 
     # ── the walk ────────────────────────────────────────────────────────────
@@ -511,7 +490,7 @@ class _NodeWalk:
         """An announced-only node: the announcement, and every structural descendant
         reported as inside it."""
         spoke = self.say_self(own)
-        for child in _structural_children(self.node):
+        for child in children(self.node, KIND_HELD):
             self.p.omit_subtree(OmissionReason.INSIDE_ANNOUNCED, self.node.id, child)
         if not spoke:
             self.p.omit_one(OmissionReason.NOTHING_SAYABLE, self.node)

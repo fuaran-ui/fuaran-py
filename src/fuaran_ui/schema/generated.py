@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "c694bd27beacf7d3f6a9c794ec15f03e02b78ca98bbbe56333b648410d14ef19"
+IDL_SHA256 = "243a7fc91cf5a737aea3ca3b6c6e6b6a7eb4cb46aa96eaa771ba1b62d44f3cef"
 IDL_VERSION = 1
 
 

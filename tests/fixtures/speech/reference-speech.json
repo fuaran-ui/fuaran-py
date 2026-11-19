@@ -2228,6 +2228,107 @@
         }
       ]
     },
+    "frag-stdlib-parameter-panel-ref-mixed": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-parameter-panel-ref-mixed",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-parameter-panel-ref-mixed"
+        }
+      ]
+    },
+    "frag-stdlib-parameter-panel-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-parameter-panel-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-parameter-panel-ref"
+        }
+      ]
+    },
+    "frag-stdlib-parameter-panel": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-parameter-panel",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-parameter-panel"
+        },
+        {
+          "nodeId": "parameter-panel",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-parameter-panel"
+        },
+        {
+          "nodeId": "parameter-panel-heading",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-parameter-panel"
+        },
+        {
+          "nodeId": "parameter-panel-controls",
+          "kind": "Filters",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-parameter-panel"
+        }
+      ]
+    },
+    "frag-stdlib-scenario-comparison-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-scenario-comparison-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-scenario-comparison-ref"
+        }
+      ]
+    },
+    "frag-stdlib-scenario-comparison": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-scenario-comparison",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-scenario-comparison"
+        },
+        {
+          "nodeId": "scenario-comparison",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-scenario-comparison"
+        },
+        {
+          "nodeId": "scenario-comparison-heading",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-scenario-comparison"
+        },
+        {
+          "nodeId": "scenario-comparison-grid",
+          "kind": "DataGrid",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-scenario-comparison"
+        }
+      ]
+    },
     "frag-stdlib-section-header-ref": {
       "text": "",
       "ssml": "<speak>\n</speak>\n",

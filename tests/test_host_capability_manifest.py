@@ -247,7 +247,6 @@ CORPUS_UNEXERCISED: dict[str, str] = {
     ),
     "LocalFlushTrigger.OnSubmit": "no fixture writes it in a Binding.Local flushOn slot",
     "Scalar.Bool": _NO_HOLE_FIXTURE,
-    "Scalar.Float": _NO_HOLE_FIXTURE,
 }
 
 

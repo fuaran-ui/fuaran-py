@@ -2907,6 +2907,51 @@
       "description": "FragmentRef (stdlib 'metric-card' — a representative application)"
     },
     {
+      "id": "frag-stdlib-parameter-panel",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-parameter-panel.json",
+      "expectedFile": "nodes/frag-stdlib-parameter-panel.json",
+      "description": "FragmentDecl (stdlib 'parameter-panel' — One to four controls, each writing the filter key a pipeline's parameter of the same name reads: a bounded number or a choice.)"
+    },
+    {
+      "id": "frag-stdlib-parameter-panel-ref",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-parameter-panel-ref.json",
+      "expectedFile": "nodes/frag-stdlib-parameter-panel-ref.json",
+      "description": "FragmentRef (stdlib 'parameter-panel' — a representative application)"
+    },
+    {
+      "id": "frag-stdlib-parameter-panel-ref-mixed",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-parameter-panel-ref-mixed.json",
+      "expectedFile": "nodes/frag-stdlib-parameter-panel-ref-mixed.json",
+      "description": "FragmentRef (stdlib 'parameter-panel' — a number and a choice parameter)"
+    },
+    {
+      "id": "frag-stdlib-scenario-comparison",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-scenario-comparison.json",
+      "expectedFile": "nodes/frag-stdlib-scenario-comparison.json",
+      "description": "FragmentDecl (stdlib 'scenario-comparison' — One model run under two parameter sets, side by side with their difference — every figure computed by the pipeline.)"
+    },
+    {
+      "id": "frag-stdlib-scenario-comparison-ref",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-scenario-comparison-ref.json",
+      "expectedFile": "nodes/frag-stdlib-scenario-comparison-ref.json",
+      "description": "FragmentRef (stdlib 'scenario-comparison' — a representative application)"
+    },
+    {
       "id": "frag-stdlib-section-header",
       "kind": "node-round-trip",
       "since": "0.39.0",

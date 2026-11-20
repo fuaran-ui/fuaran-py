@@ -1,7 +1,7 @@
 {
   "version": 1,
   "$id": "https://fuaran.dev/wire-format/v1/render-fidelity.json",
-  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. Beside kinds, traits declares the obligations owed for a member that rides the node envelope rather than any one kind - a trait is identified by the wire path of the member it governs, names the kinds it applies to, and draws its claim ids from the same closed obligationVocabulary, so a host reports an unchecked trait claim exactly as it reports an unchecked kind claim. Each kind also declares its SPEECH ruling: what a speech projection says for the kind when a node carries no accessibility.speak of its own, drawn from the closed speechClasses (spoken, derived, announced-only, omitted) with the per-kind derivation as a note. See WIRE_FORMAT.md 13.",
+  "description": "Per-NodeKind render-fidelity declaration for the Fuaran UI wire format. For each canonical kind.$type: what the wire carries (source), what the parity-checked render pins (fallback), and what, if anything, is declared client-only rich. Generated from Fuaran.UI.RenderFidelity; it transcribes the shipped fidelity contracts and introduces no wire or renderer behaviour. A consumer deriving per-node fidelity badges reads this rather than hand-annotating. Each kind also declares the checkable render obligations it owes, drawn from the closed obligationVocabulary and bound to the spec section that states each one; a host render suite asserts every obligation for the kinds it renders and REPORTS any it cannot check, because not checked is not passed. Each kind also declares its INTRINSIC ARIA: the roles and live regions the renderer emits whatever the node's accessibility trait says, with the condition where the emission turns on the kind's own spec and the tier that emits it. A consumer reads that to know whether a kind is already announced before authoring a trait it does not need; an empty array means the kind announces nothing of itself. Beside kinds, traits declares the obligations owed for a member that rides the node envelope rather than any one kind - a trait is identified by the wire path of the member it governs, names the kinds it applies to, and draws its claim ids from the same closed obligationVocabulary, so a host reports an unchecked trait claim exactly as it reports an unchecked kind claim. Each kind also declares its SPEECH ruling: what a speech projection says for the kind when a node carries no accessibility.speak of its own, drawn from the closed speechClasses (spoken, derived, announced-only, omitted) with the per-kind derivation as a note. Each kind also declares its ADAPTIVE CARD ruling: what a projection to an Adaptive Card (schema 1.4) does with the kind, drawn from the closed adaptiveCardClasses (mapped, structural, open-live, flatten-to-text, omitted), with the card element types the node itself may emit and the per-kind rule as a note. See WIRE_FORMAT.md 13.",
   "tiers": [
     {
       "tier": "source",
@@ -32,6 +32,28 @@
     {
       "class": "omitted",
       "meaning": "nothing is said, and the node is reported in the projection's omission list rather than dropped"
+    }
+  ],
+  "adaptiveCardClasses": [
+    {
+      "class": "mapped",
+      "meaning": "the kind projects to its Adaptive Card counterpart"
+    },
+    {
+      "class": "structural",
+      "meaning": "the node lays out its children in a Container or ColumnSet, and the children project"
+    },
+    {
+      "class": "open-live",
+      "meaning": "a labelled Action.OpenUrl to the live surface, or a labelled note when none is declared; never a half-working control"
+    },
+    {
+      "class": "flatten-to-text",
+      "meaning": "the content survives as literal text in a RichTextBlock; the form does not"
+    },
+    {
+      "class": "omitted",
+      "meaning": "nothing is emitted, and the node is named in the projection's degradation list"
     }
   ],
   "obligationVocabulary": [
@@ -157,6 +179,13 @@
         "class": "derived",
         "note": "the resolved label, as one short utterance"
       },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "the label as a bold TextRun coloured by the variant; the pill shape has no card form"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -174,6 +203,14 @@
       "speech": {
         "class": "derived",
         "note": "no utterance of its own beyond a Card's heading (emphasised); its children speak in authored order"
+      },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "Container",
+          "ColumnSet"
+        ],
+        "note": "a Container; a horizontal flex row is a ColumnSet, a grid or masonry layout is a Container of ColumnSet rows; a Card gains the emphasis style and its heading"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -195,6 +232,14 @@
         "class": "announced-only",
         "note": "'Button: <label>' - the declared action is never described as done"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "an ActionSet holding one action: Navigate to an absolute allowed URL is Action.OpenUrl, an action the backend can run is Action.Execute with a declared verb, a client-only action is open-live; a disabled button is a note"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -212,6 +257,13 @@
       "speech": {
         "class": "spoken",
         "note": "the heading (emphasised) then the body, as authored"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Container"
+        ],
+        "note": "a Container styled by tone, holding the heading (bold) and the body"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -235,6 +287,14 @@
         "class": "announced-only",
         "note": "'Chart: <title>' - the series are not read out; `speak` is how an author supplies the spoken summary"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a chart is drawn as SVG, which neither Teams nor Outlook renders in a card image; the title is the link text"
+      },
       "contract": "Phase 526; docs/SSR.md (Visualisation)"
     },
     {
@@ -256,6 +316,13 @@
       "speech": {
         "class": "announced-only",
         "note": "'Code block (<language>)[: <name>], <n> lines' - source text read aloud is noise rather than content"
+      },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "the source as one monospace TextRun; there is no highlighting pass and no copy control"
       },
       "contract": "Phases 290, 1854; WIRE_FORMAT.md 3.2; docs/SSR.md (deterministic-render + client-only-enhancement contract); docs/CODE-HIGHLIGHT.md"
     },
@@ -284,6 +351,14 @@
       "speech": {
         "class": "announced-only",
         "note": "'Component: <accessible label, else the component id>'"
+      },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a host renderer's output is outside this projection's audit, so it is linked, not embedded"
       },
       "contract": "Phase 141; Phase 1108; docs/SSR.md (custom-renderer registry); WIRE_FORMAT.md 25; SANITIZATION.md"
     },
@@ -333,6 +408,15 @@
         "class": "announced-only",
         "note": "'Table[: <name>], <n> rows, <m> columns' for the static-rows form, else 'Table[: <name>]'; the cells are not read out"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Container",
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "the staticRows form is a Container of ColumnSet rows under a bold header row (Table is a 1.5 element Outlook does not render); the row ceiling is the host limits' MaxGridRows, refused before projection; the client-library form is open-live"
+      },
       "contract": "Phase 393; Phase 1701; Phase 2473; Phase 2474; docs/SSR.md (Visualisation, sortable rendered tables); WIRE_FORMAT.md 3.6.24"
     },
     {
@@ -350,6 +434,13 @@
       "speech": {
         "class": "derived",
         "note": "the heading (emphasised) then its children, always - a spoken summary that skips a closed section is a lie about what it contains"
+      },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "Container"
+        ],
+        "note": "always expanded: the heading (bold), then the children; a card that hides a section silently loses it"
       },
       "contract": "docs/SSR.md (Layout.Disclosure)"
     },
@@ -369,6 +460,14 @@
         "class": "announced-only",
         "note": "'Diagram: <title>', then the description where one is declared"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "inline SVG, for the same reason as Chart"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -387,6 +486,11 @@
         "class": "derived",
         "note": "the protected child speaks; the fallback is a client-runtime path and is reported as not taken"
       },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [],
+        "note": "the protected child projects; the fallback is a client-runtime path, reported as not taken"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -404,6 +508,14 @@
       "speech": {
         "class": "derived",
         "note": "'<label>: <value>', then the help text"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "FactSet",
+          "RichTextBlock"
+        ],
+        "note": "a FactSet row (adjacent Facts and LabelValueRows share one FactSet); help text follows as a subtle line"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -441,6 +553,14 @@
       "speech": {
         "class": "announced-only",
         "note": "'File upload: <label>'"
+      },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a card cannot carry a file"
       },
       "contract": "Phase 1115; Phase 1548; WIRE_FORMAT.md 3.6.10 + 3.6.23; docs/SSR.md (Input - rendered inert)"
     },
@@ -481,6 +601,14 @@
         "class": "announced-only",
         "note": "'Filters[: <name>], <n> fields'"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "filters re-query a live view, and the card is inert after projection"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -520,6 +648,15 @@
         "class": "announced-only",
         "note": "'Form[: <name>], <n> fields' - a form is never filled in by voice here"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Container",
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a Container of Input elements (Text, Number, Date, Toggle, ChoiceSet), then an ActionSet whose Action.Execute submits them; a field with no faithful input is substituted and declared"
+      },
       "contract": "docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -537,6 +674,11 @@
       "speech": {
         "class": "omitted",
         "note": "a template declaration says nothing, here as everywhere"
+      },
+      "adaptiveCard": {
+        "class": "omitted",
+        "elements": [],
+        "note": "a template declaration paints nothing, here as everywhere"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -556,6 +698,13 @@
         "class": "derived",
         "note": "expanded against the tree's fragment registry, the body speaks; an unresolved reference is reported"
       },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "expanded against the tree's fragment registry; an unresolved reference is a labelled note"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -573,6 +722,13 @@
       "speech": {
         "class": "spoken",
         "note": "the text, emphasised, with a long pause after - a heading announces a section"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "a bold TextRun sized by level (1 extraLarge, 2 large, 3 medium, 4 to 6 default)"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -598,6 +754,11 @@
       "speech": {
         "class": "derived",
         "note": "the icon's declared label, else its accessible label; an icon with neither is decorative and is reported as omitted"
+      },
+      "adaptiveCard": {
+        "class": "omitted",
+        "elements": [],
+        "note": "a card has no icon font, and the name alone would paint as a word; the icon is reported, not drawn"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -648,6 +809,14 @@
         "class": "derived",
         "note": "'Image: <alt>'; an EMPTY alt declares the image decorative, and it is reported as omitted"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Image",
+          "RichTextBlock"
+        ],
+        "note": "an Image at an absolute allowed URL with the alt as altText, then the caption; a refused or relative source degrades to the alt text"
+      },
       "contract": "Phase 1079; WIRE_FORMAT.md 3.6.5; docs/SSR.md (expandable images)"
     },
     {
@@ -667,6 +836,14 @@
       "speech": {
         "class": "derived",
         "note": "'<label>: <value>', the value formatted through the declared format"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "FactSet",
+          "RichTextBlock"
+        ],
+        "note": "a FactSet row, the value formatted through the shared projection; adjacent rows share one FactSet"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour); Phase 2499"
     },
@@ -688,6 +865,13 @@
         "class": "derived",
         "note": "'Link: <label>'"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "a TextRun whose selectAction is Action.OpenUrl at the allowed destination; a refused or relative destination is plain text"
+      },
       "contract": "Phase 812; WIRE_FORMAT.md 3.2 (link protection); docs/SSR.md (protected email links)"
     },
     {
@@ -705,6 +889,13 @@
       "speech": {
         "class": "spoken",
         "note": "one utterance per item, numbered for an ordered list"
+      },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "one literal line per item, numbered or bulleted; a card has no list element outside markdown"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -728,6 +919,14 @@
         "class": "announced-only",
         "note": "'Map[: <name>]' - the markers are not read out"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a client map library draws it; the server has markers, not a picture"
+      },
       "contract": "docs/SSR.md (Visualisation)"
     },
     {
@@ -750,6 +949,13 @@
         "class": "spoken",
         "note": "the one deterministic GFM render, read as its text: markup removed, entities decoded, one utterance per block"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "the one deterministic GFM render, one RichTextBlock per block: bold, italic, strikethrough and code become TextRun styles, a link at an allowed absolute destination keeps an Action.OpenUrl, an image becomes its alt text"
+      },
       "contract": "Phases 292, 293; WIRE_FORMAT.md 14; docs/MARKDOWN.md"
     },
     {
@@ -771,6 +977,13 @@
       "speech": {
         "class": "announced-only",
         "note": "'Formula[: <name>]' - LaTeX read aloud is not mathematics; `speak` supplies a reading"
+      },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "the LaTeX source in a monospace TextRun; readable source beats invisible mathematics"
       },
       "contract": "Phases 293, 658; WIRE_FORMAT.md 3.2; docs/SSR.md; docs/MATH-DEGRADATION.md"
     },
@@ -834,6 +1047,15 @@
         "class": "announced-only",
         "note": "'Video: <label>' or 'Audio: <label>'"
       },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Media",
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a Media element when the source is an absolute allowed URL whose extension names a MIME type, with the poster and the label as altText; otherwise open-live"
+      },
       "contract": "Phase 1076; WIRE_FORMAT.md 3.6.6; docs/SSR.md (media)"
     },
     {
@@ -872,6 +1094,14 @@
         "class": "announced-only",
         "note": "'Embedded view: <title>'"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a third-party browsing context has no card form; the title is the link text"
+      },
       "contract": "Phase 1111; WIRE_FORMAT.md 3.6.8, 19.1; docs/SSR.md (embed)"
     },
     {
@@ -899,6 +1129,13 @@
       "speech": {
         "class": "derived",
         "note": "'<label>: <value>' with the value through its format, then 'trend <trend>' through the trend format, then the subtext"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "Container"
+        ],
+        "note": "a Container: the label (subtle), the formatted value (large, bold), the trend and comparisons, then the subtext"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour); Phase 2490; Phase 2499"
     },
@@ -936,6 +1173,14 @@
         "class": "announced-only",
         "note": "'Dialog: <heading>' - an overlay's content is not read into the page"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "an overlay has no meaning in a card"
+      },
       "contract": "Phase 289; Phase 1119; WIRE_FORMAT.md 3.2 + 3.6.11; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -954,6 +1199,14 @@
         "class": "announced-only",
         "note": "'Embedded view[: <name>]' - the guest tree attaches client-side"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "the guest tree attaches client-side; there is nothing to project"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -971,6 +1224,13 @@
       "speech": {
         "class": "derived",
         "note": "'<label>: <n> percent', or 'In progress' when indeterminate"
+      },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "'<label>: <n>%', or 'in progress' when indeterminate"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -992,6 +1252,13 @@
         "class": "derived",
         "note": "no utterance of its own; its children speak in full"
       },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "Container"
+        ],
+        "note": "a Container; a card has no clipping, and hidden content is lost content"
+      },
       "contract": "Phase 289; WIRE_FORMAT.md 3.2; docs/SSR.md (overlay + overflow render-fidelity contract)"
     },
     {
@@ -1012,6 +1279,14 @@
         "class": "announced-only",
         "note": "'Selection: <label>'"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a selection outside a Form has no submit to carry it, and an input that reaches nothing is a half-working control"
+      },
       "contract": "Phase 291; docs/SSR.md (Input - rendered inert)"
     },
     {
@@ -1029,6 +1304,11 @@
       "speech": {
         "class": "omitted",
         "note": "a loading placeholder describes a state a script is never read in"
+      },
+      "adaptiveCard": {
+        "class": "omitted",
+        "elements": [],
+        "note": "a loading placeholder describes a state a delivered card is never in"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -1062,6 +1342,14 @@
         "class": "announced-only",
         "note": "'Trend line[: <name>]' - the points are not read out"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "the polyline is drawn client-side"
+      },
       "contract": "Phase 644 4k; Phase 1098; Phase 1704; WIRE_FORMAT.md 24.7; docs/SSR.md (Display.Sparkline)"
     },
     {
@@ -1079,6 +1367,13 @@
       "speech": {
         "class": "derived",
         "note": "no utterance of its own; the panes speak in authored order"
+      },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "ColumnSet"
+        ],
+        "note": "a two-column ColumnSet at the declared weights"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -1100,6 +1395,14 @@
         "class": "announced-only",
         "note": "'Step-by-step section[: <name>], <n> steps'"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "step-by-step navigation needs the runtime"
+      },
       "contract": "docs/SSR.md (Layout)"
     },
     {
@@ -1118,6 +1421,13 @@
         "class": "derived",
         "note": "the heading (emphasised) then its children"
       },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [
+          "Container"
+        ],
+        "note": "a Container: the heading (bold), then the children, whose adjacent Facts and LabelValueRows share one FactSet"
+      },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
     {
@@ -1135,6 +1445,11 @@
       "speech": {
         "class": "derived",
         "note": "the case matching the resolved selector, else the default; every other case is reported as not taken"
+      },
+      "adaptiveCard": {
+        "class": "structural",
+        "elements": [],
+        "note": "the case matching the resolved selector, else the default; the others are reported as not taken"
       },
       "contract": "WIRE_FORMAT.md 3.2; docs/SSR.md (per-kind server behaviour)"
     },
@@ -1172,6 +1487,14 @@
         "class": "announced-only",
         "note": "'Tabbed section[: <name>], <n> tabs' - reading only the active panel would be a lie about how much the section contains"
       },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "projecting only the active panel would be a lie about how much the section holds, so the card links to it"
+      },
       "contract": "docs/SSR.md (Layout.Tabs)"
     },
     {
@@ -1198,6 +1521,13 @@
       "speech": {
         "class": "spoken",
         "note": "an OPEN toast reads its message; a closed one is reported as omitted, never read"
+      },
+      "adaptiveCard": {
+        "class": "flatten-to-text",
+        "elements": [
+          "Container"
+        ],
+        "note": "an OPEN toast is a Container styled by tone holding the message; a closed one is omitted and reported"
       },
       "contract": "Phase 289; WIRE_FORMAT.md 3.2 (Toast vs Action.Notify); docs/SSR.md"
     },
@@ -1245,6 +1575,14 @@
       "speech": {
         "class": "announced-only",
         "note": "'Hierarchy[: <name>]' - a listener can expand nothing"
+      },
+      "adaptiveCard": {
+        "class": "open-live",
+        "elements": [
+          "ActionSet",
+          "RichTextBlock"
+        ],
+        "note": "a card can toggle nothing, so a faithful hierarchy would have to show every closed branch"
       },
       "contract": "Phase 1120; WIRE_FORMAT.md 3.6.12, 21.5; docs/SSR.md (the Tree server floor)"
     }

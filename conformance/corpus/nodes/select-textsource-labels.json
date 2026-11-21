@@ -1,0 +1,1 @@
+{"id":"select-textsource-labels","kind":{"$type":"Select","label":"Region","source":{"$type":"Static","value":[{"label":"UK","value":"uk"},{"label":{"$type":"Bound","binding":{"$type":"State","defaultValue":"France","key":"regionLabelFr"}},"value":"fr"},{"label":{"$type":"I18n","args":{},"key":"region.de"},"value":"de"}]},"value":{"$type":"Static","value":"uk"}}}

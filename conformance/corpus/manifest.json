@@ -2727,6 +2727,15 @@
       "description": "Input/Form (Phase 1121 — Tokens: allowFreeText false over a static suggestion source, tokens in reader order)"
     },
     {
+      "id": "form-unvalued-textarea-ranges",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/form-unvalued-textarea-ranges.json",
+      "expectedFile": "nodes/form-unvalued-textarea-ranges.json",
+      "description": "Input/Form (Phase 2811 — TextArea, RangedNumber and Range with no value)"
+    },
+    {
       "id": "format-bindings",
       "kind": "node-round-trip",
       "since": "0.3.0",
@@ -3465,6 +3474,15 @@
       "description": "Visualisation/Map"
     },
     {
+      "id": "map-textsource-labels",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/map-textsource-labels.json",
+      "expectedFile": "nodes/map-textsource-labels.json",
+      "description": "Visualisation/Map (Phase 2811 — Bound and I18n marker labels beside a literal)"
+    },
+    {
       "id": "markdown-1",
       "kind": "node-round-trip",
       "since": "0.3.0",
@@ -3895,6 +3913,15 @@
       "inputFile": "nodes/select-option-groups-remainder.json",
       "expectedFile": "nodes/select-option-groups-remainder.json",
       "description": "Input/Select (Phase 2571 — option groups, an ungrouped remainder)"
+    },
+    {
+      "id": "select-textsource-labels",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/select-textsource-labels.json",
+      "expectedFile": "nodes/select-textsource-labels.json",
+      "description": "Input/Select (Phase 2811 — Bound and I18n option labels beside a literal)"
     },
     {
       "id": "shared-source-seeded-pair",

@@ -15,6 +15,17 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — the option and marker labels are `TextSource` in the IDL (Phase 2811)
+
+- The regenerated structural layer (`fuaran_ui.schema.generated`) types `SelectOption.label` and `MapMarker.label` as
+  `TextSource`, as the corpus `idl.json` now does (WIRE_FORMAT §5's ruling, the label half of the announced 0.105.0
+  cut, Phase 2303). The dataclasses already took a `TextSource` (a bare `str` coerced to `LiteralText`), so no
+  authoring call changes; a `Bound` or `I18n` label round-trips, pinned by the corpus vectors
+  `select-textsource-labels` and `map-textsource-labels`.
+- The bundled corpus snapshot re-syncs with the rider's three node vectors. The speech golden gains
+  `form-unvalued-textarea-ranges`; the two label vectors wait in `AWAITING_REFERENCE`, because the pinned reference
+  refuses a non-literal label.
+
 ### behavioural — `Select.multiple` is omit-at-default (fuaran#2413)
 
 - `Select.multiple` is `bool` (default `False`) and `fuaran.select(..., multiple=...)` takes a `bool`; `False`

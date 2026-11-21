@@ -458,7 +458,40 @@ def _authored() -> dict[str, t.UiNode]:
                 disabled=binding.state("selectBusy", False),
             )
         ),
+        # Phase 2811 — an option label is a `TextSource`: a `Bound` and an `I18n`
+        # label beside a literal one.
+        "select-textsource-labels": node.bare(
+            fuaran.select(
+                "select-textsource-labels",
+                label="Region",
+                source=binding.static(
+                    [
+                        t.SelectOption("UK", "uk"),
+                        t.SelectOption(t.Bound(binding.state("regionLabelFr", "France")), "fr"),
+                        t.SelectOption(binding.i18n("region.de"), "de"),
+                    ]
+                ),
+                value=binding.static("uk"),
+                on_change=False,
+            )
+        ),
         # ── Visualisation ────────────────────────────────────────────────────
+        # Phase 2811 — a marker label is a `TextSource`, as an option label is.
+        "map-textsource-labels": node.bare(
+            fuaran.map(
+                "map-textsource-labels",
+                source=binding.static(
+                    [
+                        t.MapMarker("London", 51.5, -0.12),
+                        t.MapMarker(t.Bound(binding.state("markerLabelParis", "Paris")), 48.86, 2.35),
+                        t.MapMarker(binding.i18n("city.berlin"), 52.52, 13.4),
+                    ]
+                ),
+                centre_latitude=51.5,
+                centre_longitude=2.35,
+                zoom=4,
+            )
+        ),
         "table-1": fuaran.table(
             "table-1",
             headers=["Term", "Definition"],

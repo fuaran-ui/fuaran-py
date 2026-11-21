@@ -62,7 +62,10 @@ Set-Location $PSScriptRoot
 #
 # The sibling `Fuaran-Program` launcher shipped the first half and returned a green `exit
 # $null` having built and tested nothing. Seeding it costs one line and removes the class.
-$LASTEXITCODE = 0
+# `global:` is load-bearing: a plain assignment makes a script-scope copy, and when this file
+# is run as `.\run.ps1` or `& ./run.ps1` every later check reads that copy and never the code
+# a native command set, so a failed stage reads as passed.
+$global:LASTEXITCODE = 0
 
 function Find-Python {
     # Resolve a real CPython 3.12+ interpreter. The bare `python` on PATH is often

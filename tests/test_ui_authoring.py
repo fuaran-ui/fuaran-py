@@ -458,17 +458,6 @@ def _authored() -> dict[str, t.UiNode]:
                 disabled=binding.state("selectBusy", False),
             )
         ),
-        # Phase 1962 — `multiple` is an ordinary optional field, emitted as
-        # authored: an explicit `False` is kept, never folded into the default.
-        "select-multiple-false": node.bare(
-            fuaran.select(
-                "select-multiple-false",
-                label="Size",
-                source=binding.static([t.SelectOption("Small", "s"), t.SelectOption("Large", "l")]),
-                value=binding.static("s"),
-                multiple=False,
-            )
-        ),
         # ── Visualisation ────────────────────────────────────────────────────
         "table-1": fuaran.table(
             "table-1",
@@ -2336,6 +2325,23 @@ def _expected(fixture_id: str) -> str:
 def test_authored_tree_is_byte_identical_to_corpus(fixture_id: str) -> None:
     tree = _authored()[fixture_id]
     assert encode(tree) == _expected(fixture_id)
+
+
+@corpus_required
+def test_an_explicit_single_select_writes_no_multiple_member() -> None:
+    """fuaran#2413 — `multiple` is omit-at-default: `multiple=False` encodes the lenient
+    fixture's canonical form, which carries no `multiple` key."""
+    tree = node.bare(
+        fuaran.select(
+            "select-multiple-false",
+            label="Size",
+            source=binding.static([t.SelectOption("Small", "s"), t.SelectOption("Large", "l")]),
+            value=binding.static("s"),
+            multiple=False,
+        )
+    )
+    text = (CORPUS_ROOT / "lenient" / "lenient-2413-select-multiple-false.expected.json").read_text(encoding="utf-8")
+    assert encode(tree) == text.rstrip("\n")
 
 
 def test_smart_constructors_inject_per_kind_aria() -> None:

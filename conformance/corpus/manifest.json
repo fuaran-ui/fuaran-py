@@ -1116,6 +1116,15 @@
       "description": "§3.6 — the declared-default rule over the enum-valued fields Phase 2300 declared: `Heading.variant` (`Standard`), `Badge.variant` (`Neutral`), `Button.variant` (`Secondary`), `Image.variant` (`Default`) and `SegmentedChoice.orientation` (`Horizontal`, which the decoder restored on absence since Phase 460 while the encoder still emitted it). Each written explicitly at its default re-encodes WITHOUT the member (Phase 2300)"
     },
     {
+      "id": "lenient-2413-select-multiple-false",
+      "kind": "lenient-accept",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "lenient/lenient-2413-select-multiple-false.json",
+      "expectedFile": "lenient/lenient-2413-select-multiple-false.expected.json",
+      "description": "§3.6 / §16 (Phase 2413) — `Select.multiple` is omit-at-default like every other defaulted boolean: an explicit `\"multiple\":false` decodes as a single-select and re-encodes without the member. It was the canonical node vector `nodes/select-multiple-false.json` (Phase 1962) until the canonical form lost its last per-kind exception"
+    },
+    {
       "id": "lenient-2451-panel-1-0",
       "kind": "lenient-accept",
       "since": "0.101.0",
@@ -3868,15 +3877,6 @@
       "inputFile": "nodes/select-1.json",
       "expectedFile": "nodes/select-1.json",
       "description": "Input/Select"
-    },
-    {
-      "id": "select-multiple-false",
-      "kind": "node-round-trip",
-      "since": "0.97.0",
-      "decoder": "node",
-      "inputFile": "nodes/select-multiple-false.json",
-      "expectedFile": "nodes/select-multiple-false.json",
-      "description": "Input/Select (Phase 1962 — an explicit multiple:false, emitted as authored)"
     },
     {
       "id": "select-option-groups",

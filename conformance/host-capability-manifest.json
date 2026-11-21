@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.12.0",
-  "corpusAuthority": "df91b09affd0a437c6b70baa2e9896fab995e54b",
+  "corpusAuthority": "d83dc96f5b63e56a0c106204be25387307473770",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -143,6 +143,7 @@
     "Action.AiTool",
     "Action.Call",
     "Action.Chain",
+    "Action.Choose",
     "Action.CommitLocal",
     "Action.Confirm",
     "Action.Dispatch",
@@ -152,6 +153,7 @@
     "Action.Notify",
     "Action.Print",
     "Action.ReadFileBody",
+    "Action.Require",
     "Action.SetState",
     "Action.WriteToClipboard",
     "Binding.Filter",

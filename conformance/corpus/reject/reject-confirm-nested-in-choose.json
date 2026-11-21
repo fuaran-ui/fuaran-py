@@ -1,0 +1,1 @@
+{"id":"b-confirm","kind":{"$type":"Button","label":"Delete","onClick":{"$type":"Confirm","prompt":"Delete this order?","onConfirm":{"$type":"Choose","condition":{"$type":"State","key":"order.paid"},"whenTrue":{"$type":"Confirm","prompt":"It is paid. Really?","onConfirm":{"$type":"Print"}}}}}}

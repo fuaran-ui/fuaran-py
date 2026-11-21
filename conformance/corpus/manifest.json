@@ -1818,6 +1818,15 @@
       "description": "Accessibility (Phase 1665 — a Transform-bound accessible name, read through the SCALAR path)"
     },
     {
+      "id": "action-choose",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/action-choose.json",
+      "expectedFile": "nodes/action-choose.json",
+      "description": "Phase 2107 — Input/Button whose Action.Choose carries both arms and the optional exit assertion"
+    },
+    {
       "id": "action-confirm",
       "kind": "node-round-trip",
       "since": "0.78.0",
@@ -1861,6 +1870,15 @@
       "inputFile": "nodes/action-navigate-target.json",
       "expectedFile": "nodes/action-navigate-target.json",
       "description": "Phase 1536 — Input/Button whose Action.Navigate names a Blank target (opened with noopener,noreferrer); `Self` is omitted, so this is the only shape that puts `target` on the wire"
+    },
+    {
+      "id": "action-require",
+      "kind": "node-round-trip",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "nodes/action-require.json",
+      "expectedFile": "nodes/action-require.json",
+      "description": "Phase 2107 — Input/Button whose Chain is guarded by Action.Require on a state flag, then an Action.Choose with no whenFalse and no exit"
     },
     {
       "id": "badge-1",
@@ -5094,6 +5112,16 @@
       "description": "chart range band whose pair runs from its upper value to its lower one — a band names an interval, and swapping the ends silently would draw one the author did not describe (Phase 1492)"
     },
     {
+      "id": "reject-choose-missing-whentrue",
+      "kind": "reject",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-choose-missing-whentrue.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.whenTrue",
+      "description": "Choose with no 'whenTrue' — the true arm is required and only 'whenFalse' may be absent (Phase 2107)"
+    },
+    {
       "id": "reject-color-value-not-hex",
       "kind": "reject",
       "since": "0.70.0",
@@ -5152,6 +5180,16 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.onClick.onConfirm.ops[1]",
       "description": "A Confirm inside a Confirm's continuation, reached through a Chain — confirmation is bounded at one question, and the check walks the DECODED continuation so a chain cannot hide the nesting (Phase 1537)"
+    },
+    {
+      "id": "reject-confirm-nested-in-choose",
+      "kind": "reject",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-confirm-nested-in-choose.json",
+      "expectedErrorCode": "WRONG_TYPE",
+      "expectedPath": "$.kind.onClick.onConfirm.whenTrue",
+      "description": "A Confirm inside a Choose arm inside a Confirm's continuation — the depth-one bound walks a selection's arms as it walks a Chain (Phase 2107)"
     },
     {
       "id": "reject-daterange-unordered",
@@ -6406,6 +6444,16 @@
         }
       ],
       "description": "a Rating `max` of `0` — refused rather than clamped. This is not a control with a bad number in it: a scale with no positions has nothing to draw, no `aria-valuemax` to announce and no keystroke that could change anything, so the document names a control that cannot exist. Note the asymmetry this vector pins: the SCALE is refused here and the VALUE is not, because a bound value is invisible to a decoder and a rule enforced only on literals would be two rules wearing one name"
+    },
+    {
+      "id": "reject-require-missing-condition",
+      "kind": "reject",
+      "since": "0.105.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-require-missing-condition.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.onClick.ops[0].condition",
+      "description": "Require with no 'condition' — a guard is never defaulted to holding (Phase 2107)"
     },
     {
       "id": "reject-setstate-value-and-valuefrom",

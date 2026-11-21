@@ -201,6 +201,8 @@ KNOWN_HOST_DIVERGENCES: dict[str, str] = {
 # below fails until it is dropped here.
 AWAITING_REFERENCE: dict[str, str] = {
     "grid-transform-int-bounds": "the int32 minimum, which the pinned reference refuses in an int column (Phase 2484)",
+    "action-choose": "Action.Choose, which the pinned reference predates (Phase 2107)",
+    "action-require": "Action.Require, which the pinned reference predates (Phase 2107)",
 }
 
 

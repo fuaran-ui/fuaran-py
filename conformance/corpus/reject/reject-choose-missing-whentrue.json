@@ -1,0 +1,1 @@
+{"id":"b-choose","kind":{"$type":"Button","label":"Go","onClick":{"$type":"Choose","condition":{"$type":"State","key":"ready"},"whenFalse":{"$type":"Print"}}}}

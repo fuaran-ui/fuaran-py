@@ -4625,6 +4625,196 @@
             "model",
             "scale"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "kmeans"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "expr": {
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "expr",
+                  "name"
+                ]
+              }
+            },
+            "groupBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "k": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            },
+            "maxIterations": {
+              "type": "integer"
+            },
+            "output": {
+              "type": "string",
+              "enum": [
+                "assignments",
+                "centres",
+                "summary"
+              ]
+            },
+            "restarts": {
+              "type": "integer"
+            },
+            "seed": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0|-?[1-9][0-9]{0,18})$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            },
+            "silhouette": {
+              "type": "boolean"
+            },
+            "standardise": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "$type",
+            "features",
+            "groupBy",
+            "k",
+            "maxIterations",
+            "output",
+            "restarts",
+            "seed",
+            "silhouette",
+            "standardise"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "bootstrap"
+            },
+            "aggregates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TransformAgg"
+              }
+            },
+            "cluster": {
+              "type": "string"
+            },
+            "groupBy": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "level": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "output": {
+              "type": "string",
+              "enum": [
+                "replicates",
+                "summary"
+              ]
+            },
+            "replicates": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            },
+            "seed": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(0|-?[1-9][0-9]{0,18})$"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "$param": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "$param"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "$type",
+            "aggregates",
+            "groupBy",
+            "output",
+            "replicates",
+            "seed"
+          ]
         }
       ]
     },

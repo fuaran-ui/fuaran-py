@@ -5500,6 +5500,46 @@
             "$type",
             "nodeId"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Choose"
+            },
+            "condition": {
+              "$ref": "#/$defs/Binding_json"
+            },
+            "exit": {
+              "$ref": "#/$defs/Binding_json"
+            },
+            "whenFalse": {
+              "$ref": "#/$defs/Action"
+            },
+            "whenTrue": {
+              "$ref": "#/$defs/Action"
+            }
+          },
+          "required": [
+            "$type",
+            "condition",
+            "whenTrue"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Require"
+            },
+            "condition": {
+              "$ref": "#/$defs/Binding_json"
+            }
+          },
+          "required": [
+            "$type",
+            "condition"
+          ]
         }
       ]
     },

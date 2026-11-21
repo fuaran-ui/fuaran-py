@@ -8332,6 +8332,104 @@
             }
           ],
           "tag": "Focus"
+        },
+        {
+          "annotations": {
+            "doc": "Phase 2107 — run `whenTrue` when `condition` resolves to the boolean\u000a`true` at dispatch time, otherwise `whenFalse` (absent is the empty\u000asequence). The bounded program core's SELECTION arm, spelled with its\u000aown name: an unresolved or errored condition halts the gesture before\u000aeither arm runs, and `exit`, when present, must hold after the true\u000aarm and fail after the false one.\u000a\u000aControl only: every effect an arm reaches is an existing case meeting\u000aits own gate. A host without the bounded loop refuses a gesture that\u000acarries this case, whole, rather than evaluating it a second way."
+          },
+          "fields": [
+            {
+              "annotations": {
+                "doc": "The binding resolved at dispatch time; the boolean `true` selects `whenTrue`."
+              },
+              "name": "condition",
+              "optionality": {
+                "$type": "required"
+              },
+              "type": {
+                "$type": "union",
+                "args": [
+                  {
+                    "$type": "json"
+                  }
+                ],
+                "name": "Binding"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The action run when the condition is `true`."
+              },
+              "name": "whenTrue",
+              "optionality": {
+                "$type": "required"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "Action"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The action run when the condition resolves to anything else. Omitted means nothing runs."
+              },
+              "name": "whenFalse",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "Action"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "An optional assertion checked after the arm: it must hold after `whenTrue` and fail after `whenFalse`."
+              },
+              "name": "exit",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [
+                  {
+                    "$type": "json"
+                  }
+                ],
+                "name": "Binding"
+              }
+            }
+          ],
+          "tag": "Choose"
+        },
+        {
+          "annotations": {
+            "doc": "Phase 2107 — the halting guard. `condition` resolves at dispatch time;\u000athe boolean `true` holds and changes nothing, and anything else halts\u000athe gesture, so nothing after the guard runs. The bounded program\u000acore's `Require`, spelled with its own name."
+          },
+          "fields": [
+            {
+              "annotations": {
+                "doc": "The binding that must resolve to `true` for the gesture to continue."
+              },
+              "name": "condition",
+              "optionality": {
+                "$type": "required"
+              },
+              "type": {
+                "$type": "union",
+                "args": [
+                  {
+                    "$type": "json"
+                  }
+                ],
+                "name": "Binding"
+              }
+            }
+          ],
+          "tag": "Require"
         }
       ],
       "name": "Action",

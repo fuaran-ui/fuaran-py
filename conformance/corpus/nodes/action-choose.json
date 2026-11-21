@@ -1,0 +1,1 @@
+{"id":"action-choose","kind":{"$type":"Button","label":"Toggle details","onClick":{"$type":"Choose","condition":{"$type":"State","defaultValue":false,"key":"details.open"},"exit":{"$type":"State","key":"details.open"},"whenFalse":{"$type":"SetState","key":"details.open","value":true},"whenTrue":{"$type":"SetState","key":"details.open","value":false}}}}

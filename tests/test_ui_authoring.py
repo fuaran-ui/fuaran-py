@@ -2274,6 +2274,23 @@ def _authored() -> dict[str, t.UiNode]:
                 ),
             )
         ),
+        # fuaran#2107 — the core's guard and selection, authored through the typed model.
+        "action-require": node.bare(
+            fuaran.button(
+                "action-require",
+                label="Submit order",
+                on_click=action.chain(
+                    [
+                        t.Require(binding.state("form.valid", None)),
+                        t.Choose(
+                            binding.state("order.express", False),
+                            action.set_state("shipping", "express"),
+                        ),
+                        action.call("/orders/submit", into=action.into_state("submit-result")),
+                    ]
+                ),
+            )
+        ),
         "composite-tabs-panels": node.bare(
             fuaran.tabs(
                 "composite-tabs-panels",

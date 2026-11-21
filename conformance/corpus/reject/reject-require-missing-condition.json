@@ -1,0 +1,1 @@
+{"id":"b-require","kind":{"$type":"Button","label":"Go","onClick":{"$type":"Chain","ops":[{"$type":"Require"},{"$type":"Print"}]}}}

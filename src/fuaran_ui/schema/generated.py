@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "243a7fc91cf5a737aea3ca3b6c6e6b6a7eb4cb46aa96eaa771ba1b62d44f3cef"
+IDL_SHA256 = "a8dd5c77f261a21c83e87122c4f3c3aa76939d858d358df60db940e6173d4057"
 IDL_VERSION = 1
 
 
@@ -1056,6 +1056,8 @@ UNION_CASES: dict[str, tuple[str, ...]] = {
         "Print",
         "Confirm",
         "Focus",
+        "Choose",
+        "Require",
     ),
     "Binding": (
         "Static",
@@ -1184,6 +1186,13 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
             F("onCancel", "optional", T_union_Action),
         ),
         "Focus": (F("nodeId", "required", T_str),),
+        "Choose": (
+            F("condition", "required", T_union_Binding_json),
+            F("whenTrue", "required", T_union_Action),
+            F("whenFalse", "optional", T_union_Action),
+            F("exit", "optional", T_union_Binding_json),
+        ),
+        "Require": (F("condition", "required", T_union_Binding_json),),
     },
     "Binding": {
         "Static": (F("value", "optional", T_var_T),),

@@ -2160,6 +2160,13 @@ def _decode_action_case(value: object, path: str) -> Value:
                             found = _nested_confirm_path(f"{p}.ops[{i}]", inner)
                             if found is not None:
                                 return found
+                # fuaran#2107 — a selection's arms are as reachable as a chain's members.
+                if action.tag == "Choose":
+                    for arm in ("whenTrue", "whenFalse"):
+                        if arm in action.fields:
+                            found = _nested_confirm_path(f"{p}.{arm}", action.fields[arm])
+                            if found is not None:
+                                return found
             return None
 
         def _refuse_nested(p: str, action: Value) -> None:
@@ -2188,6 +2195,31 @@ def _decode_action_case(value: object, path: str) -> Value:
             if k not in ("$type", "prompt", "onConfirm", "onCancel")
         }
         return Obj("Confirm", {**rest, **decoded_confirm})
+    elif tag == "Choose":
+        # fuaran#2107 — the bounded core's SELECTION (WIRE_FORMAT §3.6.34).
+        # `condition` and `exit` are Bindings evaluated at dispatch (the
+        # `SetState.valueFrom` decoder); `whenTrue` is required and an absent
+        # `whenFalse` means nothing runs. This host decodes and encodes it; it
+        # executes no action, so there is no second evaluator here.
+        decoded_choose: dict[str, Value] = {
+            "condition": _decode_binding(_require(obj, "condition", path), f"{path}.condition"),
+            "whenTrue": _decode_action(_require(obj, "whenTrue", path), f"{path}.whenTrue"),
+        }
+        if "whenFalse" in obj:
+            decoded_choose["whenFalse"] = _decode_action(obj["whenFalse"], f"{path}.whenFalse")
+        if "exit" in obj:
+            decoded_choose["exit"] = _decode_binding(obj["exit"], f"{path}.exit")
+        rest = {
+            k: _from_json_strict(v, f"{path}.{k}")
+            for k, v in obj.items()
+            if k not in ("$type", "condition", "whenTrue", "whenFalse", "exit")
+        }
+        return Obj("Choose", {**rest, **decoded_choose})
+    elif tag == "Require":
+        # fuaran#2107 — the bounded core's halting GUARD: one Binding, never defaulted.
+        condition = _decode_binding(_require(obj, "condition", path), f"{path}.condition")
+        rest = {k: _from_json_strict(v, f"{path}.{k}") for k, v in obj.items() if k not in ("$type", "condition")}
+        return Obj("Require", {**rest, "condition": condition})
     elif tag == "WriteToClipboard":
         # fuaran#1126 — the payload is a `TextSource`, not a bare string. The
         # bare JSON string IS `Literal`'s canonical form, so every document

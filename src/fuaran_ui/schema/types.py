@@ -831,6 +831,43 @@ class Confirm:
 
 
 @dataclass(frozen=True)
+class Choose:
+    """``Action.Choose`` — the bounded program core's selection (fuaran#2107).
+
+    ``condition`` resolves at dispatch time; the boolean ``true`` runs
+    ``when_true``, anything else ``when_false`` (absent: nothing happens).
+    ``exit`` is the core's optional exit assertion. Control flow runs on the
+    bounded path only; this host decodes and encodes it and executes nothing.
+    """
+
+    condition: Value
+    when_true: Action
+    when_false: Action | None = None
+    exit: Value | None = None
+
+    def to_wire(self) -> Value:
+        # Keys sort to condition < exit < whenFalse < whenTrue; the two optional
+        # members ride only when present.
+        fields: dict[str, Value] = {"condition": _lower(self.condition)}
+        if self.exit is not None:
+            fields["exit"] = _lower(self.exit)
+        if self.when_false is not None:
+            fields["whenFalse"] = self.when_false.to_wire()
+        fields["whenTrue"] = self.when_true.to_wire()
+        return Obj("Choose", fields)
+
+
+@dataclass(frozen=True)
+class Require:
+    """``Action.Require`` — the bounded program core's halting guard (fuaran#2107)."""
+
+    condition: Value
+
+    def to_wire(self) -> Value:
+        return Obj("Require", {"condition": _lower(self.condition)})
+
+
+@dataclass(frozen=True)
 class Focus:
     """``Action.Focus`` — move keyboard focus to an addressed node (fuaran#1537).
 
@@ -993,6 +1030,8 @@ Action = (
     | WriteToClipboard
     | Print
     | Confirm
+    | Choose
+    | Require
     | Focus
     | ReadFileBody
     | CommitLocal

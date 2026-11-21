@@ -2663,14 +2663,13 @@ class Select:
     value: Binding | None = None
     placeholder: TextSource | None = None
     disabled: Binding | None = None
-    # Multi-select (Phase 291): ``multiple`` is an ordinary OPTIONAL wire field,
-    # emitted as authored (WIRE_FORMAT §3.2, Phase 1962) — NOT an omit-at-default
-    # one. ``None`` (the default) omits it, so a single-select stays byte-identical
-    # to the pre-multi corpus; an explicit ``False`` is kept and emitted
-    # (``nodes/select-multiple-false.json``), exactly as the decoder keeps it.
+    # Multi-select (Phase 291): ``multiple`` is omit-at-default (fuaran#2413, like
+    # ``FileUpload.multiple``): ``False`` is a single-select and writes no key, so an
+    # explicit ``"multiple":false`` decodes and re-encodes without the member
+    # (``lenient/lenient-2413-select-multiple-false.json``).
     # ``values`` is the ``Binding<string list>`` of selected option values, emitted
     # only when present.
-    multiple: bool | None = None
+    multiple: bool = False
     values: Binding | None = None
     #: fuaran#1170 — whether a HOST HANDLER is present. The wire's `onChange` is a
     #: closure and so rides as the sentinel; what matters is whether the key is there
@@ -2696,7 +2695,7 @@ class Select:
             {
                 "disabled": self.disabled,
                 "label": self.label,
-                "multiple": self.multiple,
+                "multiple": True if self.multiple else None,
                 "onChange": CLOSURE if self.on_change else None,
                 "onChangeMulti": CLOSURE if self.on_change_multi else None,
                 "placeholder": self.placeholder,

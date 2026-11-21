@@ -22,11 +22,17 @@ corpus, not by this file.
   cut, Phase 2303). The dataclasses already took a `TextSource` (a bare `str` coerced to `LiteralText`), so no
   authoring call changes; a `Bound` or `I18n` label round-trips, pinned by the corpus vectors
   `select-textsource-labels` and `map-textsource-labels`.
-- The bundled corpus snapshot re-syncs: the rider's three node vectors arrive, and Phase 2413's move of
-  `nodes/select-multiple-false.json` to `lenient/lenient-2413-select-multiple-false.json` reaches this host; the
-  authoring parity table drops its entry for the retired node vector. The speech golden drops that vector and gains
+- The bundled corpus snapshot re-syncs with the rider's three node vectors. The speech golden gains
   `form-unvalued-textarea-ranges`; the two label vectors wait in `AWAITING_REFERENCE`, because the pinned reference
   refuses a non-literal label.
+
+### behavioural — `Select.multiple` is omit-at-default (fuaran#2413)
+
+- `Select.multiple` is `bool` (default `False`) and `fuaran.select(..., multiple=...)` takes a `bool`; `False`
+  writes no `multiple` key, as `FileUpload.multiple` already did. `fuaran.select(..., multiple=False)` therefore
+  encodes the same bytes as a select that does not name it, reversing the 0.11.0 entry below. A decoded
+  `"multiple":false` re-encodes without the member (`lenient/lenient-2413-select-multiple-false.json`). Passing
+  `None` still means a single-select at runtime; type-checkers now flag it.
 
 ### additive — one child enumeration; every walk reaches what the IDL holds (Phase 2663)
 

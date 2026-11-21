@@ -1262,7 +1262,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         value: Binding | None = None,
         placeholder: t.TextInput | None = None,
         disabled: Binding | None = None,
-        multiple: bool | None = None,
+        multiple: bool = False,
         values: Binding | None = None,
         on_change: bool = True,
         on_change_multi: bool = False,
@@ -1276,7 +1276,7 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         state: a multi-select (``multiple=True``) carries ``values`` and no ``value``,
         so a ``value`` handed to it is dropped; a single-select always carries one, so
         an absent ``value`` becomes the empty ``Static`` ("no selection"). ``multiple``
-        is emitted as authored: ``None`` omits it, an explicit ``False`` is kept.
+        is omit-at-default (fuaran#2413): ``False`` writes no key.
 
         ``groups`` (Phase 2699, WIRE_FORMAT §3.6.30) names options of this select by
         ``value`` under a label; options no group names render after the groups. Absent

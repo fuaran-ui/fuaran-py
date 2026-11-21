@@ -15,6 +15,14 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### behavioural — `Select.multiple` is omit-at-default (fuaran#2413)
+
+- `Select.multiple` is `bool` (default `False`) and `fuaran.select(..., multiple=...)` takes a `bool`; `False`
+  writes no `multiple` key, as `FileUpload.multiple` already did. `fuaran.select(..., multiple=False)` therefore
+  encodes the same bytes as a select that does not name it, reversing the 0.11.0 entry below. A decoded
+  `"multiple":false` re-encodes without the member (`lenient/lenient-2413-select-multiple-false.json`). Passing
+  `None` still means a single-select at runtime; type-checkers now flag it.
+
 ### additive — one child enumeration; every walk reaches what the IDL holds (Phase 2663)
 
 - New module `fuaran_ui.ops.enumeration`: the host's one answer to "which nodes does this node hold", derived from the

@@ -4297,19 +4297,6 @@
       ],
       "omissions": []
     },
-    "select-multiple-false": {
-      "text": "Selection: Size\n",
-      "ssml": "<speak>\n<s>Selection: Size</s><break strength=\"medium\"/>\n</speak>\n",
-      "utterances": [
-        {
-          "nodeId": "select-multiple-false",
-          "source": "announced",
-          "emphasis": false,
-          "pause": "short"
-        }
-      ],
-      "omissions": []
-    },
     "select-option-groups-remainder": {
       "text": "Selection: Chart\n",
       "ssml": "<speak>\n<s>Selection: Chart</s><break strength=\"medium\"/>\n</speak>\n",

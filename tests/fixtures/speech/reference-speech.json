@@ -1773,6 +1773,19 @@
       ],
       "omissions": []
     },
+    "form-unvalued-textarea-ranges": {
+      "text": "Form, 3 fields\n",
+      "ssml": "<speak>\n<s>Form, 3 fields</s><break strength=\"medium\"/>\n</speak>\n",
+      "utterances": [
+        {
+          "nodeId": "form-unvalued-textarea-ranges",
+          "source": "announced",
+          "emphasis": false,
+          "pause": "short"
+        }
+      ],
+      "omissions": []
+    },
     "format-bindings": {
       "text": "1,234.50\n£1,234.50\n42.00 %\nmardi 14 novembre 2023\n3 days ago\n",
       "ssml": "<speak>\n<s>1,234.50</s><break strength=\"medium\"/>\n<s>£1,234.50</s><break strength=\"medium\"/>\n<s>42.00 %</s><break strength=\"medium\"/>\n<s>mardi 14 novembre 2023</s><break strength=\"medium\"/>\n<s>3 days ago</s><break strength=\"medium\"/>\n</speak>\n",
@@ -4290,19 +4303,6 @@
       "utterances": [
         {
           "nodeId": "select-1",
-          "source": "announced",
-          "emphasis": false,
-          "pause": "short"
-        }
-      ],
-      "omissions": []
-    },
-    "select-multiple-false": {
-      "text": "Selection: Size\n",
-      "ssml": "<speak>\n<s>Selection: Size</s><break strength=\"medium\"/>\n</speak>\n",
-      "utterances": [
-        {
-          "nodeId": "select-multiple-false",
           "source": "announced",
           "emphasis": false,
           "pause": "short"

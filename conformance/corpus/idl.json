@@ -4464,11 +4464,15 @@
         },
         {
           "annotations": {
-            "doc": "Whether several options may be selected, carried in `values`. Omitted means a single-select."
+            "doc": "Whether several options may be selected, carried in `values`. Omitted means `false`, a single-select."
           },
           "name": "multiple",
           "optionality": {
-            "$type": "optional"
+            "$type": "omitDefault",
+            "default": {
+              "$type": "bool",
+              "value": false
+            }
           },
           "type": {
             "$type": "bool"
@@ -6819,7 +6823,9 @@
             "$type": "required"
           },
           "type": {
-            "$type": "str"
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
           }
         },
         {
@@ -7017,7 +7023,9 @@
             "$type": "required"
           },
           "type": {
-            "$type": "str"
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
           }
         },
         {

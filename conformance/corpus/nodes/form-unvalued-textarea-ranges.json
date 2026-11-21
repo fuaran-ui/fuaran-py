@@ -1,0 +1,1 @@
+{"id":"form-unvalued-textarea-ranges","kind":{"$type":"Form","fields":[{"id":"remarks","kind":{"$type":"TextArea","rows":4},"label":"Remarks"},{"id":"guests","kind":{"$type":"RangedNumber","max":12,"min":1,"step":1},"label":"Guests"},{"id":"budget","kind":{"$type":"Range","max":500,"min":0},"label":"Budget"}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Send"}}

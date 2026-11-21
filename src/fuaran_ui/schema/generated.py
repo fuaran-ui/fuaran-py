@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "a8dd5c77f261a21c83e87122c4f3c3aa76939d858d358df60db940e6173d4057"
+IDL_SHA256 = "710cf74d1f084d3f0854c8d58f6cebbbbac629b97e9bfeeb379d40628b28197e"
 IDL_VERSION = 1
 
 
@@ -763,7 +763,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("value", "optional", T_union_Binding_str),
         F("placeholder", "optional", T_union_TextSource),
         F("disabled", "optional", T_union_Binding_bool),
-        F("multiple", "optional", T_bool),
+        F("multiple", "omitDefault", T_bool, default=False),
         F("values", "optional", T_union_Binding_list_str),
         F("affordance", "optional", T_record_Affordance),
         F("groups", "omitDefault", T_list_record_SelectOptionGroup, default=[]),
@@ -936,7 +936,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("value", "required", T_str),
     ),
     "MapMarker": (
-        F("label", "required", T_str),
+        F("label", "required", T_union_TextSource),
         F("latitude", "required", T_float),
         F("longitude", "required", T_float),
     ),
@@ -956,7 +956,7 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("min", "required", T_float),
     ),
     "SelectOption": (
-        F("label", "required", T_str),
+        F("label", "required", T_union_TextSource),
         F("value", "required", T_str),
     ),
     "SelectOptionGroup": (

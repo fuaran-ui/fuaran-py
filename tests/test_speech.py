@@ -203,6 +203,8 @@ AWAITING_REFERENCE: dict[str, str] = {
     "grid-transform-int-bounds": "the int32 minimum, which the pinned reference refuses in an int column (Phase 2484)",
     "action-choose": "Action.Choose, which the pinned reference predates (Phase 2107)",
     "action-require": "Action.Require, which the pinned reference predates (Phase 2107)",
+    "select-textsource-labels": "a Bound and an I18n option label, which the pinned reference refuses (Phase 2811)",
+    "map-textsource-labels": "a Bound and an I18n marker label, which the pinned reference refuses (Phase 2811)",
 }
 
 

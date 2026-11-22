@@ -1290,6 +1290,15 @@ class ChartSpec:
     #: by a disclosure gate: the row draws a placeholder, never its value and
     #: never a zero. ``None`` means nothing is withheld.
     withheld_field: str | None = None
+    #: Phase 2654 (D39) — the mark channels: ``interval`` is ``(low, high)`` column
+    #: names on the single series; ``size_field`` sizes a Scatter point by area;
+    #: ``sort_by`` is ``(field, "asc" | "desc")``; ``path_field`` joins a Scatter
+    #: series' points in that column's order. A channel on a kind that does not read
+    #: it is NEUTRALISED.
+    interval: tuple[str, str] | None = None
+    size_field: str | None = None
+    sort_by: tuple[str, str] | None = None
+    path_field: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -1368,6 +1377,78 @@ _WITHHELD_WORD = "withheld"
 #: Phase 2809 — the side of a WITHHELD placeholder (the reference host's
 #: ``ChartStyle.WithheldMarkSize``): a fixed size, so no height implies a value.
 _WITHHELD_MARK_SIZE = 8.0
+
+
+# ─── The mark channels (Phase 2654, D39, WIRE_FORMAT §3.6.37) ──────────────────
+
+_SCATTER_MIN_RADIUS = 2.0  # a sized point's floor (``ChartStyle.ScatterMinRadius``)
+_SCATTER_MAX_RADIUS = 16.0  # the largest size drawn (``ChartStyle.ScatterMaxRadius``)
+_INTERVAL_CAP_WIDTH = 8.0  # an error bar's caps (``ChartStyle.IntervalCapWidth``)
+_INTERVAL_BAND_OPACITY = 0.2  # an interval band's wash (``ChartStyle.IntervalBandOpacity``)
+_INTERVAL_DASH = " – "  # between an interval's two ends in a readout
+_INTERVAL_WORD = "interval"  # the readout of an interval band
+
+
+def _interval_applies(spec: ChartSpec) -> bool:
+    """Whether the chart's ``interval`` is read: one series on a Bar, Line, Area or Scatter."""
+    return spec.interval is not None and len(spec.y_fields) == 1 and spec.kind in ("Bar", "Line", "Area", "Scatter")
+
+
+def _scatter_channel(spec: ChartSpec, field_name: str | None) -> str | None:
+    """A Scatter-only channel's column, or ``None`` off Scatter."""
+    return field_name if spec.kind == "Scatter" else None
+
+
+def _sort_applies(spec: ChartSpec) -> tuple[str, str] | None:
+    """The chart's ``sort_by`` when it is read: a Bar, Line, Area or Pie whose x is
+    not temporal (a temporal axis places each row at its date)."""
+    if spec.x_scale == "Temporal" or spec.kind not in ("Bar", "Line", "Area", "Pie"):
+        return None
+    return spec.sort_by
+
+
+def _sorted_rows(spec: ChartSpec, rows: list[Mapping[str, object]]) -> list[Mapping[str, object]]:
+    """Phase 2654 (D39) — the rows in the declared ``sort_by`` order: by the row's
+    PRESENT numeric value in the sort column; rows whose key is missing, and every
+    WITHHELD row, follow in source order. Stable, so equal keys keep their source
+    order (``reverse=True`` keeps it too)."""
+    sort = _sort_applies(spec)
+    if sort is None:
+        return rows
+    sort_field, direction = sort
+    present: list[tuple[float, Mapping[str, object]]] = []
+    missing: list[Mapping[str, object]] = []
+    for r in rows:
+        k = None if _is_withheld_row(spec.withheld_field, r) else _present_value_of(r, sort_field)
+        if k is None:
+            missing.append(r)
+        else:
+            present.append((k, r))
+    ordered = sorted(present, key=lambda p: p[0], reverse=direction == "desc")
+    return [r for _, r in ordered] + missing
+
+
+def _interval_end(iv: tuple[float, float] | None, k: int) -> float:
+    """One end of a present interval (``k`` 0 low, 1 high); a band reads only runs of
+    present intervals, so ``None`` never reaches here."""
+    return math.nan if iv is None else iv[k]
+
+
+def _path_key(path_keys: Sequence[float | None], i: int) -> float:
+    key = path_keys[i]
+    return math.nan if key is None else key
+
+
+def _path_vertex(
+    path_order: Sequence[int], values: Sequence[float | None], x_values: Sequence[float]
+) -> Callable[[int], bool]:
+    """Whether the ``k``-th row along a path is a vertex: its x and its y present."""
+
+    def vertex(k: int) -> bool:
+        i = path_order[k]
+        return not math.isnan(x_values[i]) and values[i] is not None
+
+    return vertex
 
 
 def _withheld_style() -> Obj:
@@ -1878,6 +1959,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     rows = list(rows)
     if spec.kind == "Heatmap":
         return _lower_heatmap(spec, rows)
+    # Phase 2654 (D39) — a declared order is applied BEFORE layout.
+    rows = _sorted_rows(spec, rows)
     categories = [_string_of(r, spec.x_field) for r in rows]
     n = len(rows)
 
@@ -1972,6 +2055,39 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             continue
         value_bands.append((i, min(float(a_raw), float(b_raw)), max(float(a_raw), float(b_raw)), lbl))
 
+    # ── The mark channels (Phase 2654, D39) ──
+    #
+    # A withheld row reads NO channel value: its interval and its size are values
+    # of the datum (the path order is a position, read below on its own terms).
+    def read_channel(field_name: str) -> list[float | None]:
+        return [None if withheld[i] else _present_value_of(r, field_name) for i, r in enumerate(rows)]
+
+    intervals: list[tuple[float, float] | None] = [None] * n
+    if spec.interval is not None and _interval_applies(spec):
+        los, his = read_channel(spec.interval[0]), read_channel(spec.interval[1])
+        intervals = [
+            (min(lo, hi), max(lo, hi)) if lo is not None and hi is not None else None
+            for lo, hi in zip(los, his, strict=True)
+        ]
+    size_field = _scatter_channel(spec, spec.size_field)
+    sizes: list[float | None] = (
+        [] if size_field is None else [v if v is not None and v >= 0.0 else None for v in read_channel(size_field)]
+    )
+    # The path order is read off every row, withheld or not: it is WHERE the row
+    # sits on the path, and a withheld row's missing point then BREAKS the path.
+    path_field = _scatter_channel(spec, spec.path_field)
+    path_keys: list[float | None] = [] if path_field is None else [_present_value_of(r, path_field) for r in rows]
+    # A vertical line at a NUMERIC x: read on a Scatter whose x is numeric.
+    reference_lines_x: list[tuple[float, Value]] = []
+    if spec.kind == "Scatter" and spec.x_scale != "Temporal":
+        for ann in declared:
+            if ann.tag != "ReferenceLineX":
+                continue
+            raw_x = ann.fields.get("value")
+            if not isinstance(raw_x, (int, float)) or isinstance(raw_x, bool) or not math.isfinite(float(raw_x)):
+                continue
+            reference_lines_x.append((float(raw_x), ann.fields.get("label")))
+
     if stacked:
         series_values = [v for i in range(n) for v in cums_for(i)]
     else:
@@ -1982,7 +2098,11 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # data's own domain would draw a line at a value that is not the value
     # declared. A value band's BOTH ends join on exactly the same rule.
     all_values = (
-        series_values + [v for v, _ in reference_lines] + [v for _, lo, hi, _ in value_bands for v in (lo, hi)]
+        series_values
+        + [v for v, _ in reference_lines]
+        + [v for _, lo, hi, _ in value_bands for v in (lo, hi)]
+        # Phase 2654 — an interval's ends join the domain on the same rule.
+        + [v for iv in intervals if iv is not None for v in iv]
     ) or [0.0]
     data_min = min(all_values)
     data_max = max(all_values)
@@ -2033,6 +2153,21 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         makes that safe. The series name is the FIELD name, matching the legend
         and the mark id rather than the capitalised axis title."""
         return _with_tip(style, f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}{tip_value_text(v)}")
+
+    def datum_tip_with(style: Obj, series_field: str, category_key: str, v: float, suffix: str) -> Obj:
+        """Phase 2654 — a datum's readout with a trailing part (a sized point's size)."""
+        return _with_tip(
+            style,
+            f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}{tip_value_text(v)}{_TIP_SEPARATOR}{suffix}",
+        )
+
+    def interval_tip(style: Obj, series_field: str, category_key: str, lo: float, hi: float) -> Obj:
+        """Phase 2654 — an interval's readout: "Series · Category · low – high"."""
+        return _with_tip(
+            style,
+            f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}"
+            f"{tip_value_text(lo)}{_INTERVAL_DASH}{tip_value_text(hi)}",
+        )
 
     def series_tip(style: Obj, series_field: str) -> Obj:
         """The readout for a SERIES-LEVEL mark (a line, an area band or its
@@ -2189,7 +2324,8 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         x_step = _nominal_days(temporal_step)
         x_ticks = [float(t) for t in _temporal_ticks(temporal_step, temporal_lo, temporal_hi)]
     elif is_scatter:
-        present_xs = [x for x in x_values if not math.isnan(x)]
+        # Phase 2654 — an x reference line's value joins the x domain.
+        present_xs = [x for x in x_values if not math.isnan(x)] + [v for v, _ in reference_lines_x]
         if present_xs:
             x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(min(present_xs), max(present_xs))
         else:
@@ -2913,6 +3049,49 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         return categories[i]
 
     # ── Series geometry ──
+    # ── The interval (Phase 2654, D39) ──
+    #
+    # An ERROR BAR on the per-datum arms (Bar, Scatter): a stem and two caps in the
+    # axis ink, after the mark it qualifies. A BAND on the series arms (Line, Area):
+    # one translucent polygon per run of present intervals, BEHIND the series.
+    interval_ink = _style_stroke_ink(_AXIS_OPACITY, _REFERENCE_STROKE_WIDTH)
+
+    def error_bar(cx: float, i: int) -> list[Value]:
+        iv = intervals[i]
+        if iv is None:
+            return []
+        lo, hi = iv
+        x = _r2(cx)
+        y_lo, y_hi = y_scale(lo), y_scale(hi)
+        half = _INTERVAL_CAP_WIDTH / 2.0
+        ink = interval_tip(interval_ink, spec.y_fields[0], categories[i], lo, hi)
+        return [
+            _line(x, y_hi, x, y_lo, ink),
+            _line(_r2(cx - half), y_lo, _r2(cx + half), y_lo, ink),
+            _line(_r2(cx - half), y_hi, _r2(cx + half), y_hi, ink),
+        ]
+
+    def interval_bands() -> list[Value]:
+        if m != 1 or n == 0:
+            return []
+        yf = spec.y_fields[0]
+        out: list[Value] = []
+        for run_first, run_last in _present_runs(n, lambda i: intervals[i] is not None):
+            upper = [(x_centre(i), y_scale(_interval_end(intervals[i], 1))) for i in range(run_first, run_last + 1)]
+            lower_pts = [
+                (x_centre(i), y_scale(_interval_end(intervals[i], 0))) for i in range(run_last, run_first - 1, -1)
+            ]
+            out.append(
+                _polygon(
+                    upper + lower_pts,
+                    _with_tip(
+                        _style_fill_opacity(_colour_for(0), _INTERVAL_BAND_OPACITY),
+                        f"{yf}{_TIP_SEPARATOR}{_INTERVAL_WORD}",
+                    ),
+                )
+            )
+        return out
+
     series_shapes: list[Value] = []
     if spec.kind in ("Bar", "Column") and stacked:
         # One capped bar per category, centred in its band; series stack as
@@ -2954,6 +3133,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                     _with_mark(_style_fill(_colour_for(j)), mark), spec.y_fields[j], categories[i], seg_v
                 )
                 series_shapes.append(_rectangle(bx, top, bw, hgt, None, seg_style))
+        # Phase 2654 — the error bars, after every bar (one series).
+        for i in range(n):
+            series_shapes.extend(error_bar(stacked_bar_x(i) + bw / 2.0, i))
     elif spec.kind in ("Bar", "Column"):
         bw = grouped_bar_w
         base_y = y_scale(0.0)
@@ -2974,12 +3156,16 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
                 bar_style = datum_tip(_with_mark(_style_fill(colour), mark), spec.y_fields[j], categories[i], v)
                 series_shapes.append(_rectangle(bx, top, bw, hgt, None, bar_style))
+        # Phase 2654 — the error bars, after every bar (one series).
+        for i in range(n):
+            series_shapes.extend(error_bar(grouped_bar_x(i, 0) + bw / 2.0, i))
     elif spec.kind == "Area" and stacked and n > 0:
         # Cumulative bands, bottom band first (painter's order): band j fills
         # between boundary j (below) and boundary j+1 (above); its upper
         # boundary carries the full-strength series edge (Phase 637). Phase
         # 2809 — one band per run of present values.
         cum_rows = [cums_for(i) for i in range(n)]
+        series_shapes.extend(interval_bands())
         for j in range(m):
             colour = _colour_for(j)
             yf = spec.y_fields[j]
@@ -3000,6 +3186,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         # overlap legible, the Polyline edge keeps each series distinct. Phase
         # 2809 — one band per run of present values.
         base_y = y_scale(0.0)
+        series_shapes.extend(interval_bands())
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
@@ -3015,6 +3202,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     elif spec.kind == "Line":
         # Phase 2809 — one polyline per run of present values: a gap BREAKS the
         # line rather than dropping it to zero.
+        series_shapes.extend(interval_bands())
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
@@ -3035,32 +3223,63 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         def x_present(i: int) -> bool:
             return not math.isnan(x_values[i])
 
+        # Phase 2654 (D39) — the SIZE channel: above the floor a point's area is
+        # proportional to its size, the largest size drawn taking the maximum
+        # radius; a missing or negative size draws no point.
+        max_size = max([0.0, *(v for v in sizes if v is not None)])
+
+        def radius_of(i: int) -> float | None:
+            if not sizes:
+                return 4.0
+            sv = sizes[i]
+            if sv is None:
+                return None
+            if max_size > 0.0:
+                return _r2(max(_SCATTER_MIN_RADIUS, _SCATTER_MAX_RADIUS * math.sqrt(sv / max_size)))
+            return _SCATTER_MIN_RADIUS
+
+        # Phase 2654 (D39) — the PATH channel: each series' points joined in
+        # ascending path order (stable); a row on the path whose point is missing
+        # or withheld BREAKS it, and a run of one point draws nothing. Painted
+        # under the points.
+        path_order = sorted(
+            (i for i in range(len(path_keys)) if path_keys[i] is not None), key=lambda i: _path_key(path_keys, i)
+        )
+        for j in range(m):
+            colour = _colour_for(j)
+            values = series[j]
+            yf = spec.y_fields[j]
+            for run_first, run_last in _present_runs(len(path_order), _path_vertex(path_order, values, x_values)):
+                if run_last <= run_first:
+                    continue
+                points = [
+                    (x_scale(x_values[path_order[k]]), y_scale(_nan_if_none(values[path_order[k]])))
+                    for k in range(run_first, run_last + 1)
+                ]
+                series_shapes.append(_polyline(points, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             yf = spec.y_fields[j]
             for i in range(n):
                 pv = values[i]
-                if pv is None or not x_present(i):
+                radius = radius_of(i)
+                if pv is None or not x_present(i) or radius is None:
                     continue
-                series_shapes.append(
-                    _circle(
-                        x_scale(x_values[i]),
-                        y_scale(pv),
-                        4.0,
-                        # The tip's middle part is the x cell as PROJECTED
-                        # (``categories[i]``), not the mark id's canonical
-                        # numeric form: the id is for object constancy, the
-                        # tip is for a human, and on a temporal axis the
-                        # projection is the ISO date, not a day count.
-                        datum_tip(
-                            _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}"),
-                            yf,
-                            categories[i],
-                            pv,
-                        ),
+                mark_style = _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}")
+                size = sizes[i] if sizes else None
+                point_style = (
+                    datum_tip(mark_style, yf, categories[i], pv)
+                    if size is None
+                    else datum_tip_with(
+                        mark_style, yf, categories[i], pv, f"{size_field} {_format_value(None, 1.0, False, size, size)}"
                     )
                 )
+                series_shapes.append(_circle(x_scale(x_values[i]), y_scale(pv), radius, point_style))
+        # Phase 2654 — the error bars, after the points (one series).
+        for i in range(n):
+            if x_present(i):
+                series_shapes.extend(error_bar(x_scale(x_values[i]), i))
         # A withheld row keys its placeholder as its point would have been keyed,
         # and a row with no x has no position to draw one at.
         series_shapes.extend(
@@ -3255,6 +3474,18 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         )
         for i, (v, _) in enumerate(reference_lines)
     ]
+    reference_line_shapes += [
+        # Phase 2654 — the x reference lines: the same line standing across the
+        # plot's height at a numeric x, numbered in their own case.
+        _line(
+            x_scale(v),
+            _r2(plot_y0),
+            x_scale(v),
+            _r2(plot_y1),
+            _with_mark(reference_style, f"annotation|referencex|{i}"),
+        )
+        for i, (v, _) in enumerate(reference_lines_x)
+    ]
 
     # The range bands as PLOT RECTANGLES — ``(index, x0, y0, x1, y1, label)``,
     # ordered by the per-case index both arms were numbered with, so the paint
@@ -3411,6 +3642,26 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             # still draws.
             max(0.0, bx1 - x - _ANNOTATION_LABEL_PADDING),
             max(0.0, by1 - by0 - _ANNOTATION_LABEL_PADDING),
+            lbl,
+        )
+    # Phase 2654 — the x reference lines' labels, last of the rung: at the top of
+    # the plot beside the line, the width budget running to the next line (the
+    # event markers' rule).
+    reference_x_xs = [x_scale(v) for v, _ in reference_lines_x]
+    reference_x_right = [plot_x1] * len(reference_x_xs)
+    _reference_x_order = sorted(range(len(reference_x_xs)), key=lambda i: (reference_x_xs[i], i))
+    for _r in range(len(_reference_x_order) - 1):
+        reference_x_right[_reference_x_order[_r]] = reference_x_xs[_reference_x_order[_r + 1]]
+    for i, (_, lbl) in enumerate(reference_lines_x):
+        if lbl is None:
+            continue
+        x = reference_x_xs[i] + _ANNOTATION_LABEL_OFFSET_X
+        baseline = plot_y0 + _ANNOTATION_LABEL_FONT_SIZE + _ANNOTATION_LABEL_NUDGE_Y
+        annotation_label_shapes += annotation_label_shapes_for(
+            x,
+            baseline,
+            max(0.0, reference_x_right[i] - x - _ANNOTATION_LABEL_PADDING),
+            max(0.0, plot_y1 - plot_y0 - _ANNOTATION_LABEL_PADDING),
             lbl,
         )
 
@@ -3745,6 +3996,26 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             "bands",
             [f"{address}{annotation_label_words(lbl)}" for _, address, lbl in sorted(band_items, key=lambda t: t[0])],
         )
+        # Phase 2654 — the x reference lines, in the x axis's own words.
+        clauses += annotation_clause(
+            "x reference line",
+            "x reference lines",
+            [f"{x_tick_text(v)}{annotation_label_words(lbl)}" for v, lbl in reference_lines_x],
+        )
+        # Phase 2654 (D39) — each channel read names its column.
+        if spec.interval is not None and _interval_applies(spec):
+            clauses.append(
+                f"Interval {_clamp_text(_SUMMARY_MAX_NAME_CHARS, spec.interval[0])} to "
+                f"{_clamp_text(_SUMMARY_MAX_NAME_CHARS, spec.interval[1])}"
+            )
+        if size_field is not None:
+            clauses.append(f"Sized by {_clamp_text(_SUMMARY_MAX_NAME_CHARS, size_field)}")
+        if path_field is not None:
+            clauses.append(f"Path in {_clamp_text(_SUMMARY_MAX_NAME_CHARS, path_field)} order")
+        sort = _sort_applies(spec)
+        if sort is not None:
+            direction_words = "ascending" if sort[1] == "asc" else "descending"
+            clauses.append(f"Sorted by {_clamp_text(_SUMMARY_MAX_NAME_CHARS, sort[0])}, {direction_words}")
 
         accessible_summary = _clamp_text(_SUMMARY_MAX_CHARS, _SUMMARY_CLAUSE_SEPARATOR.join(clauses) + ".")
 

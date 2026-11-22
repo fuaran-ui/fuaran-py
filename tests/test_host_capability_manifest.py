@@ -247,6 +247,10 @@ CORPUS_UNEXERCISED: dict[str, str] = {
     ),
     "LocalFlushTrigger.OnSubmit": "no fixture writes it in a Binding.Local flushOn slot",
     "Scalar.Bool": _NO_HOLE_FIXTURE,
+    "ChartAnnotation.ReferenceLineX": (
+        "only the chart-lowering/channels family writes it (Phase 2654), and that family is not a round-trip one;"
+        " a node fixture waits on the rs and go codec legs (WIRE_FORMAT §11.0, channel adoption)"
+    ),
 }
 
 

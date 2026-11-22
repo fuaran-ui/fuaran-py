@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -97,9 +98,9 @@ def _annotation(raw: dict) -> Obj:
     if "label" in raw:
         fields["label"] = _text_source(raw["label"])
     tag = raw.get("$type")
-    if tag == "ReferenceLine":
+    if tag in ("ReferenceLine", "ReferenceLineX"):
         fields["value"] = raw["value"]
-        return Obj("ReferenceLine", fields)
+        return Obj(tag, fields)
     if tag == "EventMarker":
         fields["at"] = _annotation_x(raw["at"])
         return Obj("EventMarker", fields)
@@ -159,6 +160,11 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         # Phase 2809 — `withheldField` is a WIRE field carried as a string,
         # omitted when absent.
         withheld_field=inp.get("withheldField"),
+        # Phase 2654 — the mark channels, WIRE fields omitted when absent.
+        interval=(inp["interval"]["low"], inp["interval"]["high"]) if "interval" in inp else None,
+        size_field=inp.get("sizeField"),
+        sort_by=(inp["sortBy"]["field"], inp["sortBy"]["direction"]) if "sortBy" in inp else None,
+        path_field=inp.get("pathField"),
     )
     return spec, list(inp["data"])
 
@@ -1084,3 +1090,68 @@ def test_a_withheld_number_reaches_no_tip_and_no_summary() -> None:
     assert "900" not in got
     assert "train · 10-20 · withheld" in got
     assert "2 values withheld" in got
+
+
+# ── Phase 2654 — the mark channels (`chart-lowering/channels/`, WIRE_FORMAT §3.6.37, D39) ──
+#
+# The interval, the size, the declared order, the path and the x reference line. A
+# subfamily for the heatmap's reason: the top-level enumeration above does not reach it.
+
+_CHANNELS_DIR = _CHART_LOWERING_DIR / "channels"
+
+
+def _channel_cases() -> list[str]:
+    if not corpus_available() or not _CHANNELS_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _CHANNELS_DIR.glob("*.input.json"))
+
+
+_channels_available = pytest.mark.skipif(
+    not _channel_cases(),
+    reason=f"chart-lowering/channels fixtures not found at {_CHANNELS_DIR}",
+)
+
+
+def _channel_input(name: str) -> dict:
+    return json.loads((_CHANNELS_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+
+
+@_channels_available
+@pytest.mark.parametrize("name", _channel_cases())
+def test_channels_lower_byte_identical_to_golden(name: str) -> None:
+    expected = (_CHANNELS_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(_channel_input(name))
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: channel lowering drifted from golden"
+
+
+@_channels_available
+@pytest.mark.parametrize("name", _channel_cases())
+def test_channel_lowering_is_order_independent(name: str) -> None:
+    spec, rows = _spec_and_rows(_channel_input(name))
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+@_channels_available
+@pytest.mark.parametrize("name", [n for n in _channel_cases() if n.endswith("-neutralised")])
+def test_a_neutralised_channel_lowers_as_its_absence(name: str) -> None:
+    spec, rows = _spec_and_rows(_channel_input(name))
+    annotations = [a for a in (spec.annotations or ()) if a.tag != "ReferenceLineX"]
+    plain = replace(
+        spec,
+        interval=None,
+        size_field=None,
+        sort_by=None,
+        path_field=None,
+        annotations=annotations or None,
+    )
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", plain, rows))
+
+
+@_channels_available
+def test_a_withheld_row_reaches_no_channel_readout() -> None:
+    spec, rows = _spec_and_rows(_channel_input("bar-interval"))
+    got = encode_node(lower_node("c", spec, rows))
+    assert "11 – 19" not in got
+    assert "effect · E · 6 – 13" in got

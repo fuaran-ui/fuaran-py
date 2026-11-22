@@ -3686,13 +3686,16 @@ def _check_chart_annotation(raw: object, path: str) -> None:
     tag = _dispatch(o, path, _CHART_ANNOTATION_CASES)
     if "label" in o:
         _decode_text_source(o["label"], f"{path}.label")
-    if tag == "ReferenceLine":
+    if tag in ("ReferenceLine", "ReferenceLineX"):
+        # Phase 2654 — ``ReferenceLineX`` is the same line on the continuous x axis,
+        # so the two cases share one finite-value rule.
+        axis = "value" if tag == "ReferenceLine" else "x"
         v = _decode_number(_require(o, "value", path), f"{path}.value")
         if not isinstance(v, (int, float)) or not math.isfinite(float(v)):
             _fail(
                 WRONG_TYPE,
                 f"{path}.value",
-                "expected a FINITE JSON number — a reference line names a place on the value axis, "
+                f"expected a FINITE JSON number — a reference line names a place on the {axis} axis, "
                 "and NaN / Infinity names none; give the value in the axis's own units, or drop the "
                 "annotation",
             )
@@ -3728,6 +3731,23 @@ def _decode_chart_scale(value: object, path: str) -> Value:
     for key in ("midpoint", "min", "max"):
         if key in o:
             _decode_number(o[key], f"{path}.{key}")
+    return from_json(value)
+
+
+def _decode_chart_interval(value: object, path: str) -> Value:
+    """Phase 2654 — ``Chart.interval``: the low and high column names, both required strings.
+    Which kinds read it, and whether the columns exist, is the validator's (FUARAN172/173/086)."""
+    o = _expect_object(value, path)
+    for key in ("low", "high"):
+        _expect_string(_require(o, key, path), f"{path}.{key}")
+    return from_json(value)
+
+
+def _decode_chart_sort(value: object, path: str) -> Value:
+    """Phase 2654 — ``Chart.sortBy``: the column to order by and a ``SortDirection`` token."""
+    o = _expect_object(value, path)
+    _expect_string(_require(o, "field", path), f"{path}.field")
+    _enum(_require(o, "direction", path), f"{path}.direction", _SORT_DIRECTIONS, "SortDirection")
     return from_json(value)
 
 
@@ -3768,6 +3788,8 @@ KIND_SCHEMAS["Chart"] = _kind_schema(
         "valueFormat": _decode_format_structural,
         "annotations": _decode_chart_annotations,
         "scale": _decode_chart_scale,
+        "interval": _decode_chart_interval,
+        "sortBy": _decode_chart_sort,
     },
 )
 

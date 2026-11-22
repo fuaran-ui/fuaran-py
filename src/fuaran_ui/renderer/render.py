@@ -2517,6 +2517,21 @@ class Renderer:
         withheld_src = fields.get("withheldField")
         withheld_field = withheld_src if isinstance(withheld_src, str) else None
 
+        # Phase 2654 — the mark channels, carried as declared: the lowering reads
+        # each only on the kinds that admit it.
+        def str_field(obj: Value, key: str) -> str | None:
+            v = obj.fields.get(key) if isinstance(obj, Obj) else None
+            return v if isinstance(v, str) else None
+
+        interval_src = fields.get("interval")
+        low, high = str_field(interval_src, "low"), str_field(interval_src, "high")
+        interval = (low, high) if low is not None and high is not None else None
+        sort_src = fields.get("sortBy")
+        sort_field, sort_direction = str_field(sort_src, "field"), str_field(sort_src, "direction")
+        sort_by = (sort_field, sort_direction) if sort_field is not None and sort_direction is not None else None
+        size_src = fields.get("sizeField")
+        path_src = fields.get("pathField")
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -2534,6 +2549,10 @@ class Renderer:
             annotations=annotations,
             scale=scale,
             withheld_field=withheld_field,
+            interval=interval,
+            size_field=size_src if isinstance(size_src, str) else None,
+            sort_by=sort_by,
+            path_field=path_src if isinstance(path_src, str) else None,
         )
         return lower_node(node.id, spec, rows)
 

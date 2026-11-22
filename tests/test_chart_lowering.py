@@ -994,6 +994,39 @@ def test_heatmap_is_a_lowered_kind() -> None:
     assert "Heatmap" in LOWERED_KINDS
 
 
+# Phase 2810 — a withheld cell is drawn apart from an absent one. The goldens above
+# carry the byte-parity; these say what the bytes mean.
+
+
+@_heatmap_available
+def test_heatmap_withheld_vectors_are_present() -> None:
+    names = _heatmap_cases()
+    for name in ("heatmap-withheld-cells", "heatmap-withheld-diverging", "heatmap-withheld-only"):
+        assert name in names
+
+
+@_heatmap_available
+def test_heatmap_withheld_cell_is_tipped_and_keyed_without_its_number() -> None:
+    inp = json.loads((_HEATMAP_DIR / "heatmap-withheld-cells.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    got = encode_node(lower_node("c", spec, rows))
+    assert "Q2 · A · withheld" in got
+    assert '"text":"withheld"' in got
+    assert "3 values withheld" in got
+    assert "5 cells empty" in got
+    assert "500" not in got
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", [n for n in _heatmap_cases() if not n.startswith("heatmap-withheld")])
+def test_heatmap_declared_withheld_field_no_row_sets_is_byte_unchanged(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    flagged = [{**r, "suppressed": False} for r in rows]
+    declared, _ = _spec_and_rows({**inp, "withheldField": "suppressed"})
+    assert encode_node(lower_node("c", declared, flagged)) == encode_node(lower_node("c", spec, rows))
+
+
 # ── Phase 2809 — missing and withheld values (`chart-lowering/withheld/`, WIRE_FORMAT §3.6.36) ──
 #
 # A subfamily for the heatmap's reason. A missing value is a gap on every arm,

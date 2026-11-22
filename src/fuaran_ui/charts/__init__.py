@@ -1382,6 +1382,15 @@ def _withheld_tip(style: Obj, series_field: str, category_key: str) -> Obj:
     return _with_tip(style, f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}{_WITHHELD_WORD}")
 
 
+def _withheld_clause(k: int) -> list[str]:
+    """Phase 2809 (D38) — the summary clause that counts ``k`` withheld values: none
+    when nothing is withheld, so a chart with no withheld value gains no clause.
+    Phase 2810 — shared by the series arms and the Heatmap arm (one value a cell)."""
+    if k == 0:
+        return []
+    return [f"1 value {_WITHHELD_WORD}"] if k == 1 else [f"{k} values {_WITHHELD_WORD}"]
+
+
 def _nan_if_none(v: float | None) -> float:
     return math.nan if v is None else v
 
@@ -1492,8 +1501,14 @@ def _summary_kind_words(kind: str, stacked: bool) -> str:
 # field (``y_fields[1]``) of the first row carrying that pair. A pair no row
 # carries — or a row whose value cell is empty, text or non-finite — is ABSENT
 # and draws the surface (``fill: none`` under a gridline-weight outline), never a
-# zero. The colour is a BIN: the declared scale maps a value to a fraction and
-# the fraction to one ramp stop by ``floor(t · n)``, clamped to the last stop —
+# zero. A WITHHELD cell (Phase 2810, WIRE_FORMAT §3.6.36 rule 8) — a pair whose
+# first row is withheld — is drawn apart from an absent one: the withheld
+# placeholder's paint over the cell, with the cell's mark and the readout
+# ``row · x · withheld``; its value is never read. Any withheld cell adds the key
+# under the ramp and the summary's withheld clause.
+#
+# The colour is a BIN: the declared scale maps a value to a fraction and the
+# fraction to one ramp stop by ``floor(t · n)``, clamped to the last stop —
 # plain IEEE arithmetic in a fixed order, so every host picks the same stop.
 
 _SEQUENTIAL_RAMP: tuple[str, ...] = ("#e8f2f7", "#bcdae8", "#8ec2da", "#5caacb", "#2c92b9")
@@ -1580,12 +1595,16 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
     x_index = {k: i for i, k in enumerate(x_keys)}
     row_index = {k: j for j, k in enumerate(row_keys)}
     cells: dict[tuple[int, int], float] = {}
+    withheld: set[tuple[int, int]] = set()
     seen: set[tuple[int, int]] = set()
     for x_key_of, row_key_of, r in keyed:
         at = (x_index[x_key_of], row_index[row_key_of])
         if at in seen:
             continue
         seen.add(at)
+        if _is_withheld_row(spec.withheld_field, r):
+            withheld.add(at)
+            continue
         v = _present_value_of(r, value_field)
         if v is not None:
             cells[at] = v
@@ -1635,6 +1654,11 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
 
     show_legend = spec.legend_position != "None"
     legend_texts = [value_text(high)] + ([value_text(midpoint)] if midpoint is not None else []) + [value_text(low)]
+    # Phase 2810 — a chart with any withheld cell keys it under the ramp, so the
+    # column is wide enough for that entry's word too.
+    any_withheld = len(withheld) > 0
+    if any_withheld:
+        legend_texts.append(_WITHHELD_WORD)
     legend_reserve = (
         _LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X + widest_of(tick_size, legend_texts) if show_legend else 0.0
     )
@@ -1664,10 +1688,15 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
             y = _r2(plot_y0 + cell_h * j + half)
             w = _r2(max(0.0, cell_w - gap))
             h = _r2(max(0.0, cell_h - gap))
-            if (i, j) in cells:
+            x_key = x_keys[i]
+            row_key = row_keys[j]
+            if (i, j) in withheld:
+                # Phase 2810 (D38) — a WITHHELD cell: the withheld placeholder fitted
+                # to the cell, with the cell's own mark and a numberless readout.
+                style = _withheld_tip(_with_mark(_withheld_style(), f"{value_field}|{x_key}|{row_key}"), row_key, x_key)
+                shapes.append(_rectangle(x, y, w, h, None, style))
+            elif (i, j) in cells:
                 v = cells[(i, j)]
-                x_key = x_keys[i]
-                row_key = row_keys[j]
                 style = _with_tip(
                     _with_mark(_style_fill(fill_of(v)), f"{value_field}|{x_key}|{row_key}"),
                     row_key
@@ -1774,6 +1803,22 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
         if midpoint is not None:
             shapes.append(label_at((plot_y0 + plot_y1) / 2.0, value_text(midpoint)))
         shapes.append(label_at(plot_y1, value_text(low)))
+        # Phase 2810 — the withheld KEY, when any cell is withheld: the placeholder's
+        # paint as a swatch, worded ``withheld``, on the column labels' line below
+        # the ramp. Chrome, so it carries no mark.
+        if any_withheld:
+            key_y = plot_y1 + _CATEGORY_LABEL_OFFSET_Y - _HEATMAP_TICK_LABEL_BASELINE_DY
+            shapes.append(
+                _rectangle(
+                    swatch_x,
+                    _r2(key_y - _LEGEND_SWATCH_SIZE / 2.0),
+                    _LEGEND_SWATCH_SIZE,
+                    _LEGEND_SWATCH_SIZE,
+                    None,
+                    _withheld_style(),
+                )
+            )
+            shapes.append(label_at(key_y, _WITHHELD_WORD))
 
     if spec.title is not None:
         shapes.append(
@@ -1797,7 +1842,7 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
     def name(s: str) -> str:
         return _clamp_text(_SUMMARY_MAX_NAME_CHARS, s)
 
-    absent = n * m - len(cells)
+    absent = n * m - len(cells) - len(withheld)
     clauses = [
         f"{_summary_kind_words('Heatmap', False)} of {name(value_field)} by {name(spec.x_field)} and {name(row_field)}",
         f"{n} columns by {m} rows",
@@ -1805,6 +1850,7 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
     ]
     if absent > 0:
         clauses.append(f"{absent} cells empty")
+    clauses.extend(_withheld_clause(len(withheld)))
 
     kind_fields: dict[str, Value] = {
         "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _W, "height": _H}),
@@ -3613,11 +3659,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
 
         # Phase 2809 (D38) — the withheld clause: every series value of a withheld
         # row, counted. A chart with nothing withheld gains no clause.
-        withheld_values = sum(1 for w in withheld if w) * m
-        if withheld_values == 1:
-            clauses.append(f"1 value {_WITHHELD_WORD}")
-        elif withheld_values > 1:
-            clauses.append(f"{withheld_values} values {_WITHHELD_WORD}")
+        clauses.extend(_withheld_clause(sum(1 for w in withheld if w) * m))
 
         # ── The annotation clauses (Phase 1494 — §4i, extended) ──────────────
         #

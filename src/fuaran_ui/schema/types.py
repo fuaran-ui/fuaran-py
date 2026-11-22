@@ -3046,6 +3046,9 @@ class Chart:
     #: Phase 2655 — a heatmap's declared colour scale, absent meaning sequential
     #: over the data's extent.
     scale: ChartScale | None = None
+    #: Phase 2809 (D38) — the column whose boolean ``True`` marks a row WITHHELD by
+    #: a disclosure gate: the row draws a placeholder, never its value. Absent omits.
+    withheld_field: str | None = None
     #: Phase 2334 — whether the emitting host holds a point-click handler. A closure: it
     #: crosses the wire as the sentinel when true and is omitted when false.
     on_point_click: bool = False
@@ -3067,6 +3070,7 @@ class Chart:
                 "subtitle": self.subtitle,
                 "title": self.title,
                 "valueFormat": self.value_format,
+                "withheldField": self.withheld_field,
                 "xField": self.x_field,
                 "xScale": self.x_scale,
                 "xTitle": self.x_title,

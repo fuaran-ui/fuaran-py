@@ -2512,6 +2512,11 @@ class Renderer:
         if isinstance(scale_src, Obj) and isinstance(scale_src.tag, str):
             scale = {"$type": scale_src.tag, **scale_src.fields}
 
+        # Phase 2809 — the withheld flag column, carried as declared: the lowering
+        # reads each row's flag and never a withheld row's values.
+        withheld_src = fields.get("withheldField")
+        withheld_field = withheld_src if isinstance(withheld_src, str) else None
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -2528,6 +2533,7 @@ class Renderer:
             x_scale=x_scale,
             annotations=annotations,
             scale=scale,
+            withheld_field=withheld_field,
         )
         return lower_node(node.id, spec, rows)
 

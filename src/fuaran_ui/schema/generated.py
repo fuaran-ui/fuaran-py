@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "b63cc2baad57c2036ad56bb91071b6594f35d80d47af10ff99d82a6acedfc17d"
+IDL_SHA256 = "3382d69213dfc1dc55896169cd64a22c7388eb14f111cb2441e85bc1d69f84b9"
 IDL_VERSION = 1
 
 
@@ -543,6 +543,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("xScale", "optional", T_enum_ChartXScale),
         F("annotations", "optional", T_list_union_ChartAnnotation),
         F("scale", "optional", T_union_ChartScale),
+        F("withheldField", "optional", T_str),
         F("onPointClick", "optional", T_fn),
     ),
     "CodeBlock": (

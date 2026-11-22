@@ -1745,6 +1745,18 @@
         },
         {
           "annotations": {
+            "doc": "The column that marks a row as withheld by a disclosure gate: a row whose cell there is `true` draws a placeholder and the tip 'withheld', never its value and never a zero. Absent means nothing is withheld."
+          },
+          "name": "withheldField",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
             "doc": "An in-process handler called with the clicked point's row; it travels on the wire only as a `\"<closure>\"` sentinel."
           },
           "name": "onPointClick",

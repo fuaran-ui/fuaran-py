@@ -9026,6 +9026,9 @@
         "scale": {
           "$ref": "#/$defs/ChartScale"
         },
+        "withheldField": {
+          "type": "string"
+        },
         "onPointClick": {
           "const": "<closure>"
         }

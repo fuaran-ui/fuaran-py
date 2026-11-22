@@ -11,6 +11,7 @@ the render-parity pattern.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 
 import pytest
@@ -155,6 +156,9 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         # Phase 2655 — `scale` is a WIRE field carried in canonical `$type` JSON
         # (the mapping the lowering reads), omitted when absent.
         scale=inp.get("scale"),
+        # Phase 2809 — `withheldField` is a WIRE field carried as a string,
+        # omitted when absent.
+        withheld_field=inp.get("withheldField"),
     )
     return spec, list(inp["data"])
 
@@ -988,3 +992,62 @@ def test_heatmap_is_a_lowered_kind() -> None:
     from fuaran_ui.charts import LOWERED_KINDS
 
     assert "Heatmap" in LOWERED_KINDS
+
+
+# ── Phase 2809 — missing and withheld values (`chart-lowering/withheld/`, WIRE_FORMAT §3.6.36) ──
+#
+# A subfamily for the heatmap's reason. A missing value is a gap on every arm,
+# never a zero; a withheld row draws an outlined placeholder with its own mark and
+# a "withheld" readout, and the summary counts it.
+
+_WITHHELD_DIR = _CHART_LOWERING_DIR / "withheld"
+
+
+def _withheld_cases() -> list[str]:
+    if not corpus_available() or not _WITHHELD_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _WITHHELD_DIR.glob("*.input.json"))
+
+
+_withheld_available = pytest.mark.skipif(
+    not _withheld_cases(),
+    reason=f"chart-lowering/withheld fixtures not found at {_WITHHELD_DIR}",
+)
+
+
+def _withheld_input(name: str) -> dict:
+    return json.loads((_WITHHELD_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+
+
+@_withheld_available
+@pytest.mark.parametrize("name", _withheld_cases())
+def test_withheld_lowers_byte_identical_to_golden(name: str) -> None:
+    expected = (_WITHHELD_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(_withheld_input(name))
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: withheld lowering drifted from golden"
+
+
+@_withheld_available
+@pytest.mark.parametrize("name", _withheld_cases())
+def test_withheld_lowering_is_order_independent(name: str) -> None:
+    spec, rows = _spec_and_rows(_withheld_input(name))
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+@_withheld_available
+def test_a_declared_withheld_field_no_row_sets_changes_nothing() -> None:
+    spec, rows = _spec_and_rows(_withheld_input("bar-missing"))
+    flagged = [{**r, "suppressed": False} for r in rows]
+    declared = dataclasses.replace(spec, withheld_field="suppressed")
+    assert encode_node(lower_node("c", declared, flagged)) == encode_node(lower_node("c", spec, rows))
+
+
+@_withheld_available
+def test_a_withheld_number_reaches_no_tip_and_no_summary() -> None:
+    spec, rows = _spec_and_rows(_withheld_input("bar-withheld"))
+    got = encode_node(lower_node("c", spec, rows))
+    assert "900" not in got
+    assert "train · 10-20 · withheld" in got
+    assert "2 values withheld" in got

@@ -902,8 +902,7 @@ def _try_parse_day(text: str) -> int | None:
 
 def _day_of(text: str) -> int:
     """The day number a row's x cell carries, with an UNPARSEABLE cell reading as
-    the epoch. That mirrors ``_numeric_of``'s posture for a non-numeric value-axis
-    cell — the lowering stays total, and the grounding rule (FUARAN097) is what
+    the epoch. The lowering stays total here, and the grounding rule (FUARAN097) is what
     makes a non-date column loud, upstream, before any picture is drawn. Silence
     here is not the design; refusing here would be."""
     d = _try_parse_day(text)
@@ -1287,6 +1286,10 @@ class ChartSpec:
     # what the value means; the lowering picks the ramp stop. No colour crosses
     # the wire. Absent means sequential over the data's extent.
     scale: Mapping[str, object] | None = None
+    #: Phase 2809 (D38) — the column whose boolean ``True`` marks a row WITHHELD
+    #: by a disclosure gate: the row draws a placeholder, never its value and
+    #: never a zero. ``None`` means nothing is withheld.
+    withheld_field: str | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -1312,21 +1315,75 @@ def _row_get(row: Mapping[str, object], field_name: str) -> object:
     return row.get(field_name)
 
 
-def _numeric_of(row: Mapping[str, object], field_name: str) -> float:
+def _present_value_of(row: Mapping[str, object], field_name: str) -> float | None:
+    """Phase 2809 (D38) — a value cell, or ``None`` when it is MISSING.
+
+    Present is a finite number or a boolean (1/0, as FUARAN087 and the Heatmap arm
+    read it); everything else — an empty cell, a string, a date, a non-finite
+    number — is missing, and a missing value is drawn as a GAP on every arm, never
+    as a zero. Until this phase the series arms read it as ``0.0``, so a bar whose
+    value was missing was drawn at height zero. Non-finite (Phase 640): NaN and
+    Infinity would poison every domain computation; wire-carried data can never be
+    non-finite, so that arm covers host-side rows only.
+    """
     v = _row_get(row, field_name)
     if isinstance(v, bool):
         return 1.0 if v else 0.0
     if isinstance(v, (int, float)):
         f = float(v)
-        # Non-finite guard (Phase 640): NaN/Infinity would poison every domain
-        # computation and emit NaN geometry into the SVG. Wire-carried data can
-        # never be non-finite (the canonical-float codec rejects it), so this
-        # covers only host-side rows — coerced to the same 0.0 the non-numeric
-        # posture uses, deterministically.
-        if math.isnan(f) or math.isinf(f):
-            return 0.0
-        return f
-    return 0.0
+        return None if math.isnan(f) or math.isinf(f) else f
+    return None
+
+
+def _is_withheld_row(withheld_field: str | None, row: Mapping[str, object]) -> bool:
+    """Phase 2809 (D38) — whether a row is WITHHELD: its cell in the declared
+    ``withheld_field`` is the boolean ``True``. Any other cell, or no declaration,
+    leaves the row to its values. A withheld row's values are never read."""
+    return withheld_field is not None and _row_get(row, withheld_field) is True
+
+
+def _present_runs(n: int, present: Callable[[int], bool]) -> list[tuple[int, int]]:
+    """Phase 2809 — the maximal runs of consecutive indices ``0 .. n-1`` for which
+    ``present`` holds, as ``(first, last)`` pairs in order. A Line or an Area draws
+    each run exactly as it drew a whole series before."""
+    runs: list[tuple[int, int]] = []
+    start = -1
+    for i in range(n + 1):
+        if i < n and present(i):
+            if start < 0:
+                start = i
+        elif start >= 0:
+            runs.append((start, i - 1))
+            start = -1
+    return runs
+
+
+def _present_in(values: Sequence[float | None]) -> Callable[[int], bool]:
+    """Phase 2809 — whether a series has a PRESENT value at an index."""
+    return lambda i: values[i] is not None
+
+
+#: Phase 2809 — the word a WITHHELD datum's readout ends in.
+_WITHHELD_WORD = "withheld"
+#: Phase 2809 — the side of a WITHHELD placeholder (the reference host's
+#: ``ChartStyle.WithheldMarkSize``): a fixed size, so no height implies a value.
+_WITHHELD_MARK_SIZE = 8.0
+
+
+def _withheld_style() -> Obj:
+    """Phase 2809 — the WITHHELD placeholder's paint: no fill, outlined in the
+    axis's own ink at the axis's opacity, never a series colour."""
+    ink = _style_stroke_ink(_AXIS_OPACITY, 1.0)
+    return Obj(ink.tag, {**ink.fields, "fill": _static("none")})
+
+
+def _withheld_tip(style: Obj, series_field: str, category_key: str) -> Obj:
+    """Phase 2809 — "Series · Category · withheld", with no number."""
+    return _with_tip(style, f"{series_field}{_TIP_SEPARATOR}{category_key}{_TIP_SEPARATOR}{_WITHHELD_WORD}")
+
+
+def _nan_if_none(v: float | None) -> float:
+    return math.nan if v is None else v
 
 
 def _string_of(row: Mapping[str, object], field_name: str) -> str:
@@ -1451,17 +1508,6 @@ _GRID_STROKE_WIDTH = 1.0
 MAX_HEATMAP_CELLS = 10_000
 
 
-def _heatmap_value_of(row: Mapping[str, object], field_name: str) -> float | None:
-    """A heatmap value cell, or ``None`` when absent: empty, text, non-finite."""
-    v = _row_get(row, field_name)
-    if isinstance(v, bool):
-        return 1.0 if v else 0.0
-    if isinstance(v, (int, float)):
-        f = float(v)
-        return None if math.isnan(f) or math.isinf(f) else f
-    return None
-
-
 def _bound_or(declared: object, fallback: float) -> float:
     """A declared bound, or the data's own when it is absent or non-finite."""
     if isinstance(declared, (int, float)) and not isinstance(declared, bool):
@@ -1540,7 +1586,7 @@ def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  #
         if at in seen:
             continue
         seen.add(at)
-        v = _heatmap_value_of(r, value_field)
+        v = _present_value_of(r, value_field)
         if v is not None:
             cells[at] = v
 
@@ -1789,7 +1835,13 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     categories = [_string_of(r, spec.x_field) for r in rows]
     n = len(rows)
 
-    series = [[_numeric_of(r, yf) for r in rows] for yf in spec.y_fields]
+    # Phase 2809 (D38) — a withheld row's values are never read, so they join the
+    # missing ones as ``None`` here and every reader below treats them alike; only
+    # the placeholder marks and the summary ask which of the two it was.
+    withheld = [_is_withheld_row(spec.withheld_field, r) for r in rows]
+    series: list[list[float | None]] = [
+        [None if withheld[i] else _present_value_of(r, yf) for i, r in enumerate(rows)] for yf in spec.y_fields
+    ]
     m = len(series)
 
     # Stacking applies to Bar + Area only (Phase 637). Values stack as-is by
@@ -1803,7 +1855,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         out = [0.0]
         acc = 0.0
         for j in range(m):
-            acc = acc + series[j][i]
+            # A missing or withheld value adds nothing (Phase 2809).
+            v = series[j][i]
+            acc = acc + (0.0 if v is None else v)
             out.append(acc)
         return out
 
@@ -1875,7 +1929,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     if stacked:
         series_values = [v for i in range(n) for v in cums_for(i)]
     else:
-        series_values = [v for s in series for v in s]
+        series_values = [v for s in series for v in s if v is not None]
     # §4l rule 3 — AN ADDRESS PARTICIPATES IN THE DOMAIN IT ADDRESSES, on the same
     # terms the series data does, and BEFORE the axis is nice-d. A threshold above
     # every bar is still drawn, and the axis says so; clamping the line to the
@@ -2063,7 +2117,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     if is_temporal:
         x_values = [float(d) for d in day_values]
     elif is_scatter:
-        x_values = [_numeric_of(r, spec.x_field) for r in rows]
+        # A MISSING x (Phase 2809) has no position: NaN here, read by nothing but
+        # the domain's filter below and the marks' skip.
+        x_values = [_nan_if_none(_present_value_of(r, spec.x_field)) for r in rows]
     else:
         x_values = []
 
@@ -2087,8 +2143,9 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         x_step = _nominal_days(temporal_step)
         x_ticks = [float(t) for t in _temporal_ticks(temporal_step, temporal_lo, temporal_hi)]
     elif is_scatter:
-        if x_values:
-            x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(min(x_values), max(x_values))
+        present_xs = [x for x in x_values if not math.isnan(x)]
+        if present_xs:
+            x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(min(present_xs), max(present_xs))
         else:
             x_nice_lo, x_nice_hi, x_step, x_ticks = _nice_domain(0.0, 1.0)
     else:
@@ -2231,14 +2288,15 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # The pie arm's shares are resolved here for the same reason: its legend
     # labels carry them ("name (NN%)"), so they are layout input, not output.
     is_pie = spec.kind == "Pie"
-    pie_values = series[0] if is_pie and m == 1 else []
-    pie_total = sum(pie_values)
+    # Phase 2809 — a missing or withheld category (``None``) takes no share.
+    pie_values: list[float | None] = series[0] if is_pie and m == 1 else []
+    pie_total = sum(v for v in pie_values if v is not None)
     # The Phase-638 bounded-v1 guard, unchanged and merely lifted: exactly one
     # series, no negative value, a positive total. A refused pie draws no
     # geometry AND no legend — a legend for a picture that was refused would be
     # a claim about data the drawing declined to show.
-    pie_refused = is_pie and (m != 1 or any(v < 0.0 for v in pie_values) or pie_total <= 0.0)
-    pie_fractions = [v / pie_total for v in pie_values] if is_pie and not pie_refused else []
+    pie_refused = is_pie and (m != 1 or any(v is not None and v < 0.0 for v in pie_values) or pie_total <= 0.0)
+    pie_fractions = [(0.0 if v is None else v) / pie_total for v in pie_values] if is_pie and not pie_refused else []
 
     # The legend's rows in draw order — ``(colour, label)``. TWO sources, ONE
     # shape, which is what Phase 880 unified: the cartesian arms legend their
@@ -2248,17 +2306,35 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # and a single-series bar does not. Before this phase these were two
     # separate emitters with two separate constant sets, and only one of them
     # could honour a position.
+    #
+    # Phase 2809 (D38) — on the pie a MISSING category has no entry at all (a
+    # ``0%`` entry would be the zero the gap rule removes), and a WITHHELD one has
+    # the entry ``name (withheld)``, whose outlined swatch IS the datum's
+    # placeholder. Each entry's swatch paint rides beside it in ``legend_swatches``.
     legend_entries: list[tuple[str, str]] = []
+    legend_swatches: list[Obj] = []
     if is_pie:
-        # Routed through the canonical formatter (Phase 876) — one rounding +
-        # rendering rule for every number this module prints. A share is a whole
-        # percent, so the shipped ``NN%`` shape is unchanged.
-        legend_entries = [
-            (_colour_for(i), f"{categories[i]} ({_format_value(None, 1.0, False, 1.0, f * 100.0)}%)")
-            for i, f in enumerate(pie_fractions)
-        ]
+        for i, f in enumerate(pie_fractions):
+            if withheld[i]:
+                legend_entries.append((_colour_for(i), f"{categories[i]} ({_WITHHELD_WORD})"))
+                legend_swatches.append(
+                    _withheld_tip(
+                        _with_mark(_withheld_style(), f"{spec.y_fields[0]}|{categories[i]}"),
+                        spec.y_fields[0],
+                        categories[i],
+                    )
+                )
+            elif pie_values[i] is not None:
+                # Routed through the canonical formatter (Phase 876) — one rounding
+                # + rendering rule for every number this module prints. A share is
+                # a whole percent, so the shipped ``NN%`` shape is unchanged.
+                legend_entries.append(
+                    (_colour_for(i), f"{categories[i]} ({_format_value(None, 1.0, False, 1.0, f * 100.0)}%)")
+                )
+                legend_swatches.append(_style_fill(_colour_for(i)))
     elif m > 1:
         legend_entries = [(_colour_for(j), spec.y_fields[j]) for j in range(m)]
+        legend_swatches = [_style_fill(_colour_for(j)) for j in range(m)]
 
     # The placement the author ASKED FOR: their explicit spec value where there
     # is one, else the host default. With no entries at all the answer is
@@ -2747,6 +2823,49 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         slot_x = slot_origin_x(i) + (band_w - bar_group_w) / 2.0 + float(j) * grouped_sub_w
         return _r2(slot_x + (grouped_sub_w - grouped_bar_w) / 2.0)
 
+    # ── The WITHHELD placeholder (Phase 2809, D38) ──
+    #
+    # An outlined square of ``_WITHHELD_MARK_SIZE``, centred on the zero line: a
+    # fixed size, so no height implies a value. ``x`` and ``w`` are the slot it
+    # spans — a grouped bar's own slot, a stacked bar's slot split between its
+    # series, or one square per series side by side on the point arms. It carries
+    # the datum's OWN mark identity, so a click on it resolves the withheld row.
+    zero_y = y_scale(0.0)
+
+    def withheld_mark(x: float, w: float, series_field: str, category_key: str) -> Obj:
+        return _rectangle(
+            _r2(x),
+            _r2(zero_y - _WITHHELD_MARK_SIZE / 2.0),
+            _r2(w),
+            _WITHHELD_MARK_SIZE,
+            None,
+            _withheld_tip(_with_mark(_withheld_style(), f"{series_field}|{category_key}"), series_field, category_key),
+        )
+
+    def withheld_strips(centre_of: Callable[[int], float | None], key_of: Callable[[int], str]) -> list[Value]:
+        """The point arms' placeholders, after their series (painter's order): one
+        square per series, side by side and centred on the datum's x."""
+        out: list[Value] = []
+        for i in range(n):
+            if not withheld[i]:
+                continue
+            cx = centre_of(i)
+            if cx is None:
+                continue
+            for j in range(m):
+                out.append(
+                    withheld_mark(
+                        cx - float(m) * _WITHHELD_MARK_SIZE / 2.0 + float(j) * _WITHHELD_MARK_SIZE,
+                        _WITHHELD_MARK_SIZE,
+                        spec.y_fields[j],
+                        key_of(i),
+                    )
+                )
+        return out
+
+    def category_key(i: int) -> str:
+        return categories[i]
+
     # ── Series geometry ──
     series_shapes: list[Value] = []
     if spec.kind in ("Bar", "Column") and stacked:
@@ -2757,15 +2876,27 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         bw = stacked_bar_w
         for i in range(n):
             bx = stacked_bar_x(i)
+            if withheld[i]:
+                # Phase 2809 — the stack's slot split evenly between its series.
+                for j in range(m):
+                    series_shapes.append(
+                        withheld_mark(bx + float(j) * bw / float(m), bw / float(m), spec.y_fields[j], categories[i])
+                    )
+                continue
             cums = cums_for(i)
             for j in range(m):
+                seg_v = series[j][i]
+                if seg_v is None:
+                    continue
                 y0 = y_scale(cums[j])
                 y1 = y_scale(cums[j + 1])
                 # The gap comes off the far side from the baseline, and only
-                # where another segment follows — so the stack's outer tip
-                # keeps its full height and the total stays honest. `max 0`
-                # covers a segment thinner than the gap.
-                gap = _STACK_SEGMENT_GAP if j < m - 1 else 0.0
+                # where another DRAWN segment follows (Phase 2809: a missing one
+                # draws nothing) — so the stack's outer tip keeps its full height
+                # and the total stays honest. `max 0` covers a segment thinner
+                # than the gap.
+                followed = any(series[k][i] is not None for k in range(j + 1, m))
+                gap = _STACK_SEGMENT_GAP if followed else 0.0
                 top = _r2(min(y0, y1) + (gap if y1 < y0 else 0.0))
                 hgt = _r2(max(0.0, abs(y1 - y0) - gap))
                 mark = f"{spec.y_fields[j]}|{categories[i]}"
@@ -2774,7 +2905,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 # segment gets its readout: Phase 881 prints the stack TOTAL
                 # at the cap and nothing else, and pointed here for the rest.
                 seg_style = datum_tip(
-                    _with_mark(_style_fill(_colour_for(j)), mark), spec.y_fields[j], categories[i], series[j][i]
+                    _with_mark(_style_fill(_colour_for(j)), mark), spec.y_fields[j], categories[i], seg_v
                 )
                 series_shapes.append(_rectangle(bx, top, bw, hgt, None, seg_style))
     elif spec.kind in ("Bar", "Column"):
@@ -2784,7 +2915,12 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
             colour = _colour_for(j)
             values = series[j]
             for i in range(n):
+                if withheld[i]:
+                    series_shapes.append(withheld_mark(grouped_bar_x(i, j), bw, spec.y_fields[j], categories[i]))
+                    continue
                 v = values[i]
+                if v is None:
+                    continue
                 bx = grouped_bar_x(i, j)
                 vy = y_scale(v)
                 top = min(vy, base_y)
@@ -2795,59 +2931,76 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     elif spec.kind == "Area" and stacked and n > 0:
         # Cumulative bands, bottom band first (painter's order): band j fills
         # between boundary j (below) and boundary j+1 (above); its upper
-        # boundary carries the full-strength series edge (Phase 637).
+        # boundary carries the full-strength series edge (Phase 637). Phase
+        # 2809 — one band per run of present values.
         cum_rows = [cums_for(i) for i in range(n)]
         for j in range(m):
             colour = _colour_for(j)
             yf = spec.y_fields[j]
-            upper = [(x_centre(i), y_scale(cum_rows[i][j + 1])) for i in range(n)]
-            lower_pts = [(x_centre(i), y_scale(cum_rows[i][j])) for i in range(n - 1, -1, -1)]
-            series_shapes.append(
-                _polygon(
-                    upper + lower_pts,
-                    series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf),
+            for run_first, run_last in _present_runs(n, _present_in(series[j])):
+                upper = [(x_centre(i), y_scale(cum_rows[i][j + 1])) for i in range(run_first, run_last + 1)]
+                lower_pts = [(x_centre(i), y_scale(cum_rows[i][j])) for i in range(run_last, run_first - 1, -1)]
+                series_shapes.append(
+                    _polygon(
+                        upper + lower_pts,
+                        series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf),
+                    )
                 )
-            )
-            series_shapes.append(_polyline(upper, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
+                series_shapes.append(_polyline(upper, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
+        series_shapes.extend(withheld_strips(x_centre, category_key))
     elif spec.kind == "Area" and n > 0:
         # Overlaid baseline-closed bands in palette order (painter's order:
         # later series draw over earlier); the translucent fill keeps the
-        # overlap legible, the Polyline edge keeps each series distinct.
+        # overlap legible, the Polyline edge keeps each series distinct. Phase
+        # 2809 — one band per run of present values.
         base_y = y_scale(0.0)
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             yf = spec.y_fields[j]
-            points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
-            band = [(x_centre(0), base_y), *points, (x_centre(n - 1), base_y)]
-            series_shapes.append(
-                _polygon(band, series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf))
-            )
-            series_shapes.append(_polyline(points, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
+            for run_first, run_last in _present_runs(n, _present_in(values)):
+                points = [(x_centre(i), y_scale(_nan_if_none(values[i]))) for i in range(run_first, run_last + 1)]
+                band = [(x_centre(run_first), base_y), *points, (x_centre(run_last), base_y)]
+                series_shapes.append(
+                    _polygon(band, series_tip(_with_mark(_style_fill_opacity(colour, _AREA_FILL_OPACITY), yf), yf))
+                )
+                series_shapes.append(_polyline(points, series_tip(_with_mark(_style_stroke(colour, 2.0), yf), yf)))
+        series_shapes.extend(withheld_strips(x_centre, category_key))
     elif spec.kind == "Line":
+        # Phase 2809 — one polyline per run of present values: a gap BREAKS the
+        # line rather than dropping it to zero.
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
-            points = [(x_centre(i), y_scale(values[i])) for i in range(n)]
-            series_shapes.append(
-                _polyline(
-                    points,
-                    series_tip(_with_mark(_style_stroke(colour, 2.0), spec.y_fields[j]), spec.y_fields[j]),
+            for run_first, run_last in _present_runs(n, _present_in(values)):
+                points = [(x_centre(i), y_scale(_nan_if_none(values[i]))) for i in range(run_first, run_last + 1)]
+                series_shapes.append(
+                    _polyline(
+                        points,
+                        series_tip(_with_mark(_style_stroke(colour, 2.0), spec.y_fields[j]), spec.y_fields[j]),
+                    )
                 )
-            )
+        series_shapes.extend(withheld_strips(x_centre, category_key))
     elif spec.kind == "Scatter":
-        # Fixed-radius point marks per datum (Phase 636). A non-numeric x/y
-        # cell reads 0.0 (`_numeric_of`'s posture, shared with the other arms)
-        # — grounded validation makes that loud upstream, not here.
+        # Fixed-radius point marks per datum (Phase 636). A missing x or y cell
+        # draws NO point (Phase 2809, D38) — a point at 0.0 would be a datum the
+        # table never stated; grounded validation makes a non-numeric column loud
+        # upstream.
+        def x_present(i: int) -> bool:
+            return not math.isnan(x_values[i])
+
         for j in range(m):
             colour = _colour_for(j)
             values = series[j]
             yf = spec.y_fields[j]
             for i in range(n):
+                pv = values[i]
+                if pv is None or not x_present(i):
+                    continue
                 series_shapes.append(
                     _circle(
                         x_scale(x_values[i]),
-                        y_scale(values[i]),
+                        y_scale(pv),
                         4.0,
                         # The tip's middle part is the x cell as PROJECTED
                         # (``categories[i]``), not the mark id's canonical
@@ -2858,10 +3011,18 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                             _with_mark(_style_fill(colour), f"{yf}|{_format_num(x_values[i])}"),
                             yf,
                             categories[i],
-                            values[i],
+                            pv,
                         ),
                     )
                 )
+        # A withheld row keys its placeholder as its point would have been keyed,
+        # and a row with no x has no position to draw one at.
+        series_shapes.extend(
+            withheld_strips(
+                lambda i: x_scale(x_values[i]) if x_present(i) else None,
+                lambda i: _format_num(x_values[i]),
+            )
+        )
 
     # ── Data labels (Phase 881) — the values, written selectively ────────────
     #
@@ -2936,7 +3097,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 y_tick_text(v),
             )
 
-    def push_endpoint_labels(value_at: Callable[[int], float]) -> None:
+    def push_endpoint_labels(value_at: Callable[[int], float | None]) -> None:
         """The series-endpoint labels, in series order. Two gates, the second the
         vertical analogue of the cap labels' pitch: every endpoint label shares
         one x, so the thing they collide with is each other. A label is admitted
@@ -2952,6 +3113,10 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         admitted: list[float] = []
         for j in range(m):
             v = value_at(j)
+            # Phase 2809 — a series whose LAST value is missing or withheld has no
+            # endpoint to label: a number there would belong to no mark.
+            if v is None:
+                continue
             baseline = y_scale(v) - _DATA_LABEL_END_NUDGE_Y
             if not all(abs(b - baseline) >= data_label_line + _DATA_LABEL_PADDING for b in admitted):
                 continue
@@ -2968,18 +3133,22 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     if data_labels_on:
         if spec.kind in ("Bar", "Column") and stacked:
             # The TOTAL at the stack cap, once per category.
+            # A category with no drawn segment (Phase 2809) has no cap.
             for i in range(n):
-                push_cap_label(stacked_bar_x(i) + stacked_bar_w / 2.0, band_w, cums_for(i)[m])
+                if any(series[j][i] is not None for j in range(m)):
+                    push_cap_label(stacked_bar_x(i) + stacked_bar_w / 2.0, band_w, cums_for(i)[m])
         elif spec.kind in ("Bar", "Column"):
             for j in range(m):
                 for i in range(n):
-                    push_cap_label(grouped_bar_x(i, j) + grouped_bar_w / 2.0, grouped_sub_w, series[j][i])
+                    cap_v = series[j][i]
+                    if cap_v is not None:
+                        push_cap_label(grouped_bar_x(i, j) + grouped_bar_w / 2.0, grouped_sub_w, cap_v)
         elif spec.kind == "Area" and stacked:
             # The band's own UPPER boundary is the edge that was drawn, so it is
             # the cumulative value there — not the series' own datum, which is
             # nowhere on the picture.
             last_cums = cums_for(n - 1) if n > 0 else ()
-            push_endpoint_labels(lambda j: last_cums[j + 1])
+            push_endpoint_labels(lambda j: last_cums[j + 1] if series[j][n - 1] is not None else None)
         elif spec.kind in ("Line", "Area"):
             push_endpoint_labels(lambda j: series[j][n - 1])
 
@@ -3236,7 +3405,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 _LEGEND_SWATCH_SIZE,
                 _LEGEND_SWATCH_SIZE,
                 _LEGEND_SWATCH_CORNER_RADIUS,
-                _style_fill(legend_entries[j][0]),
+                legend_swatches[j],
             ),
             _label(
                 _r2(swatch_x + _LEGEND_LABEL_OFFSET_X),
@@ -3277,7 +3446,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                     _LEGEND_SWATCH_SIZE,
                     _LEGEND_SWATCH_SIZE,
                     _LEGEND_SWATCH_CORNER_RADIUS,
-                    _style_fill(legend_entries[j][0]),
+                    legend_swatches[j],
                 )
             )
             legend.append(
@@ -3327,7 +3496,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
                 plot_x1,
                 plot_y0,
                 plot_y1,
-                pie_values,
+                [0.0 if v is None else v for v in pie_values],
                 datum_tip,
             )
             + legend
@@ -3428,16 +3597,27 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
         # Phase-876 formatter at the axis's step precision, plus the axis's
         # display unit in its own words); the category is the datum's OWN label,
         # verbatim, even on a temporal axis.
-        if n > 0 and m > 0:
-            bi = bj = 0
-            bv = series[0][0]
-            for i in range(n):
-                for j in range(m):
-                    if series[j][i] > bv:
-                        bv, bi, bj = series[j][i], i, j
+        # Phase 2809 — over PRESENT values only: a missing or withheld value is no
+        # datum, and a chart with none has no peak clause.
+        best: tuple[int, int, float] | None = None
+        for i in range(n):
+            for j in range(m):
+                pv = series[j][i]
+                if pv is not None and (best is None or pv > best[2]):
+                    best = (i, j, pv)
+        if best is not None:
+            bi, bj, bv = best
             peak_series = _clamp_text(_SUMMARY_MAX_NAME_CHARS, spec.y_fields[bj])
             peak_category = _clamp_text(_SUMMARY_MAX_NAME_CHARS, categories[bi])
             clauses.append(f"Peak {peak_series} at {peak_category}, {y_tick_text(bv)}{unit_suffix}")
+
+        # Phase 2809 (D38) — the withheld clause: every series value of a withheld
+        # row, counted. A chart with nothing withheld gains no clause.
+        withheld_values = sum(1 for w in withheld if w) * m
+        if withheld_values == 1:
+            clauses.append(f"1 value {_WITHHELD_WORD}")
+        elif withheld_values > 1:
+            clauses.append(f"{withheld_values} values {_WITHHELD_WORD}")
 
         # ── The annotation clauses (Phase 1494 — §4i, extended) ──────────────
         #

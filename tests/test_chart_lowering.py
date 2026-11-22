@@ -152,6 +152,9 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         # crosses UNRESOLVED, whichever arm it carries — the Phase 1143 text
         # contract at a new slot.
         annotations=([_annotation(a) for a in inp["annotations"]] if inp.get("annotations") is not None else None),
+        # Phase 2655 — `scale` is a WIRE field carried in canonical `$type` JSON
+        # (the mapping the lowering reads), omitted when absent.
+        scale=inp.get("scale"),
     )
     return spec, list(inp["data"])
 
@@ -938,3 +941,50 @@ def test_drawing_root_announces_its_description() -> None:
     hostile = render_drawing('a"b', "<script>alert('x') & \"y\"</script>")
     assert ('aria-label="a&quot;b. &lt;script&gt;alert(&#39;x&#39;) &amp; &quot;y&quot;&lt;/script&gt;"') in hostile
     assert "<script>" not in hostile
+
+
+# ── Phase 2655 — the Heatmap arm (`chart-lowering/heatmap/`, WIRE_FORMAT §3.6.35) ──
+#
+# A subfamily, so the top-level enumeration above does not reach it: a cell grid
+# under a declared scale, binned onto the ramp; an absent pair or an empty value
+# cell draws the surface; a grid over the cell budget is the refusal drawing.
+
+_HEATMAP_DIR = _CHART_LOWERING_DIR / "heatmap"
+
+
+def _heatmap_cases() -> list[str]:
+    if not corpus_available() or not _HEATMAP_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _HEATMAP_DIR.glob("*.input.json"))
+
+
+_heatmap_available = pytest.mark.skipif(
+    not _heatmap_cases(),
+    reason=f"chart-lowering/heatmap fixtures not found at {_HEATMAP_DIR}",
+)
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", _heatmap_cases())
+def test_heatmap_lowers_byte_identical_to_golden(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    expected = (_HEATMAP_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(inp)
+    assert spec.kind == "Heatmap"
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: heatmap lowering drifted from golden"
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", _heatmap_cases())
+def test_heatmap_lowering_is_order_independent(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+def test_heatmap_is_a_lowered_kind() -> None:
+    from fuaran_ui.charts import LOWERED_KINDS
+
+    assert "Heatmap" in LOWERED_KINDS

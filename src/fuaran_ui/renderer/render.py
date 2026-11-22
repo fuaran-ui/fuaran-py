@@ -2504,6 +2504,14 @@ class Renderer:
             [a for a in annotations_src.items if isinstance(a, Obj)] if isinstance(annotations_src, Arr) else None
         )
 
+        # Phase 2655 — a heatmap's declared colour scale crosses the bridge as its
+        # canonical wire mapping, the shape the lowering reads. Absent stays
+        # absent: sequential over the data's extent.
+        scale_src = fields.get("scale")
+        scale: dict[str, object] | None = None
+        if isinstance(scale_src, Obj) and isinstance(scale_src.tag, str):
+            scale = {"$type": scale_src.tag, **scale_src.fields}
+
         spec = ChartSpec(
             kind=kind,
             x_field=x_field,
@@ -2519,6 +2527,7 @@ class Renderer:
             data_labels=data_labels,
             x_scale=x_scale,
             annotations=annotations,
+            scale=scale,
         )
         return lower_node(node.id, spec, rows)
 

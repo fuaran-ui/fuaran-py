@@ -3548,6 +3548,7 @@ def _check_grid(obj: dict, path: str) -> None:
 _CHART_ANNOTATION_CASES = frozenset(_g.UNION_CASES["ChartAnnotation"])
 _CHART_ANNOTATION_X_CASES = frozenset(_g.UNION_CASES["ChartAnnotationX"])
 _CHART_ANNOTATION_RANGE_CASES = frozenset(_g.UNION_CASES["ChartAnnotationRange"])
+_CHART_SCALE_CASES = frozenset(_g.UNION_CASES["ChartScale"])
 
 
 def _is_canonical_iso_day(text: str) -> bool:
@@ -3714,6 +3715,22 @@ def _decode_chart_annotations(value: object, path: str) -> Value:
     return from_json(value)
 
 
+def _decode_chart_scale(value: object, path: str) -> Value:
+    """Phase 2655 — ``Chart.scale``: a heatmap's declared colour scale.
+
+    Every bound is an optional float at §7's ordinary (sentinel-widened) slot: what a bound MEANS
+    against the rows is the lowering's — a non-finite one reads as absent there — and whether the
+    kind admits a scale at all is the validator's (FUARAN169). Carried structurally, so a
+    conformant document round-trips byte-for-byte; the case and each bound's type are checked.
+    """
+    o = _expect_object(value, path)
+    _dispatch(o, path, _CHART_SCALE_CASES)
+    for key in ("midpoint", "min", "max"):
+        if key in o:
+            _decode_number(o[key], f"{path}.{key}")
+    return from_json(value)
+
+
 def _decode_format_structural(value: object, path: str) -> Value:
     """A ``Format`` member (``Chart.valueFormat``): discriminator checked, payload preserved."""
     obj = _expect_object(value, path)
@@ -3750,6 +3767,7 @@ KIND_SCHEMAS["Chart"] = _kind_schema(
         "source": (_decode_grid_source, ("data",)),
         "valueFormat": _decode_format_structural,
         "annotations": _decode_chart_annotations,
+        "scale": _decode_chart_scale,
     },
 )
 

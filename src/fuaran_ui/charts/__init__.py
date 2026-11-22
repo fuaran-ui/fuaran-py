@@ -1215,7 +1215,7 @@ class ChartSpec:
 
     Mirrors the F# ``ChartSpec`` fields the lowering reads: ``kind`` (``Bar``
     grouped + stacked, ``Line``, ``Area`` overlaid + stacked, ``Scatter``,
-    ``Pie`` are lowered; ``Heatmap`` produces an empty drawing), the ``x_field``
+    ``Pie`` and — Phase 2655 — ``Heatmap`` are lowered), the ``x_field``
     category (Scatter: numeric) column, the ``y_fields`` series columns, the
     optional ``title``, and ``stacked`` (Bar/Area geometry only).
 
@@ -1281,6 +1281,12 @@ class ChartSpec:
     #
     # Absent (and empty) draws nothing, so a pre-1490 chart lowers byte-for-byte.
     annotations: Sequence[Obj] | None = None
+    # Phase 2655 — a ``Heatmap``'s DECLARED colour scale, carried as its
+    # canonical wire mapping (``{"$type": "Diverging", "min": -1, "max": 1}``):
+    # sequential from a floor, or diverging about a midpoint. The author states
+    # what the value means; the lowering picks the ramp stop. No colour crosses
+    # the wire. Absent means sequential over the data's extent.
+    scale: Mapping[str, object] | None = None
     # Phase 876 — the VALUE axis's number format, reusing the existing
     # ``Format`` vocabulary, carried as its canonical wire mapping
     # (``{"$type": "Currency", "isoCode": "GBP"}``). A WIRE field: a semantic
@@ -1292,10 +1298,11 @@ class ChartSpec:
     display_unit_min_exponent: int = DISPLAY_UNIT_MIN_EXPONENT
 
 
-LOWERED_KINDS = frozenset({"Bar", "Line", "Area", "Scatter", "Pie"})
+LOWERED_KINDS = frozenset({"Bar", "Line", "Area", "Scatter", "Pie", "Heatmap"})
 """The ``ChartKind``s this module lowers to a real ``Drawing`` (the render
 dispatch consults THIS, so the first-party render branch and the lowering's
-arm set can never drift apart). ``Heatmap`` stays a placeholder."""
+arm set can never drift apart). Every kind, since ``Heatmap`` gained its arm
+(Phase 2655)."""
 
 
 # ── Row field extraction ─────────────────────────────────────────────────────
@@ -1416,16 +1423,369 @@ def _summary_kind_words(kind: str, stacked: bool) -> str:
 # ── The lowering ─────────────────────────────────────────────────────────────
 
 
+# ── The Heatmap arm (Phase 2655) ─────────────────────────────────────────────
+#
+# NORMATIVE CROSS-HOST SPEC (WIRE_FORMAT §3.6.35), reproduced byte-for-byte from
+# the reference host's ``lowerHeatmap``: the ``chart-lowering/heatmap/``
+# subfamily pins it.
+#
+# A heatmap is a CELL GRID, not a series chart: the columns are the distinct
+# ``x_field`` keys and the rows the distinct keys of the ROW field
+# (``y_fields[0]``), both in first-appearance order; a cell's value is the VALUE
+# field (``y_fields[1]``) of the first row carrying that pair. A pair no row
+# carries — or a row whose value cell is empty, text or non-finite — is ABSENT
+# and draws the surface (``fill: none`` under a gridline-weight outline), never a
+# zero. The colour is a BIN: the declared scale maps a value to a fraction and
+# the fraction to one ramp stop by ``floor(t · n)``, clamped to the last stop —
+# plain IEEE arithmetic in a fixed order, so every host picks the same stop.
+
+_SEQUENTIAL_RAMP: tuple[str, ...] = ("#e8f2f7", "#bcdae8", "#8ec2da", "#5caacb", "#2c92b9")
+_DIVERGING_RAMP: tuple[str, ...] = ("#2c92b9", "#7ab2cc", "#b9d2df", "#f2f2f0", "#ddcbb2", "#c9a26c", "#b47803")
+_RAMP_LABEL_INK = "#1a1a19"
+_HEATMAP_CELL_GAP = 2.0
+_HEATMAP_TITLE_FONT_SIZE = 18.0
+_HEATMAP_TITLE_BASELINE_Y = 22.0
+_HEATMAP_TICK_LABEL_BASELINE_DY = 4.0
+_GRID_STROKE_WIDTH = 1.0
+# The reference host's Phase-790 point budget, applied to the cell grid.
+MAX_HEATMAP_CELLS = 10_000
+
+
+def _heatmap_value_of(row: Mapping[str, object], field_name: str) -> float | None:
+    """A heatmap value cell, or ``None`` when absent: empty, text, non-finite."""
+    v = _row_get(row, field_name)
+    if isinstance(v, bool):
+        return 1.0 if v else 0.0
+    if isinstance(v, (int, float)):
+        f = float(v)
+        return None if math.isnan(f) or math.isinf(f) else f
+    return None
+
+
+def _bound_or(declared: object, fallback: float) -> float:
+    """A declared bound, or the data's own when it is absent or non-finite."""
+    if isinstance(declared, (int, float)) and not isinstance(declared, bool):
+        f = float(declared)
+        if not (math.isnan(f) or math.isinf(f)):
+            return f
+    return fallback
+
+
+def _clamp_bin(n: int, x: float) -> int:
+    return 0 if n == 0 else max(0, min(n - 1, math.floor(x)))
+
+
+def _heatmap_scale(
+    scale: Mapping[str, object] | None, values: list[float]
+) -> tuple[tuple[str, ...], Callable[[float], int], float, float, float | None]:
+    """The resolved scale: the ramp, the bin of a value, and the ends + midpoint the legend states."""
+    data_min = min(values) if values else 0.0
+    data_max = max(values) if values else 0.0
+    if scale is not None and scale.get("$type") == "Diverging":
+        ramp = _DIVERGING_RAMP
+        n = len(ramp)
+        m = _bound_or(scale.get("midpoint"), 0.0)
+        lo = _bound_or(scale.get("min"), data_min)
+        hi = _bound_or(scale.get("max"), data_max)
+        e = max(m - lo, hi - m)
+
+        def div_bin(v: float) -> int:
+            t = max(-1.0, min(1.0, (v - m) / e)) if e > 0.0 else 0.0
+            return _clamp_bin(n, (t + 1.0) / 2.0 * n)
+
+        return ramp, div_bin, (m - e if e > 0.0 else m), (m + e if e > 0.0 else m), m
+    ramp = _SEQUENTIAL_RAMP
+    n = len(ramp)
+    lo = _bound_or(scale.get("min"), data_min) if scale is not None else data_min
+    hi = _bound_or(scale.get("max"), data_max) if scale is not None else data_max
+
+    def seq_bin(v: float) -> int:
+        t = max(0.0, min(1.0, (v - lo) / (hi - lo))) if hi > lo else 0.0
+        return _clamp_bin(n, t * n)
+
+    return ramp, seq_bin, lo, hi, None
+
+
+def _heatmap_refusal(spec: ChartSpec, at_least: int) -> Obj:
+    kind_fields: dict[str, Value] = {
+        "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _W, "height": _H}),
+        "shapes": Arr([]),
+        "style": Obj(None, {}),
+    }
+    if spec.title is not None:
+        kind_fields["title"] = spec.title
+    kind_fields["description"] = _literal(
+        f"Chart not rendered: at least {at_least} data points exceeds the limit of {MAX_HEATMAP_CELLS} per series."
+    )
+    return Obj("Drawing", kind_fields)
+
+
+def _lower_heatmap(spec: ChartSpec, rows: list[Mapping[str, object]]) -> Obj:  # noqa: C901, PLR0912, PLR0914, PLR0915
+    """Lower a ``Heatmap`` chart: the reference host's cost caps, then the cell grid."""
+    if len(rows) > MAX_HEATMAP_CELLS:
+        return _heatmap_refusal(spec, MAX_HEATMAP_CELLS + 1)
+    row_field = spec.y_fields[0] if spec.y_fields else ""
+    value_field = spec.y_fields[1] if len(spec.y_fields) >= 2 else ""
+    keyed = [(_string_of(r, spec.x_field), _string_of(r, row_field), r) for r in rows]
+    x_keys = list(dict.fromkeys(k[0] for k in keyed))
+    row_keys = list(dict.fromkeys(k[1] for k in keyed))
+    if len(x_keys) * len(row_keys) > MAX_HEATMAP_CELLS:
+        return _heatmap_refusal(spec, len(x_keys) * len(row_keys))
+    x_index = {k: i for i, k in enumerate(x_keys)}
+    row_index = {k: j for j, k in enumerate(row_keys)}
+    cells: dict[tuple[int, int], float] = {}
+    seen: set[tuple[int, int]] = set()
+    for x_key_of, row_key_of, r in keyed:
+        at = (x_index[x_key_of], row_index[row_key_of])
+        if at in seen:
+            continue
+        seen.add(at)
+        v = _heatmap_value_of(r, value_field)
+        if v is not None:
+            cells[at] = v
+
+    tick_size = _TICK_FONT_SIZE
+    line_height = _text_line_height(tick_size, _TEXT_LINE_HEIGHT_FACTOR)
+
+    def widest_of(font_size: float, texts: Sequence[str]) -> float:
+        acc = 0.0
+        for t in texts:
+            acc = max(acc, _text_width(font_size, t))
+        return acc
+
+    def axis_title_of(declared: Value | None, fallback_field: str) -> Value | None:
+        if declared is not None:
+            return declared
+        return None if fallback_field == "" else _literal(_capitalise(fallback_field))
+
+    def bound_text(font_size: float, extent: float, t: Value) -> Value:
+        text = _literal_text_of(t)
+        return _literal(_truncate_to_width(font_size, extent, text)) if text is not None else t
+
+    x_title = axis_title_of(spec.x_title, spec.x_field)
+    y_title = axis_title_of(spec.y_title, row_field)
+    n = len(x_keys)
+    m = len(row_keys)
+    values = [cells[(i, j)] for i in range(n) for j in range(m) if (i, j) in cells]
+
+    ramp, bin_of, low, high, midpoint = _heatmap_scale(spec.scale, values)
+    _, _, step, _ = _nice_domain(low, high)
+
+    def value_text(v: float) -> str:
+        return _format_value(spec.value_format, 1.0, False, step, v)
+
+    subtitle_band = (
+        _text_line_height(_SUBTITLE_FONT_SIZE, _TEXT_LINE_HEIGHT_FACTOR) if spec.subtitle is not None else 0.0
+    )
+    plot_y0 = _r2(_MARGIN_TOP + subtitle_band)
+    plot_y1 = _r2(_H - _MARGIN_BOTTOM)
+
+    left_ceiling = _MARGIN_LEFT_MAX_SHARE * _W
+    y_title_band = line_height + _AXIS_LABEL_PADDING if y_title is not None else 0.0
+    row_text_budget = max(0.0, left_ceiling - _TICK_LABEL_GAP - _AXIS_LABEL_PADDING - y_title_band)
+    row_labels = [_truncate_to_width(tick_size, row_text_budget, k) for k in row_keys]
+    required_left = _TICK_LABEL_GAP + widest_of(tick_size, row_labels) + _AXIS_LABEL_PADDING + y_title_band
+    plot_x0 = _r2(max(_MARGIN_LEFT, min(left_ceiling, required_left)))
+
+    show_legend = spec.legend_position != "None"
+    legend_texts = [value_text(high)] + ([value_text(midpoint)] if midpoint is not None else []) + [value_text(low)]
+    legend_reserve = (
+        _LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X + widest_of(tick_size, legend_texts) if show_legend else 0.0
+    )
+
+    plot_x1 = _r2(_W - _MARGIN_RIGHT - legend_reserve)
+    plot_w = plot_x1 - plot_x0
+    plot_h = plot_y1 - plot_y0
+    cell_w = plot_w / n if n > 0 else 0.0
+    cell_h = plot_h / m if m > 0 else 0.0
+    gap = _HEATMAP_CELL_GAP
+    half = gap / 2.0
+
+    def centre_x(i: int) -> float:
+        return plot_x0 + cell_w * i + cell_w / 2.0
+
+    def centre_y(j: int) -> float:
+        return plot_y0 + cell_h * j + cell_h / 2.0
+
+    def fill_of(v: float) -> str:
+        return _INK if len(ramp) == 0 else ramp[bin_of(v)]
+
+    absent_style = Obj(None, {**_style_stroke_ink(_GRID_OPACITY, _GRID_STROKE_WIDTH).fields, "fill": _static("none")})
+    shapes: list[Value] = []
+    for i in range(n):
+        for j in range(m):
+            x = _r2(plot_x0 + cell_w * i + half)
+            y = _r2(plot_y0 + cell_h * j + half)
+            w = _r2(max(0.0, cell_w - gap))
+            h = _r2(max(0.0, cell_h - gap))
+            if (i, j) in cells:
+                v = cells[(i, j)]
+                x_key = x_keys[i]
+                row_key = row_keys[j]
+                style = _with_tip(
+                    _with_mark(_style_fill(fill_of(v)), f"{value_field}|{x_key}|{row_key}"),
+                    row_key
+                    + _TIP_SEPARATOR
+                    + x_key
+                    + _TIP_SEPARATOR
+                    + _format_value(spec.value_format, 1.0, False, v, v),
+                )
+                shapes.append(_rectangle(x, y, w, h, None, style))
+            else:
+                shapes.append(_rectangle(x, y, w, h, None, absent_style))
+
+    if spec.data_labels == "Ends":
+        label_style = Obj(
+            None,
+            {
+                "fill": _static(_RAMP_LABEL_INK),
+                "textAnchor": "Middle",
+                "fontSize": _DATA_LABEL_FONT_SIZE,
+                "emphasis": "Normal",
+                "fontFamily": _CHART_FONT,
+            },
+        )
+        room = 2.0 * _DATA_LABEL_PADDING
+        for i in range(n):
+            for j in range(m):
+                if (i, j) not in cells:
+                    continue
+                text = value_text(cells[(i, j)])
+                if text_fits_box(
+                    _DATA_LABEL_FONT_SIZE, _TEXT_LINE_HEIGHT_FACTOR, cell_w - gap - room, cell_h - gap - room, text
+                ):
+                    shapes.append(
+                        _label(
+                            _r2(centre_x(i)),
+                            _r2(centre_y(j) + _HEATMAP_TICK_LABEL_BASELINE_DY),
+                            _literal(text),
+                            label_style,
+                        )
+                    )
+
+    def chrome_label(anchor: str) -> Obj:
+        return _text_style(_LABEL_OPACITY, anchor, tick_size, "Normal")
+
+    for j, text in enumerate(row_labels):
+        shapes.append(
+            _label(
+                _r2(plot_x0 - _TICK_LABEL_GAP),
+                _r2(centre_y(j) + _HEATMAP_TICK_LABEL_BASELINE_DY),
+                _literal(text),
+                chrome_label("End"),
+            )
+        )
+    for i, key in enumerate(x_keys):
+        shapes.append(
+            _label(
+                _r2(centre_x(i)),
+                _r2(plot_y1 + _CATEGORY_LABEL_OFFSET_Y),
+                _literal(_truncate_to_width(tick_size, cell_w, key)),
+                chrome_label("Middle"),
+            )
+        )
+
+    if x_title is not None:
+        shapes.append(
+            _label(
+                _r2((plot_x0 + plot_x1) / 2.0),
+                _r2(_H - _AXIS_TITLE_BOTTOM_OFFSET),
+                bound_text(tick_size, plot_w, x_title),
+                _text_style(None, "Middle", tick_size, "Normal"),
+            )
+        )
+    if y_title is not None:
+        shapes.append(
+            _label(
+                _r2(_Y_AXIS_TITLE_OFFSET_X),
+                _r2((plot_y0 + plot_y1) / 2.0),
+                bound_text(tick_size, plot_h, y_title),
+                _text_style(None, "Middle", tick_size, "Normal", rotation=_r2(-_Y_AXIS_TITLE_DEGREES)),
+            )
+        )
+
+    if show_legend and len(ramp) > 0:
+        stops = len(ramp)
+        stop_h = plot_h / stops
+        swatch_x = _r2(plot_x1 + _LEGEND_COLUMN_GAP)
+        label_x = _r2(plot_x1 + _LEGEND_COLUMN_GAP + _LEGEND_LABEL_OFFSET_X)
+        for k in range(stops):
+            shapes.append(
+                _rectangle(
+                    swatch_x,
+                    _r2(plot_y0 + stop_h * (stops - 1 - k)),
+                    _LEGEND_SWATCH_SIZE,
+                    _r2(stop_h),
+                    None,
+                    _style_fill(ramp[k]),
+                )
+            )
+
+        def label_at(y: float, text: str) -> Obj:
+            return _label(label_x, _r2(y + _HEATMAP_TICK_LABEL_BASELINE_DY), _literal(text), chrome_label("Start"))
+
+        shapes.append(label_at(plot_y0, value_text(high)))
+        if midpoint is not None:
+            shapes.append(label_at((plot_y0 + plot_y1) / 2.0, value_text(midpoint)))
+        shapes.append(label_at(plot_y1, value_text(low)))
+
+    if spec.title is not None:
+        shapes.append(
+            _label(
+                _r2(plot_x0),
+                _HEATMAP_TITLE_BASELINE_Y,
+                spec.title,
+                _text_style(None, "Start", _HEATMAP_TITLE_FONT_SIZE, "Loud"),
+            )
+        )
+    if spec.subtitle is not None:
+        shapes.append(
+            _label(
+                _r2(plot_x0),
+                _SUBTITLE_BASELINE_Y,
+                bound_text(_SUBTITLE_FONT_SIZE, plot_w, spec.subtitle),
+                _text_style(_LABEL_OPACITY, "Start", _SUBTITLE_FONT_SIZE, "Normal"),
+            )
+        )
+
+    def name(s: str) -> str:
+        return _clamp_text(_SUMMARY_MAX_NAME_CHARS, s)
+
+    absent = n * m - len(cells)
+    clauses = [
+        f"{_summary_kind_words('Heatmap', False)} of {name(value_field)} by {name(spec.x_field)} and {name(row_field)}",
+        f"{n} columns by {m} rows",
+        "no values" if not values else f"values from {value_text(min(values))} to {value_text(max(values))}",
+    ]
+    if absent > 0:
+        clauses.append(f"{absent} cells empty")
+
+    kind_fields: dict[str, Value] = {
+        "viewBox": Obj(None, {"minX": 0.0, "minY": 0.0, "width": _W, "height": _H}),
+        "shapes": Arr(shapes),
+        "style": Obj(None, {}),
+    }
+    if spec.title is not None:
+        kind_fields["title"] = spec.title
+    kind_fields["description"] = _literal(
+        _clamp_text(_SUMMARY_MAX_CHARS, _SUMMARY_CLAUSE_SEPARATOR.join(clauses) + ".")
+    )
+    return Obj("Drawing", kind_fields)
+
+
 def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa: C901, PLR0912, PLR0915
     """Lower a resolved ``ChartSpec`` + data rows to a canonical ``Drawing`` kind.
 
     Returns the ``Drawing`` kind object (``$type = "Drawing"``); wrap it in a node
     with :func:`lower_node`. Lowered arms: ``Bar`` (grouped + stacked), ``Line``,
     ``Area`` (overlaid + stacked), ``Scatter`` (linear numeric x), ``Pie``
-    (polar, single-series); ``Heatmap`` produces an empty drawing. ``stacked``
-    on a kind where stacking is meaningless is ignored.
+    (polar, single-series), and ``Heatmap`` (Phase 2655 — a cell grid under a
+    declared scale, :func:`_lower_heatmap`). ``stacked`` on a kind where
+    stacking is meaningless is ignored.
     """
     rows = list(rows)
+    if spec.kind == "Heatmap":
+        return _lower_heatmap(spec, rows)
     categories = [_string_of(r, spec.x_field) for r in rows]
     n = len(rows)
 

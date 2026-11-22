@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "710cf74d1f084d3f0854c8d58f6cebbbbac629b97e9bfeeb379d40628b28197e"
+IDL_SHA256 = "b63cc2baad57c2036ad56bb91071b6594f35d80d47af10ff99d82a6acedfc17d"
 IDL_VERSION = 1
 
 
@@ -77,6 +77,7 @@ T_enum_ChartDataLabels = T("enum", "ChartDataLabels")
 T_enum_ChartXScale = T("enum", "ChartXScale")
 T_union_ChartAnnotation = T("union", "ChartAnnotation")
 T_list_union_ChartAnnotation = T("list", of=T_union_ChartAnnotation)
+T_union_ChartScale = T("union", "ChartScale")
 T_int = T("int")
 T_list_int = T("list", of=T_int)
 T_json = T("json")
@@ -541,6 +542,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("dataLabels", "optional", T_enum_ChartDataLabels),
         F("xScale", "optional", T_enum_ChartXScale),
         F("annotations", "optional", T_list_union_ChartAnnotation),
+        F("scale", "optional", T_union_ChartScale),
         F("onPointClick", "optional", T_fn),
     ),
     "CodeBlock": (
@@ -1104,6 +1106,7 @@ UNION_CASES: dict[str, tuple[str, ...]] = {
     "ChartAnnotation": ("ReferenceLine", "EventMarker", "RangeBand"),
     "ChartAnnotationRange": ("ValueRange", "XRange"),
     "ChartAnnotationX": ("Category", "Date"),
+    "ChartScale": ("Sequential", "Diverging"),
     "ColumnWidth": ("Auto", "Fixed", "Flex"),
     "CurveCommand": ("MoveTo", "LineTo", "CubicTo", "QuadraticTo", "Close"),
     "FormFieldKind": (
@@ -1357,6 +1360,17 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
     "ChartAnnotationX": {
         "Category": (F("key", "required", T_str),),
         "Date": (F("iso", "required", T_str),),
+    },
+    "ChartScale": {
+        "Sequential": (
+            F("min", "optional", T_float),
+            F("max", "optional", T_float),
+        ),
+        "Diverging": (
+            F("midpoint", "optional", T_float),
+            F("min", "optional", T_float),
+            F("max", "optional", T_float),
+        ),
     },
     "ColumnWidth": {
         "Auto": (),

@@ -2890,6 +2890,37 @@ ChartAnnotation = ReferenceLine | EventMarker | RangeBand
 """The closed three-member annotation union (§4l)."""
 
 
+@dataclass(frozen=True)
+class SequentialScale:
+    """Phase 2655 — a heatmap value light to dark from ``min`` to ``max``. An
+    absent bound is the data's own extent."""
+
+    min: float | None = None
+    max: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Sequential", {"max": self.max, "min": self.min})
+
+
+@dataclass(frozen=True)
+class DivergingScale:
+    """Phase 2655 — a heatmap value as two hues meeting at a light neutral
+    ``midpoint`` (absent: zero). An absent bound is the data's own extent."""
+
+    midpoint: float | None = None
+    min: float | None = None
+    max: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Diverging", {"max": self.max, "midpoint": self.midpoint, "min": self.min})
+
+
+ChartScale = SequentialScale | DivergingScale
+"""Phase 2655 — a chart's DECLARED colour scale: the author states what the value
+means and the lowering picks the colours. No colour crosses the wire. Read by a
+``Heatmap`` only; any other kind carrying it is refused pre-emit (FUARAN169)."""
+
+
 # ── The row feed (WIRE_FORMAT.md §5 "Row payloads") ────────────────────────
 #
 # Phase 1960 — "The two encode refusals". A row cell holding an ``int`` outside
@@ -3012,6 +3043,9 @@ class Chart:
     #: the key, so a chart authored before the slot existed still encodes
     #: byte-for-byte as it did.
     annotations: tuple[ChartAnnotation, ...] | None = None
+    #: Phase 2655 — a heatmap's declared colour scale, absent meaning sequential
+    #: over the data's extent.
+    scale: ChartScale | None = None
     #: Phase 2334 — whether the emitting host holds a point-click handler. A closure: it
     #: crosses the wire as the sentinel when true and is omitted when false.
     on_point_click: bool = False
@@ -3025,6 +3059,7 @@ class Chart:
                 "kind": self.kind,
                 "legendPosition": self.legend_position,
                 "onPointClick": CLOSURE if self.on_point_click else None,
+                "scale": self.scale,
                 "source": _row_feed(self.source),
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.

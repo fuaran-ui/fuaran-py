@@ -1428,6 +1428,17 @@ def _sorted_rows(spec: ChartSpec, rows: list[Mapping[str, object]]) -> list[Mapp
     return [r for _, r in ordered] + missing
 
 
+def _label_right_of(xs: Sequence[float], plot_x1: float) -> list[float]:
+    """For vertical lines at ``xs``, the x each one's label must not reach: its successor in
+    ``(x, index)`` order, or the plot's right edge for the last. One rule for the event markers
+    and the x reference lines (Phase 2654)."""
+    right = [plot_x1] * len(xs)
+    order = sorted(range(len(xs)), key=lambda i: (xs[i], i))
+    for r in range(len(order) - 1):
+        right[order[r]] = xs[order[r + 1]]
+    return right
+
+
 def _interval_end(iv: tuple[float, float] | None, k: int) -> float:
     """One end of a present interval (``k`` 0 low, 1 high); a band reads only runs of
     present intervals, so ``None`` never reaches here."""
@@ -3574,10 +3585,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # same rule rather than needing one of their own: the earlier gets a budget of
     # zero and is suppressed, the later runs to the next distinct position.
     event_marker_xs = [event_marker_x(i) for i in range(len(event_markers))]
-    event_label_right = [plot_x1] * len(event_marker_xs)
-    _event_order = sorted(range(len(event_marker_xs)), key=lambda i: (event_marker_xs[i], i))
-    for _r in range(len(_event_order) - 1):
-        event_label_right[_event_order[_r]] = event_marker_xs[_event_order[_r + 1]]
+    event_label_right = _label_right_of(event_marker_xs, plot_x1)
 
     annotation_label_shapes: list[Value] = []
     for v, lbl in reference_lines:
@@ -3648,10 +3656,7 @@ def lower(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> Obj:  # noqa
     # the plot beside the line, the width budget running to the next line (the
     # event markers' rule).
     reference_x_xs = [x_scale(v) for v, _ in reference_lines_x]
-    reference_x_right = [plot_x1] * len(reference_x_xs)
-    _reference_x_order = sorted(range(len(reference_x_xs)), key=lambda i: (reference_x_xs[i], i))
-    for _r in range(len(_reference_x_order) - 1):
-        reference_x_right[_reference_x_order[_r]] = reference_x_xs[_reference_x_order[_r + 1]]
+    reference_x_right = _label_right_of(reference_x_xs, plot_x1)
     for i, (_, lbl) in enumerate(reference_lines_x):
         if lbl is None:
             continue

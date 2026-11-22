@@ -9023,6 +9023,52 @@
             "$ref": "#/$defs/ChartAnnotation"
           }
         },
+        "scale": {
+          "$ref": "#/$defs/ChartScale"
+        },
+        "withheldField": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "object",
+          "properties": {
+            "low": {
+              "type": "string"
+            },
+            "high": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "low",
+            "high"
+          ]
+        },
+        "sizeField": {
+          "type": "string"
+        },
+        "sortBy": {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string"
+            },
+            "direction": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          "required": [
+            "field",
+            "direction"
+          ]
+        },
+        "pathField": {
+          "type": "string"
+        },
         "onPointClick": {
           "const": "<closure>"
         }
@@ -9088,6 +9134,24 @@
           "required": [
             "$type",
             "range"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "ReferenceLineX"
+            },
+            "value": {
+              "type": "number"
+            },
+            "label": {
+              "$ref": "#/$defs/TextSource"
+            }
+          },
+          "required": [
+            "$type",
+            "value"
           ]
         }
       ]
@@ -9164,6 +9228,102 @@
           "required": [
             "$type",
             "iso"
+          ]
+        }
+      ]
+    },
+    "ChartScale": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Sequential"
+            },
+            "min": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "max": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "$type"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "$type": {
+              "const": "Diverging"
+            },
+            "midpoint": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "min": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            },
+            "max": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "enum": [
+                    "NaN",
+                    "Infinity",
+                    "-Infinity"
+                  ]
+                }
+              ]
+            }
+          },
+          "required": [
+            "$type"
           ]
         }
       ]

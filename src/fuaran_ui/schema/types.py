@@ -2886,8 +2886,76 @@ class RangeBand:
         return _obj("RangeBand", {"label": self.label, "range": self.range})
 
 
-ChartAnnotation = ReferenceLine | EventMarker | RangeBand
-"""The closed three-member annotation union (§4l)."""
+@dataclass(frozen=True)
+class ReferenceLineX:
+    """Phase 2654 — a vertical line at a NUMERIC x on a Scatter's continuous axis:
+    the reference line mirrored onto x (a quadrant divider). A category or a date
+    on x is :class:`EventMarker`'s address."""
+
+    value: float
+    label: TextSource | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("ReferenceLineX", {"label": self.label, "value": self.value})
+
+
+ChartAnnotation = ReferenceLine | EventMarker | RangeBand | ReferenceLineX
+"""The closed annotation union (§4l), with the x reference line (Phase 2654)."""
+
+
+@dataclass(frozen=True)
+class ChartInterval:
+    """Phase 2654 (D39) — a chart's INTERVAL channel: the columns holding each
+    datum's low and high ends, on the single series."""
+
+    low: str
+    high: str
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"high": self.high, "low": self.low})
+
+
+@dataclass(frozen=True)
+class ChartSort:
+    """Phase 2654 (D39) — a chart's declared row ORDER: the column whose numeric
+    value orders the rows before layout, and the direction."""
+
+    field: str
+    direction: SortDirection
+
+    def to_wire(self) -> Value:
+        return _obj(None, {"direction": self.direction, "field": self.field})
+
+
+@dataclass(frozen=True)
+class SequentialScale:
+    """Phase 2655 — a heatmap value light to dark from ``min`` to ``max``. An
+    absent bound is the data's own extent."""
+
+    min: float | None = None
+    max: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Sequential", {"max": self.max, "min": self.min})
+
+
+@dataclass(frozen=True)
+class DivergingScale:
+    """Phase 2655 — a heatmap value as two hues meeting at a light neutral
+    ``midpoint`` (absent: zero). An absent bound is the data's own extent."""
+
+    midpoint: float | None = None
+    min: float | None = None
+    max: float | None = None
+
+    def to_wire(self) -> Value:
+        return _obj("Diverging", {"max": self.max, "midpoint": self.midpoint, "min": self.min})
+
+
+ChartScale = SequentialScale | DivergingScale
+"""Phase 2655 — a chart's DECLARED colour scale: the author states what the value
+means and the lowering picks the colours. No colour crosses the wire. Read by a
+``Heatmap`` only; any other kind carrying it is refused pre-emit (FUARAN169)."""
 
 
 # ── The row feed (WIRE_FORMAT.md §5 "Row payloads") ────────────────────────
@@ -3012,6 +3080,19 @@ class Chart:
     #: the key, so a chart authored before the slot existed still encodes
     #: byte-for-byte as it did.
     annotations: tuple[ChartAnnotation, ...] | None = None
+    #: Phase 2655 — a heatmap's declared colour scale, absent meaning sequential
+    #: over the data's extent.
+    scale: ChartScale | None = None
+    #: Phase 2809 (D38) — the column whose boolean ``True`` marks a row WITHHELD by
+    #: a disclosure gate: the row draws a placeholder, never its value. Absent omits.
+    withheld_field: str | None = None
+    #: Phase 2654 (D39) — the mark channels: an interval on the single series, a
+    #: Scatter point's size, the rows' declared order and a Scatter series' path.
+    #: Each absent omits, so a chart authored before them encodes as it did.
+    interval: ChartInterval | None = None
+    size_field: str | None = None
+    sort_by: ChartSort | None = None
+    path_field: str | None = None
     #: Phase 2334 — whether the emitting host holds a point-click handler. A closure: it
     #: crosses the wire as the sentinel when true and is omitted when false.
     on_point_click: bool = False
@@ -3022,9 +3103,14 @@ class Chart:
             {
                 "annotations": list(self.annotations) if self.annotations is not None else None,
                 "dataLabels": self.data_labels,
+                "interval": self.interval,
                 "kind": self.kind,
                 "legendPosition": self.legend_position,
                 "onPointClick": CLOSURE if self.on_point_click else None,
+                "pathField": self.path_field,
+                "scale": self.scale,
+                "sizeField": self.size_field,
+                "sortBy": self.sort_by,
                 "source": _row_feed(self.source),
                 # Phase 1585 — omitted-when-false. Every host's decoder restores
                 # `False` on absence, so a grouped chart pays no key for it.
@@ -3032,6 +3118,7 @@ class Chart:
                 "subtitle": self.subtitle,
                 "title": self.title,
                 "valueFormat": self.value_format,
+                "withheldField": self.withheld_field,
                 "xField": self.x_field,
                 "xScale": self.x_scale,
                 "xTitle": self.x_title,

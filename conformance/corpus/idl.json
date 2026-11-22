@@ -1731,6 +1731,82 @@
         },
         {
           "annotations": {
+            "doc": "The declared colour scale of a `Heatmap`'s value field: sequential or diverging. Absent means sequential over the data's extent; any other kind carrying it is refused before emission (FUARAN169)."
+          },
+          "name": "scale",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "ChartScale"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "The column that marks a row as withheld by a disclosure gate: a row whose cell there is `true` draws a placeholder and the tip 'withheld', never its value and never a zero. Absent means nothing is withheld."
+          },
+          "name": "withheldField",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "An interval drawn on the single series: the columns holding each datum's low and high ends. Read by `Bar`, `Line`, `Area` and `Scatter`; a row missing either end draws no interval. Absent means none."
+          },
+          "name": "interval",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "record",
+            "name": "ChartInterval"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "The column that sizes each `Scatter` point by area, between the style's minimum and maximum radius. A row whose size is missing or negative draws no point. Absent means one fixed radius."
+          },
+          "name": "sizeField",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "The column whose numeric value orders the rows before layout, and the direction; rows whose value is missing, and withheld rows, follow in source order. Absent means source order."
+          },
+          "name": "sortBy",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "record",
+            "name": "ChartSort"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "The column whose numeric value orders a `Scatter` series' points along a connecting path; a row missing its x, y or path value breaks the path. Absent means no path."
+          },
+          "name": "pathField",
+          "optionality": {
+            "$type": "optional"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
             "doc": "An in-process handler called with the clicked point's row; it travels on the wire only as a `\"<closure>\"` sentinel."
           },
           "name": "onPointClick",
@@ -6001,6 +6077,71 @@
     },
     {
       "annotations": {
+        "doc": "A chart interval: the columns holding each datum's low and high ends."
+      },
+      "fields": [
+        {
+          "annotations": {
+            "doc": "The column holding each datum's low end, in the value axis's units."
+          },
+          "name": "low",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "The column holding each datum's high end, in the value axis's units."
+          },
+          "name": "high",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        }
+      ],
+      "name": "ChartInterval"
+    },
+    {
+      "annotations": {
+        "doc": "A chart's declared row order: the column to order by and the direction."
+      },
+      "fields": [
+        {
+          "annotations": {
+            "doc": "The column whose numeric value orders the rows."
+          },
+          "name": "field",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "str"
+          }
+        },
+        {
+          "annotations": {
+            "doc": "Ascending or descending."
+          },
+          "name": "direction",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "enum",
+            "name": "SortDirection"
+          }
+        }
+      ],
+      "name": "ChartSort"
+    },
+    {
+      "annotations": {
         "doc": "A `DataGrid` column: its header, cell kind, format, width, and where each row's cell value comes from (a row field name or a projection closure)."
       },
       "fields": [
@@ -10005,6 +10146,40 @@
             }
           ],
           "tag": "RangeBand"
+        },
+        {
+          "annotations": {
+            "doc": "A vertical line across the plot at a numeric value on a continuous x axis."
+          },
+          "fields": [
+            {
+              "annotations": {
+                "doc": "The line's position in the x axis's own units. Must be finite; a non-finite value is refused by the decoder."
+              },
+              "name": "value",
+              "optionality": {
+                "$type": "required"
+              },
+              "type": {
+                "$type": "float"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The line's label text. Omitted means an unlabelled line."
+              },
+              "name": "label",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "union",
+                "args": [],
+                "name": "TextSource"
+              }
+            }
+          ],
+          "tag": "ReferenceLineX"
         }
       ],
       "name": "ChartAnnotation",
@@ -10134,6 +10309,91 @@
         }
       ],
       "name": "ChartAnnotationX",
+      "params": []
+    },
+    {
+      "annotations": {
+        "doc": "The declared colour scale of a chart's value field: the author states what the value means, and the lowering picks and validates the colours. No colour crosses the wire."
+      },
+      "cases": [
+        {
+          "annotations": {
+            "doc": "Light to dark from a floor to a ceiling, for a quantity with a natural low end."
+          },
+          "fields": [
+            {
+              "annotations": {
+                "doc": "The value drawn as the lightest stop. Absent means the data minimum."
+              },
+              "name": "min",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "float"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The value drawn as the darkest stop. Absent means the data maximum."
+              },
+              "name": "max",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "float"
+              }
+            }
+          ],
+          "tag": "Sequential"
+        },
+        {
+          "annotations": {
+            "doc": "Two hues meeting at a light neutral midpoint, for a quantity whose sign or side of a reference value is the reading."
+          },
+          "fields": [
+            {
+              "annotations": {
+                "doc": "The value drawn as the neutral centre stop. Absent means zero."
+              },
+              "name": "midpoint",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "float"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The low end of the extent. Absent means the data minimum; the scale is symmetric about the midpoint, using the wider excursion."
+              },
+              "name": "min",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "float"
+              }
+            },
+            {
+              "annotations": {
+                "doc": "The high end of the extent. Absent means the data maximum; the scale is symmetric about the midpoint, using the wider excursion."
+              },
+              "name": "max",
+              "optionality": {
+                "$type": "optional"
+              },
+              "type": {
+                "$type": "float"
+              }
+            }
+          ],
+          "tag": "Diverging"
+        }
+      ],
+      "name": "ChartScale",
       "params": []
     },
     {

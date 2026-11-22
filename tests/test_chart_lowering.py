@@ -11,7 +11,9 @@ the render-parity pattern.
 
 from __future__ import annotations
 
+import dataclasses
 import json
+from dataclasses import replace
 
 import pytest
 
@@ -96,9 +98,9 @@ def _annotation(raw: dict) -> Obj:
     if "label" in raw:
         fields["label"] = _text_source(raw["label"])
     tag = raw.get("$type")
-    if tag == "ReferenceLine":
+    if tag in ("ReferenceLine", "ReferenceLineX"):
         fields["value"] = raw["value"]
-        return Obj("ReferenceLine", fields)
+        return Obj(tag, fields)
     if tag == "EventMarker":
         fields["at"] = _annotation_x(raw["at"])
         return Obj("EventMarker", fields)
@@ -152,6 +154,17 @@ def _spec_and_rows(inp: dict) -> tuple[ChartSpec, list[dict]]:
         # crosses UNRESOLVED, whichever arm it carries — the Phase 1143 text
         # contract at a new slot.
         annotations=([_annotation(a) for a in inp["annotations"]] if inp.get("annotations") is not None else None),
+        # Phase 2655 — `scale` is a WIRE field carried in canonical `$type` JSON
+        # (the mapping the lowering reads), omitted when absent.
+        scale=inp.get("scale"),
+        # Phase 2809 — `withheldField` is a WIRE field carried as a string,
+        # omitted when absent.
+        withheld_field=inp.get("withheldField"),
+        # Phase 2654 — the mark channels, WIRE fields omitted when absent.
+        interval=(inp["interval"]["low"], inp["interval"]["high"]) if "interval" in inp else None,
+        size_field=inp.get("sizeField"),
+        sort_by=(inp["sortBy"]["field"], inp["sortBy"]["direction"]) if "sortBy" in inp else None,
+        path_field=inp.get("pathField"),
     )
     return spec, list(inp["data"])
 
@@ -938,3 +951,207 @@ def test_drawing_root_announces_its_description() -> None:
     hostile = render_drawing('a"b', "<script>alert('x') & \"y\"</script>")
     assert ('aria-label="a&quot;b. &lt;script&gt;alert(&#39;x&#39;) &amp; &quot;y&quot;&lt;/script&gt;"') in hostile
     assert "<script>" not in hostile
+
+
+# ── Phase 2655 — the Heatmap arm (`chart-lowering/heatmap/`, WIRE_FORMAT §3.6.35) ──
+#
+# A subfamily, so the top-level enumeration above does not reach it: a cell grid
+# under a declared scale, binned onto the ramp; an absent pair or an empty value
+# cell draws the surface; a grid over the cell budget is the refusal drawing.
+
+_HEATMAP_DIR = _CHART_LOWERING_DIR / "heatmap"
+
+
+def _heatmap_cases() -> list[str]:
+    if not corpus_available() or not _HEATMAP_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _HEATMAP_DIR.glob("*.input.json"))
+
+
+_heatmap_available = pytest.mark.skipif(
+    not _heatmap_cases(),
+    reason=f"chart-lowering/heatmap fixtures not found at {_HEATMAP_DIR}",
+)
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", _heatmap_cases())
+def test_heatmap_lowers_byte_identical_to_golden(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    expected = (_HEATMAP_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(inp)
+    assert spec.kind == "Heatmap"
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: heatmap lowering drifted from golden"
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", _heatmap_cases())
+def test_heatmap_lowering_is_order_independent(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+def test_heatmap_is_a_lowered_kind() -> None:
+    from fuaran_ui.charts import LOWERED_KINDS
+
+    assert "Heatmap" in LOWERED_KINDS
+
+
+# Phase 2810 — a withheld cell is drawn apart from an absent one. The goldens above
+# carry the byte-parity; these say what the bytes mean.
+
+
+@_heatmap_available
+def test_heatmap_withheld_vectors_are_present() -> None:
+    names = _heatmap_cases()
+    for name in ("heatmap-withheld-cells", "heatmap-withheld-diverging", "heatmap-withheld-only"):
+        assert name in names
+
+
+@_heatmap_available
+def test_heatmap_withheld_cell_is_tipped_and_keyed_without_its_number() -> None:
+    inp = json.loads((_HEATMAP_DIR / "heatmap-withheld-cells.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    got = encode_node(lower_node("c", spec, rows))
+    assert "Q2 · A · withheld" in got
+    assert '"text":"withheld"' in got
+    assert "3 values withheld" in got
+    assert "5 cells empty" in got
+    assert "500" not in got
+
+
+@_heatmap_available
+@pytest.mark.parametrize("name", [n for n in _heatmap_cases() if not n.startswith("heatmap-withheld")])
+def test_heatmap_declared_withheld_field_no_row_sets_is_byte_unchanged(name: str) -> None:
+    inp = json.loads((_HEATMAP_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    spec, rows = _spec_and_rows(inp)
+    flagged = [{**r, "suppressed": False} for r in rows]
+    declared, _ = _spec_and_rows({**inp, "withheldField": "suppressed"})
+    assert encode_node(lower_node("c", declared, flagged)) == encode_node(lower_node("c", spec, rows))
+
+
+# ── Phase 2809 — missing and withheld values (`chart-lowering/withheld/`, WIRE_FORMAT §3.6.36) ──
+#
+# A subfamily for the heatmap's reason. A missing value is a gap on every arm,
+# never a zero; a withheld row draws an outlined placeholder with its own mark and
+# a "withheld" readout, and the summary counts it.
+
+_WITHHELD_DIR = _CHART_LOWERING_DIR / "withheld"
+
+
+def _withheld_cases() -> list[str]:
+    if not corpus_available() or not _WITHHELD_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _WITHHELD_DIR.glob("*.input.json"))
+
+
+_withheld_available = pytest.mark.skipif(
+    not _withheld_cases(),
+    reason=f"chart-lowering/withheld fixtures not found at {_WITHHELD_DIR}",
+)
+
+
+def _withheld_input(name: str) -> dict:
+    return json.loads((_WITHHELD_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+
+
+@_withheld_available
+@pytest.mark.parametrize("name", _withheld_cases())
+def test_withheld_lowers_byte_identical_to_golden(name: str) -> None:
+    expected = (_WITHHELD_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(_withheld_input(name))
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: withheld lowering drifted from golden"
+
+
+@_withheld_available
+@pytest.mark.parametrize("name", _withheld_cases())
+def test_withheld_lowering_is_order_independent(name: str) -> None:
+    spec, rows = _spec_and_rows(_withheld_input(name))
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+@_withheld_available
+def test_a_declared_withheld_field_no_row_sets_changes_nothing() -> None:
+    spec, rows = _spec_and_rows(_withheld_input("bar-missing"))
+    flagged = [{**r, "suppressed": False} for r in rows]
+    declared = dataclasses.replace(spec, withheld_field="suppressed")
+    assert encode_node(lower_node("c", declared, flagged)) == encode_node(lower_node("c", spec, rows))
+
+
+@_withheld_available
+def test_a_withheld_number_reaches_no_tip_and_no_summary() -> None:
+    spec, rows = _spec_and_rows(_withheld_input("bar-withheld"))
+    got = encode_node(lower_node("c", spec, rows))
+    assert "900" not in got
+    assert "train · 10-20 · withheld" in got
+    assert "2 values withheld" in got
+
+
+# ── Phase 2654 — the mark channels (`chart-lowering/channels/`, WIRE_FORMAT §3.6.37, D39) ──
+#
+# The interval, the size, the declared order, the path and the x reference line. A
+# subfamily for the heatmap's reason: the top-level enumeration above does not reach it.
+
+_CHANNELS_DIR = _CHART_LOWERING_DIR / "channels"
+
+
+def _channel_cases() -> list[str]:
+    if not corpus_available() or not _CHANNELS_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _CHANNELS_DIR.glob("*.input.json"))
+
+
+_channels_available = pytest.mark.skipif(
+    not _channel_cases(),
+    reason=f"chart-lowering/channels fixtures not found at {_CHANNELS_DIR}",
+)
+
+
+def _channel_input(name: str) -> dict:
+    return json.loads((_CHANNELS_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+
+
+@_channels_available
+@pytest.mark.parametrize("name", _channel_cases())
+def test_channels_lower_byte_identical_to_golden(name: str) -> None:
+    expected = (_CHANNELS_DIR / f"{name}.expected.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(_channel_input(name))
+    got = encode_node(lower_node(f"chart-{name}", spec, rows))
+    assert got == expected, f"{name}: channel lowering drifted from golden"
+
+
+@_channels_available
+@pytest.mark.parametrize("name", _channel_cases())
+def test_channel_lowering_is_order_independent(name: str) -> None:
+    spec, rows = _spec_and_rows(_channel_input(name))
+    reversed_rows = [dict(reversed(list(r.items()))) for r in rows]
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", spec, reversed_rows))
+
+
+@_channels_available
+@pytest.mark.parametrize("name", [n for n in _channel_cases() if n.endswith("-neutralised")])
+def test_a_neutralised_channel_lowers_as_its_absence(name: str) -> None:
+    spec, rows = _spec_and_rows(_channel_input(name))
+    annotations = [a for a in (spec.annotations or ()) if a.tag != "ReferenceLineX"]
+    plain = replace(
+        spec,
+        interval=None,
+        size_field=None,
+        sort_by=None,
+        path_field=None,
+        annotations=annotations or None,
+    )
+    assert encode_node(lower_node("c", spec, rows)) == encode_node(lower_node("c", plain, rows))
+
+
+@_channels_available
+def test_a_withheld_row_reaches_no_channel_readout() -> None:
+    spec, rows = _spec_and_rows(_channel_input("bar-interval"))
+    got = encode_node(lower_node("c", spec, rows))
+    assert "11 – 19" not in got
+    assert "effect · E · 6 – 13" in got

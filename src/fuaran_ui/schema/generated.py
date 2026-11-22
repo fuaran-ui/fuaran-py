@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "710cf74d1f084d3f0854c8d58f6cebbbbac629b97e9bfeeb379d40628b28197e"
+IDL_SHA256 = "e5e867dc804adc9788f1f80c00f9b3ad29403370d28dc28ee87bda98991132fa"
 IDL_VERSION = 1
 
 
@@ -77,6 +77,9 @@ T_enum_ChartDataLabels = T("enum", "ChartDataLabels")
 T_enum_ChartXScale = T("enum", "ChartXScale")
 T_union_ChartAnnotation = T("union", "ChartAnnotation")
 T_list_union_ChartAnnotation = T("list", of=T_union_ChartAnnotation)
+T_union_ChartScale = T("union", "ChartScale")
+T_record_ChartInterval = T("record", "ChartInterval")
+T_record_ChartSort = T("record", "ChartSort")
 T_int = T("int")
 T_list_int = T("list", of=T_int)
 T_json = T("json")
@@ -155,12 +158,12 @@ T_record_SemanticStyle = T("record", "SemanticStyle")
 T_enum_LiveRegionKind = T("enum", "LiveRegionKind")
 T_record_AffordanceAlias = T("record", "AffordanceAlias")
 T_list_record_AffordanceAlias = T("list", of=T_record_AffordanceAlias)
+T_enum_SortDirection = T("enum", "SortDirection")
 T_union_CellKindErased = T("union", "CellKindErased")
 T_union_ColumnWidth = T("union", "ColumnWidth")
 T_union_Binding_json = T("union", "Binding", args=(T_json,))
 T_enum_CompareOp = T("enum", "CompareOp")
 T_enum_HashStrictness = T("enum", "HashStrictness")
-T_enum_SortDirection = T("enum", "SortDirection")
 T_enum_TextAnchor = T("enum", "TextAnchor")
 T_enum_DeterminismSource = T("enum", "DeterminismSource")
 T_enum_HostEffect = T("enum", "HostEffect")
@@ -541,6 +544,12 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("dataLabels", "optional", T_enum_ChartDataLabels),
         F("xScale", "optional", T_enum_ChartXScale),
         F("annotations", "optional", T_list_union_ChartAnnotation),
+        F("scale", "optional", T_union_ChartScale),
+        F("withheldField", "optional", T_str),
+        F("interval", "optional", T_record_ChartInterval),
+        F("sizeField", "optional", T_str),
+        F("sortBy", "optional", T_record_ChartSort),
+        F("pathField", "optional", T_str),
         F("onPointClick", "optional", T_fn),
     ),
     "CodeBlock": (
@@ -857,6 +866,14 @@ RECORD_FIELDS: dict[str, tuple[F, ...]] = {
         F("label", "required", T_union_TextSource),
         F("onClick", "optional", T_fn),
     ),
+    "ChartInterval": (
+        F("low", "required", T_str),
+        F("high", "required", T_str),
+    ),
+    "ChartSort": (
+        F("field", "required", T_str),
+        F("direction", "required", T_enum_SortDirection),
+    ),
     "ColumnErased": (
         F("field", "optional", T_str),
         F("sortable", "optional", T_bool),
@@ -1101,9 +1118,10 @@ UNION_CASES: dict[str, tuple[str, ...]] = {
         "Progress",
         "Custom",
     ),
-    "ChartAnnotation": ("ReferenceLine", "EventMarker", "RangeBand"),
+    "ChartAnnotation": ("ReferenceLine", "EventMarker", "RangeBand", "ReferenceLineX"),
     "ChartAnnotationRange": ("ValueRange", "XRange"),
     "ChartAnnotationX": ("Category", "Date"),
+    "ChartScale": ("Sequential", "Diverging"),
     "ColumnWidth": ("Auto", "Fixed", "Flex"),
     "CurveCommand": ("MoveTo", "LineTo", "CubicTo", "QuadraticTo", "Close"),
     "FormFieldKind": (
@@ -1343,6 +1361,10 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
             F("range", "required", T_union_ChartAnnotationRange),
             F("label", "optional", T_union_TextSource),
         ),
+        "ReferenceLineX": (
+            F("value", "required", T_float),
+            F("label", "optional", T_union_TextSource),
+        ),
     },
     "ChartAnnotationRange": {
         "ValueRange": (
@@ -1357,6 +1379,17 @@ UNION_CASE_FIELDS: dict[str, dict[str, tuple[F, ...]]] = {
     "ChartAnnotationX": {
         "Category": (F("key", "required", T_str),),
         "Date": (F("iso", "required", T_str),),
+    },
+    "ChartScale": {
+        "Sequential": (
+            F("min", "optional", T_float),
+            F("max", "optional", T_float),
+        ),
+        "Diverging": (
+            F("midpoint", "optional", T_float),
+            F("min", "optional", T_float),
+            F("max", "optional", T_float),
+        ),
     },
     "ColumnWidth": {
         "Auto": (),

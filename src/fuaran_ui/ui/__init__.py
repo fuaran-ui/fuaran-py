@@ -1384,6 +1384,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         data_labels: t.ChartDataLabels | None = None,
         x_scale: t.ChartXScale | None = None,
         annotations: Sequence[t.ChartAnnotation] | None = None,
+        scale: t.ChartScale | None = None,
+        withheld_field: str | None = None,
+        interval: t.ChartInterval | None = None,
+        size_field: str | None = None,
+        sort_by: t.ChartSort | None = None,
+        path_field: str | None = None,
         on_point_click: bool = False,
     ) -> UiNode:
         """The eight slots past ``stacked`` are each ABSENT by default, so a chart
@@ -1408,6 +1414,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
             data_labels=data_labels,
             x_scale=x_scale,
             annotations=tuple(annotations) if annotations is not None else None,
+            scale=scale,
+            withheld_field=withheld_field,
+            interval=interval,
+            size_field=size_field,
+            sort_by=sort_by,
+            path_field=path_field,
             on_point_click=on_point_click,
         )
         return _node(id, spec, accessibility.chart)

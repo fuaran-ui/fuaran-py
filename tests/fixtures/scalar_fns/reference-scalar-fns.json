@@ -1,0 +1,1877 @@
+{
+  "producer": "Fuaran.Compute.DataFrame 0.47.0",
+  "vectors": [
+    {
+      "id": "trim-ascii-set",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          " \t\r\n a b \n\r\t "
+        ]
+      ],
+      "ok": [
+        "str",
+        "a b"
+      ]
+    },
+    {
+      "id": "trim-keeps-nbsp",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "\u00A0x\u00A0"
+        ]
+      ],
+      "ok": [
+        "str",
+        "\u00A0x\u00A0"
+      ]
+    },
+    {
+      "id": "trim-keeps-nel",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "\u0085x\u0085"
+        ]
+      ],
+      "ok": [
+        "str",
+        "\u0085x\u0085"
+      ]
+    },
+    {
+      "id": "trim-keeps-vt-ff",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "\u000Bx\f"
+        ]
+      ],
+      "ok": [
+        "str",
+        "\u000Bx\f"
+      ]
+    },
+    {
+      "id": "trim-keeps-ideographic-space",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "\u3000x\u3000"
+        ]
+      ],
+      "ok": [
+        "str",
+        "\u3000x\u3000"
+      ]
+    },
+    {
+      "id": "trim-empty",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "str",
+        ""
+      ]
+    },
+    {
+      "id": "trim-all-space",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "  \t "
+        ]
+      ],
+      "ok": [
+        "str",
+        ""
+      ]
+    },
+    {
+      "id": "trim-null",
+      "fn": "trim",
+      "args": [
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "trim-int",
+      "fn": "trim",
+      "args": [
+        [
+          "int",
+          3
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "trim of a non-string"
+      }
+    },
+    {
+      "id": "trim-date",
+      "fn": "trim",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "trim of a non-string"
+      }
+    },
+    {
+      "id": "trim-arity-0",
+      "fn": "trim",
+      "args": [],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 1,
+        "got": 0
+      }
+    },
+    {
+      "id": "trim-arity-2",
+      "fn": "trim",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 1,
+        "got": 2
+      }
+    },
+    {
+      "id": "replace-all",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "aXbXc"
+        ],
+        [
+          "str",
+          "X"
+        ],
+        [
+          "str",
+          "-"
+        ]
+      ],
+      "ok": [
+        "str",
+        "a-b-c"
+      ]
+    },
+    {
+      "id": "replace-non-overlapping",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "aaaa"
+        ],
+        [
+          "str",
+          "aa"
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "ok": [
+        "str",
+        "aa"
+      ]
+    },
+    {
+      "id": "replace-to-empty",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "abab"
+        ],
+        [
+          "str",
+          "ab"
+        ],
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "str",
+        ""
+      ]
+    },
+    {
+      "id": "replace-empty-find",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "abc"
+        ],
+        [
+          "str",
+          ""
+        ],
+        [
+          "str",
+          "x"
+        ]
+      ],
+      "ok": [
+        "str",
+        "abc"
+      ]
+    },
+    {
+      "id": "replace-absent",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "abc"
+        ],
+        [
+          "str",
+          "z"
+        ],
+        [
+          "str",
+          "x"
+        ]
+      ],
+      "ok": [
+        "str",
+        "abc"
+      ]
+    },
+    {
+      "id": "replace-ordinal-case",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "Aa"
+        ],
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "ok": [
+        "str",
+        "Ab"
+      ]
+    },
+    {
+      "id": "replace-astral",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "a\uD83D\uDE00b"
+        ],
+        [
+          "str",
+          "\uD83D\uDE00"
+        ],
+        [
+          "str",
+          "c"
+        ]
+      ],
+      "ok": [
+        "str",
+        "acb"
+      ]
+    },
+    {
+      "id": "replace-null-subject",
+      "fn": "replace",
+      "args": [
+        [
+          "null"
+        ],
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "replace-null-find",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "null"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "replace-null-repl",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "a"
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "replace-null-beats-type",
+      "fn": "replace",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "null"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "replace-int-subject",
+      "fn": "replace",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "replace expects (string, string, string)"
+      }
+    },
+    {
+      "id": "replace-int-repl",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "a"
+        ],
+        [
+          "int",
+          1
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "replace expects (string, string, string)"
+      }
+    },
+    {
+      "id": "replace-arity-2",
+      "fn": "replace",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 3,
+        "got": 2
+      }
+    },
+    {
+      "id": "ddd-forward",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "date",
+          "2024-03-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        60
+      ]
+    },
+    {
+      "id": "ddd-backward",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-03-01"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        -60
+      ]
+    },
+    {
+      "id": "ddd-same",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-02-29"
+        ],
+        [
+          "date",
+          "2024-02-29"
+        ]
+      ],
+      "ok": [
+        "int",
+        0
+      ]
+    },
+    {
+      "id": "ddd-leap-day",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2023-02-28"
+        ],
+        [
+          "str",
+          "2024-02-28"
+        ]
+      ],
+      "ok": [
+        "int",
+        365
+      ]
+    },
+    {
+      "id": "ddd-timestamp-head",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "timestamp",
+          "2024-02-29T23:59:59Z"
+        ],
+        [
+          "date",
+          "2024-03-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        1
+      ]
+    },
+    {
+      "id": "ddd-string-head",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2024-01-01T00:00:00Z"
+        ],
+        [
+          "str",
+          "2024-01-02 anything"
+        ]
+      ],
+      "ok": [
+        "int",
+        1
+      ]
+    },
+    {
+      "id": "ddd-epoch-span",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "0000-01-01"
+        ],
+        [
+          "date",
+          "9999-12-31"
+        ]
+      ],
+      "ok": [
+        "int",
+        3652424
+      ]
+    },
+    {
+      "id": "ddd-pre-epoch",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "1969-12-31"
+        ],
+        [
+          "date",
+          "1970-01-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        1
+      ]
+    },
+    {
+      "id": "ddd-now-grain-inv-2001",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2026-08-02"
+        ],
+        [
+          "str",
+          "2026-07-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        -32
+      ]
+    },
+    {
+      "id": "ddd-now-env-inv-1001",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2026-08-02T06:59:24Z"
+        ],
+        [
+          "str",
+          "2026-07-01"
+        ]
+      ],
+      "ok": [
+        "int",
+        -32
+      ]
+    },
+    {
+      "id": "ddd-now-env-inv-1002",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2026-08-02T06:59:24Z"
+        ],
+        [
+          "str",
+          "2026-07-28"
+        ]
+      ],
+      "ok": [
+        "int",
+        -5
+      ]
+    },
+    {
+      "id": "ddd-invalid-day",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2023-02-29"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '2023-02-29' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-month-13",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "str",
+          "2024-13-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '2024-13-01' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-short",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2024-1-01"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '2024-1-01' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-nine-chars",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2024-01-0"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '2024-01-0' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-empty",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          ""
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-slash",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "2024/01/01"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '2024/01/01' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-non-ascii-digit",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "２024-01-01"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: '２024-01-01' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-first-error-wins",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "str",
+          "bad"
+        ],
+        [
+          "int",
+          1
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays: 'bad' is not YYYY-MM-DD[...]"
+      }
+    },
+    {
+      "id": "ddd-int",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "int",
+          5
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "dateDiffDays expects date/timestamp/string operands"
+      }
+    },
+    {
+      "id": "ddd-null-first",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "null"
+        ],
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "ddd-null-second",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "ddd-null-beats-type",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "int",
+          5
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "ddd-arity-1",
+      "fn": "dateDiffDays",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 2,
+        "got": 1
+      }
+    },
+    {
+      "id": "sqrt-int",
+      "fn": "sqrt",
+      "args": [
+        [
+          "int",
+          2
+        ]
+      ],
+      "ok": [
+        "float",
+        "3ff6a09e667f3bcd"
+      ]
+    },
+    {
+      "id": "sqrt-float",
+      "fn": "sqrt",
+      "args": [
+        [
+          "float",
+          "4019000000000000"
+        ]
+      ],
+      "ok": [
+        "float",
+        "4004000000000000"
+      ]
+    },
+    {
+      "id": "sqrt-zero",
+      "fn": "sqrt",
+      "args": [
+        [
+          "float",
+          "0000000000000000"
+        ]
+      ],
+      "ok": [
+        "float",
+        "0000000000000000"
+      ]
+    },
+    {
+      "id": "sqrt-negative-zero",
+      "fn": "sqrt",
+      "args": [
+        [
+          "float",
+          "8000000000000000"
+        ]
+      ],
+      "ok": [
+        "float",
+        "8000000000000000"
+      ]
+    },
+    {
+      "id": "sqrt-negative",
+      "fn": "sqrt",
+      "args": [
+        [
+          "int",
+          -1
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "sqrt-large",
+      "fn": "sqrt",
+      "args": [
+        [
+          "float",
+          "7fe1ccf385ebc8a0"
+        ]
+      ],
+      "ok": [
+        "float",
+        "5fe7dddf6b095ff1"
+      ]
+    },
+    {
+      "id": "sqrt-decimal",
+      "fn": "sqrt",
+      "args": [
+        [
+          "decimal",
+          "4"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "sqrt of a decimal is not exact: write Sqrt(Cast(float, x))"
+      }
+    },
+    {
+      "id": "sqrt-string",
+      "fn": "sqrt",
+      "args": [
+        [
+          "str",
+          "4"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "sqrt of a non-numeric"
+      }
+    },
+    {
+      "id": "sqrt-null",
+      "fn": "sqrt",
+      "args": [
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "sqrt-arity-2",
+      "fn": "sqrt",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "int",
+          2
+        ]
+      ],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 1,
+        "got": 2
+      }
+    },
+    {
+      "id": "indexof-found",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "l"
+        ]
+      ],
+      "ok": [
+        "int",
+        2
+      ]
+    },
+    {
+      "id": "indexof-absent",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "z"
+        ]
+      ],
+      "ok": [
+        "int",
+        -1
+      ]
+    },
+    {
+      "id": "indexof-empty-needle",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "int",
+        0
+      ]
+    },
+    {
+      "id": "indexof-both-empty",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          ""
+        ],
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "int",
+        0
+      ]
+    },
+    {
+      "id": "indexof-ordinal-case",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "Hello"
+        ],
+        [
+          "str",
+          "h"
+        ]
+      ],
+      "ok": [
+        "int",
+        -1
+      ]
+    },
+    {
+      "id": "indexof-after-astral",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "\uD83D\uDE00a"
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "ok": [
+        "int",
+        2
+      ]
+    },
+    {
+      "id": "indexof-null",
+      "fn": "indexOf",
+      "args": [
+        [
+          "null"
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "indexof-null-needle",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "indexof-int",
+      "fn": "indexOf",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "indexOf expects (string, string)"
+      }
+    },
+    {
+      "id": "indexof-arity-1",
+      "fn": "indexOf",
+      "args": [
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "err": {
+        "code": "ARITY_ERROR",
+        "expected": 2,
+        "got": 1
+      }
+    },
+    {
+      "id": "abs-int",
+      "fn": "abs",
+      "args": [
+        [
+          "int",
+          -3
+        ]
+      ],
+      "ok": [
+        "int",
+        3
+      ]
+    },
+    {
+      "id": "round-half-away",
+      "fn": "round",
+      "args": [
+        [
+          "float",
+          "c004000000000000"
+        ]
+      ],
+      "ok": [
+        "float",
+        "c008000000000000"
+      ]
+    },
+    {
+      "id": "floor-float",
+      "fn": "floor",
+      "args": [
+        [
+          "float",
+          "bff8000000000000"
+        ]
+      ],
+      "ok": [
+        "float",
+        "c000000000000000"
+      ]
+    },
+    {
+      "id": "ceil-float",
+      "fn": "ceil",
+      "args": [
+        [
+          "float",
+          "3ff3333333333333"
+        ]
+      ],
+      "ok": [
+        "float",
+        "4000000000000000"
+      ]
+    },
+    {
+      "id": "length-ascii",
+      "fn": "length",
+      "args": [
+        [
+          "str",
+          "abc"
+        ]
+      ],
+      "ok": [
+        "int",
+        3
+      ]
+    },
+    {
+      "id": "length-astral",
+      "fn": "length",
+      "args": [
+        [
+          "str",
+          "a\uD83D\uDE00"
+        ]
+      ],
+      "ok": [
+        "int",
+        3
+      ]
+    },
+    {
+      "id": "lower-ascii",
+      "fn": "lower",
+      "args": [
+        [
+          "str",
+          "AbC"
+        ]
+      ],
+      "ok": [
+        "str",
+        "abc"
+      ]
+    },
+    {
+      "id": "upper-ascii",
+      "fn": "upper",
+      "args": [
+        [
+          "str",
+          "aBc"
+        ]
+      ],
+      "ok": [
+        "str",
+        "ABC"
+      ]
+    },
+    {
+      "id": "upper-sharp-s",
+      "fn": "upper",
+      "args": [
+        [
+          "str",
+          "straße"
+        ]
+      ],
+      "ok": [
+        "str",
+        "STRAßE"
+      ]
+    },
+    {
+      "id": "lower-dotted-capital-i",
+      "fn": "lower",
+      "args": [
+        [
+          "str",
+          "İ"
+        ]
+      ],
+      "ok": [
+        "str",
+        "İ"
+      ]
+    },
+    {
+      "id": "substr-mid",
+      "fn": "substr",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "int",
+          1
+        ],
+        [
+          "int",
+          3
+        ]
+      ],
+      "ok": [
+        "str",
+        "ell"
+      ]
+    },
+    {
+      "id": "substr-after-astral",
+      "fn": "substr",
+      "args": [
+        [
+          "str",
+          "\uD83D\uDE00ab"
+        ],
+        [
+          "int",
+          2
+        ],
+        [
+          "int",
+          1
+        ]
+      ],
+      "ok": [
+        "str",
+        "a"
+      ]
+    },
+    {
+      "id": "substr-date-subject",
+      "fn": "substr",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "int",
+          0
+        ],
+        [
+          "int",
+          4
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "substr expects (string, int, int)"
+      }
+    },
+    {
+      "id": "substr-bool-start",
+      "fn": "substr",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "bool",
+          true
+        ],
+        [
+          "int",
+          1
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "substr expects (string, int, int)"
+      }
+    },
+    {
+      "id": "replace-date-subject",
+      "fn": "replace",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "str",
+          "-"
+        ],
+        [
+          "str",
+          "/"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "replace expects (string, string, string)"
+      }
+    },
+    {
+      "id": "indexof-date-subject",
+      "fn": "indexOf",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "str",
+          "-"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "indexOf expects (string, string)"
+      }
+    },
+    {
+      "id": "length-date",
+      "fn": "length",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "length of a non-string"
+      }
+    },
+    {
+      "id": "datepart-year",
+      "fn": "datePart",
+      "args": [
+        [
+          "str",
+          "year"
+        ],
+        [
+          "date",
+          "2024-02-29"
+        ]
+      ],
+      "ok": [
+        "int",
+        2024
+      ]
+    },
+    {
+      "id": "concat-mixed",
+      "fn": "concat",
+      "args": [
+        [
+          "str",
+          "n="
+        ],
+        [
+          "int",
+          3
+        ]
+      ],
+      "ok": [
+        "str",
+        "n=3"
+      ]
+    },
+    {
+      "id": "least-ints",
+      "fn": "least",
+      "args": [
+        [
+          "int",
+          3
+        ],
+        [
+          "int",
+          1
+        ],
+        [
+          "int",
+          2
+        ]
+      ],
+      "ok": [
+        "int",
+        1
+      ]
+    },
+    {
+      "id": "greatest-strs",
+      "fn": "greatest",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "str",
+          "c"
+        ],
+        [
+          "str",
+          "b"
+        ]
+      ],
+      "ok": [
+        "str",
+        "c"
+      ]
+    },
+    {
+      "id": "pow-int",
+      "fn": "pow",
+      "args": [
+        [
+          "int",
+          2
+        ],
+        [
+          "int",
+          10
+        ]
+      ],
+      "ok": [
+        "int",
+        1024
+      ]
+    },
+    {
+      "id": "exp-zero",
+      "fn": "exp",
+      "args": [
+        [
+          "int",
+          0
+        ]
+      ],
+      "ok": [
+        "float",
+        "3ff0000000000000"
+      ]
+    },
+    {
+      "id": "ln-one",
+      "fn": "ln",
+      "args": [
+        [
+          "int",
+          1
+        ]
+      ],
+      "ok": [
+        "float",
+        "0000000000000000"
+      ]
+    },
+    {
+      "id": "log10-hundred",
+      "fn": "log10",
+      "args": [
+        [
+          "int",
+          100
+        ]
+      ],
+      "ok": [
+        "float",
+        "4000000000000000"
+      ]
+    }
+  ],
+  "predicates": [
+    {
+      "id": "contains-found",
+      "op": "contains",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "ell"
+        ]
+      ],
+      "ok": [
+        "bool",
+        true
+      ]
+    },
+    {
+      "id": "contains-absent",
+      "op": "contains",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "z"
+        ]
+      ],
+      "ok": [
+        "bool",
+        false
+      ]
+    },
+    {
+      "id": "contains-empty",
+      "op": "contains",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "bool",
+        true
+      ]
+    },
+    {
+      "id": "contains-ordinal-case",
+      "op": "contains",
+      "args": [
+        [
+          "str",
+          "Hello"
+        ],
+        [
+          "str",
+          "h"
+        ]
+      ],
+      "ok": [
+        "bool",
+        false
+      ]
+    },
+    {
+      "id": "startswith-found",
+      "op": "startsWith",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "he"
+        ]
+      ],
+      "ok": [
+        "bool",
+        true
+      ]
+    },
+    {
+      "id": "startswith-absent",
+      "op": "startsWith",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "lo"
+        ]
+      ],
+      "ok": [
+        "bool",
+        false
+      ]
+    },
+    {
+      "id": "startswith-empty",
+      "op": "startsWith",
+      "args": [
+        [
+          "str",
+          ""
+        ],
+        [
+          "str",
+          ""
+        ]
+      ],
+      "ok": [
+        "bool",
+        true
+      ]
+    },
+    {
+      "id": "endswith-found",
+      "op": "endsWith",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "lo"
+        ]
+      ],
+      "ok": [
+        "bool",
+        true
+      ]
+    },
+    {
+      "id": "endswith-absent",
+      "op": "endsWith",
+      "args": [
+        [
+          "str",
+          "hello"
+        ],
+        [
+          "str",
+          "he"
+        ]
+      ],
+      "ok": [
+        "bool",
+        false
+      ]
+    },
+    {
+      "id": "contains-null-left",
+      "op": "contains",
+      "args": [
+        [
+          "null"
+        ],
+        [
+          "str",
+          "a"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "startswith-null-right",
+      "op": "startsWith",
+      "args": [
+        [
+          "str",
+          "a"
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "endswith-null-beats-type",
+      "op": "endsWith",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "null"
+        ]
+      ],
+      "ok": [
+        "null"
+      ]
+    },
+    {
+      "id": "contains-int",
+      "op": "contains",
+      "args": [
+        [
+          "int",
+          1
+        ],
+        [
+          "str",
+          "1"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "string predicate on a non-string operand"
+      }
+    },
+    {
+      "id": "startswith-date",
+      "op": "startsWith",
+      "args": [
+        [
+          "date",
+          "2024-01-01"
+        ],
+        [
+          "str",
+          "2024"
+        ]
+      ],
+      "err": {
+        "code": "TYPE_ERROR",
+        "detail": "string predicate on a non-string operand"
+      }
+    }
+  ]
+}

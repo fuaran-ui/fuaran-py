@@ -421,6 +421,10 @@ SCALAR_FNS: frozenset[str] = frozenset(
         # Phase 2208 — SQL LEAST / GREATEST (the reference's fuaran-core#101).
         "least",
         "greatest",
+        # Phase 1956 — the reference's remaining closed-set edges: the non-negative root, and the
+        # 0-based UTF-16 position `substr` composes with.
+        "sqrt",
+        "indexOf",
     }
 )
 AGG_FNS: frozenset[str] = frozenset(

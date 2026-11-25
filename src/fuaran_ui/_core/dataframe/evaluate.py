@@ -33,6 +33,7 @@ from functools import cmp_to_key
 
 from ...canonical import format_finite_double
 from . import decimal_text
+from .codec import _days_in_month
 from .model import (
     AGG_ERROR,
     BOOL,
@@ -398,6 +399,16 @@ def _comparison(op: str, a: Cell, b: Cell) -> Result[Cell, EvalError]:
     return Ok(cell_bool(r))
 
 
+def _string_pred(op: str, a: Cell, b: Cell) -> Result[Cell, EvalError]:
+    """The ordinal substring predicates: a null operand propagates, a non-string one is a typed error."""
+    if is_null(a) or is_null(b):
+        return Ok(NULL)
+    if a.kind != STRING or b.kind != STRING:
+        return Err(EvalError(TYPE_ERROR, "string predicate on a non-string operand"))
+    s, t = str(a.value), str(b.value)
+    return Ok(cell_bool(t in s if op == "contains" else s.startswith(t) if op == "startsWith" else s.endswith(t)))
+
+
 def _logical(op: str, a: Cell, b: Cell) -> Result[Cell, EvalError]:
     def as_bool(c: Cell) -> Result[bool | None, EvalError]:
         if c.kind == BOOL:
@@ -725,6 +736,70 @@ def _apply_power(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa:
     return Ok(_log_host(math.log if fn == "ln" else math.log10, f))
 
 
+# ── text as the reference counts it ──────────────────────────────────────────
+#
+# The reference's strings are UTF-16, and every position and length the text functions answer is a
+# count of UTF-16 code units (`length`, `substr`, `indexOf`), the same count a JavaScript host makes.
+# A Python `str` counts code points, which agree only below U+10000, so an astral character counts
+# two here as it does there. Case mapping is the reference's invariant SIMPLE mapping, one character
+# to one: a character whose full mapping is longer (`ß` upper-cased, `İ` lower-cased) is unchanged,
+# and no mapping depends on its neighbours (Python's final-sigma rule is contextual).
+
+_TRIM_SET = " \t\r\n"  # pinned ASCII set: never str.strip()'s Unicode whitespace
+
+
+def _code_units(s: str) -> str:
+    """``s`` with each astral character split into its two surrogates: one element per UTF-16 unit."""
+    if s.isascii():
+        return s
+    return "".join(
+        ch if ord(ch) <= 0xFFFF else chr(0xD7C0 + (ord(ch) >> 10)) + chr(0xDC00 + (ord(ch) & 0x3FF)) for ch in s
+    )
+
+
+def _from_code_units(units: str) -> str:
+    """Rejoin every surrogate pair; a lone surrogate (a cut through a pair) stays, as it does there."""
+    return units.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "surrogatepass")
+
+
+def _simple_case(s: str, upper: bool) -> str:  # noqa: FBT001
+    if s.isascii():
+        return s.upper() if upper else s.lower()
+    out = []
+    for ch in s:
+        m = ch.upper() if upper else ch.lower()
+        out.append(m if len(m) == 1 else ch)
+    return "".join(out)
+
+
+def _days_of_civil_text(s: str) -> int | None:
+    """Days since 1970-01-01 of exactly ``YYYY-MM-DD`` (ASCII digits) naming a day that exists."""
+    if len(s) != 10 or s[4] != "-" or s[7] != "-":
+        return None
+    ys, ms, ds = s[0:4], s[5:7], s[8:10]
+    if not (ys + ms + ds).isascii() or not (ys + ms + ds).isdigit():
+        return None
+    year, month, day = int(ys), int(ms), int(ds)
+    if not (1 <= month <= 12 and 1 <= day <= _days_in_month(year, month)):
+        return None
+    y = year - 1 if month <= 2 else year
+    era = y // 400
+    yoe = y - era * 400
+    doy = (153 * (month + (-3 if month > 2 else 9)) + 2) // 5 + day - 1
+    return era * 146097 + yoe * 365 + yoe // 4 - yoe // 100 + doy - 719468
+
+
+def _civil_days(c: Cell) -> Result[int, EvalError]:
+    """A date-like operand of ``dateDiffDays``: its first ten characters, read as ``YYYY-MM-DD``."""
+    if c.kind not in (DATE, TIMESTAMP, STRING):
+        return Err(EvalError(TYPE_ERROR, "dateDiffDays expects date/timestamp/string operands"))
+    s = str(c.value)
+    days = _days_of_civil_text(s[:10])
+    if days is None:
+        return Err(EvalError(TYPE_ERROR, f"dateDiffDays: '{s}' is not YYYY-MM-DD[...]"))
+    return Ok(days)
+
+
 def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa: C901, PLR0911, PLR0912
     def arity(n: int) -> Err[EvalError] | None:
         if len(args) != n:
@@ -734,7 +809,7 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
     if fn in ("pow", "exp", "ln", "log10"):
         return _apply_power(fn, args)
 
-    if fn in ("abs", "round", "floor", "ceil", "length", "lower", "upper"):
+    if fn in ("abs", "round", "floor", "ceil", "length", "lower", "upper", "trim", "sqrt"):
         a = arity(1)
         if a is not None:
             return a
@@ -761,13 +836,22 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
             if fn == "floor":
                 return Ok(cell_float(math.floor(n)))
             return Ok(cell_float(math.ceil(n)))
+        if fn == "sqrt":
+            if c.kind == DECIMAL:
+                return Err(EvalError(TYPE_ERROR, "sqrt of a decimal is not exact: write Sqrt(Cast(float, x))"))
+            n = _as_num(c)
+            if n is None:
+                return Err(EvalError(TYPE_ERROR, "sqrt of a non-numeric"))
+            # A negative root is undefined over the reals: null, as a division by zero is.
+            return Ok(NULL if n < 0.0 else cell_float(math.sqrt(n)))
         if c.kind != STRING:
             return Err(EvalError(TYPE_ERROR, f"{fn} of a non-string"))
+        text: str = c.value  # type: ignore[assignment]
         if fn == "length":
-            return Ok(cell_int(len(c.value)))  # type: ignore[arg-type]
-        if fn == "lower":
-            return Ok(cell_str(c.value.lower()))  # type: ignore[union-attr]
-        return Ok(cell_str(c.value.upper()))  # type: ignore[union-attr]
+            return Ok(cell_int(len(_code_units(text))))
+        if fn == "trim":
+            return Ok(cell_str(text.strip(_TRIM_SET)))
+        return Ok(cell_str(_simple_case(text, fn == "upper")))
     if fn == "substr":
         a = arity(3)
         if a is not None:
@@ -775,11 +859,12 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
         s, start, length = args
         if is_null(s):
             return Ok(NULL)
-        sv, stv, lnv = s.value, start.value, length.value
-        if isinstance(sv, str) and isinstance(stv, int) and isinstance(lnv, int):
-            st = max(0, min(stv, len(sv)))
-            ln = max(0, min(lnv, len(sv) - st))
-            return Ok(cell_str(sv[st : st + ln]))
+        if s.kind == STRING and start.kind == INT and length.kind == INT:
+            stv, lnv = int(start.value), int(length.value)  # type: ignore[arg-type]
+            units = _code_units(str(s.value))
+            st = max(0, min(stv, len(units)))
+            ln = max(0, min(lnv, len(units) - st))
+            return Ok(cell_str(_from_code_units(units[st : st + ln])))
         return Err(EvalError(TYPE_ERROR, "substr expects (string, int, int)"))
     if fn == "datePart":
         a = arity(2)
@@ -812,6 +897,39 @@ def _apply_scalar(fn: str, args: list[Cell]) -> Result[Cell, EvalError]:  # noqa
         if any(is_null(c) for c in args):
             return Ok(NULL)
         return Ok(cell_str("".join(cell_string(c) for c in args)))
+    if fn == "replace":
+        a = arity(3)
+        if a is not None:
+            return a
+        if any(is_null(c) for c in args):
+            return Ok(NULL)
+        if any(c.kind != STRING for c in args):
+            return Err(EvalError(TYPE_ERROR, "replace expects (string, string, string)"))
+        subj, find, repl = (str(c.value) for c in args)
+        # Pinned: an empty `find` is the subject unchanged; otherwise every occurrence, left to right.
+        return Ok(cell_str(subj.replace(find, repl) if find else subj))
+    if fn == "dateDiffDays":
+        a = arity(2)
+        if a is not None:
+            return a
+        if any(is_null(c) for c in args):
+            return Ok(NULL)
+        da = _civil_days(args[0])
+        if not da.ok:
+            return da  # type: ignore[return-value]
+        db = _civil_days(args[1])
+        return db if not db.ok else Ok(cell_int(db.value - da.value))  # type: ignore[return-value]
+    if fn == "indexOf":
+        a = arity(2)
+        if a is not None:
+            return a
+        if any(is_null(c) for c in args):
+            return Ok(NULL)
+        if any(c.kind != STRING for c in args):
+            return Err(EvalError(TYPE_ERROR, "indexOf expects (string, string)"))
+        subj, needle = str(args[0].value), str(args[1].value)
+        # Ordinal and 0-based over UTF-16 units, -1 when absent.
+        return Ok(cell_int(_code_units(subj).find(_code_units(needle))))
     if fn in ("least", "greatest"):
         # Variadic (at least one). Any null propagates, as concat's does; incomparable operands are
         # a typed error through the shared cell ordering, the one pinned comparison.
@@ -847,6 +965,8 @@ def _eval_expr(cols: Schema, row: Row, e: ColExpr) -> Result[Cell, EvalError]:  
             return _arith(e.op, ra.value, rb.value)
         if e.op in ("eq", "ne", "lt", "le", "gt", "ge"):
             return _comparison(e.op, ra.value, rb.value)
+        if e.op in ("contains", "startsWith", "endsWith"):
+            return _string_pred(e.op, ra.value, rb.value)
         return _logical(e.op, ra.value, rb.value)
     if isinstance(e, Not):
         r = _eval_expr(cols, row, e.expr)
@@ -1047,8 +1167,10 @@ def _typing_apply(fn: str, args: list[str]) -> str:  # noqa: PLR0911
     # an int base and an int exponent is decided by the exponent's SIGN, which a typing does not carry —
     # `_typing_pow_lit` reads a literal exponent, and otherwise the cells decide; an undecided operand may
     # be that pair, so it is undecided too; every other pair is a float.
-    if fn in ("exp", "ln", "log10"):
+    if fn in ("sqrt", "exp", "ln", "log10"):
         return unary(lambda _: FLOAT)
+    if fn == "indexOf":
+        return ABSENT if len(args) != 2 or any_absent else INT
     if fn in ("least", "greatest"):
         return ABSENT if not args or any_absent else _join_all(args)
     if fn == "pow":

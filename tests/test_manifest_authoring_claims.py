@@ -150,6 +150,7 @@ BUILDERS: dict[str, tuple[str, ...]] = {
     "SummaryList": ("summary_list",),
     "Switch": ("switch",),
     "Tabs": ("tabs",),
+    "Text": ("text",),
     "Toast": ("toast",),
     "Tree": ("tree",),
 }
@@ -158,6 +159,7 @@ BUILDERS: dict[str, tuple[str, ...]] = {
 RENAMED: dict[tuple[str, str], str] = {
     ("Icon", "icon"): "name",
     ("Markdown", "text"): "body",
+    ("Text", "text"): "body",
 }
 
 #: A field the CHOICE of builder fixes, so no builder takes it as a parameter.

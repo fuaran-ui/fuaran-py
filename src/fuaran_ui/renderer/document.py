@@ -253,6 +253,10 @@ SCOPE: Final[tuple[tuple[str, Disposition], ...]] = (
         ),
     ),
     (
+        "Text",
+        rendered("the words as one paragraph, every markdown-significant character escaped, so it reads literally"),
+    ),
+    (
         "Toast",
         rendered(
             "an OPEN toast renders as a blockquote; a CLOSED one is OMITTED, because a "
@@ -546,6 +550,11 @@ class _MarkdownRenderer:
         body = self._text(fields.get("text")).strip("\n")
         return [body] if body else []
 
+    def _text_kind(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
+        # Phase 2536 — the words are text, never markup: escaped, as every other text slot is.
+        body = self._inline(fields.get("text"), block_start=True)
+        return [body] if body else []
+
     def _metric(self, node: Node, fields: dict[str, Value], depth: int, level: int) -> list[str]:
         value = resolve_scalar_number(fields.get("value"), self.sources)
         value_text = format_number(fields.get("format"), value, self.sources) if value is not None else _EM_DASH
@@ -786,6 +795,7 @@ _DISPATCH: Final = {
     # Display
     "Heading": _MarkdownRenderer._heading,
     "Markdown": _MarkdownRenderer._markdown,
+    "Text": _MarkdownRenderer._text_kind,
     "Metric": _MarkdownRenderer._metric,
     "Fact": _MarkdownRenderer._fact,
     "LabelValueRow": _MarkdownRenderer._label_value_row,

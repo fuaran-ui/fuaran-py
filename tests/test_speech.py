@@ -205,6 +205,8 @@ AWAITING_REFERENCE: dict[str, str] = {
     "action-require": "Action.Require, which the pinned reference predates (Phase 2107)",
     "select-textsource-labels": "a Bound and an I18n option label, which the pinned reference refuses (Phase 2811)",
     "map-textsource-labels": "a Bound and an I18n marker label, which the pinned reference refuses (Phase 2811)",
+    "text-1": "the Text node, which the pinned reference predates (Phase 2536)",
+    "text-beside-text-field": "the Text node, which the pinned reference predates (Phase 2536)",
 }
 
 

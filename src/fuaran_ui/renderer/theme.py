@@ -62,6 +62,7 @@ KIND_CLASS: dict[str, str] = {
     "CodeBlock": "fuaran-kind-code-block",
     "Math": "fuaran-kind-math",
     "Markdown": "fuaran-kind-markdown",
+    "Text": "fuaran-kind-text",
     "Metric": "fuaran-kind-metric",
     "Badge": "fuaran-kind-badge",
     "Sparkline": "fuaran-kind-sparkline",

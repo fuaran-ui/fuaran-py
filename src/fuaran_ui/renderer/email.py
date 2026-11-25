@@ -250,6 +250,7 @@ SCOPE: Final[tuple[tuple[str, Disposition], ...]] = (
             "contains"
         ),
     ),
+    ("Text", rendered("the words escaped, never parsed, in the Markdown cell's typography")),
     (
         "Toast",
         rendered(
@@ -787,6 +788,21 @@ class _EmailRenderer:
             style = self._text_style(f"font-size:{size};line-height:1.3;font-weight:{weight};")
         return text_element(f"h{level}", [("style", style)], self._text(fields.get("text")))
 
+    def _text_kind(self, node: Node, fields: dict[str, Value], depth: int) -> str:
+        # Phase 2536 — the Markdown cell's typography, with the words escaped rather than parsed.
+        return _layout_table(
+            "",
+            element(
+                "tr",
+                [],
+                text_element(
+                    "td",
+                    [("style", self._text_style("font-size:15px;line-height:22px;"))],
+                    self._text(fields.get("text")),
+                ),
+            ),
+        )
+
     def _markdown(self, node: Node, fields: dict[str, Value], depth: int) -> str:
         citations = fields.get("citations")
         cited = [
@@ -1242,6 +1258,7 @@ _DISPATCH: Final = {
     # Display
     "Heading": _EmailRenderer._heading,
     "Markdown": _EmailRenderer._markdown,
+    "Text": _EmailRenderer._text_kind,
     "Metric": _EmailRenderer._metric,
     "Fact": _EmailRenderer._fact,
     "LabelValueRow": _EmailRenderer._label_value_row,

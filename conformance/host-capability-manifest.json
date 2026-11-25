@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.12.0",
-  "corpusAuthority": "803acfd0499f161befb2805bac32500c1488e363",
+  "corpusAuthority": "da3a3c167dd51dcd373178b08f61d93c3a627d02",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {
@@ -269,6 +269,7 @@
     "Kind.SummaryList",
     "Kind.Switch",
     "Kind.Tabs",
+    "Kind.Text",
     "Kind.Toast",
     "Kind.Tree",
     "LocalFlushTrigger.OnBlur",

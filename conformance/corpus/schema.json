@@ -6632,6 +6632,17 @@
         "text"
       ]
     },
+    "TextSpec": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "$ref": "#/$defs/TextSource"
+        }
+      },
+      "required": [
+        "text"
+      ]
+    },
     "TableCitation": {
       "type": "object",
       "properties": {
@@ -7919,6 +7930,24 @@
             },
             {
               "$ref": "#/$defs/MarkdownSpec"
+            }
+          ]
+        },
+        {
+          "allOf": [
+            {
+              "type": "object",
+              "properties": {
+                "$type": {
+                  "const": "Text"
+                }
+              },
+              "required": [
+                "$type"
+              ]
+            },
+            {
+              "$ref": "#/$defs/TextSpec"
             }
           ]
         },

@@ -15,6 +15,18 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### additive — a plain `Text` node, running text with no parse (Phase 2536)
+
+- The `Text` kind (`{"$type":"Text","text":<TextSource>}`, WIRE_FORMAT §3.6.38), `types.Text` and `fuaran.text(id, body)`.
+  The decoder takes its generated schema; the server renderer draws the resolved words, escaped, in one `<span>` inside
+  the node wrapper (`fuaran-kind-text`); the email projection draws them in the `Markdown` cell's typography, the
+  document projection as one escaped paragraph, and speech as one utterance. `UpdateProp` reaches its `Text` field.
+  Certified by `nodes/text-1.json`, `nodes/text-beside-text-field.json` and `reject/reject-*text*.json`.
+- The tag also names the text-input form field, read by position (§11.4). `tests/test_node_child_routing.py` now
+  reads a `Form`'s `fields[]` and a `Filters`' `items[]` as control positions, so a `Text` field is not counted as a
+  node.
+- The speech golden predates the kind: `text-1` and `text-beside-text-field` are listed as awaiting the reference.
+
 ### additive — the option and marker labels are `TextSource` in the IDL (Phase 2811)
 
 - The regenerated structural layer (`fuaran_ui.schema.generated`) types `SelectOption.label` and `MapMarker.label` as

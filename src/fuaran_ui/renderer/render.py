@@ -858,6 +858,11 @@ class Renderer:
         html = markdown.to_html_cited(self.egress_policy, cited, self._text(fields.get("text")))
         return element("div", [("class", "fuaran-markdown")], html)
 
+    def _text_kind(self, node: Node, fields: dict[str, Value]) -> str:
+        # Phase 2536 — running text with no parse: the resolved words, escaped into one inline
+        # `<span>` (WIRE_FORMAT 3.6.38). The node wrapper carries `fuaran-kind-text`.
+        return text_element("span", [], self._text(fields.get("text")))
+
     def _metric(self, node: Node, fields: dict[str, Value]) -> str:
         # 0.2.0 rename law — the scalar displayed value is `value`. Phase 648 —
         # the value/trend are scalar slots: a `Transform` resolves to its 1×1
@@ -2932,6 +2937,7 @@ _DISPATCH: dict[str, _KindHandler] = {
     "ScrollArea": Renderer._scroll_area,
     "Heading": Renderer._heading,
     "Markdown": Renderer._markdown,
+    "Text": Renderer._text_kind,
     "Metric": Renderer._metric,
     "Badge": Renderer._badge,
     "Callout": Renderer._callout,

@@ -1,0 +1,1 @@
+{"id":"text-beside-text-field","kind":{"$type":"Box","children":[{"id":"search-form","kind":{"$type":"Form","fields":[{"id":"query","kind":{"$type":"Text"},"label":"Search"}],"onSubmit":{"$type":"Chain","ops":[]},"submitLabel":"Search"}},{"id":"search-hint","kind":{"$type":"Text","text":"Search by name or ID."}}],"layout":{"$type":"Flex","direction":"Vertical"},"role":"Group"}}

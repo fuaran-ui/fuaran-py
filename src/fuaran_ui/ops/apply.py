@@ -293,6 +293,7 @@ _FIELDS: dict[str, dict[str, str]] = {
         "Variant": "variant",
     },
     "Markdown": {"Text": "text"},
+    "Text": {"Text": "text"},
     # The row 2535 left out: every other host's Fact takes these fields.
     "Fact": {
         "Label": "label",

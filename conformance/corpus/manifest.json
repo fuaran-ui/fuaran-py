@@ -48,6 +48,7 @@
     "SummaryList",
     "Switch",
     "Tabs",
+    "Text",
     "Toast",
     "Tree"
   ],
@@ -4176,6 +4177,24 @@
       "description": "Layout/Tabs (explicit headers + tags + activeTag)"
     },
     {
+      "id": "text-1",
+      "kind": "node-round-trip",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "nodes/text-1.json",
+      "expectedFile": "nodes/text-1.json",
+      "description": "Display/Text"
+    },
+    {
+      "id": "text-beside-text-field",
+      "kind": "node-round-trip",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "nodes/text-beside-text-field.json",
+      "expectedFile": "nodes/text-beside-text-field.json",
+      "description": "Display/Text beside the Text form field"
+    },
+    {
       "id": "text-i18n-bound-arg-1",
       "kind": "node-round-trip",
       "since": "0.81.0",
@@ -5879,6 +5898,16 @@
       "description": "Switch missing stateKey"
     },
     {
+      "id": "reject-missing-text-text",
+      "kind": "reject",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-missing-text-text.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text",
+      "description": "Text spec missing text"
+    },
+    {
       "id": "reject-modal-modality-blocking",
       "kind": "reject",
       "since": "0.98.0",
@@ -6661,6 +6690,16 @@
       "expectedErrorCode": "WRONG_TYPE",
       "expectedPath": "$.kind.staticRows.citations",
       "description": "an empty `citations` array — absent is the one spelling of none, so a document has one byte form"
+    },
+    {
+      "id": "reject-text-node-shaped-as-field",
+      "kind": "reject",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-text-node-shaped-as-field.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.text",
+      "description": "a Text at a node position shaped like the Text form field: read as the node kind, which requires text (WIRE_FORMAT 11.4)"
     },
     {
       "id": "reject-tokens-closed-without-suggestions",

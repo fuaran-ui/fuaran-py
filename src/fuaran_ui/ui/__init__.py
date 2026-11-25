@@ -825,6 +825,12 @@ class fuaran:  # noqa: N801 — namespace object, mirrors the cross-tier `fuaran
         return _node(id, t.Markdown(_text(body), citations=tuple(citations)), accessibility.none)
 
     @staticmethod
+    def text(id: str, body: t.TextInput) -> UiNode:  # noqa: A002
+        # Phase 2536 — running text with no parse: `*`, `_`, `[` and `<` are characters, not
+        # markup. Use `markdown` when the text carries formatting.
+        return _node(id, t.Text(_text(body)), accessibility.none)
+
+    @staticmethod
     def metric(
         id: str,  # noqa: A002
         *,

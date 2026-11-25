@@ -1699,6 +1699,20 @@ class Markdown:
 
 
 @dataclass(frozen=True)
+class Text:
+    """Phase 2536 (WIRE_FORMAT §3.6.38) — running text with no parse: the words exactly as written.
+
+    The tag also names the text-input form field (:class:`TextField`), read in a ``Form``'s
+    ``fields[]``; a position decides which (§11.4).
+    """
+
+    text: TextSource
+
+    def to_wire(self) -> Obj:
+        return _obj("Text", {"text": self.text})
+
+
+@dataclass(frozen=True)
 class MetricComparison:
     """fuaran#2472 — one further comparison on a :class:`Metric`: a figure measured
     against a second (or third) period at once, rendered as one more trend line

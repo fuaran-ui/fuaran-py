@@ -210,6 +210,7 @@ SCOPE: Final[tuple[tuple[str, SpeechClass], ...]] = (
     ("SummaryList", "derived"),
     ("Switch", "derived"),
     ("Tabs", "announced-only"),
+    ("Text", "spoken"),
     ("Toast", "spoken"),
     ("Tree", "announced-only"),
 )
@@ -568,6 +569,10 @@ class _NodeWalk:
         blocks = _markdown_blocks(self.p.policy, self.p.text(f.get("text")))
         return self.leaf(_derived([_sentence(b) for b in blocks]))
 
+    def text_kind(self, f: dict[str, Value]) -> bool:
+        # Phase 2536 — the text as written, one utterance.
+        return self.leaf(_derived([_sentence(self.p.text(f.get("text")))]))
+
     def callout(self, f: dict[str, Value]) -> bool:
         heading = f.get("heading")
         lines = [_heading(self.p.text(heading))] if heading is not None else []
@@ -762,6 +767,7 @@ _ARMS: Final[dict[str, Callable[[_NodeWalk, dict[str, Value]], bool]]] = {
     "List": _NodeWalk.list_,
     "Map": _named("Map"),
     "Markdown": _NodeWalk.markdown,
+    "Text": _NodeWalk.text_kind,
     "Math": _named("Formula"),
     "Media": _NodeWalk.media,
     "Metric": _NodeWalk.metric,

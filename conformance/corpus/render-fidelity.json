@@ -1498,6 +1498,33 @@
       "contract": "docs/SSR.md (Layout.Tabs)"
     },
     {
+      "kind": "Text",
+      "sensitive": false,
+      "source": "the text as a `TextSource`, never parsed",
+      "fallback": "the resolved words, HTML-escaped into one `<span>` inside the node wrapper, byte-identical on both sides and on every host",
+      "rich": {
+        "class": "none",
+        "meaning": "no client-only tier - the parity-checked fallback is the whole render"
+      },
+      "fixtures": [
+        "nodes/text-1.json"
+      ],
+      "obligations": [],
+      "intrinsic": [],
+      "speech": {
+        "class": "spoken",
+        "note": "the text as written, one utterance"
+      },
+      "adaptiveCard": {
+        "class": "mapped",
+        "elements": [
+          "RichTextBlock"
+        ],
+        "note": "one literal TextRun; a TextRun is never parsed, so the words need no escape"
+      },
+      "contract": "Phase 2536; WIRE_FORMAT.md 3.2"
+    },
+    {
       "kind": "Toast",
       "sensitive": true,
       "source": "the content, the `open` `Binding<bool>`, and the tone",

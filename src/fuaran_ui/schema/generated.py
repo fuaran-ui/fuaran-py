@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "e5e867dc804adc9788f1f80c00f9b3ad29403370d28dc28ee87bda98991132fa"
+IDL_SHA256 = "eaad6e14392daebcec074a5d63b312977a484f2711eb88c6bf3340d26d8dbc6f"
 IDL_VERSION = 1
 
 
@@ -402,6 +402,7 @@ NodeKindTag = Literal[
     "SummaryList",
     "Switch",
     "Tabs",
+    "Text",
     "Toast",
     "Tree",
 ]
@@ -449,6 +450,7 @@ KINDS: tuple[str, ...] = (
     "SummaryList",
     "Switch",
     "Tabs",
+    "Text",
     "Toast",
     "Tree",
 )
@@ -495,6 +497,7 @@ KIND_CATEGORY: dict[str, str] = {
     "SummaryList": "Layout",
     "Switch": "Meta",
     "Tabs": "Layout",
+    "Text": "Display",
     "Toast": "Display",
     "Tree": "Display",
 }
@@ -809,6 +812,7 @@ KIND_FIELDS: dict[str, tuple[F, ...]] = {
         F("tabTags", "optional", T_list_str),
         F("activeTag", "optional", T_union_Binding_str),
     ),
+    "Text": (F("text", "required", T_union_TextSource),),
     "Toast": (
         F("dismissable", "omitDefault", T_bool, default=True),
         F("message", "required", T_union_TextSource),

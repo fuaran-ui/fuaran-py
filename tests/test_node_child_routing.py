@@ -27,24 +27,42 @@ from fuaran_ui.ai_tools import walk_nodes
 from fuaran_ui.schema.decode import KNOWN_KINDS
 from fuaran_ui.validator import validate_node
 
+# The control positions (WIRE_FORMAT 11.4): a `Form`'s `fields[]` and a `Filters`' `items[]`
+# carry form fields, whose `kind.$type` is read in the form-field family. Since Phase 2536 a tag
+# may name a member of both families (`Text`), so a field there has the node envelope's SHAPE
+# and is not a node: the walk reads the position, not the tag.
+_CONTROL_POSITIONS = {"Form": "fields", "Filters": "items"}
 
-def _node_ids(value: object) -> list[str]:
+
+def _node_ids(value: object, *, control: bool = False) -> list[str]:
     """Every node envelope's id in a raw decoded-JSON value, depth-first.
 
-    A node envelope is ``{"id": <str>, "kind": {"$type": <known kind>, …}}``. That
-    shape is the wire's own definition of a node, so reading it back out of the raw
-    JSON is independent of anything the decoder believes.
+    A node envelope is ``{"id": <str>, "kind": {"$type": <known kind>, …}}`` at a node position.
+    That shape is the wire's own definition of a node, so reading it back out of the raw JSON is
+    independent of anything the decoder believes. An element of a control position is a form
+    field, whatever its tag (``control``).
     """
     found: list[str] = []
     if isinstance(value, dict):
         kind = value.get("kind")
-        if isinstance(value.get("id"), str) and isinstance(kind, dict) and kind.get("$type") in KNOWN_KINDS:
+        if (
+            not control
+            and isinstance(value.get("id"), str)
+            and isinstance(kind, dict)
+            and kind.get("$type") in KNOWN_KINDS
+        ):
             found.append(value["id"])
-        for item in value.values():
-            found.extend(_node_ids(item))
+        carrier = _CONTROL_POSITIONS.get(value.get("$type")) if isinstance(value.get("$type"), str) else None
+        for key, item in value.items():
+            found.extend(_node_ids(item, control=key == carrier))
     elif isinstance(value, list):
         for item in value:
-            found.extend(_node_ids(item))
+            if control and isinstance(item, dict):
+                # The field itself is not a node; what it carries is walked as ordinary positions.
+                for member in item.values():
+                    found.extend(_node_ids(member))
+            else:
+                found.extend(_node_ids(item))
     return found
 
 

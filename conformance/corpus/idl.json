@@ -5048,6 +5048,29 @@
     },
     {
       "annotations": {
+        "doc": "Display kind (§4b): running text shown exactly as written, escaped and never parsed, in an inline container; use `Markdown` when the text carries formatting."
+      },
+      "category": "Display",
+      "fields": [
+        {
+          "annotations": {
+            "doc": "The text, rendered literally."
+          },
+          "name": "text",
+          "optionality": {
+            "$type": "required"
+          },
+          "type": {
+            "$type": "union",
+            "args": [],
+            "name": "TextSource"
+          }
+        }
+      ],
+      "tag": "Text"
+    },
+    {
+      "annotations": {
         "doc": "Display kind (§4b): an in-tree notification announced through a live region and shown while its `open` binding is true."
       },
       "category": "Display",

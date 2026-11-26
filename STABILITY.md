@@ -26,6 +26,10 @@ corpus, not by this file.
   shorthand keeps its current spelling.
 - Certified by the corpus `validate` family (`tests/test_validate_corpus.py`, now bundled in the snapshot)
   and `reject/reject-transform-param-from-missing-name.json`.
+- A repeated node id is reported at each occurrence after the first in DOCUMENT order (§27.8.2): the
+  validator now walks a node's envelope `fallback` before its kind and its `state` alternatives after it,
+  so an id held by a node's fallback and by its child is reported at the child, where it was reported at
+  the fallback. Certified by `validate-duplicate-id-in-the-node-envelope`.
 
 ### additive — a plain `Text` node, running text with no parse (Phase 2536)
 

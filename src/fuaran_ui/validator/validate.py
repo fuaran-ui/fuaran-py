@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from ..charts import _string_of, _try_parse_day
 from ..model import Arr, Node, Obj, Value
-from ..ops.enumeration import slots
+from ..ops.enumeration import Slot, slots
 from ..schema.decode import KNOWN_KINDS
 
 # ``_string_of`` / ``_try_parse_day`` are the LOWERING's own projections, imported
@@ -71,9 +71,20 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     # Every position the node holds another node in (the keyed walk): the kind's own
     # children and arms, slot arguments, the `state` alternatives and the author-declared
     # `fallback` (fuaran#1812), so NodeId uniqueness (8.1) and every rule hold across them.
-    for slot in slots(node):
+    # Walked in wire-document order, the node object's members in canonical (code point)
+    # order: `fallback` before the kind's positions, `state` after them, so "the first
+    # occurrence" of a repeated id is the first in the document (WIRE_FORMAT 27.8.2).
+    for slot in sorted(slots(node), key=_document_order):
         child_path = path + "".join(f"[{step}]" if isinstance(step, int) else f".{step}" for step in slot.address)
         _walk(slot.node, child_path, findings, seen_ids)
+
+
+def _document_order(slot: Slot) -> tuple[str, tuple[str, ...]]:
+    """A slot's place among its node's members: the member, then (outside the kind,
+    whose positions keep the order ``slots`` gives) the rest of its address."""
+    address = slot.address
+    head = str(address[0])
+    return head, () if head == "kind" else tuple(str(step) for step in address[1:])
 
 
 def _check_media_label(node: Node, kind: Obj, path: str, findings: list[Finding]) -> None:

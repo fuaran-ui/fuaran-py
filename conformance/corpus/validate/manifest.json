@@ -97,6 +97,32 @@
           "path": "$.kind.children[2].kind.children[0]"
         }
       ]
+    },
+    {
+      "id": "validate-duplicate-id-in-a-list-of-twelve",
+      "description": "One id held by the third and the eleventh of twelve children (FUARAN-DUP-ID). Document order puts children[2] before children[10], so the one finding is at $.kind.children[10]. A host that walks or orders positions as strings meets children[10] first and reports children[2].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m0\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"0\"}},{\"id\":\"m1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"1\"}},{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"2\"}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"3\"}},{\"id\":\"m4\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"4\"}},{\"id\":\"m5\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"5\"}},{\"id\":\"m6\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"6\"}},{\"id\":\"m7\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"7\"}},{\"id\":\"m8\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"8\"}},{\"id\":\"m9\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"9\"}},{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"10\"}},{\"id\":\"m11\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"11\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "twice",
+          "path": "$.kind.children[10]"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-in-the-node-envelope",
+      "description": "One id held by the root's envelope fallback and by its child (FUARAN-DUP-ID). The fallback is walked (section 8.1), and the canonical document lists it before the kind (member order), so the fallback is the first occurrence and the finding is at $.kind.children[0]. A host that walks the kind before the envelope reports $.fallback.",
+      "tree": "{\"fallback\":{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Fallback\"}},\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Child\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "twice",
+          "path": "$.kind.children[0]"
+        }
+      ]
     }
   ]
 }

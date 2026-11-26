@@ -1747,7 +1747,9 @@ def _decode_expr_params(raw_params: object, path: str) -> list[Value]:
         from_raw, from_present = _alias_get(el_obj, "from", ("value",))
         if not from_present:
             _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
-        binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
+        # The entry's own index, never its name (WIRE_FORMAT 29.3): the canonical list is an
+        # array, so a defect inside the binding is located at `params[i].from`.
+        binding = _decode_binding(from_raw, f"{path}.params[{i}].from")
         entries.append(Obj(None, {"from": binding, "name": name}))
     return entries
 
@@ -1873,24 +1875,7 @@ def _decode_transform_binding(obj: dict, path: str) -> Value:
     _check_pipeline_expr_bound(pipeline, path)
     fields: dict[str, Value] = {}
     if "params" in obj:
-        raw_params = obj["params"]
-        entries: list[Value] = []
-        if isinstance(raw_params, dict):
-            # Map form — a name-keyed set, coerced to the canonical array in
-            # key order (deterministic: F# Map.toList is key-sorted).
-            for name in sorted(raw_params):
-                binding = _decode_binding(raw_params[name], f"{path}.params.{name}.from")
-                entries.append(Obj(None, {"from": binding, "name": name}))
-        else:
-            arr = _expect_array(raw_params, f"{path}.params")
-            for i, el in enumerate(arr):
-                el_obj = _expect_object(el, f"{path}.params[{i}]")
-                name = _expect_string(_require(el_obj, "name", f"{path}.params[{i}]"), f"{path}.params[{i}].name")
-                from_raw, from_present = _alias_get(el_obj, "from", ("value",))
-                if not from_present:
-                    _fail(MISSING_FIELD, f"{path}.params[{i}].from", "missing required field 'from'")
-                binding = _decode_binding(from_raw, f"{path}.params.{name}.from")
-                entries.append(Obj(None, {"from": binding, "name": name}))
+        entries = _decode_expr_params(obj["params"], path)
         if entries:
             fields["params"] = Arr(entries)
     fields["pipeline"] = pipeline

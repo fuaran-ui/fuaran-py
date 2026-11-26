@@ -15,6 +15,18 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### behavioural (wire readers and validator callers) — a reported path spells an array element `[i]` (Phase 2381)
+
+- `validate_node` locates a finding with the WIRE_FORMAT §29.3 grammar: a node held in an array is
+  `$.kind.children[1]`, never `$.kind.children.1`, and so is a form field (`$.kind.fields[0].rule`), a
+  `dependsOn` entry and a filter-edge `params` entry. No finding's code, count or message changes, only its
+  `path`. A caller matching the old dotted spelling must match the bracketed one.
+- A defect inside an array-form `params` entry's binding, on `Transform` and `Expr`, is decoded at
+  `…params[i].from`, the entry's own index, where it was `…params.<name>.from` (§29.3). The §3.6 map
+  shorthand keeps its current spelling.
+- Certified by the corpus `validate` family (`tests/test_validate_corpus.py`, now bundled in the snapshot)
+  and `reject/reject-transform-param-from-missing-name.json`.
+
 ### additive — a plain `Text` node, running text with no parse (Phase 2536)
 
 - The `Text` kind (`{"$type":"Text","text":<TextSource>}`, WIRE_FORMAT §3.6.38), `types.Text` and `fuaran.text(id, body)`.

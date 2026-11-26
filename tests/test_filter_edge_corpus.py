@@ -170,7 +170,7 @@ def test_a_grids_own_page_and_window_keys_are_the_host_slicing_edge_not_a_filter
         ),
     )
     findings = [f for f in validate_node(grid) if f.code == "FUARAN075"]
-    assert [f.path for f in findings] == ["$.kind.source.dependsOn.2"], findings
+    assert [f.path for f in findings] == ["$.kind.source.dependsOn[2]"], findings
     assert "'region'" in findings[0].message
 
 

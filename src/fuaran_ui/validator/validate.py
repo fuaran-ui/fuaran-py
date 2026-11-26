@@ -72,7 +72,7 @@ def _walk(node: Node, path: str, findings: list[Finding], seen_ids: set[str]) ->
     # children and arms, slot arguments, the `state` alternatives and the author-declared
     # `fallback` (fuaran#1812), so NodeId uniqueness (8.1) and every rule hold across them.
     for slot in slots(node):
-        child_path = path + "".join(f".{step}" for step in slot.address)
+        child_path = path + "".join(f"[{step}]" if isinstance(step, int) else f".{step}" for step in slot.address)
         _walk(slot.node, child_path, findings, seen_ids)
 
 
@@ -642,7 +642,7 @@ def _check_field_rules(node: Node, kind: Obj, path: str, findings: list[Finding]
         field_id_s = field_id if isinstance(field_id, str) else "?"
         control_obj = item.fields.get("kind")
         control = control_obj.tag if isinstance(control_obj, Obj) and control_obj.tag is not None else "?"
-        rule_path = f"{path}.fields.{i}.rule"
+        rule_path = f"{path}.fields[{i}].rule"
 
         for slot, label in _RULE_SLOTS:
             if slot not in rule.fields:
@@ -852,7 +852,7 @@ def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str,
 
     if isinstance(value, Arr):
         for i, item in enumerate(value.items):
-            _filter_edge_uses(item, reader, f"{path}.{i}", out)
+            _filter_edge_uses(item, reader, f"{path}[{i}]", out)
         return
 
     if not isinstance(value, Obj):
@@ -863,7 +863,7 @@ def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str,
         if isinstance(depends_on, Arr):
             for i, name in enumerate(depends_on.items):
                 if isinstance(name, str):
-                    out.append((reader, name, f"{path}.dependsOn.{i}", True))
+                    out.append((reader, name, f"{path}.dependsOn[{i}]", True))
 
     if value.tag in _FILTER_EDGE_PARAM_TAGS:
         params = value.fields.get("params")
@@ -878,7 +878,7 @@ def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str,
                 if isinstance(source, Obj) and source.tag == "Filter":
                     name = source.fields.get("name")
                     if isinstance(name, str):
-                        out.append((reader, name, f"{path}.params.{i}.from", False))
+                        out.append((reader, name, f"{path}.params[{i}].from", False))
 
     for key, field_value in value.fields.items():
         _filter_edge_uses(field_value, reader, f"{path}.{key}", out)

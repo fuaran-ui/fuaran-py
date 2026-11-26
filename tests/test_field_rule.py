@@ -171,7 +171,7 @@ def test_a_rule_slot_the_control_cannot_honour_is_flagged(control: str, slot_jso
     found = _findings(wire, "FUARAN100")
     assert bool(found) is expect
     if expect:
-        assert found[0].path.startswith("$.kind.fields.0.rule.")
+        assert found[0].path.startswith("$.kind.fields[0].rule.")
         assert "cannot honour it" in found[0].message
 
 
@@ -214,7 +214,7 @@ def test_a_literal_compare_duplicating_a_declared_bound_is_flagged(op: str, boun
     found = _findings(wire, "FUARAN101")
     assert bool(found) is expect
     if expect:
-        assert found[0].path == "$.kind.fields.0.rule.compare"
+        assert found[0].path == "$.kind.fields[0].rule.compare"
         assert "RangedNumber." in found[0].message
 
 

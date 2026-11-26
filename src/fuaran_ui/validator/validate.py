@@ -164,7 +164,6 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
     cases = kind.fields.get("cases")
     if isinstance(cases, Arr):
         seen: set[str] = set()
-        reported: set[str] = set()
         for index, case in enumerate(cases.items):
             if isinstance(case, Obj):
                 # fuaran#1535 — FUARAN147: a case selects on a string ``match``
@@ -200,18 +199,19 @@ def _check_switch(kind: Obj, path: str, findings: list[Finding]) -> None:
                 # carries a binding, two bindings equal today may resolve
                 # differently tomorrow, and structural equality of two predicates
                 # is not the question this rule asks.
+                # One finding at EACH case after the first that repeats the value, located at that case
+                # (WIRE_FORMAT 27.8.2): each is a dead case.
                 match = case.fields.get("match")
                 if isinstance(match, str):
-                    if match in seen and match not in reported:
+                    if match in seen:
                         findings.append(
                             Finding(
                                 "FUARAN082",
-                                f"{path}.cases",
-                                f"switch has two or more cases matching '{match}' — first-match-wins "
-                                "makes the later case dead; give each case a distinct match value",
+                                f"{path}.cases[{index}].match",
+                                f"switch case {index} matches '{match}', which an earlier case already matches — "
+                                "first-match-wins makes this case dead; give each case a distinct match value",
                             )
                         )
-                        reported.add(match)
                     seen.add(match)
 
 

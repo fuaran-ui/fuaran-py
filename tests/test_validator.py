@@ -278,3 +278,20 @@ def test_track_without_label_is_flagged_per_entry() -> None:
     # one at fault rather than the slot in general.
     assert findings[0].path == "$.kind.tracks[1].label"
     assert "at index 1" in findings[0].message
+
+
+def test_a_repeated_switch_match_is_one_finding_per_later_case() -> None:
+    # One FUARAN082 at EACH case after the first that repeats the value, located at that case (WIRE_FORMAT 27.8.2):
+    # `x, x, y, x, y` is three findings, never one per value.
+    def arm(node_id: str, match: str) -> str:
+        return f'{{"child":{{"id":"{node_id}","kind":{{"$type":"Markdown","text":"t"}}}},"match":"{match}"}}'
+
+    arms = ",".join(arm(i, m) for i, m in [("a", "x"), ("b", "x"), ("c", "y"), ("e", "x"), ("f", "y")])
+    decoded = decode_node(
+        '{"id":"sw","kind":{"$type":"Switch","cases":['
+        + arms
+        + '],"default":{"id":"d","kind":{"$type":"Markdown","text":"t"}},"stateKey":"k"}}'
+    )
+    assert decoded.ok, decoded
+    paths = [f.path for f in validate_node(decoded.value) if f.code == "FUARAN082"]
+    assert paths == ["$.kind.cases[1].match", "$.kind.cases[3].match", "$.kind.cases[4].match"]

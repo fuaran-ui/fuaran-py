@@ -2298,6 +2298,50 @@
         }
       ]
     },
+    "frag-stdlib-refinable-table-ref": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-refinable-table-ref",
+          "kind": "FragmentRef",
+          "reason": "unresolved-fragment",
+          "decidedAt": "frag-stdlib-refinable-table-ref"
+        }
+      ]
+    },
+    "frag-stdlib-refinable-table": {
+      "text": "",
+      "ssml": "<speak>\n</speak>\n",
+      "utterances": [],
+      "omissions": [
+        {
+          "nodeId": "frag-stdlib-refinable-table",
+          "kind": "FragmentDecl",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-refinable-table"
+        },
+        {
+          "nodeId": "refinable-table",
+          "kind": "Box",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-refinable-table"
+        },
+        {
+          "nodeId": "refinable-table-heading",
+          "kind": "Heading",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-refinable-table"
+        },
+        {
+          "nodeId": "refinable-table-grid",
+          "kind": "DataGrid",
+          "reason": "nothing-sayable",
+          "decidedAt": "frag-stdlib-refinable-table"
+        }
+      ]
+    },
     "frag-stdlib-scenario-comparison-ref": {
       "text": "",
       "ssml": "<speak>\n</speak>\n",

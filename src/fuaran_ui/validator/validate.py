@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from ..charts import _string_of, _try_parse_day
 from ..model import Arr, Node, Obj, Value
-from ..ops.enumeration import Slot, slots
+from ..ops.enumeration import Position, Slot, slots
 from ..schema.decode import KNOWN_KINDS
 
 # ``_string_of`` / ``_try_parse_day`` are the LOWERING's own projections, imported
@@ -818,9 +818,26 @@ def _check_inert_control(node: Node, kind: Obj, path: str, findings: list[Findin
 _FILTER_EDGE_PARAM_TAGS = frozenset({"Transform", "Expr"})
 
 
+def _envelope(node: Node) -> tuple[list[tuple[str, Node]], list[tuple[str, Node]]]:
+    """The nodes ``node`` holds outside its kind, each with its path step: the envelope
+    ``fallback``, which the document lists before the kind, and the ``state``
+    alternatives, listed after it (WIRE_FORMAT 27.8.2). Every node of the document is
+    judged (8.1), so a walk that reads a node's kind reads these as well."""
+    before: list[tuple[str, Node]] = []
+    after: list[tuple[str, Node]] = []
+    for slot in slots(node):
+        if slot.position in (Position.FALLBACK, Position.STATE_ARM):
+            step = "".join(f".{part}" for part in slot.address)
+            (before if slot.position is Position.FALLBACK else after).append((step, slot.node))
+    return before, after
+
+
 def _declared_filter_names(value: Value, out: set[str]) -> None:
     """Every chip name a ``Filters`` node in the tree declares."""
     if isinstance(value, Node):
+        before, after = _envelope(value)
+        for _, held in before + after:
+            _declared_filter_names(held, out)
         if value.kind.tag == "Filters":
             items = value.kind.fields.get("items")
             if isinstance(items, Arr):
@@ -841,6 +858,9 @@ def _declared_filter_names(value: Value, out: set[str]) -> None:
 def _grid_own_state_keys(value: Value, out: set[tuple[str, str]]) -> None:
     """Every ``(DataGrid node id, key)`` for the grid's own page and window keys."""
     if isinstance(value, Node):
+        before, after = _envelope(value)
+        for _, held in before + after:
+            _grid_own_state_keys(held, out)
         if value.kind.tag == "DataGrid":
             for member in ("pageStateKey", "windowStateKey"):
                 key = value.kind.fields.get(member)
@@ -858,7 +878,12 @@ def _grid_own_state_keys(value: Value, out: set[tuple[str, str]]) -> None:
 def _filter_edge_uses(value: Value, reader: str, path: str, out: list[tuple[str, str, str, bool]]) -> None:
     """Every declared filter edge as ``(reader node id, filter name, path, is a dependsOn entry)``."""
     if isinstance(value, Node):
+        before, after = _envelope(value)
+        for step, held in before:
+            _filter_edge_uses(held, held.id, path + step, out)
         _filter_edge_uses(value.kind, value.id, f"{path}.kind", out)
+        for step, held in after:
+            _filter_edge_uses(held, held.id, path + step, out)
         return
 
     if isinstance(value, Arr):

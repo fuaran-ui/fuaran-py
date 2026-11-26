@@ -200,3 +200,43 @@ def test_another_grids_window_key_is_still_a_dangling_edge() -> None:
 def test_the_host_windowed_grid_fixture_reports_no_dangling_edge() -> None:
     """``nodes/grid-windowed.json``'s ``dependsOn`` names its own window key."""
     assert _dangling("grid-windowed") == []
+
+
+def _envelope_case(where: str, held: Node) -> Node:
+    """A root whose kind is clean, holding ``held`` in its envelope at ``where``."""
+    body = Obj("Stack", {"children": Arr([Node("body", Obj("Markdown", {"text": "t"}))])})
+    if where == "fallback":
+        return Node("root", body, {"fallback": held})
+    return Node("root", body, {"state": Obj(None, {where: held})})
+
+
+@pytest.mark.parametrize("where", ["fallback", "onEmpty", "onLoading"])
+def test_a_dangling_edge_in_the_node_envelope_is_reported_there(where: str) -> None:
+    """Phase 2381 — every node of the document is judged (WIRE_FORMAT 8.1, 27.8.2): the
+    envelope ``fallback`` and the ``state`` alternatives as well as the kind, so a
+    dangling edge held there is a finding located there."""
+    metric = Node(
+        "q",
+        Obj("Metric", {"label": "Orders", "value": Obj("Query", {"name": "n", "dependsOn": Arr(["region"])})}),
+    )
+    findings = [f for f in validate_node(_envelope_case(where, metric)) if f.code == "FUARAN075"]
+    step = ".fallback" if where == "fallback" else f".state.{where}"
+    assert [f.path for f in findings] == [f"${step}.kind.value.dependsOn[0]"], findings
+    assert findings[0].message.startswith("'q' declares")
+
+
+@pytest.mark.parametrize("where", ["fallback", "onEmpty", "onLoading"])
+def test_a_chip_declared_in_the_node_envelope_grounds_an_edge(where: str) -> None:
+    """The declaration side of the same walk: a ``Filters`` chip held by the envelope is a
+    declaration of the tree, as the reference counts it."""
+    chips = Node(
+        "chips",
+        Obj("Filters", {"items": Arr([Obj(None, {"label": "Region", "name": "region", "kind": Obj("Text", {})})])}),
+    )
+    tree = _envelope_case(where, chips)
+    metric = Node(
+        "q",
+        Obj("Metric", {"label": "Orders", "value": Obj("Query", {"name": "n", "dependsOn": Arr(["region"])})}),
+    )
+    tree = Node(tree.id, Obj("Stack", {"children": Arr([metric])}), tree.extras)
+    assert [f for f in validate_node(tree) if f.code == "FUARAN075"] == []

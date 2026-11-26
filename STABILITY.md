@@ -19,8 +19,9 @@ corpus, not by this file.
 
 - `validate_node` locates a finding with the WIRE_FORMAT §29.3 grammar: a node held in an array is
   `$.kind.children[1]`, never `$.kind.children.1`, and so is a form field (`$.kind.fields[0].rule`), a
-  `dependsOn` entry and a filter-edge `params` entry. No finding's code, count or message changes, only its
-  `path`. A caller matching the old dotted spelling must match the bracketed one.
+  `dependsOn` entry and a filter-edge `params` entry. A caller matching the old dotted spelling must match
+  the bracketed one. A dotted segment is a member name or a map key as written, digits included (§6): `….map.404`
+  names the key `404`.
 - A defect inside an array-form `params` entry's binding, on `Transform` and `Expr`, is decoded at
   `…params[i].from`, the entry's own index, where it was `…params.<name>.from` (§29.3). The §3.6 map
   shorthand keeps its current spelling.
@@ -30,6 +31,28 @@ corpus, not by this file.
   validator now walks a node's envelope `fallback` before its kind and its `state` alternatives after it,
   so an id held by a node's fallback and by its child is reported at the child, where it was reported at
   the fallback. Certified by `validate-duplicate-id-in-the-node-envelope`.
+- A repeated `Switch` match value is one `FUARAN082` at EACH case after the first that repeats it, located at
+  that case (`$.kind.cases[i].match`), where it was one finding per repeated value at `$.kind.cases`: `x, x, x`
+  is two findings, and the message names the case. Certified by `validate-switch-match-repeated-three-times`.
+  A repeated node id was already one `FUARAN-DUP-ID` at each later occurrence; no other code this validator
+  implements is about a repeated thing.
+- `fuaran_ui.conformance.harness.path_matches` no longer refuses an all-digit dotted segment as a misspelt
+  index: under §6 as amended it is a member (`reject-map-key-all-digits` expects `….map.404`). A dotted `.0`
+  below the prefix is a member the document does not have, which a prefix comparison cannot see.
+
+#### What the `validate` leg compares
+
+The capability manifest declares the `validate` family `covered`, and §27.7 gives that answer no qualifier,
+so the limit is stated here. `tests/test_validate_corpus.py` compares each finding's code, node and node path
+with the vector's: a `Finding` carries no node id, so its node is the deepest node object its path passes
+through, and that path must address the document in the §29.3 grammar. It does **not** compare:
+
+- the **severity**: this host's `Finding` carries none, so a vector's `severity` is not checked;
+- a code outside `validator-coverage.json`'s `implemented` set — those rows of a vector, and any such finding,
+  are left out on both sides, as §27.8.2 says;
+- the part of a finding's path below its node (`.stateKey`, `.cases[2].match`): a vector states the node's
+  path only;
+- the message, which is diagnostic prose per host.
 
 ### additive — a plain `Text` node, running text with no parse (Phase 2536)
 

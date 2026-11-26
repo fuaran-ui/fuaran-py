@@ -395,7 +395,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
         )
     },
     "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
-    # tests/test_validate_corpus.py — code, node and path, restricted to validator-coverage.json's implemented set.
+    # tests/test_validate_corpus.py — code, node and path, never severity; the limits are in STABILITY.md (Phase 2381).
     "validate": "covered",
 }
 

@@ -6,10 +6,11 @@ tree, validates it, and asserts that its findings, restricted to the codes its `
 
 A finding of this host carries a code and a ``$``-rooted path, and no node id and no severity, so each one is compared
 by CODE, NODE and PATH: its path must address the document in the §29.3 grammar and extend the stated node's path at a
-segment boundary (the reject leg's own ``path_matches``), and the deepest node object that path passes through must be
-the stated node, so a finding below the node (its ``stateKey``, its ``id``) is still located at that node and never at
-another one under it. What the leg does NOT compare — the severity among it — is stated in ``STABILITY.md``
-("What the ``validate`` leg compares").
+segment boundary (the reject leg's own ``path_matches``), and the deepest node that path passes through must be the
+stated node, so a finding below the node (its ``stateKey``, its ``id``) is still located at that node and never at
+another one under it. A node is an object at a position the vocabulary declares to hold one (``_node_positions``); a
+form field carries an ``id`` and a ``kind`` and is not one. What the leg does NOT compare — the severity among it — is
+stated in ``STABILITY.md`` ("What the ``validate`` leg compares").
 """
 
 from __future__ import annotations
@@ -43,18 +44,58 @@ def _vectors() -> list[dict[str, Any]]:
     return vectors
 
 
-def _is_node(value: object) -> bool:
-    return isinstance(value, dict) and isinstance(value.get("id"), str) and isinstance(value.get("kind"), dict)
+def _node_positions(tree: object) -> dict[str, str]:
+    """Every node of the document, path to id: an object at a position the vocabulary (``idl.json``) declares to hold a
+    node — the root; a node's envelope ``fallback`` and its ``state.onEmpty`` / ``state.onLoading``; and, in its kind,
+    ``children[i]``, ``cases[i].child``, ``child``, ``fallback``, ``body``, ``default`` and a slot argument's
+    ``args.<name>.tree`` / ``inputs.<name>.tree``. An object elsewhere that carries a string ``id`` and an object
+    ``kind`` (a form field, a filter chip) is not a node."""
+    out: dict[str, str] = {}
+
+    def node(path: str, value: object) -> None:
+        if not isinstance(value, dict):
+            return
+        if isinstance(value.get("id"), str):
+            out[path] = value["id"]
+        node(f"{path}.fallback", value.get("fallback"))
+        kind = value.get("kind")
+        if isinstance(kind, dict):
+            at = f"{path}.kind"
+            children = kind.get("children")
+            if isinstance(children, list):
+                for i, child in enumerate(children):
+                    node(f"{at}.children[{i}]", child)
+            cases = kind.get("cases")
+            if isinstance(cases, list):
+                for i, case in enumerate(cases):
+                    if isinstance(case, dict):
+                        node(f"{at}.cases[{i}].child", case.get("child"))
+            for member in ("child", "fallback", "body", "default"):
+                node(f"{at}.{member}", kind.get(member))
+            for member in ("args", "inputs"):
+                args = kind.get(member)
+                if isinstance(args, dict):
+                    for name, arg in args.items():
+                        if isinstance(arg, dict):
+                            node(f"{at}.{member}.{name}.tree", arg.get("tree"))
+        state = value.get("state")
+        if isinstance(state, dict):
+            for alt in ("onEmpty", "onLoading"):
+                node(f"{path}.state.{alt}", state.get(alt))
+
+    node("$", tree)
+    return out
 
 
 def _located_node(tree: object, path: str) -> tuple[str, str | None]:
-    """The path of the deepest node object ``path`` passes through, and that node's id.
+    """The path of the deepest node ``path`` passes through, and that node's id.
 
     Refused (``AssertionError``) when a segment other than the last names nothing in the document: a name on an array,
     an index on an object, a member the object does not hold. The last may name an absent member (a missing field).
     """
     assert path.startswith("$"), f"{path!r} is not $-rooted"
-    at, node_path, node_id = tree, "$", tree["id"] if _is_node(tree) else None
+    nodes = _node_positions(tree)
+    at, node_path, node_id = tree, "$", nodes.get("$")
     consumed, rest = "$", path[1:]
     while rest:
         step = _SEGMENT.match(rest)
@@ -70,8 +111,8 @@ def _located_node(tree: object, path: str) -> tuple[str, str | None]:
         if at is None:
             assert not rest, f"{path!r} names nothing in the document at {consumed!r}"
             break
-        if _is_node(at):
-            node_path, node_id = consumed, at["id"]
+        if consumed in nodes:
+            node_path, node_id = consumed, nodes[consumed]
     return node_path, node_id
 
 
@@ -109,7 +150,8 @@ def test_the_leg_reads_the_section_29_grammar() -> None:
         '{"id":"a","kind":{"$type":"Box"}},'
         '{"id":"f","kind":{"$type":"FragmentRef","args":{"my-slot":{"tree":{"id":"s","kind":{"$type":"Box"}}},'
         '"404":{"tree":{"id":"n","kind":{"$type":"Box"}}}}}},'
-        '{"id":"m","kind":{"$type":"TonedPill","map":{"On time":"Good"}}}]}}'
+        '{"id":"m","kind":{"$type":"TonedPill","map":{"On time":"Good"}}},'
+        '{"id":"form","kind":{"$type":"Form","fields":[{"id":"f","kind":{"$type":"Checkbox"},"label":"x"}]}}]}}'
     )
     for refused in (
         "$.kind.children.0.kind.stateKey",
@@ -131,4 +173,6 @@ def test_the_leg_reads_the_section_29_grammar() -> None:
     )
     assert _located_node(tree, "$.kind.children[2].kind.map.On time") == ("$.kind.children[2]", "m")
     assert _located_node(tree, "$.kind.children[2].kind.absentField") == ("$.kind.children[2]", "m")
+    # A form field carries an id and a kind and is not a node: the vocabulary declares no node position in `fields[]`.
+    assert _located_node(tree, "$.kind.children[3].kind.fields[0].kind.$type") == ("$.kind.children[3]", "form")
     assert path_matches("$.kind.columns[2].kind.map.404", "$.kind.columns[2].kind.map") is None

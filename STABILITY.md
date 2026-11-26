@@ -44,8 +44,10 @@ corpus, not by this file.
 
 The capability manifest declares the `validate` family `covered`, and §27.7 gives that answer no qualifier,
 so the limit is stated here. `tests/test_validate_corpus.py` compares each finding's code, node and node path
-with the vector's: a `Finding` carries no node id, so its node is the deepest node object its path passes
-through, and that path must address the document in the §29.3 grammar. It does **not** compare:
+with the vector's: a `Finding` carries no node id, so its node is the deepest node its path passes through,
+and that path must address the document in the §29.3 grammar. A node is an object at a position the
+vocabulary declares to hold one (§27.8.2); a form field carries an `id` and a `kind` and is not one, so a
+finding on a field is located at its `Form`. It does **not** compare:
 
 - the **severity**: this host's `Finding` carries none, so a vector's `severity` is not checked;
 - a code outside `validator-coverage.json`'s `implemented` set — those rows of a vector, and any such finding,

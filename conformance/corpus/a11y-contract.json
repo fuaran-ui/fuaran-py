@@ -89,5 +89,43 @@
         "note": "Phase 1812 — `speak` beside a Static name. The list is exhaustive WITHOUT the speech line: a host that projected speak into aria-label (or anywhere else) fails here, because the name must be 'Service status' and nothing may carry the spoken text."
       }
     ]
+  },
+  "chartTable": {
+    "$comment": "Phase 2776. The rules a lowered chart's data-table alternative must pass. Each is SCOPED to the markup that alternative introduces, the disclosure selected by `scope`, and reads nothing else, so on a host that does not offer the table there is nothing for a rule to read and it holds vacuously: the hosts that have not adopted the table (Phase 2804) stay green over the HTML they emit today. Each rule is structural, checkable over the emitted HTML with no browser and no axe run; a host suite that also runs axe keeps `severityThreshold` above for that. Additive growth, so `version` does not move.",
+    "scope": "details.fuaran-chart-table",
+    "rules": [
+      {
+        "id": "disclosure-summary",
+        "rule": "The disclosure's first child is a <summary> whose text is not empty, so the control that opens the table is named and in the tab order."
+      },
+      {
+        "id": "referenced-from-chart",
+        "rule": "The disclosure carries an id that occurs once in the document, and the chart's role=\"img\" drawing names it in aria-details. The disclosure, not the table inside it: a closed <details> keeps its content out of the accessibility tree, so the reference must reach the control that opens it."
+      },
+      {
+        "id": "one-table",
+        "rule": "The disclosure holds exactly one <table> among its children."
+      },
+      {
+        "id": "caption",
+        "rule": "The table's first child is a <caption> whose text is not empty."
+      },
+      {
+        "id": "column-headers",
+        "rule": "The table has a <thead> whose row is all <th scope=\"col\"> cells, each with text that is not empty: one per plotted field, in its declared name."
+      },
+      {
+        "id": "row-headers",
+        "rule": "Every <tbody> row's first cell is a <th scope=\"row\">, the row's x value, and every other cell is a <td>."
+      },
+      {
+        "id": "rectangular",
+        "rule": "Every <tbody> row has as many cells as the header row."
+      },
+      {
+        "id": "no-empty-body",
+        "rule": "The <tbody> holds at least one row. A chart with no rows, or one the lowering's cost caps refuse, offers no table at all rather than an empty one."
+      }
+    ]
   }
 }

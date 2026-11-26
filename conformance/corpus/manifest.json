@@ -5726,6 +5726,16 @@
       "description": "a Binding.Local carrying BOTH an `onCommit` closure sentinel and a declared `commitTo` key. The SetState value/valueFrom law, applied to the buffer's flush: exactly one commit destination. A decoding host can honour only the declared one — the closure is `\"<closure>\"` and nothing more — so admitting the pair would make the same bytes commit to two different places depending on who read them (Fuaran-UI Phase 1538)"
     },
     {
+      "id": "reject-map-key-all-digits",
+      "kind": "reject",
+      "since": "0.108.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-map-key-all-digits.json",
+      "expectedErrorCode": "UNKNOWN_DU_CASE",
+      "expectedPath": "$.kind.columns[2].kind.map.404",
+      "description": "WIRE_FORMAT §6, §29.3 — a TonedPill map keyed by the status code `404` carries a tone that is not a ToneVariant. An array index is always bracketed, so a dotted segment is a member name or a map key as written, digits included: the defect is at `$.kind.columns[2].kind.map.404`, the key's own spelling"
+    },
+    {
       "id": "reject-markdown-citation-name-empty",
       "kind": "reject",
       "since": "0.102.0",

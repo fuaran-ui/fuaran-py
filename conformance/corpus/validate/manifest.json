@@ -1,7 +1,7 @@
 {
   "version": 1,
   "$id": "https://fuaran.dev/wire-format/v1/validate/manifest.json",
-  "description": "The Fuaran pre-emit VALIDATE conformance family (WIRE_FORMAT.md 27.8.2). Each vector is a document (`tree`, canonical wire bytes) and the pre-emit defects it carries (`expected`): each defect's `code` and `severity` from validator/defect-vocabulary.json, the `node` id it is raised on (null where the defect names none), and `path`, the JSONPath of that node's object in the tree in the section 29.3 grammar: where several nodes hold the id, its first occurrence, except that FUARAN-DUP-ID is reported once at each occurrence after the first, in document order. A host that implements the pre-emit tier validates each tree and asserts that its findings, restricted to the codes its validator-coverage.json declares implemented, are exactly the expected defects restricted to the same codes, each on the stated node; a host whose finding carries a path asserts that the path is the stated one or extends it at a segment boundary. Generated from the reference host's own validator, through its decoder.",
+  "description": "The Fuaran pre-emit VALIDATE conformance family (WIRE_FORMAT.md 27.8.2). Each vector is a document (`tree`, canonical wire bytes) and the pre-emit defects it carries (`expected`): each defect's `code` and `severity` from validator/defect-vocabulary.json, the `node` id it is raised on (null where the defect names none), and `path`, the JSONPath of that node's object in the tree in the section 29.3 grammar: the occurrence that raised it, a finding judged across the whole tree included (null only where no node of the document raised it). A finding whose subject is a repetition is reported once at each occurrence after the first, located at that occurrence. The expected defects are listed in document order. A host that implements the pre-emit tier validates each tree and asserts that its findings, restricted to the codes its validator-coverage.json declares implemented, are exactly the expected defects restricted to the same codes, each on the stated node; a host whose finding carries a path asserts that the path is the stated one or extends it at a segment boundary. Generated from the reference host's own validator, through its decoder.",
   "vectors": [
     {
       "id": "validate-clean-nested",
@@ -121,6 +121,505 @@
           "severity": "Error",
           "node": "twice",
           "path": "$.kind.children[0]"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-in-the-state-alternatives",
+      "description": "One id held by the root's child and by both of the root's state alternatives (FUARAN-DUP-ID). A state alternative is a member of the node object, so it is part of the document (section 8.1): three occurrences are two findings, at $.state.onEmpty and $.state.onLoading. A host that does not walk the state alternatives reports none.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"},\"state\":{\"onEmpty\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"onLoading\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.state.onEmpty"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.state.onLoading"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-in-the-envelope-kind-and-state",
+      "description": "One id held by the root's fallback, by its first child and by both state alternatives of its second child (FUARAN-DUP-ID). Document order puts a node's fallback before its kind and its kind before its state, so the fallback is the first occurrence and the three findings are at $.kind.children[0], $.kind.children[1].state.onEmpty and $.kind.children[1].state.onLoading.",
+      "tree": "{\"fallback\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},{\"id\":\"c1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"},\"state\":{\"onEmpty\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"onLoading\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.kind.children[0]"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.kind.children[1].state.onEmpty"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.kind.children[1].state.onLoading"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-across-a-case-the-default-and-the-state",
+      "description": "One id held by a Switch's case arm, its default and its own state.onEmpty alternative (FUARAN-DUP-ID): findings at $.kind.default and $.state.onEmpty. The Switch's state key has no writer, so the reference also warns FUARAN103 on it.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k\"},\"state\":{\"onEmpty\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}}}",
+      "expected": [
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "root",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.kind.default"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.state.onEmpty"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-in-a-state-alternative-then-a-sibling",
+      "description": "One id held by the onEmpty alternative of the first child and by the second child (FUARAN-DUP-ID). The alternative comes first in document order, so the one finding is at $.kind.children[1].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"c0\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"},\"state\":{\"onEmpty\":{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}}},{\"id\":\"X\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "X",
+          "path": "$.kind.children[1]"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-empty-statekey-in-a-state-alternative",
+      "description": "A Switch with an empty stateKey (FUARAN083) held as the onLoading alternative of a child. Every rule judges a node in a state alternative as it judges one in the tree, so the finding is at $.kind.children[0].state.onLoading.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"c0\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"},\"state\":{\"onLoading\":{\"id\":\"s\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"sa\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"sd\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"\"}}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "s",
+          "path": "$.kind.children[0].state.onLoading"
+        }
+      ]
+    },
+    {
+      "id": "validate-defect-on-the-second-of-two-nodes-sharing-an-id",
+      "description": "Two Switches share one id and only the SECOND has an empty stateKey (FUARAN083). A finding is located at the occurrence that raised it, so FUARAN083 is at $.kind.children[1], not at the first node holding the id. The first Switch's state key has no writer: FUARAN103, though judged across the whole tree, is raised by the Switch whose key it names, so it is at $.kind.children[0].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k1\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[0]"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "sw",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[1]"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-two-ids-each-twice",
+      "description": "Two ids each held twice, in the order a, a, b, b (FUARAN-DUP-ID). One finding at each occurrence after the first: two findings, at $.kind.children[1] and $.kind.children[3].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"1\"}},{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"2\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"3\"}},{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"4\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "a",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "b",
+          "path": "$.kind.children[3]"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-match-repeated-three-times",
+      "description": "A Switch whose three cases match one value (FUARAN082). A finding whose subject is a repetition is one finding at each occurrence after the first, so x, x, x is two findings, both on the Switch at $: one per dead case. The state key has no writer, so the reference also warns FUARAN103.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"x\"},{\"child\":{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"x\"},{\"child\":{\"id\":\"c\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"x\"}],\"default\":{\"id\":\"d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k\"}}",
+      "expected": [
+        {
+          "code": "FUARAN082",
+          "severity": "Error",
+          "node": "root",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN082",
+          "severity": "Error",
+          "node": "root",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "root",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-two-matches-each-repeated",
+      "description": "A Switch whose cases match x, x, y, y (FUARAN082): two findings, one at each case after the first that repeats a value, not one per repeated value. The state key has no writer, so the reference also warns FUARAN103.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"x\"},{\"child\":{\"id\":\"b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"x\"},{\"child\":{\"id\":\"c\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"y\"},{\"child\":{\"id\":\"d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"y\"}],\"default\":{\"id\":\"e\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k\"}}",
+      "expected": [
+        {
+          "code": "FUARAN082",
+          "severity": "Error",
+          "node": "root",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN082",
+          "severity": "Error",
+          "node": "root",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "root",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-tree-row-id-repeated-three-times",
+      "description": "A Tree whose three rows share one id (FUARAN126): x, x, x is two findings, both on the Tree at $.",
+      "tree": "{\"id\":\"t\",\"kind\":{\"$type\":\"Tree\",\"items\":[{\"id\":\"x\",\"label\":\"Row 0\"},{\"id\":\"x\",\"label\":\"Row 1\"},{\"id\":\"x\",\"label\":\"Row 2\"}]}}",
+      "expected": [
+        {
+          "code": "FUARAN126",
+          "severity": "Error",
+          "node": "t",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN126",
+          "severity": "Error",
+          "node": "t",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-tree-row-ids-each-repeated",
+      "description": "A Tree whose rows carry the ids x, x, y, y (FUARAN126): two findings, one at each row after the first that repeats an id.",
+      "tree": "{\"id\":\"t\",\"kind\":{\"$type\":\"Tree\",\"items\":[{\"id\":\"x\",\"label\":\"Row 0\"},{\"id\":\"x\",\"label\":\"Row 1\"},{\"id\":\"y\",\"label\":\"Row 2\"},{\"id\":\"y\",\"label\":\"Row 3\"}]}}",
+      "expected": [
+        {
+          "code": "FUARAN126",
+          "severity": "Error",
+          "node": "t",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN126",
+          "severity": "Error",
+          "node": "t",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-static-token-repeated-three-times",
+      "description": "A Tokens field whose static value lists one token three times (FUARAN136): two findings, both on the Form at $. The field has no handler and no writable binding, so the reference also warns FUARAN069.",
+      "tree": "{\"id\":\"f\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"labels\",\"kind\":{\"$type\":\"Tokens\",\"value\":{\"$type\":\"Static\",\"value\":[\"x\",\"x\",\"x\"]}},\"label\":\"Labels\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Save\"}}",
+      "expected": [
+        {
+          "code": "FUARAN069",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN136",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN136",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-static-tokens-each-repeated",
+      "description": "A Tokens field whose static value is x, x, y, y (FUARAN136): two findings, one at each token after the first that repeats one. The reference also warns FUARAN069.",
+      "tree": "{\"id\":\"f\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"labels\",\"kind\":{\"$type\":\"Tokens\",\"value\":{\"$type\":\"Static\",\"value\":[\"x\",\"x\",\"y\",\"y\"]}},\"label\":\"Labels\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Save\"}}",
+      "expected": [
+        {
+          "code": "FUARAN069",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN136",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN136",
+          "severity": "Warning",
+          "node": "f",
+          "path": "$"
+        }
+      ]
+    },
+    {
+      "id": "validate-write-back-key-repeated-three-times",
+      "description": "Three Forms whose handler-free fields all write back to the state key email (FUARAN085): x, x, x is two findings, at the second and the third writer, each located at the Form that holds it ($.kind.children[1], $.kind.children[2]).",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"f1\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"f2\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"f3\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN085",
+          "severity": "Warning",
+          "node": "f2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN085",
+          "severity": "Warning",
+          "node": "f3",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-write-back-keys-each-repeated",
+      "description": "Two Forms whose handler-free fields write back to the keys email and phone, each twice (FUARAN085): x, x, y, y is two findings, one at each writer after the first of its key; both writers after the first are in the second Form, $.kind.children[1].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"f1\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"},{\"id\":\"phone\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"phone\"}},\"label\":\"phone\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"f2\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"},{\"id\":\"phone\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"phone\"}},\"label\":\"phone\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN085",
+          "severity": "Warning",
+          "node": "f2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN085",
+          "severity": "Warning",
+          "node": "f2",
+          "path": "$.kind.children[1]"
+        }
+      ]
+    },
+    {
+      "id": "validate-write-back-key-repeated-on-a-repeated-id",
+      "description": "The second writer of the key email is the second of two Forms sharing the id f2 (FUARAN085): the finding is at the occurrence that holds the writer, $.kind.children[2], not at the first node holding f2.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"f1\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"f2\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"phone\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"phone\"}},\"label\":\"phone\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"f2\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"email\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"email\"}},\"label\":\"email\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "f2",
+          "path": "$.kind.children[2]"
+        },
+        {
+          "code": "FUARAN085",
+          "severity": "Warning",
+          "node": "f2",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-state-seed-declared-three-times",
+      "description": "Three Metrics declare the state key k with the defaults 1, 2 and 3 (FUARAN106): the first declaration is the one that takes effect, so x, x, x is two findings, at the second and the third declaration ($.kind.children[1], $.kind.children[2]).",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m1\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m1\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m2\",\"value\":{\"$type\":\"State\",\"defaultValue\":2,\"key\":\"k\"}}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m3\",\"value\":{\"$type\":\"State\",\"defaultValue\":3,\"key\":\"k\"}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m3",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-state-seeds-each-declared-twice",
+      "description": "The keys k and j are each declared twice with different defaults (FUARAN106): x, x, y, y is two findings, one at the second declaration of each key ($.kind.children[1], $.kind.children[3]).",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m1\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m1\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m2\",\"value\":{\"$type\":\"State\",\"defaultValue\":2,\"key\":\"k\"}}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m3\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"j\"}}},{\"id\":\"m4\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m4\",\"value\":{\"$type\":\"State\",\"defaultValue\":2,\"key\":\"j\"}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m4",
+          "path": "$.kind.children[3]"
+        }
+      ]
+    },
+    {
+      "id": "validate-state-seed-agreeing-then-disagreeing",
+      "description": "The key k is declared 1, 1 and 2 (FUARAN106): a later declaration that agrees with the first changes nothing, so the one finding is at the third, $.kind.children[2].",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m1\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m1\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m2\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m3\",\"value\":{\"$type\":\"State\",\"defaultValue\":2,\"key\":\"k\"}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m3",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-state-seed-disagreeing-on-a-repeated-id",
+      "description": "The key k is declared 1 by m1 and by the first of two Metrics sharing the id m2, and 2 by the second (FUARAN106): the finding is at the declaration that disagrees, $.kind.children[2], not at the first node holding m2.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m1\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m1\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m2\",\"value\":{\"$type\":\"State\",\"defaultValue\":1,\"key\":\"k\"}}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Metric\",\"label\":\"m2\",\"value\":{\"$type\":\"State\",\"defaultValue\":2,\"key\":\"k\"}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "m2",
+          "path": "$.kind.children[2]"
+        },
+        {
+          "code": "FUARAN106",
+          "severity": "Error",
+          "node": "m2",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-inline-table-repeated-three-times",
+      "description": "Three DataGrids carry the same inline table (FUARAN107): x, x, x is two findings, at the second and the third copy ($.kind.children[1], $.kind.children[2]), each naming the first copy; never one per pair.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"g1\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}},{\"id\":\"g2\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}},{\"id\":\"g3\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN107",
+          "severity": "Warning",
+          "node": "g2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN107",
+          "severity": "Warning",
+          "node": "g3",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-inline-tables-each-repeated",
+      "description": "Two inline tables are each carried twice (FUARAN107): x, x, y, y is two findings, one at the second copy of each ($.kind.children[1], $.kind.children[3]).",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"g1\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}},{\"id\":\"g2\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}},{\"id\":\"g3\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":3},{\"a\":4}]}}},{\"id\":\"g4\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":3},{\"a\":4}]}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN107",
+          "severity": "Warning",
+          "node": "g2",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN107",
+          "severity": "Warning",
+          "node": "g4",
+          "path": "$.kind.children[3]"
+        }
+      ]
+    },
+    {
+      "id": "validate-inline-table-repeated-on-a-repeated-id",
+      "description": "The second copy of a table is the second of two DataGrids sharing the id g2 (FUARAN107): the finding is at that copy, $.kind.children[2], not at the first node holding g2.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"g1\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}},{\"id\":\"g2\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":3},{\"a\":4}]}}},{\"id\":\"g2\",\"kind\":{\"$type\":\"DataGrid\",\"columns\":[{\"field\":\"a\",\"kind\":{\"$type\":\"Text\"},\"label\":\"a\"}],\"rowKeyField\":\"a\",\"source\":{\"$type\":\"Static\",\"value\":[{\"a\":1},{\"a\":2}]}}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "g2",
+          "path": "$.kind.children[2]"
+        },
+        {
+          "code": "FUARAN107",
+          "severity": "Warning",
+          "node": "g2",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-cross-tree-finding-on-the-second-of-two-nodes-sharing-an-id",
+      "description": "Two Switches share one id; the first selects on a key a form field writes, the second on a key nothing writes (FUARAN103). A finding judged across the whole tree is raised by the node whose binding it names, so it is located there, $.kind.children[2], though another node holds the same id.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"f\",\"kind\":{\"$type\":\"Form\",\"fields\":[{\"id\":\"k1\",\"kind\":{\"$type\":\"Text\",\"value\":{\"$type\":\"State\",\"key\":\"k1\"}},\"label\":\"k1\"}],\"onSubmit\":{\"$type\":\"Chain\",\"ops\":[]},\"submitLabel\":\"Send\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k1\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"k2\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "sw",
+          "path": "$.kind.children[2]"
+        },
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[2]"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-empty-statekey-in-a-list-of-twelve",
+      "description": "Two Switches with an empty stateKey (FUARAN083) at children[2] and children[10] of twelve. The expected findings are listed in document order, so children[2] comes before children[10]: positions compare as section 29.3 orders paths, never as strings.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m0\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"0\"}},{\"id\":\"m1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"1\"}},{\"id\":\"sw2\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"\"}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"3\"}},{\"id\":\"m4\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"4\"}},{\"id\":\"m5\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"5\"}},{\"id\":\"m6\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"6\"}},{\"id\":\"m7\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"7\"}},{\"id\":\"m8\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"8\"}},{\"id\":\"m9\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"9\"}},{\"id\":\"sw10\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"a10\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"match\":\"a\"}],\"default\":{\"id\":\"d10\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"t\"}},\"stateKey\":\"\"}},{\"id\":\"m11\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"11\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "sw2",
+          "path": "$.kind.children[2]"
+        },
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "sw10",
+          "path": "$.kind.children[10]"
         }
       ]
     }

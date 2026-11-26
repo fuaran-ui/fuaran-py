@@ -2973,7 +2973,7 @@
     {
       "id": "frag-stdlib-refinable-table",
       "kind": "node-round-trip",
-      "since": "0.107.0",
+      "since": "0.108.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-refinable-table.json",
       "expectedFile": "nodes/frag-stdlib-refinable-table.json",
@@ -2982,7 +2982,7 @@
     {
       "id": "frag-stdlib-refinable-table-ref",
       "kind": "node-round-trip",
-      "since": "0.107.0",
+      "since": "0.108.0",
       "decoder": "node",
       "inputFile": "nodes/frag-stdlib-refinable-table-ref.json",
       "expectedFile": "nodes/frag-stdlib-refinable-table-ref.json",

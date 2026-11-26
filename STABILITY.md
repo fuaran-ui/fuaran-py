@@ -31,6 +31,13 @@ corpus, not by this file.
   validator now walks a node's envelope `fallback` before its kind and its `state` alternatives after it,
   so an id held by a node's fallback and by its child is reported at the child, where it was reported at
   the fallback. Certified by `validate-duplicate-id-in-the-node-envelope`.
+- `FUARAN075` (a declared filter edge grounded in no chip) reads the node envelope too. Its walk read a node's
+  kind only, so an edge held by a `fallback` or a `state` alternative was never judged, and a `Filters` chip held
+  there declared nothing. Now a dangling `dependsOn` entry or `params` source there is a finding located there
+  (`$.state.onEmpty.kind.value.dependsOn[0]`), and a chip there grounds an edge anywhere in the tree, as the
+  reference counts both. A tree with no envelope `fallback` or `state` alternative is unchanged. Certified by
+  `validate-filter-edge-in-the-fallback`, `-in-a-state-alternative`, `-in-a-nested-state-alternative` and
+  `validate-filter-chip-in-a-state-alternative-grounds-an-edge`.
 - A repeated `Switch` match value is one `FUARAN082` at EACH case after the first that repeats it, located at
   that case (`$.kind.cases[i].match`), where it was one finding per repeated value at `$.kind.cases`: `x, x, x`
   is two findings, and the message names the case. Certified by `validate-switch-match-repeated-three-times`.

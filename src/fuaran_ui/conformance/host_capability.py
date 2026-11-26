@@ -312,6 +312,10 @@ _NO_DESIGN_SEAM = (
     "and this host carries none"
 )
 _LAW_UNRUN = "this host's suite does not yet run this law family's vectors"
+_NO_DERIVATION_TRACE = (
+    "this host does not implement the derivation trace (WIRE_FORMAT 35) yet, so its suite does not run these "
+    "vectors; its evaluator already runs transformLaws, the pipelines they are drawn from"
+)
 
 #: Every corpus family, and this host's answer for it (WIRE_FORMAT §27.7).
 CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
@@ -362,6 +366,7 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     },
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
     "laws/decimal": "covered",  # tests/test_decimal_laws.py
+    "laws/derivationTraceLaws": {"pending": _NO_DERIVATION_TRACE},
     "laws/fieldLaws": "covered",  # tests/test_field_laws.py
     "laws/propagationLaws": {"pending": _LAW_UNRUN},
     # tests/test_transform_laws.py — every evalPipeline vector but the `-unit-` ones (fuaran#2208),

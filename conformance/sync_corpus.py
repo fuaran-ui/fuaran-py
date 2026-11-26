@@ -220,6 +220,9 @@ _FILES = (
 
 # Phase 1960 - ``row-encode`` joins on the ``apply`` footing: ``tests/test_row_encode.py`` certifies
 # the two row-cell encode refusals against it and does not skip without it.
+#
+# Phase 2381 - ``validate`` joins on the same footing: ``tests/test_validate_corpus.py`` certifies the
+# pre-emit validator's findings against it and does not skip without it.
 _DIRS = (
     "nodes",
     "ops",
@@ -232,6 +235,7 @@ _DIRS = (
     "apply",
     "laws",
     "row-encode",
+    "validate",
 )
 
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")

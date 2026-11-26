@@ -1,0 +1,102 @@
+{
+  "version": 1,
+  "$id": "https://fuaran.dev/wire-format/v1/validate/manifest.json",
+  "description": "The Fuaran pre-emit VALIDATE conformance family (WIRE_FORMAT.md 27.8.2). Each vector is a document (`tree`, canonical wire bytes) and the pre-emit defects it carries (`expected`): each defect's `code` and `severity` from validator/defect-vocabulary.json, the `node` id it is raised on (null where the defect names none), and `path`, the JSONPath of that node's object in the tree in the section 29.3 grammar: where several nodes hold the id, its first occurrence, except that FUARAN-DUP-ID is reported once at each occurrence after the first, in document order. A host that implements the pre-emit tier validates each tree and asserts that its findings, restricted to the codes its validator-coverage.json declares implemented, are exactly the expected defects restricted to the same codes, each on the stated node; a host whose finding carries a path asserts that the path is the stated one or extends it at a segment boundary. Generated from the reference host's own validator, through its decoder.",
+  "vectors": [
+    {
+      "id": "validate-clean-nested",
+      "description": "The control: nested Boxes holding Markdown report no defect, so a host that raises anything here disagrees.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"intro\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Intro\"}},{\"id\":\"inner\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"body\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Body\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": []
+    },
+    {
+      "id": "validate-switch-empty-statekey-at-index-1",
+      "description": "A Switch with an empty stateKey (FUARAN083) as the second child of a Box. The node's path is $.kind.children[1]: an array index is spelled [i] in a finding's location, as in a decode path (sections 6 and 29.3).",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"intro\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Intro\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"sw-a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"A\"}},\"match\":\"a\"}],\"default\":{\"id\":\"sw-d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"D\"}},\"stateKey\":\"\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[1]"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-empty-statekey-at-index-10",
+      "description": "The same defect on the eleventh child, so the index has two digits: $.kind.children[10]. A host that orders or compares paths as strings, or spells the index as a dotted segment, disagrees here.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"m0\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"0\"}},{\"id\":\"m1\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"1\"}},{\"id\":\"m2\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"2\"}},{\"id\":\"m3\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"3\"}},{\"id\":\"m4\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"4\"}},{\"id\":\"m5\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"5\"}},{\"id\":\"m6\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"6\"}},{\"id\":\"m7\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"7\"}},{\"id\":\"m8\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"8\"}},{\"id\":\"m9\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"9\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"sw-a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"A\"}},\"match\":\"a\"}],\"default\":{\"id\":\"sw-d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"D\"}},\"stateKey\":\"\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN083",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[10]"
+        }
+      ]
+    },
+    {
+      "id": "validate-switch-duplicate-match-in-a-case-arm",
+      "description": "A Switch whose two cases match the same value (FUARAN082), held in the first case arm of an outer Switch. The node's path is $.kind.cases[0].child: an arm of an ordered list of records carries its index too. Neither state key has a writer in the tree, so the reference also warns FUARAN103 on both Switches, the outer one at the root path $.",
+      "tree": "{\"id\":\"outer\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"inner\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"inner-a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"A\"}},\"match\":\"x\"},{\"child\":{\"id\":\"inner-b\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"B\"}},\"match\":\"x\"}],\"default\":{\"id\":\"inner-d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"D\"}},\"stateKey\":\"inner\"}},\"match\":\"one\"}],\"default\":{\"id\":\"outer-d\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"D\"}},\"stateKey\":\"outer\"}}",
+      "expected": [
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "outer",
+          "path": "$"
+        },
+        {
+          "code": "FUARAN082",
+          "severity": "Error",
+          "node": "inner",
+          "path": "$.kind.cases[0].child"
+        },
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "inner",
+          "path": "$.kind.cases[0].child"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-across-default-and-child",
+      "description": "One id held by a Box's child and by a Switch's default arm (FUARAN-DUP-ID). The defect is located at the id's SECOND node in document order, $.kind.children[1].kind.default: the node to change is the later one. The Switch's state key has no writer, so the reference also warns FUARAN103 on it.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"First\"}},{\"id\":\"sw\",\"kind\":{\"$type\":\"Switch\",\"cases\":[{\"child\":{\"id\":\"sw-a\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"A\"}},\"match\":\"a\"}],\"default\":{\"id\":\"twice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Second\"}},\"stateKey\":\"view\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN103",
+          "severity": "Warning",
+          "node": "sw",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "twice",
+          "path": "$.kind.children[1].kind.default"
+        }
+      ]
+    },
+    {
+      "id": "validate-duplicate-id-three-times",
+      "description": "One id held by three nodes, the third one level down (FUARAN-DUP-ID). Three occurrences are TWO findings, one at each occurrence after the first, in document order: $.kind.children[1] and $.kind.children[2].kind.children[0]. The count of findings is the count of nodes to change.",
+      "tree": "{\"id\":\"root\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"thrice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"One\"}},{\"id\":\"thrice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Two\"}},{\"id\":\"inner\",\"kind\":{\"$type\":\"Box\",\"children\":[{\"id\":\"thrice\",\"kind\":{\"$type\":\"Markdown\",\"text\":\"Three\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}],\"layout\":{\"$type\":\"Flex\",\"direction\":\"Vertical\"},\"role\":\"Group\"}}",
+      "expected": [
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "thrice",
+          "path": "$.kind.children[1]"
+        },
+        {
+          "code": "FUARAN-DUP-ID",
+          "severity": "Error",
+          "node": "thrice",
+          "path": "$.kind.children[2].kind.children[0]"
+        }
+      ]
+    }
+  ]
+}

@@ -353,6 +353,13 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "sanitization": "covered",
     "diff/treeDiff": "covered",
     "laws/dataframeParity": "covered",
+    "laws/canonicalFormLaws": {
+        "pending": (
+            "this host's codec is generated for the UI vocabulary alone and reads no other, so its suite does not "
+            "run these vectors over the fixture vocabulary they carry; the UI vocabulary declares no presence "
+            "condition or alias list until Phase 2340 (WIRE_FORMAT 3.6)"
+        )
+    },
     "laws/capabilityLaws": {"pending": _LAW_UNRUN},
     "laws/decimal": "covered",  # tests/test_decimal_laws.py
     "laws/fieldLaws": "covered",  # tests/test_field_laws.py
@@ -388,6 +395,8 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
         )
     },
     "stored-emissions": {"pending": "this host's suite does not yet run the stored-emission fixtures"},
+    # tests/test_validate_corpus.py — code, node and path, restricted to validator-coverage.json's implemented set.
+    "validate": "covered",
 }
 
 

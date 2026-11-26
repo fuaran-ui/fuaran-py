@@ -1,0 +1,1 @@
+{"id":"x","kind":{"$type":"DataGrid","columns":[],"rowKey":"<closure>","source":{"$type":"Transform","params":[{"from":{"$type":"Filter","name":"dept"},"name":"dept"},{"from":{"$type":"Filter"},"name":"region"}],"pipeline":[],"source":{"columns":{"dept":{"validity":[true],"values":["eng"]}},"schema":[{"name":"dept","type":"string"}]}}}}

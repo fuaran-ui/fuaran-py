@@ -6810,6 +6810,16 @@
       "description": "Phase 2484 — `2.5` in a declared `int` column: refused, never truncated to `2`; §7.1's integer-slot rule, applied to a column value (WIRE_FORMAT §3.6.28)"
     },
     {
+      "id": "reject-transform-param-from-missing-name",
+      "kind": "reject",
+      "since": "0.108.0",
+      "decoder": "node",
+      "inputFile": "reject/reject-transform-param-from-missing-name.json",
+      "expectedErrorCode": "MISSING_FIELD",
+      "expectedPath": "$.kind.source.params[1].from.name",
+      "description": "WIRE_FORMAT §29.3 — a Transform's second param binds a Filter with no `name`. The defect is located by its entry's INDEX, below the entry as at it: `params[1].from.name`, never the entry's own `name` standing in for its index (`params.region.from.name`) or an empty index (`params[].from.name`)"
+    },
+    {
       "id": "reject-transform-project-columns-and-cols",
       "kind": "reject",
       "since": "0.85.0",

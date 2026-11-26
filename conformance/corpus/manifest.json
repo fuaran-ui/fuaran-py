@@ -2971,6 +2971,24 @@
       "description": "FragmentRef (stdlib 'parameter-panel' — a number and a choice parameter)"
     },
     {
+      "id": "frag-stdlib-refinable-table",
+      "kind": "node-round-trip",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-refinable-table.json",
+      "expectedFile": "nodes/frag-stdlib-refinable-table.json",
+      "description": "FragmentDecl (stdlib 'refinable-table' — A grid whose sort, page and membership filters are its view: state the grid and its chips write, which the substituted pipeline restates.)"
+    },
+    {
+      "id": "frag-stdlib-refinable-table-ref",
+      "kind": "node-round-trip",
+      "since": "0.107.0",
+      "decoder": "node",
+      "inputFile": "nodes/frag-stdlib-refinable-table-ref.json",
+      "expectedFile": "nodes/frag-stdlib-refinable-table-ref.json",
+      "description": "FragmentRef (stdlib 'refinable-table' — a representative application)"
+    },
+    {
       "id": "frag-stdlib-scenario-comparison",
       "kind": "node-round-trip",
       "since": "0.105.0",

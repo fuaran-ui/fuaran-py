@@ -4247,3 +4247,161 @@ def try_lower_sparkline_node(node_id: str, series: Sequence[float] | None) -> No
     sparkline seam."""
     kind = try_lower_sparkline(series)
     return None if kind is None else Node(id=node_id, kind=kind)
+
+
+# ═══ The data-table alternative (Phase 2804) ════════════════════════════════
+#
+# The Python twin of the reference host's ``Charts.tableModel`` (Phase 2776). A
+# lowered chart is an image to assistive technology: ``role="img"`` with a title
+# and a summary of at most 320 characters. The summary is not the data. This is
+# the data: beside the drawing, the lowering yields the values its marks were
+# drawn from as a table, and the renderer offers it behind a "View as table"
+# disclosure the drawing names in ``aria-details``.
+#
+# WHAT A TABLE HOLDS — a lowering rule, pinned for every host by the corpus's
+# ``chart-lowering/table-model/`` goldens:
+#
+#  * THE CAPTION is the chart's ``title``, carried unresolved; a chart with no
+#    title gets a ``Literal`` minted from its kind, "Bar chart data".
+#  * THE COLUMNS are the fields the marks read, under their declared names: the
+#    x field, then each series in order, then the interval's low and high ends,
+#    the size and the path order when the kind reads them. A heatmap's are its x
+#    field, its row field and its value field. A field that orders or withholds
+#    rows is not plotted, so it is not a column.
+#  * THE ROWS are the rows the chart plotted, in the order the marks were drawn
+#    (after ``sort_by``); a heatmap's are one per cell, the first row of an
+#    (x, row) pair, in data order.
+#  * A CELL is the value's exact readout through the declared ``value_format``
+#    (the hover tip's text), the x cell as the category axis projected it, a size
+#    or a path order as a plain number, a withheld value as "withheld" and a
+#    missing one as an empty cell. Never a zero for a value that is not there.
+#  * THE COST CAPS APPLY, as the reference host's admission applies them: a chart
+#    the caps refuse offers no table, nor does a chart with no rows; and a table
+#    longer than ``TABLE_ROW_LIMIT`` holds its first that many rows and says how
+#    many there were (``row_count``).
+
+#: The most rows a chart's data table holds: the bound grid's limit, so the two
+#: tables a reader meets are cut at the same place.
+TABLE_ROW_LIMIT = 1000
+
+#: The reference host's cost caps (``ChartLimits.defaults``).
+_MAX_SERIES = 32
+_MAX_POINTS = 10_000
+
+
+@dataclass(frozen=True)
+class ChartTable:
+    """A chart's data table: what the renderer draws behind the disclosure."""
+
+    #: The chart's ``title``, unresolved, or a ``Literal`` minted from its kind.
+    caption: Value
+    #: One header per plotted field, in its declared name.
+    columns: tuple[str, ...]
+    #: One row per plotted row, in draw order; at most ``TABLE_ROW_LIMIT``.
+    rows: tuple[tuple[str, ...], ...]
+    #: How many rows the chart plotted — more than ``rows`` holds past the limit.
+    row_count: int
+
+
+def _table_cell(fmt: Mapping[str, object] | None, withheld: bool, value: float | None) -> str:
+    """A value cell: "withheld", the hover tip's exact readout (unscaled, at the
+    datum's own precision), or empty when the value is missing."""
+    if withheld:
+        return _WITHHELD_WORD
+    return "" if value is None else _format_value(fmt, 1.0, False, value, value)
+
+
+def _table_caption(spec: ChartSpec, stacked: bool) -> Value:
+    return spec.title if spec.title is not None else _literal(f"{_summary_kind_words(spec.kind, stacked)} data")
+
+
+def _series_table(spec: ChartSpec, admitted: list[Mapping[str, object]]) -> ChartTable:
+    rows = _sorted_rows(spec, admitted)
+    fmt = spec.value_format
+    withheld = [_is_withheld_row(spec.withheld_field, r) for r in rows]
+
+    def read(field_name: str, i: int) -> float | None:
+        # A withheld row reads no value: its interval and size go with it.
+        return None if withheld[i] else _present_value_of(rows[i], field_name)
+
+    columns: list[tuple[str, Callable[[int], str]]] = [(spec.x_field, lambda i: _string_of(rows[i], spec.x_field))]
+
+    def series_cell(field_name: str) -> Callable[[int], str]:
+        return lambda i: _table_cell(fmt, withheld[i], read(field_name, i))
+
+    columns.extend((f, series_cell(f)) for f in spec.y_fields)
+    if spec.interval is not None and _interval_applies(spec):
+        low, high = spec.interval
+
+        def ends(i: int) -> tuple[float, float] | None:
+            lo, hi = read(low, i), read(high, i)
+            return (min(lo, hi), max(lo, hi)) if lo is not None and hi is not None else None
+
+        def end(i: int, k: int) -> float | None:
+            iv = ends(i)
+            return None if iv is None else iv[k]
+
+        columns.append((low, lambda i: _table_cell(fmt, withheld[i], end(i, 0))))
+        columns.append((high, lambda i: _table_cell(fmt, withheld[i], end(i, 1))))
+    size_field = _scatter_channel(spec, spec.size_field)
+    if size_field is not None:
+
+        def size(i: int) -> float | None:
+            v = read(size_field, i)
+            return v if v is not None and v >= 0.0 else None
+
+        columns.append((size_field, lambda i: _table_cell(None, withheld[i], size(i))))
+    # The path order is a position, read off a withheld row too.
+    path_field = _scatter_channel(spec, spec.path_field)
+    if path_field is not None:
+        columns.append((path_field, lambda i: _table_cell(None, False, _present_value_of(rows[i], path_field))))
+
+    stacked = spec.stacked and spec.kind in ("Bar", "Area")
+    return ChartTable(
+        caption=_table_caption(spec, stacked),
+        columns=tuple(name for name, _ in columns),
+        rows=tuple(tuple(cell(i) for _, cell in columns) for i in range(min(len(rows), TABLE_ROW_LIMIT))),
+        row_count=len(rows),
+    )
+
+
+def _heatmap_table(spec: ChartSpec, rows: list[Mapping[str, object]]) -> ChartTable | None:
+    row_field = spec.y_fields[0] if spec.y_fields else ""
+    value_field = spec.y_fields[1] if len(spec.y_fields) >= 2 else ""
+    keyed = [(_string_of(r, spec.x_field), _string_of(r, row_field), r) for r in rows]
+    x_keys = dict.fromkeys(k[0] for k in keyed)
+    row_keys = dict.fromkeys(k[1] for k in keyed)
+    if len(x_keys) * len(row_keys) > MAX_HEATMAP_CELLS:
+        return None
+    seen: set[tuple[str, str]] = set()
+    cells: list[tuple[str, ...]] = []
+    for x, y, r in keyed:
+        if (x, y) in seen:
+            continue
+        seen.add((x, y))
+        withheld = _is_withheld_row(spec.withheld_field, r)
+        cells.append((x, y, _table_cell(spec.value_format, withheld, _present_value_of(r, value_field))))
+    return ChartTable(
+        caption=_table_caption(spec, False),
+        columns=(spec.x_field, row_field, value_field),
+        rows=tuple(cells[:TABLE_ROW_LIMIT]),
+        row_count=len(cells),
+    )
+
+
+def table_model(spec: ChartSpec, rows: Sequence[Mapping[str, object]]) -> ChartTable | None:
+    """The data-table alternative of a chart: the values its marks are drawn from,
+    or ``None`` when there are none to read, because the reference host's cost caps
+    refuse the chart (it is drawn as the refusal) or it has no rows.
+
+    A chart naming no series offers none either: this host does not read a chart's
+    series off its rows (the reference's Phase 2568), so such a chart plots nothing.
+    """
+    rows = list(rows)
+    if not rows or len(rows) > _MAX_POINTS:
+        return None
+    if spec.kind == "Heatmap":
+        return _heatmap_table(spec, rows)
+    if not spec.y_fields or len(spec.y_fields) > _MAX_SERIES:
+        return None
+    return _series_table(spec, rows)

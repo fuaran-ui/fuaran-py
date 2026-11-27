@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING
 
 from ..model import Arr, Node, Obj, Value
 from ..ops.enumeration import FRAGMENT_SCOPE, walk
@@ -55,6 +56,7 @@ from .bindings import (
     resolve_source,
     select_switch_case,
 )
+from .chart_table import ChartTablePolicy, chart_table_host
 from .egress import (
     DENY_NON_LOCAL_EGRESS,
     EgressClass,
@@ -86,6 +88,9 @@ from .theme import (
     text_direction_attrs,
     trend_sentiment,
 )
+
+if TYPE_CHECKING:
+    from ..charts import ChartSpec
 
 # Unresolved-binding placeholder — matches the F# SSR renderer's em-dash.
 _EM_DASH = "—"
@@ -349,10 +354,14 @@ class Renderer:
         sources: BindingSourcesLike | None,
         fragments: dict[str, Node],
         egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
+        chart_table: ChartTablePolicy = "Offer",
     ) -> None:
         self.sources = sources
         self.fragments = fragments
         self.egress_policy = egress_policy
+        # Phase 2804 — whether a lowered chart offers its data table (host chrome,
+        # never wire): ``"Offer"`` by default, ``"Off"`` renders as before.
+        self.chart_table = chart_table
 
     # ── text / value helpers ────────────────────────────────────────────────
 
@@ -2394,10 +2403,23 @@ class Renderer:
         Returns ``None`` (fall through to the placeholder) when the kind is not
         lowerable or the data source did not resolve to embedded rows.
         """
-        drawing_node = self._lower_chart_node(node, fields, resolved)
-        if drawing_node is None or not isinstance(drawing_node.kind, Obj):
+        bridged = self._chart_spec_and_rows(fields, resolved)
+        if bridged is None:
             return None
-        return self._drawing(drawing_node, drawing_node.kind.fields)
+        drawing_node = self._lower_bridged(node, bridged)
+        if not isinstance(drawing_node.kind, Obj):
+            return None
+        # Phase 2804 — the data table, when the policy offers it and the lowering
+        # has values to give: the drawing and its disclosure in one host element,
+        # the drawing naming the disclosure, byte for byte the reference server
+        # renderer's markup. With the policy ``Off`` the table is never computed
+        # and the chart renders exactly as before.
+        from ..charts import table_model
+
+        table = None if self.chart_table == "Off" else table_model(*bridged)
+        if table is None:
+            return self._drawing(drawing_node, drawing_node.kind.fields)
+        return chart_table_host(self._text, node.id, self.bare_drawing_svg(drawing_node.kind.fields), table)
 
     def chart_svg(self, node: Node, fields: dict[str, Value]) -> str | None:
         """The bare inline ``<svg>`` for a lowerable chart, or ``None``.
@@ -2436,7 +2458,23 @@ class Renderer:
         that wants the geometry without the page's markup reaches the same lowering rather
         than a second one.
         """
-        from ..charts import LOWERED_KINDS, ChartSpec, lower_node
+        bridged = self._chart_spec_and_rows(fields, resolved)
+        return None if bridged is None else self._lower_bridged(node, bridged)
+
+    @staticmethod
+    def _lower_bridged(node: Node, bridged: tuple[ChartSpec, list[dict[str, object]]]) -> Node:
+        from ..charts import lower_node
+
+        return lower_node(node.id, *bridged)
+
+    def _chart_spec_and_rows(
+        self, fields: dict[str, Value], resolved: object
+    ) -> tuple[ChartSpec, list[dict[str, object]]] | None:
+        """The bridge: a chart's declared fields as the lowering's ``ChartSpec``, and
+        its resolved rows. ``None`` when the kind is not lowerable or the source did
+        not resolve to embedded rows. One statement, read by the drawing and by the
+        data table (Phase 2804), so the two cannot see different charts."""
+        from ..charts import LOWERED_KINDS, ChartSpec
 
         kind = fields.get("kind")
         if not isinstance(kind, str) or (kind not in LOWERED_KINDS and kind != "Column"):
@@ -2559,7 +2597,7 @@ class Renderer:
             sort_by=sort_by,
             path_field=path_src if isinstance(path_src, str) else None,
         )
-        return lower_node(node.id, spec, rows)
+        return spec, rows
 
     def _chart(self, node: Node, fields: dict[str, Value]) -> str:
         resolved = resolve_source(fields.get("source"), self.sources)
@@ -2978,6 +3016,7 @@ def render_html(
     node: Node,
     sources: BindingSourcesLike | None = None,
     egress_policy: EgressPolicy = DENY_NON_LOCAL_EGRESS,
+    chart_table: ChartTablePolicy = "Offer",
 ) -> str:
     """Render a decoded :class:`~fuaran_ui.model.Node` tree to a body-fragment HTML string.
 
@@ -3009,4 +3048,4 @@ def render_html(
     # of its own reads what a sibling declared. Laid UNDER the caller's own
     # sources: a seed is never an override. See :mod:`fuaran_ui.renderer.seeds`.
     seeded = with_state_seeds(node, sources)
-    return Renderer(seeded, fragments, egress_policy).render_node(node)
+    return Renderer(seeded, fragments, egress_policy, chart_table).render_node(node)

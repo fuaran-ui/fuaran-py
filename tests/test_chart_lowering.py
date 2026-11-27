@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import pathlib
+from collections.abc import Callable
 from dataclasses import replace
+from xml.etree import ElementTree
 
 import pytest
 
@@ -23,7 +26,9 @@ from _corpus import CORPUS_ROOT, corpus_available
 # are asserted directly rather than inferred from pixel positions — which means
 # reaching for the module-private helpers that implement it.
 from fuaran_ui.charts import (
+    TABLE_ROW_LIMIT,
     ChartSpec,
+    ChartTable,
     _choose_temporal_step,
     _civil_from_days,
     _day_of,
@@ -38,8 +43,12 @@ from fuaran_ui.charts import (
     _try_parse_day,
     lower,
     lower_node,
+    table_model,
 )
 from fuaran_ui.model import Arr, Obj
+from fuaran_ui.renderer.chart_table import ChartTablePolicy
+from fuaran_ui.renderer.render import render_html
+from fuaran_ui.schema.decode import decode_node
 from fuaran_ui.schema.encode import encode_node
 
 _CHART_LOWERING_DIR = CORPUS_ROOT / "chart-lowering"
@@ -361,7 +370,7 @@ def test_ssr_bridge_passes_legend_position() -> None:
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
         assert result.ok, getattr(result, "error", result)
-        html = render_html(result.value)
+        html = render_html(result.value, chart_table="Off")  # the drawing alone (Phase 2804)
         assert "<svg" in html and "ssr-placeholder" not in html
         return html
 
@@ -420,7 +429,7 @@ def test_ssr_bridge_passes_data_labels() -> None:
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
         assert result.ok, getattr(result, "error", result)
-        html = render_html(result.value)
+        html = render_html(result.value, chart_table="Off")  # the drawing alone (Phase 2804)
         assert "<svg" in html and "ssr-placeholder" not in html
         return html
 
@@ -790,7 +799,7 @@ def test_ssr_bridge_passes_x_scale() -> None:
     def render_wire(wire: str) -> str:
         result = decode_node(wire)
         assert result.ok, getattr(result, "error", result)
-        html = render_html(result.value)
+        html = render_html(result.value, chart_table="Off")  # the drawing alone (Phase 2804)
         assert "<svg" in html and "ssr-placeholder" not in html
         return html
 
@@ -1155,3 +1164,251 @@ def test_a_withheld_row_reaches_no_channel_readout() -> None:
     got = encode_node(lower_node("c", spec, rows))
     assert "11 – 19" not in got
     assert "effect · E · 6 – 13" in got
+
+
+# ── Phase 2804 — the data-table alternative ──────────────────────────────────
+#
+# The table model against the corpus's ``chart-lowering/table-model/`` goldens
+# (the reference host's Phase 2776 subfamily: each case a byte copy of an existing
+# input beside ``<name>.table.json``, the model in canonical JSON or ``null`` where
+# the cost caps refuse the chart), and the renderer's markup against the reference
+# SERVER renderer's bytes for the documents in ``tests/fixtures/chart_table/``
+# (``<name>.reference.txt``, produced by ``render-oracle.fsx`` there; its header
+# carries the command).
+
+_TABLE_MODEL_DIR = _CHART_LOWERING_DIR / "table-model"
+_CHART_TABLE_FIXTURES = pathlib.Path(__file__).parent / "fixtures" / "chart_table"
+
+#: The cases this host cannot certify, and why: it does not read a chart's series
+#: off its rows (the reference's Phase 2568, ``chart-lowering/derived-series/``,
+#: which this suite does not run either), so a chart naming no series plots nothing
+#: here and offers no table.
+_TABLE_MODEL_NOT_CERTIFIED = {"derived-mixed-columns", "derived-over-series-cap"}
+
+
+def _table_model_cases() -> list[str]:
+    if not corpus_available() or not _TABLE_MODEL_DIR.is_dir():
+        return []
+    return sorted(p.name[: -len(".input.json")] for p in _TABLE_MODEL_DIR.glob("*.input.json"))
+
+
+def _table_json(table: ChartTable | None) -> str:
+    if table is None:
+        return "null"
+    assert isinstance(table.caption, str), "a table-model caption is a Literal in every corpus case"
+    model = {
+        "caption": table.caption,
+        "columns": list(table.columns),
+        "rowCount": table.row_count,
+        "rows": [list(r) for r in table.rows],
+    }
+    return json.dumps(model, ensure_ascii=False, separators=(",", ":"))
+
+
+_table_model_available = pytest.mark.skipif(
+    not _table_model_cases(), reason=f"chart-lowering/table-model fixtures not found at {_TABLE_MODEL_DIR}"
+)
+
+
+@_table_model_available
+def test_table_model_subfamily_is_whole() -> None:
+    names = _table_model_cases()
+    goldens = sorted(p.name[: -len(".table.json")] for p in _TABLE_MODEL_DIR.glob("*.table.json"))
+    assert goldens == names
+    # A subfamily that lost its cases would make the sweep below vacuous, and an
+    # exclusion naming a case that is gone would outlive its reason.
+    assert len(names) >= 25
+    assert set(names) >= _TABLE_MODEL_NOT_CERTIFIED
+
+
+@_table_model_available
+@pytest.mark.parametrize("name", [n for n in _table_model_cases() if n not in _TABLE_MODEL_NOT_CERTIFIED])
+def test_table_model_byte_identical_to_golden(name: str) -> None:
+    inp = json.loads((_TABLE_MODEL_DIR / f"{name}.input.json").read_text(encoding="utf-8"))
+    expected = (_TABLE_MODEL_DIR / f"{name}.table.json").read_text(encoding="utf-8")
+    spec, rows = _spec_and_rows(inp)
+    assert _table_json(table_model(spec, rows)) == expected, f"{name}: table model drifted from golden"
+
+
+def test_table_caption_is_the_title_unresolved_or_minted_from_the_kind() -> None:
+    rows = [{"x": "p", "a": 1.0, "b": 2.0}]
+    bound = Obj("Bound", {"binding": Obj("State", {"key": "title"})})
+    titled = table_model(ChartSpec(kind="Bar", x_field="x", y_fields=("a", "b"), title=bound), rows)
+    assert titled is not None
+    assert titled.caption is bound
+    untitled = table_model(ChartSpec(kind="Area", x_field="x", y_fields=("a", "b"), stacked=True), rows)
+    assert untitled is not None
+    assert untitled.caption == "Stacked area chart data"
+
+
+def test_no_rows_or_a_refused_chart_offers_no_table() -> None:
+    assert table_model(ChartSpec(kind="Bar", x_field="x", y_fields=("v",)), []) is None
+    many = tuple(f"s{i}" for i in range(33))
+    wide = [{"x": "q", **dict.fromkeys(many, 1.0)}]
+    assert table_model(ChartSpec(kind="Bar", x_field="x", y_fields=many), wide) is None
+    deep = [{"x": f"r{i}", "v": float(i)} for i in range(10_001)]
+    assert table_model(ChartSpec(kind="Line", x_field="x", y_fields=("v",)), deep) is None
+
+
+def test_past_the_row_limit_the_table_holds_the_first_rows_and_states_the_count() -> None:
+    rows = [{"x": f"r{i}", "v": float(i)} for i in range(TABLE_ROW_LIMIT + 3)]
+    table = table_model(ChartSpec(kind="Line", x_field="x", y_fields=("v",)), rows)
+    assert table is not None
+    assert len(table.rows) == TABLE_ROW_LIMIT
+    assert table.row_count == TABLE_ROW_LIMIT + 3
+
+
+def _chart_table_documents() -> list[str]:
+    return sorted(p.stem for p in _CHART_TABLE_FIXTURES.glob("*.json"))
+
+
+def _render_doc(doc: str, chart_table: ChartTablePolicy = "Offer") -> str:
+    decoded = decode_node(doc)
+    assert decoded.value is not None, "decode failed"
+    return render_html(decoded.value, chart_table=chart_table)
+
+
+def _render_fixture(name: str, chart_table: ChartTablePolicy = "Offer") -> str:
+    return _render_doc((_CHART_TABLE_FIXTURES / f"{name}.json").read_text(encoding="utf-8"), chart_table)
+
+
+def test_chart_table_fixtures_are_whole() -> None:
+    names = _chart_table_documents()
+    assert len(names) >= 8
+    references = sorted(p.name[: -len(".reference.txt")] for p in _CHART_TABLE_FIXTURES.glob("*.reference.txt"))
+    assert references == names
+
+
+@pytest.mark.parametrize("name", _chart_table_documents())
+def test_chart_table_html_is_the_reference_server_renderers(name: str) -> None:
+    expected = (_CHART_TABLE_FIXTURES / f"{name}.reference.txt").read_text(encoding="utf-8")
+    assert _render_fixture(name) == expected
+
+
+_PRE_PHASE = sorted(p.name[: -len(".pre-phase.txt")] for p in _CHART_TABLE_FIXTURES.glob("*.pre-phase.txt"))
+
+
+@pytest.mark.parametrize("name", _PRE_PHASE)
+def test_chart_table_off_renders_the_pre_phase_bytes(name: str) -> None:
+    # ``<name>.pre-phase.txt`` is THIS renderer's output for the document on the
+    # tree before the phase (a lowered chart drawn inside two wrapping elements
+    # where the reference draws one: a pre-existing difference the policy leaves).
+    assert len(_PRE_PHASE) >= 7
+    expected = (_CHART_TABLE_FIXTURES / f"{name}.pre-phase.txt").read_text(encoding="utf-8")
+    assert _render_fixture(name, "Off") == expected
+
+
+def test_chart_table_cells_are_the_exact_readout() -> None:
+    stacked = _render_fixture("bar-stacked-currency")
+    assert "<td>£3,400.25</td>" in stacked
+    assert '<th scope="row">South &lt;&amp;&gt; &quot;quoted&quot; &apos;x&apos;</th>' in stacked
+    assert '<tr><th scope="row">B</th><td>withheld</td></tr></tbody>' in _render_fixture("bar-withheld-sorted")
+    assert '<th scope="row">2026-01-03</th><td></td>' in _render_fixture("line-temporal")
+    limited = _render_fixture("line-limit")
+    assert limited.count('<th scope="row">') == 1000
+    assert '<p class="fuaran-chart-table-limit">Rows 1–1000 of 1003</p>' in limited
+    assert "<script" not in limited
+
+
+def test_chart_with_no_rows_offers_no_table() -> None:
+    doc = (
+        '{"id":"e","kind":{"$type":"Chart","kind":"Bar",'
+        '"source":{"$type":"Static","value":[]},"xField":"q","yFields":["v"]}}'
+    )
+    assert "fuaran-chart-table" not in _render_doc(doc)
+
+
+# The accessibility contract's ``chartTable`` rules, each checked over every
+# document's disclosure; a rule the contract names that this suite has no check
+# for fails, so the contract and this tier cannot drift apart.
+
+Element = ElementTree.Element
+
+
+def _disclosure(html: str) -> Element:
+    start = html.index('<details class="fuaran-chart-table"')
+    stop = html.index("</details>", start) + len("</details>")
+    return ElementTree.fromstring(html[start:stop].replace("&apos;", "&#39;"))
+
+
+def _table(d: Element) -> Element | None:
+    return d.find("table")
+
+
+def _header(d: Element) -> list[Element]:
+    row = d.find("table/thead/tr")
+    return [] if row is None else list(row)
+
+
+def _body(d: Element) -> list[Element]:
+    return d.findall("table/tbody/tr")
+
+
+def _check_summary(_: str, d: Element) -> list[str]:
+    return [] if len(d) and d[0].tag == "summary" and d[0].text else ["the first child is not a summary with text"]
+
+
+def _check_referenced(html: str, d: Element) -> list[str]:
+    ident = d.get("id") or ""
+    if not ident:
+        return ["the disclosure carries no id"]
+    out = [] if html.count(f'id="{ident}"') == 1 else [f"the id {ident} is not unique"]
+    if f'<svg class="fuaran-drawing" role="img" aria-details="{ident}"' not in html:
+        out.append("the drawing does not name it")
+    return out
+
+
+def _check_one_table(_: str, d: Element) -> list[str]:
+    return [] if len(d.findall("table")) == 1 else ["not exactly one table"]
+
+
+def _check_caption(_: str, d: Element) -> list[str]:
+    t = _table(d)
+    ok = t is not None and len(t) and t[0].tag == "caption" and t[0].text
+    return [] if ok else ["the table does not open with a caption with text"]
+
+
+def _check_column_headers(_: str, d: Element) -> list[str]:
+    cells = _header(d)
+    ok = cells and all(c.tag == "th" and c.get("scope") == "col" and c.text for c in cells)
+    return [] if ok else ["the header row is not all th scope=col with text"]
+
+
+def _check_row_headers(_: str, d: Element) -> list[str]:
+    def good(r: Element) -> bool:
+        return len(r) > 0 and r[0].tag == "th" and r[0].get("scope") == "row" and all(c.tag == "td" for c in r[1:])
+
+    return [] if all(good(r) for r in _body(d)) else ["a body row does not lead with th scope=row then td cells"]
+
+
+def _check_rectangular(_: str, d: Element) -> list[str]:
+    width = len(_header(d))
+    return [] if all(len(r) == width for r in _body(d)) else ["a body row is not as wide as the header"]
+
+
+def _check_no_empty_body(_: str, d: Element) -> list[str]:
+    return [] if _body(d) else ["the body holds no row"]
+
+
+_CHART_TABLE_CHECKS: dict[str, Callable[[str, Element], list[str]]] = {
+    "disclosure-summary": _check_summary,
+    "referenced-from-chart": _check_referenced,
+    "one-table": _check_one_table,
+    "caption": _check_caption,
+    "column-headers": _check_column_headers,
+    "row-headers": _check_row_headers,
+    "rectangular": _check_rectangular,
+    "no-empty-body": _check_no_empty_body,
+}
+
+
+@pytest.mark.skipif(not corpus_available(), reason="the corpus's a11y-contract.json is not available")
+@pytest.mark.parametrize("name", _chart_table_documents())
+def test_a11y_contract_chart_table_rules_hold(name: str) -> None:
+    contract = json.loads((CORPUS_ROOT / "a11y-contract.json").read_text(encoding="utf-8"))["chartTable"]
+    rules = [r["id"] for r in contract["rules"]]
+    assert len(rules) >= 8
+    assert set(rules) <= set(_CHART_TABLE_CHECKS)
+    html = _render_fixture(name)
+    disclosure = _disclosure(html)
+    assert [f"{rule}: {f}" for rule in rules for f in _CHART_TABLE_CHECKS[rule](html, disclosure)] == []

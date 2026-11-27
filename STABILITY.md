@@ -15,6 +15,21 @@ corpus, not by this file.
 
 ## 0.13.0 (draft — the release act sets the version)
 
+### behavioural (server-rendered HTML) — a lowered chart offers its data table (Phase 2804)
+
+- `render_html` draws every chart this host lowers with a "View as table" disclosure after the drawing: a
+  native `<details class="fuaran-chart-table">` holding a real table (a `<caption>` from the chart's title,
+  one `<th scope="col">` per plotted field, each row led by its x value as `<th scope="row">`), the drawing's
+  `role="img"` root naming it in `aria-details`, the two in one `fuaran-chart-table-host` element. The bytes
+  are the reference server renderer's for the same document (`tests/fixtures/chart_table/`, produced by the
+  reference host). A chart with no rows, or one the cost caps refuse, offers none and renders as before.
+- `render_html(..., chart_table="Off")` (and `Renderer(..., chart_table="Off")`) renders every chart byte for
+  byte as before; the default is `"Offer"`. A caller comparing a page's full HTML against an older capture sees
+  the table, and a caller asserting a chart's values are absent from the page will now find them in it.
+- additive: `fuaran_ui.charts.table_model`, `ChartTable` and `TABLE_ROW_LIMIT` (1000; a longer table holds its
+  first 1000 rows and states the count), certified against the corpus's `chart-lowering/table-model/` goldens.
+  A chart naming no series offers no table here, because this host does not read series off the rows.
+
 ### behavioural (wire readers and validator callers) — a reported path spells an array element `[i]` (Phase 2381)
 
 - `validate_node` locates a finding with the WIRE_FORMAT §29.3 grammar: a node held in an array is

@@ -2,7 +2,7 @@
   "$manifest": "fuaran.host-capability/1",
   "host": "fuaran-py",
   "hostVersion": "0.12.0",
-  "corpusAuthority": "cc2436b5cb095925e771e7cbbb8b8309a587c37a",
+  "corpusAuthority": "d63c56dc28d867f7a91b4ae3e1fed9cdde3d95bc",
   "generator": "fuaran_ui.conformance.host_capability",
   "families": {
     "kinds": {

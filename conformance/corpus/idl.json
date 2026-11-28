@@ -5257,6 +5257,24 @@
     },
     {
       "annotations": {
+        "doc": "Host-only: the members this node's JSON carried that its shape does not declare, by path inside the node; never read, and written back at their paths on re-encode (§15.8)."
+      },
+      "name": "keptMembers",
+      "optionality": {
+        "$type": "hostOnly"
+      },
+      "type": {
+        "$type": "fn",
+        "hostSurface": {
+          "fsharp": "Fuaran.UI.HostPrelude.KeptMembers",
+          "placeholder": "Fuaran.UI.HostPrelude.KeptMembers.empty",
+          "typescript": "never"
+        },
+        "wire": "<closure>"
+      }
+    },
+    {
+      "annotations": {
         "doc": "Host-only animation token for this node; never emitted on the wire. Omitted means no animation."
       },
       "name": "motion",

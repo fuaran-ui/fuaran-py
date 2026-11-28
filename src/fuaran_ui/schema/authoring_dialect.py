@@ -200,7 +200,7 @@ GAPS: Mapping[str, Mapping[str, str]] = {
         "rowKey": "the erased row-key closure: emitted as <closure> unless row_key_field names the key",
         "staticRows": "authored through the Table record, which lowers to a DataGrid carrying staticRows",
     },
-    "node": {"extraAttributes": _HOST_ONLY, "motion": _HOST_ONLY},
+    "node": {"extraAttributes": _HOST_ONLY, "keptMembers": _HOST_ONLY, "motion": _HOST_ONLY},
     "case:Action.ReadFileBody": {"fileHandle": _HOST_ONLY},
     "case:Binding.Query": {"accessor": _HOST_ONLY},
     "case:Binding.Selection": {"accessor": _HOST_ONLY},

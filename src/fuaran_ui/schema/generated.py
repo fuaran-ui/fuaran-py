@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 #: SHA-256 of the exact ``idl.json`` bytes this module was generated from.
-IDL_SHA256 = "eaad6e14392daebcec074a5d63b312977a484f2711eb88c6bf3340d26d8dbc6f"
+IDL_SHA256 = "845dd130d6ae7cbcbea4126d4db697ebba4864f4467ab18feaa303a2362fd7a3"
 IDL_VERSION = 1
 
 
@@ -834,6 +834,7 @@ NODE_FIELDS: tuple[F, ...] = (
     F("accessibility", "optional", T_record_Accessibility),
     F("extraAttributes", "hostOnly", T_fn),
     F("fallback", "optional", T_node),
+    F("keptMembers", "hostOnly", T_fn),
     F("motion", "hostOnly", T_fn),
     F("state", "optional", T_record_StateBehaviour),
     F("style", "optional", T_record_SemanticStyle),

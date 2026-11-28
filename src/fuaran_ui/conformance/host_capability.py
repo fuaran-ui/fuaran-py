@@ -355,6 +355,9 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "dag": "covered",
     "merge-conformance": "covered",
     "sanitization": "covered",
+    "diff/keptMember": {
+        "pending": "the structural diff has no kept members to compare until this host keeps them (WIRE_FORMAT 15.8)",
+    },
     "diff/treeDiff": "covered",
     "laws/dataframeParity": "covered",
     "laws/canonicalFormLaws": {
@@ -384,6 +387,12 @@ CORPUS_FAMILIES: Mapping[str, str | Mapping[str, str]] = {
     "design-seam-round-trip": {"notApplicable": _NO_DESIGN_SEAM},
     "devtools-relay": {"notApplicable": "this host ships no devtools relay endpoint"},
     "lowers-to": {"notApplicable": "this host carries no bounded program core for actions to lower onto (§30)"},
+    "kept-member": {
+        "pending": (
+            "the codec drops an undeclared member on re-encode; keeping it (WIRE_FORMAT 15.8, the ruling of "
+            "2026-11-28) is this host's own adoption, not yet made"
+        ),
+    },
     "operability": {
         "pending": (
             "the codec round-trips and refuses the affordance member (WIRE_FORMAT 31.1, 31.2) and its suite runs the "
